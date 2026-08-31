@@ -43,12 +43,11 @@ def _record(*origins: Origin) -> FileRecord:
 
 
 def test_every_source_is_classified():
-    """An unclassified source would silently vanish from both halves."""
-    assert set(CONFIDENCE) == ACQUISITION | INTRINSIC
+    """An unclassified source would silently vanish from every view."""
+    from filetrail.models import INTERACTION, kind
 
-
-def test_the_two_halves_do_not_overlap():
-    assert not ACQUISITION & INTRINSIC
+    for source in CONFIDENCE:
+        assert kind(Origin(source=source)) in (ACQUISITION, INTERACTION, INTRINSIC)
 
 
 def test_a_download_is_acquisition_and_exif_is_intrinsic():

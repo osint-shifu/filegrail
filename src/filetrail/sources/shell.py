@@ -15,6 +15,7 @@ import re
 import shlex
 from pathlib import Path
 
+from ..models import FETCH_TOOLS as _FETCH_TOOLS
 from ..models import Origin
 from ..util import iso
 
@@ -23,25 +24,6 @@ HISTORY_FILES = [
     ".zsh_history",
     ".local/share/fish/fish_history",
 ]
-
-# Commands that plausibly create or fetch a file, worth reporting as an origin.
-_FETCH_TOOLS = {
-    "curl",
-    "wget",
-    "aria2c",
-    "yt-dlp",
-    "youtube-dl",
-    "git",
-    "scp",
-    "rsync",
-    "s3cmd",
-    "aws",
-    "gh",
-    "gallery-dl",
-    "wpull",
-    "httrack",
-    "monolith",
-}
 
 _BASH_TIMESTAMP = re.compile(r"^#(\d{9,11})$")
 _ZSH_ENTRY = re.compile(r"^: (\d{9,11}):\d+;(.*)$", re.DOTALL)

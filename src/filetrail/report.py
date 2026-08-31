@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 
 from .identify import Identifier, extract
-from .models import ACQUISITION, SOURCE_LABELS, FileRecord, Origin
+from .models import ACQUISITION, SOURCE_LABELS, FileRecord, Origin, kind
 from .reconcile import CONFLICT, PARTIAL, Verdict, reconcile
 from .theme import (
     ARROW,
@@ -231,10 +231,13 @@ def _entry(
     elif verdict.state in (PARTIAL, CONFLICT):
         # A verdict that refers to evidence the report hid is not a verdict, so
         # a disagreement brings every acquisition record on screen with it.
-        acquisition = [o for o in record.origins if o.source in ACQUISITION and o.url]
-        claims = [*acquisition, record.intrinsic]
+        acquisition = [o for o in record.origins if kind(o) == ACQUISITION and o.url]
+        claims = [*acquisition, record.intrinsic, record.interaction]
     else:
-        claims = [record.acquisition, record.intrinsic]
+        # Strongest first, and interaction last: it is the weakest of the three
+        # and putting it above intrinsic would bury a camera's GPS under the
+        # fact that something opened the file.
+        claims = [record.acquisition, record.intrinsic, record.interaction]
 
     for index, origin in enumerate(claim for claim in claims if claim is not None):
         if index:

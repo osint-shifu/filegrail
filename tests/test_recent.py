@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from filetrail.models import ACQUISITION, CONFIDENCE
+from filetrail.models import CONFIDENCE, INTERACTION, Origin, kind
 from filetrail.sources.recent import collect_recent_files
 
 XBEL = """<?xml version="1.0" encoding="UTF-8"?>
@@ -64,5 +64,7 @@ def test_it_ranks_below_shell_history():
     assert CONFIDENCE["recent-documents"] < CONFIDENCE["shell-history"]
 
 
-def test_it_is_classified_as_acquisition():
-    assert "recent-documents" in ACQUISITION
+def test_it_is_interaction_and_not_acquisition():
+    """An application opening a file did not put it there, and a report that
+    files it under acquisition says it did."""
+    assert kind(Origin(source="recent-documents", tool="GIMP")) == INTERACTION

@@ -37,25 +37,67 @@ SOURCE_LABELS = {
     "filesystem": "filesystem",
 }
 
-#: How the file arrived on this machine. Another system wrote these down at the
-#: time, or a command did.
-ACQUISITION = frozenset(
+#: Commands that plausibly fetch a file. Kept here rather than in the shell
+#: reader because deciding what kind of claim an origin makes is a question
+#: about sources, and the reader imports this module rather than the reverse.
+FETCH_TOOLS = frozenset(
     {
-        "browser-download",
-        "windows-zone-identifier",
-        "macos-wherefroms",
-        "xdg-xattr",
-        "archive-member",
-        "shell-history",
-        "recent-documents",
-        "filesystem",
+        "curl",
+        "wget",
+        "aria2c",
+        "yt-dlp",
+        "youtube-dl",
+        "git",
+        "scp",
+        "rsync",
+        "s3cmd",
+        "aws",
+        "gh",
+        "gallery-dl",
+        "wpull",
+        "httrack",
+        "monolith",
     }
 )
 
-#: What the file says about its own earlier life - who made it, with what, when
-#: and where. It travelled with the bytes and says nothing about how they got
-#: here.
-INTRINSIC = frozenset({"c2pa", "device-metadata", "document-metadata"})
+#: How the file reached this machine. Another system wrote it down at the time.
+ACQUISITION = "acquisition"
+
+#: Something on this machine handled the file afterwards. It proves contact and
+#: says nothing about where the bytes came from - an application opening a file
+#: did not put it there, and presenting the two as one kind of claim invites
+#: exactly that misreading.
+INTERACTION = "interaction"
+
+#: What the file records about its own earlier life: who made it, with what,
+#: when and where. It travelled with the bytes.
+INTRINSIC = "intrinsic"
+
+_KINDS = {
+    "browser-download": ACQUISITION,
+    "windows-zone-identifier": ACQUISITION,
+    "macos-wherefroms": ACQUISITION,
+    "xdg-xattr": ACQUISITION,
+    "archive-member": ACQUISITION,
+    "filesystem": ACQUISITION,
+    "recent-documents": INTERACTION,
+    "c2pa": INTRINSIC,
+    "device-metadata": INTRINSIC,
+    "document-metadata": INTRINSIC,
+}
+
+
+def kind(origin: Origin) -> str:
+    """Which of the three questions this claim answers.
+
+    Shell history is the one source that answers either, and which one is
+    already in the record: `curl -o` fetched the bytes, `cat` merely touched
+    them. Deciding per origin rather than per source keeps a `cat` from being
+    reported as though it explained where a file came from.
+    """
+    if origin.source == "shell-history":
+        return ACQUISITION if (origin.tool or "") in FETCH_TOOLS else INTERACTION
+    return _KINDS.get(origin.source, INTERACTION)
 
 
 @dataclass(slots=True)
@@ -134,6 +176,11 @@ class FileRecord:
         return self._strongest(ACQUISITION)
 
     @property
+    def interaction(self) -> Origin | None:
+        """The strongest claim that something here handled the file."""
+        return self._strongest(INTERACTION)
+
+    @property
     def intrinsic(self) -> Origin | None:
         """The strongest claim the file makes about its own earlier life.
 
@@ -143,8 +190,8 @@ class FileRecord:
         """
         return self._strongest(INTRINSIC)
 
-    def _strongest(self, kinds: frozenset[str]) -> Origin | None:
-        candidates = [origin for origin in self.origins if origin.source in kinds]
+    def _strongest(self, wanted: str) -> Origin | None:
+        candidates = [origin for origin in self.origins if kind(origin) == wanted]
         if not candidates:
             return None
         return max(candidates, key=lambda o: (o.confidence, o.at or ""))
