@@ -61,7 +61,9 @@ def test_file_without_any_origin(tmp_path: Path):
 def test_hashing_is_opt_in(tmp_path: Path):
     case = tmp_path / "case"
     case.mkdir()
-    (case / "a.txt").write_text("hello repro\n", encoding="utf-8")
+    # Bytes, not text: `write_text` translates the newline to CRLF on Windows,
+    # and a file this test hashes has to be the same file on every platform.
+    (case / "a.txt").write_bytes(b"hello repro\n")
 
     assert scan(case, home=tmp_path, use_shell_history=False)[0].sha256 is None
     hashed = scan(case, home=tmp_path, use_shell_history=False, hash_files=True)[0]
