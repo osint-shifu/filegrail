@@ -7,6 +7,18 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- Reconciliation between acquisition records. Where two independent sources say
+  how a file arrived, the report now says whether they agree, agree only about
+  the host, or contradict each other, and prints what each one claims. It also
+  flags a file whose own metadata reports a creation time *after* it arrived,
+  and a download record that was tied to the file by name rather than by path.
+  A disagreement brings every acquisition record on screen without `--verbose`,
+  because a verdict that refers to evidence the report hid is not a verdict. A
+  single uncorroborated record - the ordinary case - is left unannotated, since
+  a label on every entry says nothing. `--json` carries the verdict too.
+
 ### Fixed
 
 - A downloaded file no longer loses everything it recorded about itself. Claims

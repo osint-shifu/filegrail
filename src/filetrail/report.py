@@ -15,12 +15,14 @@ import json
 from pathlib import Path
 
 from .identify import Identifier, extract
-from .models import FileRecord, Origin
+from .models import ACQUISITION, SOURCE_LABELS, FileRecord, Origin
+from .reconcile import CONFLICT, PARTIAL, Verdict, reconcile
 from .theme import (
     ARROW,
     BRANCH,
     BULLET,
     EVIDENCE_HEADINGS,
+    FLAG,
     LAST,
     MIDDOT,
     RAIL,
@@ -30,20 +32,6 @@ from .theme import (
 
 #: Sources describing what a file says about itself, rather than where it came from.
 SELF_REPORTED = frozenset({"document-metadata", "device-metadata", "c2pa"})
-
-#: How each source reads in a summary line.
-SOURCE_LABELS = {
-    "browser-download": "browser download",
-    "windows-zone-identifier": "Windows zone",
-    "macos-wherefroms": "macOS where-from",
-    "xdg-xattr": "XDG attribute",
-    "archive-member": "archive member",
-    "c2pa": "content credentials",
-    "device-metadata": "device metadata",
-    "document-metadata": "document metadata",
-    "shell-history": "shell history",
-    "filesystem": "filesystem",
-}
 
 #: Width of the label column inside an entry, so values line up across labels.
 _LABEL = 10
@@ -235,13 +223,39 @@ def _entry(
     # get here" and "what does it say about its earlier life" are different
     # questions; letting a download record outrank a camera's EXIF meant a
     # geotagged photograph that had been downloaded reported no GPS at all.
-    claims = record.origins if verbose else [record.acquisition, record.intrinsic]
+    verdict = reconcile(record)
+
+    if verbose:
+        claims = list(record.origins)
+    elif verdict.state in (PARTIAL, CONFLICT):
+        # A verdict that refers to evidence the report hid is not a verdict, so
+        # a disagreement brings every acquisition record on screen with it.
+        acquisition = [o for o in record.origins if o.source in ACQUISITION and o.url]
+        claims = [*acquisition, record.intrinsic]
+    else:
+        claims = [record.acquisition, record.intrinsic]
 
     for index, origin in enumerate(claim for claim in claims if claim is not None):
         if index:
             lines.append(f"  {_mark(theme, RAIL)}".rstrip())
         lines.extend(_origin(theme, origin, record, brief=brief))
+
+    if verdict.notable:
+        lines.extend(_verdict(theme, verdict))
     lines.append("")
+    return lines
+
+
+def _verdict(theme: Theme, verdict: Verdict) -> list[str]:
+    """The reconciliation, in the gutter, so it reads as part of the entry."""
+    colour = "warning" if verdict.state in (PARTIAL, CONFLICT) else "recorded"
+    indent = _gutter(theme)
+    label = theme.paint(verdict.state, colour)
+
+    lines = [f"  {_mark(theme, FLAG, colour)} {label}"]
+    for reason in verdict.reasons:
+        for part in theme.wrap(reason, theme.width - indent - 2):
+            lines.append(f"  {_mark(theme, RAIL)}   {theme.dim(part)}")
     return lines
 
 
@@ -431,10 +445,19 @@ def explain_empty_result(stats: dict[str, int] | None, theme: Theme | None = Non
     ]
 
 
+def _file_json(record: FileRecord) -> dict[str, object]:
+    """One file, with the reconciliation attached when it says anything."""
+    data = record.to_dict()
+    verdict = reconcile(record)
+    if verdict.notable:
+        data["reconciliation"] = verdict.to_dict()
+    return data
+
+
 def render_json(records: list[FileRecord], root: Path, *, identify: bool = False) -> str:
     payload: dict[str, object] = {
         "root": str(root),
-        "files": [record.to_dict() for record in records],
+        "files": [_file_json(record) for record in records],
         "summary": {
             "total": len(records),
             "with_origin": sum(1 for record in records if record.origins),

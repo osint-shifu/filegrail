@@ -18,6 +18,22 @@ CONFIDENCE = {
     "filesystem": 10,
 }
 
+#: How each source reads in prose. Data about sources, so it lives beside the
+#: confidence table rather than in the renderer - reconciliation needs to name a
+#: source too, and importing the renderer to do it would be a cycle.
+SOURCE_LABELS = {
+    "browser-download": "browser download",
+    "windows-zone-identifier": "Windows zone",
+    "macos-wherefroms": "macOS where-from",
+    "xdg-xattr": "XDG attribute",
+    "archive-member": "archive member",
+    "c2pa": "content credentials",
+    "device-metadata": "device metadata",
+    "document-metadata": "document metadata",
+    "shell-history": "shell history",
+    "filesystem": "filesystem",
+}
+
 #: How the file arrived on this machine. Another system wrote these down at the
 #: time, or a command did.
 ACQUISITION = frozenset(

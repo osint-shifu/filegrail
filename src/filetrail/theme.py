@@ -78,6 +78,7 @@ ARROW = "←"
 RAIL = "│"
 BRANCH = "├"
 LAST = "└"
+FLAG = "!"
 RULE = "─"
 MIDDOT = "·"
 ELLIPSIS = "…"
@@ -90,6 +91,7 @@ _ASCII = {
     RAIL: "|",
     BRANCH: "+",
     LAST: "\\",
+    FLAG: "!",
     RULE: "-",
     # Not "|": the rail already claims that glyph, and a separator that looks
     # like a gutter destroys the one alignment cue the ASCII layout has.
