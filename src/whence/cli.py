@@ -56,6 +56,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not inherit origins from archives the files were extracted from.",
     )
     parser.add_argument(
+        "--redact",
+        action="store_true",
+        help="Remove credentials from URLs and commands before printing.",
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         default=25,
@@ -91,6 +96,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.unknown_only:
         records = [record for record in records if not record.origins]
+
+    if args.redact:
+        records = [record.redacted() for record in records]
 
     base = root if root.is_dir() else root.parent
     if args.json:

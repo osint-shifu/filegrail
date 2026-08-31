@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
 # How much a source is trusted when several disagree. Higher wins.
@@ -10,6 +10,7 @@ CONFIDENCE = {
     "macos-wherefroms": 85,
     "xdg-xattr": 80,
     "archive-member": 70,
+    "document-metadata": 50,
     "shell-history": 40,
     "filesystem": 10,
 }
@@ -34,6 +35,17 @@ class Origin:
     def confidence(self) -> int:
         return CONFIDENCE.get(self.source, 0)
 
+    def redacted(self) -> Origin:
+        """Return a copy with credentials removed from every free-text field."""
+        from .redact import redact_text, redact_url
+
+        return replace(
+            self,
+            url=redact_url(redact_text(self.url)) if self.url else None,
+            referrer=redact_url(redact_text(self.referrer)) if self.referrer else None,
+            command=redact_text(self.command) if self.command else None,
+        )
+
     def to_dict(self) -> dict[str, Any]:
         data = {k: v for k, v in asdict(self).items() if v is not None}
         data["confidence"] = self.confidence
@@ -56,6 +68,9 @@ class FileRecord:
         if not self.origins:
             return None
         return max(self.origins, key=lambda o: (o.confidence, o.at or ""))
+
+    def redacted(self) -> FileRecord:
+        return replace(self, origins=[origin.redacted() for origin in self.origins])
 
     def to_dict(self) -> dict[str, Any]:
         return {

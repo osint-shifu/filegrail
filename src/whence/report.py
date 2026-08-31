@@ -40,7 +40,10 @@ def render_text(
         for origin in origins:
             if origin is None:
                 continue
-            target = origin.url or origin.command or origin.tool or "(no detail)"
+            if origin.source == "document-metadata":
+                target = f"made by {origin.tool}" if origin.tool else "self-reported metadata"
+            else:
+                target = origin.url or origin.command or origin.tool or "(no detail)"
             stamp = origin.at or record.btime or record.mtime
             lines.append(f"{_ARROW}{_shorten(target, 96)}")
             detail = f"     {origin.source}"

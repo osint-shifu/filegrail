@@ -14,6 +14,7 @@ from .sources import (
     inherited_origin,
     is_archive,
     list_members,
+    read_embedded_metadata,
     read_file_attributes,
 )
 from .util import birth_time, iso, sha256_file
@@ -110,6 +111,9 @@ def scan(
                 record.origins.append(_matched_by_name(origin))
 
         record.origins.extend(read_file_attributes(path))
+        embedded = read_embedded_metadata(path)
+        if embedded is not None:
+            record.origins.append(embedded)
         record.origins.extend(history.get(path.name, []))
         records.append(record)
 

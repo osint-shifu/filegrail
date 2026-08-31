@@ -23,10 +23,15 @@ report.csv
   <- curl -o report.csv https://api.example.org/export?range=90d
      shell-history / curl  2026-08-24T19:06:40Z  confidence 40
 
+annual-accounts.pdf
+  <- made by Adobe PDF Library 15.0 (created in Adobe InDesign CC 13.1)
+     document-metadata  2018-05-11T14:37:20Z  confidence 50
+     note      author M. Wolf
+
 No recorded origin (1):
   setup_v3_final.exe    created 2026-08-24T19:31:08Z
 
-3 of 4 files have a recorded origin.
+4 of 5 files have a recorded origin.
 ```
 
 No configuration. No wrapper commands. No prior setup. It works the first time
@@ -105,6 +110,7 @@ whence . --timeline          # chronological, one line per event
 whence . --verbose           # every origin claim, not just the strongest
 whence . --json              # machine-readable, for piping onward
 whence . --hash              # add SHA-256 for each file
+whence . --redact            # strip credentials from URLs and commands
 whence . --limit 100         # show more unexplained files (default: 25)
 whence . --no-shell-history  # skip shell correlation
 whence . --no-archives       # do not inherit origins from archives
@@ -122,6 +128,7 @@ highest wins; `--verbose` shows them all.
 | macOS `kMDItemWhereFroms` | URL and referrer | 85 | Written by Safari and Chrome. Good. |
 | Linux `user.xdg.origin.url` | URL and referrer | 80 | Written by KDE tools and `wget --xattr`, but **not** by Firefox ([Bugzilla 665531](https://bugzilla.mozilla.org/show_bug.cgi?id=665531)). On a sample of 107 files in a real Linux `Downloads` folder, **zero** carried it. A bonus, not a source. |
 | Archive membership | the origin of the archive a file came out of | 70 | Members matched on name and uncompressed size, so an unpacked download does not lose its provenance. |
+| Embedded metadata | the software that produced the file, its author, its creation date | 50 | Read from PDF `Info` dictionaries, OOXML `docProps` and JPEG EXIF. Says nothing about a URL, so it never competes with a download record — it fills the gap underneath one, and it survives copying, renaming and the expiry of every browser history on the machine. |
 | Shell history | the command that mentions the file | 40 | Never overrides a browser or OS record: a command naming a file proves it touched the file, not that it produced it. Timestamps only if the shell stored them (`HISTTIMEFORMAT`, `EXTENDED_HISTORY`). |
 | Filesystem | creation and modification time | 10 | Creation time via `statx(2)` on Linux, `st_birthtime` elsewhere. Absent on some filesystems. |
 
@@ -163,9 +170,21 @@ you clear history rather than after.
 
 ## Privacy
 
-`whence` runs entirely locally and makes no network requests, ever. It reads
-browser and shell history, so its output can contain URLs you visited and
-commands you ran. Review before sharing it.
+`whence` runs entirely locally and makes no network requests, ever.
+
+Its output is more sensitive than the files it describes: a URL can carry an API
+key or a session token, and a recorded command can carry a password in an
+argument. Before pasting a report into an issue or handing the JSON to anyone:
+
+```bash
+whence . --redact --json > report.json
+```
+
+`--redact` removes credentials from URLs, referrers and commands, replacing each
+with a short non-reversible fingerprint so two occurrences of the same secret
+stay visibly linked without the secret being recoverable. It is biased towards
+precision — it will not blank out an ordinary command — so read the output
+before sharing it rather than trusting the flag blindly.
 
 ## Status
 
