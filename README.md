@@ -159,8 +159,13 @@ filetrail --help                # every flag
 
 ## Sources
 
-Confidence reflects how far a source is trusted when several disagree. The
-highest wins; `--verbose` shows them all.
+Sources answer one of two questions, and the report never ranks one against the
+other. **Acquisition** sources say how the file reached this machine; **intrinsic**
+sources say what it records about its own earlier life. A downloaded photograph
+reports its URL *and* its camera, its capture time and its GPS.
+
+Confidence ranks sources within each half, when several of the same kind
+disagree. `--verbose` shows every claim rather than the strongest of each.
 
 | Source | What it gives | Conf. | Coverage in practice |
 | --- | --- | :-: | --- |

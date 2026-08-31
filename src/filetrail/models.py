@@ -18,6 +18,25 @@ CONFIDENCE = {
     "filesystem": 10,
 }
 
+#: How the file arrived on this machine. Another system wrote these down at the
+#: time, or a command did.
+ACQUISITION = frozenset(
+    {
+        "browser-download",
+        "windows-zone-identifier",
+        "macos-wherefroms",
+        "xdg-xattr",
+        "archive-member",
+        "shell-history",
+        "filesystem",
+    }
+)
+
+#: What the file says about its own earlier life - who made it, with what, when
+#: and where. It travelled with the bytes and says nothing about how they got
+#: here.
+INTRINSIC = frozenset({"c2pa", "device-metadata", "document-metadata"})
+
 
 @dataclass(slots=True)
 class Origin:
@@ -80,9 +99,35 @@ class FileRecord:
 
     @property
     def best(self) -> Origin | None:
+        """The single strongest claim, whatever kind it is.
+
+        Used for grouping and counting, where one file needs one answer. It is
+        not what the report prints: see `acquisition` and `intrinsic`.
+        """
         if not self.origins:
             return None
         return max(self.origins, key=lambda o: (o.confidence, o.at or ""))
+
+    @property
+    def acquisition(self) -> Origin | None:
+        """The strongest claim about how the file got here."""
+        return self._strongest(ACQUISITION)
+
+    @property
+    def intrinsic(self) -> Origin | None:
+        """The strongest claim the file makes about its own earlier life.
+
+        Kept apart from `acquisition` because they answer different questions.
+        Ranking them against each other lets a download record delete a camera's
+        GPS fix, which is the more valuable of the two far more often than not.
+        """
+        return self._strongest(INTRINSIC)
+
+    def _strongest(self, kinds: frozenset[str]) -> Origin | None:
+        candidates = [origin for origin in self.origins if origin.source in kinds]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda o: (o.confidence, o.at or ""))
 
     def redacted(self) -> FileRecord:
         return replace(self, origins=[origin.redacted() for origin in self.origins])

@@ -17,6 +17,20 @@ actually emits — this is a description of the implementation, not an aspiratio
   as on a terminal.
 - **Terminal**: 16-colour minimum, 256 preferred, TrueColor used when offered.
 
+### Two questions, never ranked against each other
+
+A file can answer two different questions, and the report keeps them apart:
+
+| | asks | answered by |
+|---|---|---|
+| **Acquisition** | how did this get onto this machine | browser downloads, OS origin attributes, archive membership, shell history, filesystem times |
+| **Intrinsic** | what does it say about its own earlier life | EXIF, document metadata, C2PA |
+
+Both are printed, acquisition first. Ranking them against each other by
+confidence looks reasonable and is wrong: a download record scores higher than a
+camera's EXIF, so a geotagged photograph that had been downloaded reported its
+URL and no GPS at all. The stronger claim was deleting the more valuable one.
+
 ### The one idea
 
 **Colour encodes how the tool knows, never what it found.** A green line was

@@ -231,9 +231,16 @@ def _entry(
         *(f"{' ' * indent}{theme.bold(part)}" for part in wrapped[1:]),
     ]
 
-    for origin in record.origins if verbose else [record.best]:
-        if origin is not None:
-            lines.extend(_origin(theme, origin, record, brief=brief))
+    # Both halves, always, and never ranked against each other. "How did this
+    # get here" and "what does it say about its earlier life" are different
+    # questions; letting a download record outrank a camera's EXIF meant a
+    # geotagged photograph that had been downloaded reported no GPS at all.
+    claims = record.origins if verbose else [record.acquisition, record.intrinsic]
+
+    for index, origin in enumerate(claim for claim in claims if claim is not None):
+        if index:
+            lines.append(f"  {_mark(theme, RAIL)}".rstrip())
+        lines.extend(_origin(theme, origin, record, brief=brief))
     lines.append("")
     return lines
 

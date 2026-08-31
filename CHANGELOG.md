@@ -7,6 +7,16 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Fixed
+
+- A downloaded file no longer loses everything it recorded about itself. Claims
+  were ranked against each other by confidence and only the winner printed, so a
+  browser download record (90) silently deleted a camera's EXIF (55) - and with
+  it the capture time, the body serial number and the GPS fix, which is usually
+  the most valuable thing in the file. Acquisition and intrinsic provenance
+  answer different questions and are now both printed, acquisition first.
+  `--verbose` still shows every claim.
+
 ### Changed
 
 - Nothing in the report is truncated any more. A value too long for the line
