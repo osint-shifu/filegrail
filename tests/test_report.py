@@ -15,13 +15,22 @@ def _record(name: str, origin: Origin | None = None) -> FileRecord:
     return record
 
 
+def _listed(output: str) -> int:
+    """How many unexplained files the report actually named."""
+    return sum(
+        1
+        for line in output.splitlines()
+        if line.strip().startswith("f") and line.strip().split()[0].endswith(".txt")
+    )
+
+
 def test_unknown_list_is_capped(tmp_path: Path):
     records = [_record(f"f{index}.txt") for index in range(40)]
 
     output = render_text(records, Path("/case"), limit=5, theme=PLAIN)
 
     assert "... and 35 more" in output
-    assert sum(1 for line in output.splitlines() if line.startswith("  f")) == 5
+    assert _listed(output) == 5
 
 
 def test_no_cap_message_when_everything_fits():
@@ -70,7 +79,7 @@ def test_limit_zero_lists_everything():
     output = render_text(records, Path("/case"), limit=0, theme=PLAIN)
 
     assert "more (--limit 0" not in output
-    assert sum(1 for line in output.splitlines() if line.startswith("  f")) == 40
+    assert _listed(output) == 40
 
 
 def test_document_metadata_without_a_tool_reports_the_date_it_found():

@@ -9,6 +9,7 @@ description = "Reconstruct where the files in a directory came from, after the f
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
+authors = [{ name = "osint-shifu" }]
 keywords = [
   "provenance",
   "metadata",
@@ -45,16 +46,20 @@ dependencies = []
 dev = ["pytest>=8.2,<9", "ruff>=0.6,<1"]
 
 [project.urls]
-Homepage = "https://github.com/OWNER/filetrail"
-Repository = "https://github.com/OWNER/filetrail"
-Issues = "https://github.com/OWNER/filetrail/issues"
-Changelog = "https://github.com/OWNER/filetrail/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/osint-shifu/filetrail"
+Repository = "https://github.com/osint-shifu/filetrail"
+Issues = "https://github.com/osint-shifu/filetrail/issues"
+Changelog = "https://github.com/osint-shifu/filetrail/blob/master/CHANGELOG.md"
 
 [project.scripts]
 filetrail = "filetrail.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/filetrail"]
+
+# The IANA TLD list is data, not code, and hatchling will not guess that.
+[tool.hatch.build.targets.wheel.force-include]
+"src/filetrail/data" = "filetrail/data"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

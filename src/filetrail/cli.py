@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .filters import UnknownType, describe, selection
 from .report import render_json, render_text, render_timeline
 from .scan import scan
 from .theme import detect
@@ -37,6 +38,34 @@ def build_parser() -> argparse.ArgumentParser:
         "--verbose",
         action="store_true",
         help="Show every origin claim, not only the highest-confidence one.",
+    )
+    parser.add_argument(
+        "--identify",
+        action="store_true",
+        help="List the emails, domains, URLs, addresses, hashes and coordinates "
+        "found in the metadata that was read.",
+    )
+    parser.add_argument(
+        "--type",
+        dest="families",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Only these kinds of file: image, video, audio, document, archive, text. "
+        "Repeatable, and accepts a comma-separated list.",
+    )
+    parser.add_argument(
+        "--ext",
+        dest="extensions",
+        action="append",
+        default=[],
+        metavar="LIST",
+        help="Only these extensions, e.g. --ext jpg,pdf. The leading dot is optional.",
+    )
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Print every metadata field a reader decoded, not just the summary.",
     )
     parser.add_argument(
         "--no-recurse", action="store_true", help="Do not descend into subdirectories."
@@ -90,16 +119,45 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="List only files with no recorded origin.",
     )
+    parser.add_argument(
+        "--about",
+        action="store_true",
+        help="Print what this is, who wrote it, and how to use it.",
+    )
+    parser.add_argument(
+        "--menu",
+        action="store_true",
+        help="Choose what to run from a list instead of remembering flags.",
+    )
     parser.add_argument("--version", action="version", version=f"filetrail {__version__}")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    given = sys.argv[1:] if argv is None else argv
     args = build_parser().parse_args(argv)
+
+    # A bare run introduces the tool rather than scanning the current directory.
+    # Starting an unasked-for scan of wherever the shell happens to be is a
+    # surprise, and in a home directory an expensive one.
+    if args.about or not given:
+        from .about import render
+
+        print(render(detect(colour=args.colour)))
+        return 0
+
+    if args.menu:
+        return _menu(args.path)
 
     root = args.path.resolve()
     if not root.exists():
         print(f"filetrail: no such file or directory: {args.path}", file=sys.stderr)
+        return 2
+
+    try:
+        suffixes = selection(args.families, args.extensions)
+    except UnknownType as unknown:
+        print(f"filetrail: {unknown}", file=sys.stderr)
         return 2
 
     stats: dict[str, int] = {}
@@ -109,6 +167,7 @@ def main(argv: list[str] | None = None) -> int:
         hash_files=args.hash_files,
         use_shell_history=not args.no_shell_history,
         follow_archives=not args.no_archives,
+        suffixes=suffixes,
         stats=stats,
     )
 
@@ -122,7 +181,7 @@ def main(argv: list[str] | None = None) -> int:
     theme = detect(colour=args.colour)
 
     if args.json:
-        print(render_json(records, base))
+        print(render_json(records, base, identify=args.identify))
     elif args.timeline:
         print(render_timeline(records, base, theme=theme))
     else:
@@ -131,13 +190,33 @@ def main(argv: list[str] | None = None) -> int:
                 records,
                 base,
                 verbose=args.verbose,
+                full=args.full,
                 limit=args.limit,
                 stats=stats,
                 theme=theme,
+                filtered=describe(args.families, args.extensions),
+                identify=args.identify,
             )
         )
 
     return 0
+
+
+def _menu(start: Path) -> int:
+    """Hand over to the interactive front end, if there is a terminal for it."""
+    from . import menu
+
+    if not menu.available():
+        print(
+            "filetrail: --menu needs a terminal; it cannot be piped or redirected.",
+            file=sys.stderr,
+        )
+        return 2
+    if not start.exists():
+        print(f"filetrail: no such file or directory: {start}", file=sys.stderr)
+        return 2
+
+    return menu.run(start, execute=main)
 
 
 if __name__ == "__main__":

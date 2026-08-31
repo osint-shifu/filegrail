@@ -44,7 +44,7 @@ _PDF_MAX_INFLATED = 4 * 1024 * 1024
 #: hex strings, ``/Producer<FEFF004C0069...>``, which is what LibreOffice and
 #: several other writers actually emit. Both forms have to be read.
 _PDF_ENTRY = re.compile(
-    rb"/(Producer|Creator|Author|CreationDate|ModDate)\s*"
+    rb"/(Producer|Creator|Author|Title|Subject|Keywords|CreationDate|ModDate|Trapped)\s*"
     rb"(?:\((?P<literal>(?:\\.|[^\\)])*)\)|<(?P<hex>[0-9A-Fa-f\s]*)>)"
 )
 
@@ -64,10 +64,15 @@ def read_ooxml(path: Path) -> Origin | None:
     return _read_ooxml(path)
 
 
-def _origin(tool: str | None, at: str | None, note: str | None) -> Origin | None:
+def _origin(
+    tool: str | None,
+    at: str | None,
+    note: str | None,
+    fields: dict[str, str] | None = None,
+) -> Origin | None:
     if not tool and not at and not note:
         return None
-    return Origin(source="document-metadata", tool=tool, at=at, note=note)
+    return Origin(source="document-metadata", tool=tool, at=at, note=note, fields=fields or {})
 
 
 def _read_pdf(path: Path) -> Origin | None:
@@ -93,7 +98,12 @@ def _read_pdf(path: Path) -> Origin | None:
         tool = f"{found['Producer']} (created in {found['Creator']})"
 
     notes = [f"author {found['Author']}"] if found.get("Author") else []
-    return _origin(tool, _parse_pdf_date(found.get("CreationDate")), "; ".join(notes) or None)
+    return _origin(
+        tool,
+        _parse_pdf_date(found.get("CreationDate")),
+        "; ".join(notes) or None,
+        found,
+    )
 
 
 def _inflated_streams(data: bytes) -> bytes:
@@ -169,6 +179,8 @@ def _read_ooxml(path: Path) -> Origin | None:
         core = _parse_xml(archive, names, "docProps/core.xml")
         app = _parse_xml(archive, names, "docProps/app.xml")
 
+    fields = _ooxml_properties(core, app)
+
     author = _text(core, f"{{{_DC}}}creator")
     last_editor = _text(core, f"{{{_COREPROPS}}}lastModifiedBy")
     created = _text(core, f"{{{_DCTERMS}}}created")
@@ -186,7 +198,29 @@ def _read_ooxml(path: Path) -> Origin | None:
     if company:
         notes.append(f"company {company}")
 
-    return _origin(tool, _normalise_timestamp(created), "; ".join(notes) or None)
+    return _origin(tool, _normalise_timestamp(created), "; ".join(notes) or None, fields)
+
+
+def _ooxml_properties(
+    core: ElementTree.Element | None, app: ElementTree.Element | None
+) -> dict[str, str]:
+    """Every property either docProps part declares.
+
+    Taken wholesale rather than by a list of interesting names. `Revision` and
+    `TotalTime` are the sort of thing that turns out to matter - how many times a
+    document was saved, and how long it was open - and no fixed list anticipates
+    which of them an investigation will want.
+    """
+    found: dict[str, str] = {}
+    for element in (core, app):
+        if element is None:
+            continue
+        for child in element:
+            name = child.tag.rsplit("}", 1)[-1]
+            value = (child.text or "").strip()
+            if value and name not in found:
+                found[name] = value
+    return found
 
 
 def _parse_xml(

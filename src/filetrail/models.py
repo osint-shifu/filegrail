@@ -35,6 +35,11 @@ class Origin:
     sha256: str | None = None
     note: str | None = None
 
+    #: Everything the reader decoded, named rather than numbered, beyond the
+    #: handful of fields the report summarises. An investigation cannot know in
+    #: advance which one matters, so nothing decoded is thrown away.
+    fields: dict[str, str] = field(default_factory=dict)
+
     @property
     def confidence(self) -> int:
         return CONFIDENCE.get(self.source, 0)
@@ -43,15 +48,21 @@ class Origin:
         """Return a copy with credentials removed from every free-text field."""
         from .redact import redact_text, redact_url
 
+        def clean(value: str) -> str:
+            # A tag like UserComment is free text: it can hold a URL, a command
+            # or a bare token, so it goes through both sweeps.
+            return redact_url(redact_text(value))
+
         return replace(
             self,
-            url=redact_url(redact_text(self.url)) if self.url else None,
-            referrer=redact_url(redact_text(self.referrer)) if self.referrer else None,
+            url=clean(self.url) if self.url else None,
+            referrer=clean(self.referrer) if self.referrer else None,
             command=redact_text(self.command) if self.command else None,
+            fields={name: clean(value) for name, value in self.fields.items()},
         )
 
     def to_dict(self) -> dict[str, Any]:
-        data = {k: v for k, v in asdict(self).items() if v is not None}
+        data = {k: v for k, v in asdict(self).items() if v}
         data["confidence"] = self.confidence
         return data
 

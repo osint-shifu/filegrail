@@ -42,8 +42,67 @@ GPS_LONGITUDE = 0x0004
 GPS_ALTITUDE = 0x0006
 GPS_DATESTAMP = 0x001D
 
+#: Named so a report can print them. Everything decoded is kept; these are the
+#: ones an investigation asks for by name, and several are worth more than the
+#: camera model: a body serial ties an image to one physical device, and the GPS
+#: timestamp is independent of the camera clock, so a disagreement between them
+#: is itself a finding.
+TAG_NAMES = {
+    0x010E: "ImageDescription",
+    0x010F: "Make",
+    0x0110: "Model",
+    0x0112: "Orientation",
+    0x0131: "Software",
+    0x0132: "DateTime",
+    0x013B: "Artist",
+    0x8298: "Copyright",
+    0x829A: "ExposureTime",
+    0x829D: "FNumber",
+    0x8827: "ISOSpeedRatings",
+    0x9003: "DateTimeOriginal",
+    0x9004: "DateTimeDigitized",
+    0x9204: "ExposureBiasValue",
+    0x9205: "MaxApertureValue",
+    0x920A: "FocalLength",
+    0x9286: "UserComment",
+    0x9290: "SubSecTime",
+    0x9291: "SubSecTimeOriginal",
+    0xA404: "DigitalZoomRatio",
+    0xA405: "FocalLengthIn35mmFilm",
+    0xA430: "CameraOwnerName",
+    0xA431: "BodySerialNumber",
+    0xA432: "LensSpecification",
+    0xA433: "LensMake",
+    0xA434: "LensModel",
+    0xA435: "LensSerialNumber",
+}
+
+GPS_TAG_NAMES = {
+    0x0000: "GPSVersionID",
+    0x0001: "GPSLatitudeRef",
+    0x0002: "GPSLatitude",
+    0x0003: "GPSLongitudeRef",
+    0x0004: "GPSLongitude",
+    0x0005: "GPSAltitudeRef",
+    0x0006: "GPSAltitude",
+    0x0007: "GPSTimeStamp",
+    0x0008: "GPSSatellites",
+    0x0009: "GPSStatus",
+    0x000A: "GPSMeasureMode",
+    0x000B: "GPSDOP",
+    0x0010: "GPSImgDirectionRef",
+    0x0011: "GPSImgDirection",
+    0x0012: "GPSMapDatum",
+    0x001D: "GPSDateStamp",
+}
+
+_BYTE = 1
 _ASCII = 2
+_SHORT = 3
+_LONG = 4
 _RATIONAL = 5
+_UNDEFINED = 7
+_SLONG = 9
 _SRATIONAL = 10
 
 _MAX_ENTRIES = 512
@@ -140,13 +199,24 @@ def _heif_exif(path: Path) -> bytes:
     its extent. The payload is self-identifying, so it is found by its marker
     instead, which is markedly simpler and works on the files people actually
     have.
+
+    The marker is not unique: encoders write the literal `Exif` as the item type
+    in the `infe` entry, which is followed by the version and flags word and so
+    reads as the same six bytes. Only the occurrence followed by a TIFF header
+    is the payload, so the scan continues until one is.
     """
     with path.open("rb") as handle:
         data = handle.read(_HEIF_SCAN_BYTES)
-    marker = data.find(b"Exif\x00\x00")
-    if marker < 0:
-        return b""
-    return data[marker + 6 :]
+
+    start = 0
+    while True:
+        marker = data.find(b"Exif\x00\x00", start)
+        if marker < 0:
+            return b""
+        payload = data[marker + 6 :]
+        if payload[:2] in (b"II", b"MM"):
+            return payload
+        start = marker + 1
 
 
 # --- TIFF --------------------------------------------------------------------
@@ -204,6 +274,36 @@ def _read_value(data: bytes, entry: int, endian: str, kind: int, length: int):
             return None
         text = raw.split(b"\x00")[0].decode("utf-8", "replace").strip()
         return text or None
+
+    if kind in (_SHORT, _LONG, _SLONG, _BYTE):
+        width = {_BYTE: 1, _SHORT: 2, _LONG: 4, _SLONG: 4}[kind]
+        if length == 0 or length > 8:
+            return None
+        raw = _payload(data, entry, endian, length * width)
+        if raw is None or len(raw) < length * width:
+            return None
+        code = {_BYTE: "B", _SHORT: "H", _LONG: "I", _SLONG: "i"}[kind]
+        values = [struct.unpack_from(endian + code, raw, i * width)[0] for i in range(length)]
+        return values[0] if length == 1 else values
+
+    if kind == _UNDEFINED:
+        # UserComment and friends: an 8-byte character-set header, then text.
+        if length == 0 or length > _MAX_STRING:
+            return None
+        raw = _payload(data, entry, endian, length)
+        if raw is None:
+            return None
+        if raw[:8].rstrip(b"\x00") in (b"ASCII", b"UNICODE", b"JIS", b""):
+            raw = raw[8:]
+        text = raw.split(b"\x00")[0].decode("utf-8", "replace").strip()
+        # Several UNDEFINED tags hold packed bytes rather than text -
+        # ComponentsConfiguration is \x01\x02\x03\x00 - and decoding those as a
+        # string yields control characters that print as an empty column. A row
+        # with nothing in it is worse than no row: it reads as a field that was
+        # read and found blank, which is not what happened.
+        if not text or not text.isprintable():
+            return None
+        return text
 
     if kind in (_RATIONAL, _SRATIONAL):
         if length == 0 or length > 8:

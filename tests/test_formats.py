@@ -133,6 +133,39 @@ def test_a_bare_tiff_is_read_directly(tmp_path: Path):
     assert read_embedded_metadata(scan).tool == "Nikon Scan 4.0"
 
 
+def _heif(tiff: bytes) -> bytes:
+    """A HEIF whose item table names an `Exif` item before the payload appears.
+
+    Real encoders write the literal ``Exif`` as the item type in `infe`, long
+    before the EXIF itself. A reader that stops at the first marker finds the
+    item table and decodes nothing.
+    """
+    infe = b"Exif\x00\x00" + b"\x00\x00\x00\x15infe\x02\x00\x00\x00"
+    meta = b"\x00\x00\x00\x00" + infe
+    boxes = struct.pack(">I", len(meta) + 8) + b"meta" + meta
+    payload = b"Exif\x00\x00" + tiff
+    mdat = struct.pack(">I", len(payload) + 8) + b"mdat" + payload
+    return b"\x00\x00\x00\x14ftypheic\x00\x00\x00\x00heic" + boxes + mdat
+
+
+def test_heif_exif_is_read_past_the_item_table(tmp_path: Path):
+    photo = tmp_path / "photo.heic"
+    photo.write_bytes(_heif(_tiff(NIKON, FLORENCE_GPS)))
+
+    origin = read_embedded_metadata(photo)
+
+    assert origin is not None
+    assert origin.tool == "NIKON COOLPIX P6000"
+    assert origin.location.startswith("43.4674")
+
+
+def test_heif_without_exif_reports_nothing(tmp_path: Path):
+    photo = tmp_path / "empty.heic"
+    photo.write_bytes(b"\x00\x00\x00\x14ftypheic\x00\x00\x00\x00heic")
+
+    assert read_embedded_metadata(photo) is None
+
+
 def test_webp_exif_chunk(tmp_path: Path):
     tiff = _tiff([(0x010F, 2, "Google"), (0x0110, 2, "Pixel 9")])
     chunk = b"EXIF" + struct.pack("<I", len(tiff)) + tiff
@@ -304,6 +337,28 @@ def test_svg_inkscape_version(tmp_path: Path):
     )
 
     assert read_embedded_metadata(drawing).tool == "Inkscape 1.3.2"
+
+
+def test_svg_illustrator_generator_comment(tmp_path: Path):
+    drawing = tmp_path / "logo.svg"
+    drawing.write_text(
+        "<!-- Generator: Adobe Illustrator 24.0.1, SVG Export Plug-In -->\n"
+        '<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>',
+        encoding="utf-8",
+    )
+
+    assert read_embedded_metadata(drawing).tool.startswith("Adobe Illustrator 24.0.1")
+
+
+def test_svg_created_with_comment(tmp_path: Path):
+    drawing = tmp_path / "chart.svg"
+    drawing.write_text(
+        "<!-- Created with Matplotlib (https://matplotlib.org/) -->\n"
+        '<svg xmlns="http://www.w3.org/2000/svg"/>',
+        encoding="utf-8",
+    )
+
+    assert read_embedded_metadata(drawing).tool.startswith("Matplotlib")
 
 
 def test_svg_without_a_generator(tmp_path: Path):

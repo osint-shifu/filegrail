@@ -16,7 +16,7 @@ import json
 import re
 import xml.etree.ElementTree as ElementTree
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 ODF_SUFFIXES = {".odt", ".ods", ".odp", ".odg", ".odf", ".otp", ".ott"}
@@ -35,7 +35,7 @@ _INKSCAPE = "http://www.inkscape.org/namespaces/inkscape"
 
 _TEXT_SCAN_BYTES = 256 * 1024
 _RTF_GENERATOR = re.compile(rb"\{\\\*\\generator ([^;}]{1,200})")
-_SVG_COMMENT = re.compile(r"<!--\s*(?:Generator|Created with)\s*:?\s*([^->]{3,120?})\s*-->", re.I)
+_SVG_COMMENT = re.compile(r"<!--\s*(?:Generator|Created with)\s*:?\s*([^\n]{3,120}?)\s*-->", re.I)
 
 
 @dataclass(slots=True)
@@ -46,6 +46,11 @@ class Document:
     author: str | None = None
     created: str | None = None
     title: str | None = None
+
+    #: Everything else the container declared. ODF records how many times a
+    #: document was edited and for how long; an OPF package records identifiers,
+    #: publisher and language. None of it fits a four-field summary.
+    fields: dict[str, str] = field(default_factory=dict)
 
     def __bool__(self) -> bool:
         return any((self.tool, self.author, self.created, self.title))
@@ -81,12 +86,30 @@ def _read_odf(path: Path) -> Document:
     if meta is None:
         meta = root
     return Document(
+        fields=_declared(meta),
         tool=_text(meta.findtext(f"{{{_OFFICE_META}}}generator")),
         author=_text(meta.findtext(f"{{{_DC}}}creator"))
         or _text(meta.findtext(f"{{{_OFFICE_META}}}initial-creator")),
         created=_text(meta.findtext(f"{{{_OFFICE_META}}}creation-date")),
         title=_text(meta.findtext(f"{{{_DC}}}title")),
     )
+
+
+def _declared(element) -> dict[str, str]:
+    """Every child element that carries text, by local name.
+
+    Attributes are included for the statistics element, which is where ODF puts
+    its page and word counts.
+    """
+    found: dict[str, str] = {}
+    for child in element:
+        name = child.tag.rsplit("}", 1)[-1]
+        value = (child.text or "").strip()
+        if value and name not in found:
+            found[name] = value
+        for key, attribute in child.attrib.items():
+            found.setdefault(key.rsplit("}", 1)[-1], attribute)
+    return found
 
 
 def _read_epub(path: Path) -> Document:

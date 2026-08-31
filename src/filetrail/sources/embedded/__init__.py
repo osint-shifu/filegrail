@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ...models import Origin
-from . import containers, documents, exif, id3, isobmff, png
+from . import containers, documents, exif, id3, isobmff, ole, png
 
 #: A malformed container is ordinary: truncated downloads, Office lock files and
 #: files with a misleading extension all land here, and none is an error.
@@ -41,6 +41,7 @@ SUFFIXES = (
     | isobmff.SUFFIXES
     | containers.SUFFIXES
     | id3.SUFFIXES
+    | ole.SUFFIXES
 )
 
 
@@ -56,6 +57,7 @@ def read_embedded_metadata(path: Path) -> Origin | None:
         _from_movie,
         _from_png,
         _from_container,
+        _from_compound,
         _from_audio,
     ):
         try:
@@ -107,7 +109,34 @@ def _from_exif(path: Path, suffix: str) -> Origin | None:
         at=taken,
         location=_coordinates(exif.coordinates(tags)),
         note="; ".join(notes) or None,
+        fields=_exif_fields(tags),
     )
+
+
+def _exif_fields(tags: exif.Exif) -> dict[str, str]:
+    """Every decoded tag, named where the name is known.
+
+    Unnamed tags keep their hex code rather than being dropped. They are mostly
+    camera settings, but "mostly" is not a basis for discarding evidence, and a
+    reader who does not recognise `0x9c9b` can still look it up.
+
+    Maker notes are the one thing genuinely not reachable here: they are
+    vendor-specific, undocumented and would need a parser per manufacturer.
+    """
+    found: dict[str, str] = {}
+    for names, source in ((exif.TAG_NAMES, tags), (exif.GPS_TAG_NAMES, tags.gps)):
+        for tag, value in source.items():
+            found[names.get(tag, f"0x{tag:04x}")] = _plain(value)
+    return found
+
+
+def _plain(value: object) -> str:
+    """A tag value as text, without float noise like 4.699999999999999."""
+    if isinstance(value, float):
+        return f"{value:.6f}".rstrip("0").rstrip(".")
+    if isinstance(value, list):
+        return ", ".join(_plain(item) for item in value)
+    return str(value)
 
 
 def _from_movie(path: Path, suffix: str) -> Origin | None:
@@ -127,6 +156,17 @@ def _from_movie(path: Path, suffix: str) -> Origin | None:
         tool=tool,
         at=movie.created,
         location=_coordinates(movie.coordinates),
+        fields={
+            name: str(value)
+            for name, value in (
+                ("Encoder", movie.encoder),
+                ("Make", movie.make),
+                ("Model", movie.model),
+                ("CreationTime", movie.created),
+                ("Location", _coordinates(movie.coordinates)),
+            )
+            if value
+        },
     )
 
 
@@ -148,7 +188,9 @@ def _from_png(path: Path, suffix: str) -> Origin | None:
     if generation:
         notes.append(f"generation parameters recorded: {_clip(generation)}")
 
-    return _origin("document-metadata", tool=tool, at=created, note="; ".join(notes) or None)
+    return _origin(
+        "document-metadata", tool=tool, at=created, note="; ".join(notes) or None, fields=dict(text)
+    )
 
 
 def _from_container(path: Path, suffix: str) -> Origin | None:
@@ -169,6 +211,44 @@ def _from_container(path: Path, suffix: str) -> Origin | None:
         tool=found.tool,
         at=_normalise(found.created),
         note="; ".join(notes) or None,
+        fields=dict(found.fields),
+    )
+
+
+def _from_compound(path: Path, suffix: str) -> Origin | None:
+    if suffix not in ole.SUFFIXES:
+        return None
+    found = ole.read_ole(path)
+    if not found:
+        return None
+
+    notes = []
+    if found.author:
+        notes.append(f"author {found.author}")
+    if found.last_author and found.last_author != found.author:
+        notes.append(f"last edited by {found.last_author}")
+    if found.company:
+        notes.append(f"company {found.company}")
+    if found.title:
+        notes.append(f"title {_clip(found.title, 80)}")
+
+    return _origin(
+        "document-metadata",
+        tool=found.tool,
+        at=_normalise(found.created),
+        note="; ".join(notes) or None,
+        fields={
+            name: value
+            for name, value in (
+                ("Application", found.tool),
+                ("Author", found.author),
+                ("LastAuthor", found.last_author),
+                ("Company", found.company),
+                ("Title", found.title),
+                ("Created", found.created),
+            )
+            if value
+        },
     )
 
 
@@ -202,10 +282,19 @@ def _origin(
     at: str | None = None,
     location: str | None = None,
     note: str | None = None,
+    fields: dict[str, str] | None = None,
 ) -> Origin | None:
+    """Build a claim, or None when the reader found nothing worth reporting.
+
+    `fields` alone is not enough: a file whose only decoded tags are resolution
+    and colour space has said nothing about where it came from, and inventing a
+    claim for it would put noise at the top of a provenance report.
+    """
     if not any((tool, at, location, note)):
         return None
-    return Origin(source=source, tool=tool, at=at, location=location, note=note)
+    return Origin(
+        source=source, tool=tool, at=at, location=location, note=note, fields=fields or {}
+    )
 
 
 def _coordinates(value: tuple[float, float] | None) -> str | None:

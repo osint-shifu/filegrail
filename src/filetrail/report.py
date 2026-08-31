@@ -3,6 +3,10 @@
 The default rendering is styled for a terminal and degrades to the identical
 layout in plain text when the output is piped or colour is unwanted, so the
 same command reads well by eye and greps cleanly.
+
+The layout is specified in `DESIGN.md`. Two ideas carry it: a one-character left
+gutter groups the lines of an entry without a box, and colour is spent only on
+saying which class of source made a claim.
 """
 
 from __future__ import annotations
@@ -10,8 +14,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from .identify import Identifier, extract
 from .models import FileRecord, Origin
-from .theme import ARROW, BULLET, MIDDOT, SOURCE_COLOURS, Theme, detect
+from .theme import ARROW, BULLET, EVIDENCE_HEADINGS, MIDDOT, Theme, detect
 
 #: Sources describing what a file says about itself, rather than where it came from.
 SELF_REPORTED = frozenset({"document-metadata", "device-metadata", "c2pa"})
@@ -30,60 +35,184 @@ SOURCE_LABELS = {
     "filesystem": "filesystem",
 }
 
+#: Width of the label column inside an entry, so values line up across labels.
+_LABEL = 10
+
+#: Where an entry's text begins: two spaces, one gutter glyph, one space.
+_INDENT = 4
+
+
+def _row(theme: Theme, prefix: str, body: str, right: str, *, paint=None) -> str:
+    """One line carrying a single right-aligned column.
+
+    `prefix` and `right` arrive painted, so only their visible width matters.
+    `body` arrives plain and is clipped to whatever the right-hand column leaves
+    before being painted - clipping afterwards would cut an escape sequence in
+    half, and not clipping at all is how a narrow terminal wraps into nonsense.
+    """
+    room = theme.width - _visible(prefix) - _visible(right) - 2
+    body = theme.clip(body, max(8, room))
+    painted = paint(body) if paint else body
+    gap = max(1, theme.width - _visible(prefix) - _visible(painted) - _visible(right))
+    return f"{prefix}{painted}{' ' * gap}{right}"
+
 
 def render_text(
     records: list[FileRecord],
     root: Path,
     *,
     verbose: bool = False,
+    full: bool = False,
     limit: int = 25,
     stats: dict[str, int] | None = None,
     theme: Theme | None = None,
+    filtered: str = "",
+    identify: bool = False,
 ) -> str:
     theme = theme or detect()
     known = [record for record in records if record.origins]
     unknown = [record for record in records if not record.origins]
 
-    lines = _header(theme, root, len(records), len(known))
-    for record in known:
-        lines.extend(_entry(theme, record, root, verbose=verbose))
+    lines = _masthead(theme, root, len(records), len(known))
+    lines.extend(_sections(theme, known, root, verbose=verbose, full=full))
 
     if unknown:
         lines.extend(_unknown(theme, unknown, root, limit))
 
-    lines.extend(_summary(theme, records, known, stats))
+    if identify:
+        lines.extend(_identifiers(theme, extract(records)))
+
+    lines.extend(_summary(theme, records, known, stats, filtered))
     return "\n".join(lines)
 
 
-def _header(theme: Theme, root: Path, total: int, traced: int) -> list[str]:
-    name = theme.bold("filetrail")
-    where = theme.paint(_display(root), "white")
-    count = theme.dim(f"{traced}/{total} traced")
-    gap = max(1, theme.width - _visible(f"{name} {where}") - _visible(count))
-    return ["", f"{name} {where}{' ' * gap}{count}", theme.rule(), ""]
+#: Which evidence class each identifier type is drawn in. A coordinate is the
+#: one that becomes a marker on a map, so it keeps the colour the report already
+#: uses for a location.
+_IDENTIFIER_COLOURS = {
+    "geo": "circumstantial",
+    "email": "recorded",
+    "domain": "inherited",
+    "url": "inherited",
+    "ipv4": "credentialed",
+}
 
 
-def _entry(theme: Theme, record: FileRecord, root: Path, *, verbose: bool) -> list[str]:
-    colour = SOURCE_COLOURS.get((record.best.source if record.best else ""), "grey")
-    bullet = theme.paint(theme.glyph(BULLET), colour)
-    name = theme.bold(_relative(record.path, root))
-    size = theme.dim(_size(record.size))
+def _identifiers(theme: Theme, found: list[Identifier]) -> list[str]:
+    """Every identifier the metadata carried, grouped by type.
 
-    gap = max(1, theme.width - _visible(f"{bullet} {name}") - _visible(size))
-    lines = [f"{bullet} {name}{' ' * gap}{size}"]
+    Listed once each with a count rather than once per occurrence: the question
+    an analyst asks of this section is "what is in here", and the same author
+    address across forty files is one lead, not forty.
+    """
+    if not found:
+        return []
 
-    for origin in record.origins if verbose else [record.best]:
-        if origin is not None:
-            lines.extend(_origin(theme, origin, record))
+    lines = _heading(theme, "identifiers", len(found), noun="value")
+    width = min(max(len(entry.normalized) for entry in found), theme.width - 30)
+
+    for entry in found:
+        colour = _IDENTIFIER_COLOURS.get(entry.type, "self-reported")
+        value = theme.paint(theme.clip(entry.normalized, width).ljust(width), colour)
+        kind = theme.dim(entry.type.ljust(7))
+        seen = theme.dim(f"{entry.count} in {entry.files}")
+        lines.append(f"    {kind} {value}  {seen}")
+        lines.append(f"    {' ' * 8}{theme.dim(theme.clip(entry.where[0], theme.width - 14))}")
     lines.append("")
     return lines
 
 
-def _origin(theme: Theme, origin: Origin, record: FileRecord) -> list[str]:
-    colour = SOURCE_COLOURS.get(origin.source, "grey")
-    arrow = theme.dim(theme.glyph(ARROW))
+def _masthead(theme: Theme, root: Path, total: int, traced: int) -> list[str]:
+    prefix = f"  {theme.bold('filetrail')}  "
+    count = theme.label(f"{traced} of {total} traced")
+
+    # The meter is decoration and the count is the information, so on a narrow
+    # terminal the meter goes first rather than the path being clipped to nothing.
+    right = f"{theme.coverage(traced, total)}  {count}"
+    if _visible(prefix) + _visible(right) + 12 > theme.width:
+        right = count
+
+    return [
+        "",
+        _row(theme, prefix, _display(root), right, paint=theme.dim),
+        f"  {theme.rule(theme.width - 2)}",
+        "",
+    ]
+
+
+def _sections(
+    theme: Theme, known: list[FileRecord], root: Path, *, verbose: bool, full: bool
+) -> list[str]:
+    """Group entries by the class of evidence that explains them.
+
+    Strongest class first, always - that ordering is free and it puts the
+    trustworthy findings where the eye lands.
+
+    Headings are another matter. One over every entry is not grouping, it is
+    relabelling: the colour and the source line already say which class a claim
+    belongs to. So they appear only once a class actually collects something,
+    which is also the point at which the report is long enough to need them.
+    """
+    grouped: dict[str, list[FileRecord]] = {}
+    for record in known:
+        source = record.best.source if record.best else "filesystem"
+        grouped.setdefault(theme.evidence(source), []).append(record)
+
+    show_headings = len(grouped) > 1 and max(len(m) for m in grouped.values()) > 1
+    lines: list[str] = []
+
+    for key, heading in EVIDENCE_HEADINGS:
+        members = grouped.pop(key, None)
+        if not members:
+            continue
+        if show_headings:
+            lines.extend(_heading(theme, heading, len(members)))
+        for record in members:
+            lines.extend(_entry(theme, record, root, verbose=verbose, full=full))
+
+    for members in grouped.values():  # any class the table above did not name
+        for record in members:
+            lines.extend(_entry(theme, record, root, verbose=verbose, full=full))
+    return lines
+
+
+def _heading(theme: Theme, text: str, count: int, noun: str = "file") -> list[str]:
+    right = theme.dim(f"{count} {noun}" + ("" if count == 1 else "s"))
+    return [
+        _row(theme, "  ", text, right, paint=theme.label),
+        f"  {theme.rule(theme.width - 2)}",
+        "",
+    ]
+
+
+def _entry(theme: Theme, record: FileRecord, root: Path, *, verbose: bool, full: bool) -> list[str]:
+    colour = theme.evidence(record.best.source if record.best else "filesystem")
+    prefix = f"  {theme.paint(theme.glyph(BULLET), colour)} "
+    lines = [
+        _row(
+            theme,
+            prefix,
+            _relative(record.path, root),
+            theme.dim(_size(record.size)),
+            paint=theme.bold,
+        )
+    ]
+
+    for origin in record.origins if verbose else [record.best]:
+        if origin is not None:
+            lines.extend(_origin(theme, origin, record, full=full))
+    lines.append("")
+    return lines
+
+
+def _origin(theme: Theme, origin: Origin, record: FileRecord, *, full: bool = False) -> list[str]:
+    colour = theme.evidence(origin.source)
+    arrow = theme.paint(theme.glyph(ARROW), colour)
+    rail = theme.rail_glyph()
+
     headline = _headline(origin, record)
-    lines = [f"  {arrow} {theme.paint(theme.clip(headline, theme.width - 6), colour)}"]
+    room = theme.width - _INDENT - len(theme.glyph(ARROW))
+    lines = [f"  {arrow} {theme.paint(theme.clip(headline, room), colour)}"]
 
     facts = [SOURCE_LABELS.get(origin.source, origin.source)]
     if origin.tool and origin.tool not in headline:
@@ -91,19 +220,47 @@ def _origin(theme: Theme, origin: Origin, record: FileRecord) -> list[str]:
     stamp = origin.at if origin.source in SELF_REPORTED else (origin.at or record.btime)
     if stamp:
         facts.append(stamp)
-    detail = theme.dim(theme.glyph(MIDDOT).join(f" {fact} " for fact in facts).strip())
+    detail = theme.glyph(MIDDOT).join(f" {fact} " for fact in facts).strip()
 
-    meter = theme.paint(theme.bar(origin.confidence), colour)
-    gap = max(1, theme.width - 4 - _visible(detail) - _visible(meter))
-    lines.append(f"    {detail}{' ' * gap}{meter}")
+    meter = f"{theme.meter(origin.confidence, colour)} {theme.dim(str(origin.confidence))}"
+    lines.append(_row(theme, f"  {rail} ", detail, meter, paint=theme.label))
 
-    if origin.location:
-        lines.append(f"    {theme.dim('location')}  {theme.paint(origin.location, 'yellow')}")
-    if origin.referrer:
-        lines.append(f"    {theme.dim('referrer')}  {theme.dim(theme.clip(origin.referrer, 70))}")
-    if origin.note:
-        lines.append(f"    {theme.dim('note')}      {theme.dim(theme.clip(origin.note, 70))}")
+    for label, value, paint in _facts(origin):
+        text = theme.clip(value, theme.width - _INDENT - _LABEL)
+        painted = theme.paint(text, paint) if paint else theme.dim(text)
+        lines.append(f"  {rail} {theme.dim(label.ljust(_LABEL))}{painted}")
+
+    if full and origin.fields:
+        lines.extend(_fields_block(theme, rail, origin.fields))
     return lines
+
+
+def _fields_block(theme: Theme, rail: str, fields: dict[str, str]) -> list[str]:
+    """Every decoded field, one per line, in the entry's own rail.
+
+    The label column is sized to the names actually present rather than to a
+    constant: EXIF names run to seventeen characters and a fixed column would
+    either waste width on every other reader or wrap on this one.
+    """
+    width = min(max(len(name) for name in fields), 24)
+    room = theme.width - _INDENT - width - 2
+    out = [f"  {rail}"]
+    for name, value in fields.items():
+        label = theme.dim(theme.clip(name, width).ljust(width))
+        out.append(f"  {rail} {label}  {theme.paint(theme.clip(str(value), room), 'body')}")
+    return out
+
+
+def _facts(origin: Origin) -> list[tuple[str, str, str | None]]:
+    """The labelled lines under a claim, in a fixed order."""
+    found = []
+    if origin.location:
+        found.append(("location", origin.location, "circumstantial"))
+    if origin.referrer:
+        found.append(("referrer", origin.referrer, None))
+    if origin.note:
+        found.append(("note", origin.note, None))
+    return found
 
 
 def _headline(origin: Origin, record: FileRecord) -> str:
@@ -123,44 +280,60 @@ def _headline(origin: Origin, record: FileRecord) -> str:
 
 def _unknown(theme: Theme, unknown: list[FileRecord], root: Path, limit: int) -> list[str]:
     shown = unknown if limit <= 0 else unknown[:limit]
-    heading = theme.dim(f"no recorded origin ({len(unknown)})")
-    lines = [f"{heading}", theme.rule(), ""]
+    lines = _heading(theme, "no recorded origin", len(unknown))
 
     for record in shown:
-        name = _relative(record.path, root)
-        when = theme.dim(record.btime or record.mtime or "")
-        gap = max(1, theme.width - 2 - _visible(name) - _visible(when))
-        lines.append(f"  {theme.dim(name)}{' ' * gap}{when}")
+        when = theme.dim(_moment(record.btime or record.mtime))
+        prefix = " " * _INDENT
+        lines.append(_row(theme, prefix, _relative(record.path, root), when, paint=theme.dim))
 
     if len(shown) < len(unknown):
         hidden = len(unknown) - len(shown)
-        lines.append(theme.dim(f"  ... and {hidden} more (--limit 0 for all, --json for each)"))
+        note = f"... and {hidden} more (--limit 0 for all, --json for each)"
+        if _INDENT + len(note) > theme.width:
+            note = f"... and {hidden} more (--limit 0)"
+        lines.append(theme.dim(f"{' ' * _INDENT}{note}"))
     lines.append("")
     return lines
 
 
 def _summary(
-    theme: Theme, records: list[FileRecord], known: list[FileRecord], stats: dict[str, int] | None
+    theme: Theme,
+    records: list[FileRecord],
+    known: list[FileRecord],
+    stats: dict[str, int] | None,
+    filtered: str = "",
 ) -> list[str]:
     counts: dict[str, int] = {}
+    confidence: dict[str, int] = {}
     for record in known:
         if record.best:
             counts[record.best.source] = counts.get(record.best.source, 0) + 1
+            confidence[record.best.source] = record.best.confidence
 
-    lines = [theme.rule()]
+    lines = [f"  {theme.rule(theme.width - 2)}"]
+
     if counts:
-        parts = [
-            theme.paint(
-                f"{count} {SOURCE_LABELS.get(source, source)}", SOURCE_COLOURS.get(source, "grey")
-            )
-            for source, count in sorted(counts.items(), key=lambda item: -item[1])
-        ]
-        lines.append("  " + theme.dim(theme.glyph(MIDDOT).join(f" {p} " for p in parts).strip()))
+        ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+        widest = max(len(SOURCE_LABELS.get(source, source)) for source, _ in ordered)
+        digits = max(len(str(count)) for _, count in ordered)
+        for source, count in ordered:
+            colour = theme.evidence(source)
+            label = theme.paint(SOURCE_LABELS.get(source, source).ljust(widest), colour)
+            meter = theme.meter(confidence[source], colour)
+            lines.append(f"    {label}  {meter}  {theme.dim(str(count).rjust(digits))}")
+        lines.append("")
 
     total = theme.bold(f"{len(known)} of {len(records)}")
-    lines.append(f"  {total} files have a recorded origin.")
+    lines.append(f"    {total} files have a recorded origin.")
 
-    if not known and records:
+    if filtered:
+        # An empty report after a filter has to name the filter. Otherwise it
+        # reads as "this folder holds nothing", which is a different finding.
+        scope = "No file matched" if not records else "Limited to"
+        lines.append("")
+        lines.append(theme.dim(f"    {scope} {theme.clip(filtered, theme.width - 24)}."))
+    elif not known and records:
         lines.extend(explain_empty_result(stats, theme))
     lines.append("")
     return lines
@@ -178,33 +351,37 @@ def explain_empty_result(stats: dict[str, int] | None, theme: Theme | None = Non
     if profiles == 0:
         return [
             "",
-            theme.dim("  No browser profile was readable, so the strongest source"),
-            theme.dim("  was unavailable."),
+            theme.dim("    No browser profile was readable, so the strongest source"),
+            theme.dim("    was unavailable."),
         ]
 
     return [
         "",
         theme.dim(
-            f"  There was little to match against: {downloads} download "
+            f"    There was little to match against: {downloads} download "
             f"{'record' if downloads == 1 else 'records'} across {profiles} browser "
             f"{'profile' if profiles == 1 else 'profiles'}."
         ),
-        theme.dim("  Browsers prune download history (Chromium keeps about 90 days by"),
-        theme.dim("  default) and clearing history or migrating a profile discards it,"),
-        theme.dim("  so files older than the surviving history cannot be resolved."),
+        theme.dim("    Browsers prune download history (Chromium keeps about 90 days by"),
+        theme.dim("    default) and clearing history or migrating a profile discards it,"),
+        theme.dim("    so files older than the surviving history cannot be resolved."),
     ]
 
 
-def render_json(records: list[FileRecord], root: Path) -> str:
-    return json.dumps(
-        {
-            "root": str(root),
-            "files": [record.to_dict() for record in records],
-            "summary": {
-                "total": len(records),
-                "with_origin": sum(1 for record in records if record.origins),
-            },
+def render_json(records: list[FileRecord], root: Path, *, identify: bool = False) -> str:
+    payload: dict[str, object] = {
+        "root": str(root),
+        "files": [record.to_dict() for record in records],
+        "summary": {
+            "total": len(records),
+            "with_origin": sum(1 for record in records if record.origins),
         },
+    }
+    if identify:
+        payload["identifiers"] = [entry.to_dict() for entry in extract(records)]
+
+    return json.dumps(
+        payload,
         ensure_ascii=False,
         indent=2,
     )
@@ -228,11 +405,15 @@ def render_timeline(records: list[FileRecord], root: Path, *, theme: Theme | Non
     if not events:
         return "No datable events found."
 
+    stamp_width = 21
+    rail = theme.rail_glyph()
     lines = []
     for when, name, detail, source in sorted(events):
-        colour = SOURCE_COLOURS.get(source, "grey")
-        lines.append(f"{theme.dim(when[:19].replace('T', ' '))}  {theme.bold(name)}")
-        lines.append(f"{' ' * 21}{theme.paint(theme.clip(detail, theme.width - 22), colour)}")
+        colour = theme.evidence(source)
+        moment = theme.dim(when[:19].replace("T", " "))
+        lines.append(f"  {moment}  {theme.bold(theme.clip(name, theme.width - stamp_width - 4))}")
+        claim = theme.clip(detail, theme.width - stamp_width - 6)
+        lines.append(f"  {' ' * (stamp_width - 2)}{rail} {theme.paint(claim, colour)}")
     return "\n".join(lines)
 
 
@@ -251,6 +432,18 @@ def _display(root: Path) -> str:
         return "~/" + str(root.relative_to(Path.home()))
     except ValueError:
         return str(root)
+
+
+def _moment(value: str | None) -> str:
+    """A timestamp trimmed to the second.
+
+    Filesystem times carry microseconds, which are noise in a column meant to be
+    compared by eye and never precise enough to be evidence on their own.
+    """
+    if not value:
+        return ""
+    head = value[:19]
+    return f"{head}Z" if value.endswith("Z") else head
 
 
 def _size(value: int) -> str:

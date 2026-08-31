@@ -40,10 +40,24 @@ SKIP_DIRECTORIES = {
 
 
 def iter_files(
-    root: Path, *, recursive: bool = True, follow_symlinks: bool = False
+    root: Path,
+    *,
+    recursive: bool = True,
+    follow_symlinks: bool = False,
+    suffixes: set[str] | None = None,
 ) -> Iterator[Path]:
+    """Yield the files a scan should consider.
+
+    `suffixes` narrows by extension. It is applied here rather than after the
+    walk so an excluded file is never opened, never hashed and never parsed.
+    """
+
+    def wanted(path: Path) -> bool:
+        return suffixes is None or path.suffix.lower() in suffixes
+
     if root.is_file():
-        yield root
+        if wanted(root):
+            yield root
         return
 
     for directory, subdirectories, filenames in os.walk(root, followlinks=follow_symlinks):
@@ -54,7 +68,7 @@ def iter_files(
         ]
         for name in sorted(filenames):
             path = Path(directory) / name
-            if path.is_file() and (follow_symlinks or not path.is_symlink()):
+            if path.is_file() and wanted(path) and (follow_symlinks or not path.is_symlink()):
                 yield path
         if not recursive:
             break
@@ -67,6 +81,7 @@ def scan(
     hash_files: bool = False,
     use_shell_history: bool = True,
     follow_archives: bool = True,
+    suffixes: set[str] | None = None,
     home: Path | None = None,
     stats: dict[str, int] | None = None,
 ) -> list[FileRecord]:
@@ -77,7 +92,7 @@ def scan(
     guessing whether the tool failed.
     """
     root = root.resolve()
-    files = list(iter_files(root, recursive=recursive))
+    files = list(iter_files(root, recursive=recursive, suffixes=suffixes))
 
     downloads = collect_browser_downloads(home=home, stats=stats)
     # Browsers record the path at download time; index by name too so a file
