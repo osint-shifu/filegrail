@@ -21,8 +21,8 @@ import shutil
 import sys
 from pathlib import Path
 
-from . import LICENSE, REPOSITORY, __version__
-from .theme import ARROW, Theme, detect
+from . import LICENSE, REPOSITORY, TAGLINE, __version__
+from .theme import Theme, detect
 
 #: Plain ASCII, so the wordmark survives a terminal that cannot print box
 #: drawing and never needs a second variant.
@@ -32,9 +32,6 @@ WORDMARK = (
     r"|  _| | / -_)  _| '_/ _` | | |",
     r"|_| |_|_\___|\__|_| \__,_|_|_|",
 )
-
-#: Read the way the report reads: right to left, back towards a source.
-TRAIL = "file {arrow} zip {arrow} download {arrow} web"
 
 USAGE = (
     ("filetrail <path> [options]", ""),
@@ -195,21 +192,21 @@ def _install(theme: Theme, run: str) -> list[str]:
 
 def _rows() -> tuple[tuple[str, str], ...]:
     return (
-        ("repository", REPOSITORY.split("//", 1)[-1]),
+        ("repo", REPOSITORY.split("//", 1)[-1]),
         ("license", LICENSE),
         ("version", __version__),
     )
 
 
 def _head(theme: Theme) -> list[str]:
-    """Wordmark with its trail, and the attributes beside it.
+    """Wordmark with the tagline under it, and the attributes beside it.
 
-    The trail belongs under the mark: it reads right to left, the direction the
-    report's `←` reads, so the screen teaches the notation before the first
-    report uses it.
+    The tagline sits where the trail motif used to. The trail said something
+    true about the notation, but a landing screen has one line in which to say
+    what the tool is for, and that line was spending itself on decoration.
     """
     mark = [theme.paint(line, "recorded") for line in WORDMARK]
-    trail = f"  {theme.dim(TRAIL.format(arrow=theme.glyph(ARROW)))}"
+    tagline = f"  {theme.dim(theme.clip(TAGLINE, theme.width - 4))}"
     rows = _rows()
     width = max(len(name) for name, _ in rows)
 
@@ -217,7 +214,7 @@ def _head(theme: Theme) -> list[str]:
         room = theme.width - width - 6
         return [
             *(f"  {line}" for line in mark),
-            trail,
+            tagline,
             "",
             *(
                 f"  {theme.dim(name.ljust(width))}  {theme.paint(theme.clip(v, room), 'body')}"
@@ -225,7 +222,7 @@ def _head(theme: Theme) -> list[str]:
             ),
         ]
 
-    gutter = len(WORDMARK[0]) + 4
+    gutter = len(WORDMARK[0]) + 5
     room = theme.width - gutter - width - 2
 
     right = [
@@ -235,7 +232,7 @@ def _head(theme: Theme) -> list[str]:
             for name, value in rows
         ),
     ]
-    left = [*(f"  {line}" for line in mark), trail]
+    left = [*(f"  {line}" for line in mark), tagline]
 
     out = []
     for index in range(max(len(left), len(right))):

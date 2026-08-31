@@ -1,6 +1,6 @@
 # filetrail
 
-**Where did this file come from?**
+**Trace where files came from.**
 
 Point it at any folder. It tells you which files were downloaded, from what URL,
 when, and which ones have no explanation at all.
