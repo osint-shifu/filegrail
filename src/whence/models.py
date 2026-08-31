@@ -9,6 +9,7 @@ CONFIDENCE = {
     "windows-zone-identifier": 85,
     "macos-wherefroms": 85,
     "xdg-xattr": 80,
+    "archive-member": 70,
     "shell-history": 40,
     "filesystem": 10,
 }

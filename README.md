@@ -77,6 +77,7 @@ whence . --json              # machine-readable
 whence . --unknown-only      # only files with no recorded origin
 whence . --hash              # add SHA-256 for each file
 whence . --no-shell-history  # skip shell correlation
+whence . --no-archives       # do not inherit origins from archives
 ```
 
 ## Where the answers come from
@@ -87,6 +88,7 @@ whence . --no-shell-history  # skip shell correlation
 | Windows `Zone.Identifier` ADS | `HostUrl`, `ReferrerUrl`, zone | 85 |
 | macOS `kMDItemWhereFroms` | URL and referrer | 85 |
 | Linux `user.xdg.origin.url` | URL and referrer | 80 |
+| Archive membership | the origin of the archive a file was extracted from | 70 |
 | Shell history | the command that mentions the file | 40 |
 | Filesystem | creation and modification time | 10 |
 
@@ -107,6 +109,7 @@ The honest version, because this determines whether the tool is useful to you:
 | **Windows** | `Zone.Identifier` is written for essentially every browser download. Excellent coverage. |
 | **macOS** | `kMDItemWhereFroms` is written by Safari and Chrome. Good coverage. |
 | **Linux** | `user.xdg.origin.url` is written by KDE tools and by `wget --xattr`, but **not** by Firefox ([Bugzilla 665531](https://bugzilla.mozilla.org/show_bug.cgi?id=665531)), and not by default by most tools. On a sample of 107 files in a real Linux `Downloads` folder, **zero** carried the attribute. Treat it as a bonus, not a source. |
+| **Archives** | Files extracted from a downloaded `.zip`/`.tar` inherit its origin, matched on member name and uncompressed size. A member edited after extraction no longer matches — which is itself a useful signal. |
 | **Shell history** | Timestamps exist only if the shell was configured for them (`HISTTIMEFORMAT` for bash, `EXTENDED_HISTORY` for zsh). Plain bash history has none, so only ordering survives. |
 | **Creation time** | Read via `statx(2)` on Linux, `st_birthtime` on macOS and Windows. Absent on some filesystems. |
 

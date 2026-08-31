@@ -51,6 +51,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Compute SHA-256 for each file.",
     )
     parser.add_argument(
+        "--no-archives",
+        action="store_true",
+        help="Do not inherit origins from archives the files were extracted from.",
+    )
+    parser.add_argument(
         "--unknown-only",
         action="store_true",
         help="List only files with no recorded origin.",
@@ -72,6 +77,7 @@ def main(argv: list[str] | None = None) -> int:
         recursive=not args.no_recurse,
         hash_files=args.hash_files,
         use_shell_history=not args.no_shell_history,
+        follow_archives=not args.no_archives,
     )
 
     if args.unknown_only:

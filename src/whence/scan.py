@@ -8,7 +8,14 @@ from dataclasses import replace
 from pathlib import Path
 
 from .models import FileRecord, Origin
-from .sources import collect_browser_downloads, collect_shell_history, read_file_attributes
+from .sources import (
+    collect_browser_downloads,
+    collect_shell_history,
+    inherited_origin,
+    is_archive,
+    list_members,
+    read_file_attributes,
+)
 from .util import birth_time, iso, sha256_file
 
 SKIP_DIRECTORIES = {
@@ -57,6 +64,7 @@ def scan(
     recursive: bool = True,
     hash_files: bool = False,
     use_shell_history: bool = True,
+    follow_archives: bool = True,
     home: Path | None = None,
 ) -> list[FileRecord]:
     """Build a FileRecord for every file under root."""
@@ -99,7 +107,53 @@ def scan(
         record.origins.extend(history.get(path.name, []))
         records.append(record)
 
+    if follow_archives:
+        _attach_archive_origins(records, downloads, downloads_by_name)
+
     return records
+
+
+def _attach_archive_origins(
+    records: list[FileRecord],
+    downloads: dict[str, list[Origin]],
+    downloads_by_name: dict[str, list[Origin]],
+) -> None:
+    """Give files their origin from the archive they were extracted from.
+
+    Archives are considered whether or not they are inside the scanned tree:
+    a case directory is often the *result* of unpacking a download that lives
+    somewhere else entirely.
+    """
+    candidates: dict[str, list[Origin]] = {}
+    for record in records:
+        path = Path(record.path)
+        if is_archive(path) and record.origins:
+            candidates[str(path)] = record.origins
+
+    for target, origins in downloads.items():
+        path = Path(target)
+        if is_archive(path) and path.is_file():
+            candidates.setdefault(str(path), origins)
+
+    if not candidates:
+        return
+
+    by_signature: dict[tuple[str, int], list[FileRecord]] = {}
+    for record in records:
+        if not record.origins:
+            by_signature.setdefault((Path(record.path).name, record.size), []).append(record)
+    if not by_signature:
+        return
+
+    for archive_path, origins in candidates.items():
+        members = list_members(Path(archive_path))
+        if not members:
+            continue
+        best = max(origins, key=lambda origin: origin.confidence)
+        archive_name = Path(archive_path).name
+        for name, size in members.items():
+            for record in by_signature.get((name, size), []):
+                record.origins.append(inherited_origin(best, archive_name))
 
 
 def _matched_by_name(origin: Origin) -> Origin:
