@@ -8,6 +8,10 @@ recorded origin and a complete answer.
 Members are matched on name and uncompressed size. That is deliberately strict
 enough to avoid claiming an origin for an unrelated file with a common name,
 and the resulting origin is reported below a direct download.
+
+An archive may hold several members sharing a base name at different sizes -
+a top-level README.md and a second one under examples/, say - so every size
+seen for a name is kept, not just the last.
 """
 
 from __future__ import annotations
@@ -30,15 +34,19 @@ def is_archive(path: Path) -> bool:
     return path.suffix.lower() in ARCHIVE_SUFFIXES
 
 
-def list_members(path: Path) -> dict[str, int]:
-    """Return {member name: uncompressed size} without extracting anything."""
-    members: dict[str, int] = {}
+def list_members(path: Path) -> dict[str, set[int]]:
+    """Return {member base name: every uncompressed size seen for it}."""
+    members: dict[str, set[int]] = {}
+
+    def record(name: str, size: int) -> None:
+        members.setdefault(Path(name).name, set()).add(size)
+
     try:
         if zipfile.is_zipfile(path):
             with zipfile.ZipFile(path) as archive:
                 for info in archive.infolist()[:_MAX_MEMBERS]:
                     if not info.is_dir():
-                        members[Path(info.filename).name] = info.file_size
+                        record(info.filename, info.file_size)
             return members
 
         if tarfile.is_tarfile(path):
@@ -47,7 +55,7 @@ def list_members(path: Path) -> dict[str, int]:
                     if count >= _MAX_MEMBERS:
                         break
                     if info.isfile():
-                        members[Path(info.name).name] = info.size
+                        record(info.name, info.size)
             return members
     except (OSError, zipfile.BadZipFile, tarfile.TarError, EOFError, ValueError):
         return {}

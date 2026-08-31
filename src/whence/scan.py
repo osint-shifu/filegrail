@@ -151,9 +151,10 @@ def _attach_archive_origins(
             continue
         best = max(origins, key=lambda origin: origin.confidence)
         archive_name = Path(archive_path).name
-        for name, size in members.items():
-            for record in by_signature.get((name, size), []):
-                record.origins.append(inherited_origin(best, archive_name))
+        for name, sizes in members.items():
+            for size in sizes:
+                for record in by_signature.get((name, size), []):
+                    record.origins.append(inherited_origin(best, archive_name))
 
 
 def _matched_by_name(origin: Origin) -> Origin:

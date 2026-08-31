@@ -37,7 +37,29 @@ def test_lists_zip_members_with_sizes(tmp_path: Path):
     archive = tmp_path / "pack.zip"
     _make_zip(archive, {"docs/notes.md": "hello", "data.csv": "a,b"})
 
-    assert list_members(archive) == {"notes.md": 5, "data.csv": 3}
+    assert list_members(archive) == {"notes.md": {5}, "data.csv": {3}}
+
+
+def test_same_base_name_at_two_sizes_is_kept(tmp_path: Path):
+    archive = tmp_path / "pack.zip"
+    _make_zip(archive, {"README.md": "top level readme", "examples/README.md": "short"})
+
+    assert list_members(archive) == {"README.md": {16, 5}}
+
+
+def test_nested_member_with_a_shared_name_still_inherits(tmp_path: Path):
+    archive = tmp_path / "pack.zip"
+    _make_zip(archive, {"README.md": "top level readme", "examples/README.md": "short"})
+    _download_record(tmp_path, str(archive))
+
+    case = tmp_path / "case"
+    case.mkdir()
+    (case / "README.md").write_text("top level readme", encoding="utf-8")
+
+    record = scan(case, home=tmp_path, use_shell_history=False)[0]
+
+    assert record.best is not None
+    assert record.best.source == "archive-member"
 
 
 def test_corrupt_archive_returns_no_members(tmp_path: Path):
