@@ -23,6 +23,45 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- IPTC IIM, read from the Photoshop image-resource block that carries it - which
+  means JPEG, TIFF and PSD from one search, because the block is the same
+  structure wherever it is embedded. TIFF gets a second path: some writers store
+  the datastream directly in tag 33723 with no Photoshop block around it, and
+  there is no marker to search for then - a datastream begins `\x1c\x02`, two
+  bytes that would match almost anything - so that one is reached through the
+  directory. IIM is what a newsroom writes into a picture: who took it, who is to
+  be credited, where it was taken and under what terms it may be used.
+
+  Ranked at 51, just below XMP. The two hold the same kind of self-description
+  and IIM is the older of them; modern tools maintain the XMP and leave the IIM
+  block as they found it, so a byline there is frequently a record of an earlier
+  state of the file rather than its current one. That makes it the weaker claim
+  and, for exactly the same reason, evidence worth keeping.
+
+  Two details a specification-shaped reader gets wrong. IIM predates Unicode, so
+  a block that does not declare UTF-8 in record 1 holds single-byte text, and
+  decoding it as UTF-8 turns every accent into a replacement character - losing a
+  byline rather than reading one. And a length with its top bit set is not a
+  length: the remaining bits count how many bytes the real length occupies, which
+  is how a caption longer than 32767 bytes is carried. Reading that as an
+  ordinary length does not skip one field, it loses the reader's place in the
+  stream and every dataset after it.
+
+### Changed
+
+- A place and a coordinate are two fields now. `geo` holds a latitude/longitude
+  pair this tool decoded itself, from EXIF or an ISO 6709 atom; `location` holds
+  a place written as a name. They had shared one field, which was tolerable while
+  every coordinate arrived already decoded and became untenable the moment IPTC
+  turned up recording "Firenze, Italy" and meaning it. A decoded fix can be put on
+  a map; a typed name is a claim like any other text, and a report that prints
+  them on the same line has stopped saying which it has.
+
+  `--json` gains a `geo` key, and `location` no longer carries coordinates.
+  `--identify` reads its trusted coordinate pair from `geo`, which is also the
+  name it has always used for that identifier - one word for one thing, in the
+  claim line and the identifier list alike.
+
 - XMP, read from wherever a container embeds the packet: JPEG, TIFF and raw,
   PNG, PDF, MP4, HEIC, SVG. EXIF says which camera made a photograph. XMP is the
   only metadata standard in wide use that says what happened to it afterwards,

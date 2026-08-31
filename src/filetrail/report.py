@@ -33,7 +33,9 @@ from .theme import (
 )
 
 #: Sources describing what a file says about itself, rather than where it came from.
-SELF_REPORTED = frozenset({"document-metadata", "device-metadata", "c2pa", "xmp", "xmp-history"})
+SELF_REPORTED = frozenset(
+    {"document-metadata", "device-metadata", "c2pa", "xmp", "xmp-history", "iptc"}
+)
 
 #: Width of the label column inside an entry, so values line up across labels.
 _LABEL = 10
@@ -336,6 +338,8 @@ def _fields_block(theme: Theme, fields: dict[str, str], indent: int) -> list[str
 def _facts(origin: Origin) -> list[tuple[str, str, str | None]]:
     """The labelled lines under a claim, in a fixed order."""
     found = []
+    if origin.geo:
+        found.append(("geo", origin.geo, "circumstantial"))
     if origin.location:
         found.append(("location", origin.location, "circumstantial"))
     if origin.referrer:
@@ -357,7 +361,7 @@ def _headline(origin: Origin, record: FileRecord) -> str:
             return origin.note or origin.tool or "recorded edit"
         if origin.tool:
             return f"made by {origin.tool}"
-        if origin.location:
+        if origin.geo or origin.location:
             return "self-reported location"
         if origin.at:
             same = origin.at == record.mtime
@@ -572,7 +576,9 @@ def _explained(theme: Theme, origin: Origin) -> list[str]:
 
     # Whatever became the headline must not be repeated underneath it.
     detail = [
-        value for value in (origin.tool, origin.at, origin.location) if value and value != said
+        value
+        for value in (origin.tool, origin.at, origin.geo, origin.location)
+        if value and value != said
     ]
     if origin.note and origin.note != said:
         detail.append(origin.note)

@@ -18,6 +18,10 @@ CONFIDENCE = {
     # than a bare document property.
     "xmp": 52,
     "xmp-history": 52,
+    # The same kind of self-description as XMP and the older of the two. Modern
+    # tools maintain XMP and leave the IIM block as it was, so a byline here is
+    # often a record of an earlier state rather than the current one.
+    "iptc": 51,
     "document-metadata": 50,
     "shell-history": 40,
     # An application opening a file proves contact, not acquisition.
@@ -38,6 +42,7 @@ SOURCE_LABELS = {
     "device-metadata": "device metadata",
     "xmp": "XMP",
     "xmp-history": "XMP history",
+    "iptc": "IPTC",
     "document-metadata": "document metadata",
     "shell-history": "shell history",
     "recent-documents": "recent documents",
@@ -92,6 +97,7 @@ _KINDS = {
     "device-metadata": INTRINSIC,
     "xmp": INTRINSIC,
     "xmp-history": INTRINSIC,
+    "iptc": INTRINSIC,
     "document-metadata": INTRINSIC,
 }
 
@@ -119,7 +125,16 @@ class Origin:
     tool: str | None = None
     command: str | None = None
     at: str | None = None
+
+    #: Where the file says it comes from, written as a place: "Firenze, Italy".
+    #: A newsroom types this by hand, so it is a claim like any other text.
     location: str | None = None
+
+    #: A latitude/longitude pair this tool decoded itself, from EXIF or an ISO
+    #: 6709 atom. Kept apart from `location` because a decoded fix and a typed
+    #: place name are not the same kind of fact, and only one of them can be
+    #: put on a map without believing anybody.
+    geo: str | None = None
     bytes: int | None = None
     mime: str | None = None
     sha256: str | None = None

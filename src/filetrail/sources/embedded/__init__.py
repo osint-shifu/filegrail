@@ -107,7 +107,7 @@ def _from_exif(path: Path, suffix: str) -> Origin | None:
         "device-metadata" if device else "document-metadata",
         tool=tool,
         at=taken,
-        location=_coordinates(exif.coordinates(tags)),
+        geo=_coordinates(exif.coordinates(tags)),
         note="; ".join(notes) or None,
         fields=_exif_fields(tags),
     )
@@ -155,7 +155,7 @@ def _from_movie(path: Path, suffix: str) -> Origin | None:
         "device-metadata" if device else "document-metadata",
         tool=tool,
         at=movie.created,
-        location=_coordinates(movie.coordinates),
+        geo=_coordinates(movie.coordinates),
         fields={
             name: str(value)
             for name, value in (
@@ -285,7 +285,7 @@ def _origin(
     *,
     tool: str | None = None,
     at: str | None = None,
-    location: str | None = None,
+    geo: str | None = None,
     note: str | None = None,
     fields: dict[str, str] | None = None,
 ) -> Origin | None:
@@ -295,11 +295,9 @@ def _origin(
     and colour space has said nothing about where it came from, and inventing a
     claim for it would put noise at the top of a provenance report.
     """
-    if not any((tool, at, location, note)):
+    if not any((tool, at, geo, note)):
         return None
-    return Origin(
-        source=source, tool=tool, at=at, location=location, note=note, fields=fields or {}
-    )
+    return Origin(source=source, tool=tool, at=at, geo=geo, note=note, fields=fields or {})
 
 
 def _coordinates(value: tuple[float, float] | None) -> str | None:

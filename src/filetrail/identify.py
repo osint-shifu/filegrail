@@ -108,7 +108,7 @@ _TRAILING_PUNCT = ".,;:!?'\"`)]}>"
 #: A coordinate this tool decoded itself, from EXIF or an ISO 6709 atom, is not
 #: a string that has to earn belief - it arrived as a pair of numbers in a field
 #: that means latitude and longitude.
-_TRUSTED_COORDINATE_FIELDS = frozenset({"location"})
+_TRUSTED_COORDINATE_FIELDS = frozenset({"geo"})
 
 #: Fields that name a piece of software. This corpus is *made* of version
 #: strings - `LibreOffice/24.2.7.2$Linux_X86_64` is the commonest value in it -
@@ -284,6 +284,7 @@ def _texts(records: list[FileRecord]) -> Iterator[tuple[str, str, str]]:
                 ("command", origin.command),
                 ("tool", origin.tool),
                 ("note", origin.note),
+                ("geo", origin.geo),
                 ("location", origin.location),
             ):
                 if value:

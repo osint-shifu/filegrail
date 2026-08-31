@@ -123,7 +123,7 @@ def test_gps_reaches_the_origin(tmp_path: Path):
     origin = read_embedded_metadata(photo)
 
     assert origin.source == "device-metadata"
-    assert origin.location.startswith("43.4674")
+    assert origin.geo.startswith("43.4674")
 
 
 def test_a_bare_tiff_is_read_directly(tmp_path: Path):
@@ -156,7 +156,7 @@ def test_heif_exif_is_read_past_the_item_table(tmp_path: Path):
 
     assert origin is not None
     assert origin.tool == "NIKON COOLPIX P6000"
-    assert origin.location.startswith("43.4674")
+    assert origin.geo.startswith("43.4674")
 
 
 def test_heif_without_exif_reports_nothing(tmp_path: Path):
@@ -242,7 +242,7 @@ def test_mp4_encoder_and_location(tmp_path: Path):
     origin = read_embedded_metadata(video)
 
     assert origin.tool == "Lavf58.44.100"
-    assert origin.location == "43.4674, 11.8851"
+    assert origin.geo == "43.4674, 11.8851"
 
 
 def test_mp4_data_box_does_not_leak_into_the_text(tmp_path: Path):
@@ -425,3 +425,16 @@ def test_png_text_chunks_do_not_repeat_the_raw_xmp_packet(tmp_path: Path):
 
     assert origin.tool == "Adobe Photoshop 25.0"
     assert "XML:com.adobe.xmp" not in origin.fields
+
+
+def test_decoded_coordinates_land_in_geo_not_location(tmp_path: Path):
+    """`location` has to be free to hold a place written as a name - IPTC says
+    "Firenze, Italy" and means it. A decoded latitude/longitude pair is a
+    different kind of fact and gets a field that only ever means that."""
+    photo = tmp_path / "geotagged.jpg"
+    photo.write_bytes(_jpeg(_tiff(NIKON, FLORENCE_GPS)))
+
+    origin = read_embedded_metadata(photo)
+
+    assert origin.geo.startswith("43.4674")
+    assert origin.location is None

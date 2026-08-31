@@ -215,6 +215,7 @@ Confidence helps rank **competing claims of the same kind**. It is not a probabi
 | Device metadata | Camera/device, capture time, GPS and decoded fields | 55 |
 | XMP | Creating application, author, derivation ids and decoded properties | 52 |
 | XMP history | One recorded edit: which application, what it did and when | 52 |
+| IPTC IIM | Press byline, credit, source, copyright, place and date | 51 |
 | Document metadata | Producer, author, creation data and format-specific fields | 50 |
 | Shell history | Fetching or handling command | 40 |
 | Recent documents | Application interaction and time | 35 |
@@ -228,6 +229,13 @@ A few details worth knowing:
 - Files extracted from ZIP/TAR-family archives can inherit the archive origin when member name and size match.
 - Linux origin xattrs are useful when present, but coverage varies a lot.
 - C2PA manifests are parsed, but their cryptographic signatures are **not verified**.
+- A place and a coordinate are kept apart. `geo` holds a latitude/longitude pair this
+  tool decoded itself, from EXIF or an ISO 6709 atom; `location` holds a place written
+  as a name, which is what IPTC records and what somebody typed. Only one of the two
+  can be put on a map without believing anybody.
+- IPTC IIM predates XMP, and modern tools maintain XMP while leaving the IIM block as
+  they found it. A byline there is often a record of an earlier state of the file,
+  which makes it weaker as a claim and useful as evidence.
 - XMP is unsigned free text an application writes about itself. Each recorded edit
   becomes a claim of its own, so an editing sequence lands on `--timeline` beside the
   download that brought the file in. An edit with no recorded time stays a field
@@ -257,7 +265,7 @@ A report can keep acquisition and file metadata side by side:
   │
   ← made by NIKON COOLPIX P6000
   │ device metadata · 2008-10-22T16:28:39Z                 ▰▰▰▱▱ self-reported
-  │ location  43.467448, 11.885127
+  │ geo       43.467448, 11.885127
   │
   ├ Make               NIKON
   ├ Model              COOLPIX P6000
@@ -356,6 +364,7 @@ Supported classes include URLs, domains, email addresses, IP addresses, hashes a
 | PNG | PNG, APNG | Text chunks, software, creation time, author, recorded generation parameters |
 | Content Credentials | PNG, JPEG | C2PA/JUMBF producing application, creation data, digital source type |
 | XMP | JPEG, TIFF and raw, PNG, PDF, MP4, HEIC, SVG and any other container that embeds a packet | Creating application, author, title, derivation ids, and every recorded editing step |
+| IPTC IIM | JPEG, TIFF, PSD - any Photoshop image-resource block, plus TIFF tag 33723 | By-line, credit, source, copyright, headline, caption, keywords, place and date of creation |
 | Video / audio | MP4, M4V, MOV, 3GP, M4A, MP3 | Encoder, device, creation time, ISO 6709 location, ID3 |
 | PDF | PDF | `Info` dictionary, including compressed object streams and hex strings |
 | Office Open XML | DOCX, XLSX, PPTX and macro/template variants | Application, author, last editor, company, creation data and document properties |

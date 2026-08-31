@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from filetrail.sources import iptc as iptc_reader
 from filetrail.sources import xmp as xmp_reader
 from filetrail.sources.embedded import exif as exif_reader
 from filetrail.sources.embedded import ole as ole_reader
@@ -179,3 +180,38 @@ def test_a_well_formed_xmp_packet_is_never_missed(path: Path):
         pytest.skip("carries no locatable, well-formed XMP packet")
 
     assert xmp_reader.read_xmp(path), f"{path.name} holds an XMP packet the reader did not decode"
+
+
+# --- IPTC blocks -------------------------------------------------------------
+
+IPTC_CANDIDATES = _corpus_files(exif_reader.SUFFIXES | {".psd", ".jpg", ".jpeg"})
+
+
+def _has_iim_datastream(path: Path) -> bool:
+    """True when an 8BIM resource 0x0404 is present and holds record-2 entries.
+
+    Found by its marker rather than through the reader's own block walk, so a
+    resource whose header this project parses wrongly still counts as present.
+    """
+    try:
+        with path.open("rb") as handle:
+            data = handle.read(iptc_reader._WINDOW)
+    except OSError:
+        return False
+
+    at = data.find(b"8BIM\x04\x04")
+    return at >= 0 and data.find(b"\x1c\x02", at, at + 4096) > 0
+
+
+@pytest.mark.skipif(not CORPUS.is_dir(), reason="no test-data corpus present")
+@pytest.mark.parametrize("path", IPTC_CANDIDATES, ids=lambda path: path.name)
+def test_a_present_iptc_block_is_never_missed(path: Path):
+    """The corpus holds one file with an IIM block, which is thin cover for a
+    reader built from a specification. What it can still prove is that the block
+    a marker search finds is a block this reader decodes."""
+    if not _has_iim_datastream(path):
+        pytest.skip("no IIM datastream present")
+
+    assert iptc_reader.read_iptc(path) is not None, (
+        f"{path.name} holds an IIM datastream the reader did not decode"
+    )

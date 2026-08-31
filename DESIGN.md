@@ -61,7 +61,7 @@ confidence meter of every origin in that class.
 | Recorded | `browser-download`, `windows-zone-identifier`, `macos-wherefroms`, `xdg-xattr` | `#5faf87` | `71` | `green` | Another system wrote this down at the time |
 | Inherited | `archive-member` | `#5fafaf` | `73` | `cyan` | Carried over from the archive it came out of |
 | Credentialed | `c2pa` | `#af87af` | `139` | `magenta` | A provenance manifest, signature unverified |
-| Self-reported | `device-metadata`, `document-metadata`, `xmp`, `xmp-history` | `#5f87af` | `68` | `blue` | The file's own account of itself |
+| Self-reported | `device-metadata`, `document-metadata`, `xmp`, `xmp-history`, `iptc` | `#5f87af` | `68` | `blue` | The file's own account of itself |
 | Circumstantial | `shell-history` | `#d7af5f` | `179` | `yellow` | A command mentioned the name; proves contact, not creation |
 | None | `filesystem`, no origin | `#585858` | `240` | `bright black` | Nothing accounts for it |
 
@@ -124,7 +124,7 @@ weight 700, letter-spacing -2%, always lowercase.
 | H2 | Muted, lowercase, followed by a rule | Evidence-class section headers |
 | Body | BOLD Foreground | File names |
 | Claim | Evidence-class colour | The origin line, after `←` |
-| Label | Faint, padded to 10 columns | `location`, `referrer`, `note`, `from` |
+| Label | Faint, padded to 10 columns | `geo`, `location`, `referrer`, `note`, `from` |
 | Caption | Faint | Timestamps, sizes, counts |
 
 Section headers are lowercase on purpose. Capitals read as chrome; this report

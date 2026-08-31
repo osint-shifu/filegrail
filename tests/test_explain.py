@@ -29,7 +29,7 @@ CAMERA = Origin(
     source="device-metadata",
     tool="NIKON COOLPIX P6000",
     at="2008-10-22T16:28:39Z",
-    location="43.467448, 11.885127",
+    geo="43.467448, 11.885127",
 )
 OPENED = Origin(source="recent-documents", tool="GIMP", note="opened by GIMP")
 

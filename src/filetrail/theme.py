@@ -55,6 +55,7 @@ EVIDENCE = {
     "device-metadata": "self-reported",
     "xmp": "self-reported",
     "xmp-history": "self-reported",
+    "iptc": "self-reported",
     "document-metadata": "self-reported",
     "shell-history": "circumstantial",
     "recent-documents": "circumstantial",

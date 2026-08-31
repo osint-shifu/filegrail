@@ -60,7 +60,7 @@ def _corpus() -> list[FileRecord]:
                 source="device-metadata",
                 tool="NIKON COOLPIX P6000",
                 at="2026-08-22T16:28:39Z",
-                location="43.467448, 11.885127",
+                geo="43.467448, 11.885127",
             ),
         ),
         _record(
