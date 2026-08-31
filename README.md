@@ -1,88 +1,118 @@
 # whence
 
-Reconstruct where the files in a directory came from — **after** you collected them.
+**Where did this file come from?**
+
+Point it at any folder. It tells you which files were downloaded, from what URL,
+when, and which ones have no explanation at all.
 
 ```bash
-whence ./case-folder/
+whence ~/Downloads
 ```
 
 ```text
-evidence/photo.jpg
-  <- https://forum.example.org/thread/2211/photo.jpg
+invoice-scan.pdf
+  <- https://portal.example.org/billing/2026/invoice-scan.pdf
      browser-download / firefox  2026-08-24T19:02:11Z  confidence 90
 
 toolkit/parser.py
   <- https://example.org/releases/toolkit-2.4.zip
-     archive-member / brave  2026-08-24T18:55:02Z  confidence 70
+     archive-member / chrome  2026-08-24T18:55:02Z  confidence 70
      note      extracted from toolkit-2.4.zip
 
-metadata.json
-  <- exiftool -json evidence/photo.jpg > metadata.json
-     shell-history / exiftool  2026-08-24T19:06:40Z  confidence 40
+report.csv
+  <- curl -o report.csv https://api.example.org/export?range=90d
+     shell-history / curl  2026-08-24T19:06:40Z  confidence 40
 
 No recorded origin (1):
-  notes.md    created 2026-08-24T19:31:08Z
+  setup_v3_final.exe    created 2026-08-24T19:31:08Z
 
 3 of 4 files have a recorded origin.
 ```
 
-> [!IMPORTANT]
-> **Status: working alpha.** Everything documented here is implemented and tested.
-> Nothing is documented that does not exist.
+No configuration. No wrapper commands. No prior setup. It works the first time
+you run it, on a folder you filled in months ago.
 
 ---
 
-## Why
+## The problem
 
-Provenance tools normally ask you to wrap every command you run:
+You have a folder. It has forty files in it. You made it three months ago.
+
+Which of them did you download? From where? Which came out of a zip? Which one
+did a script write? Which one did *someone else* put there?
+
+You cannot answer any of that, and the file itself will not tell you. A PDF has
+no field for "I came from this URL." Filenames lie, timestamps get clobbered by
+copies, and `Downloads` is where files go to become anonymous.
+
+This matters more than it sounds:
+
+- **Research and journalism** — a finding is worth what its source is worth. If
+  you cannot say where a document came from, you cannot cite it, and six months
+  later you cannot defend it.
+- **Investigations and OSINT** — evidence with no recorded origin is evidence you
+  cannot use. Reconstructing it from memory is not reconstruction.
+- **Security triage** — a binary in `Downloads` that **no browser ever
+  downloaded** is a question worth asking. `whence . --unknown-only` asks it.
+- **Everyone else** — you are about to delete 4 GB of files you cannot identify.
+
+### Why existing tools do not solve it
+
+Provenance tools exist. They all ask you to change how you work first:
 
 ```bash
 sometool run --input a.jpg --output b.json -- exiftool -json a.jpg
 ```
 
-Under time pressure, nobody does this. The discipline is abandoned in week two
-and the provenance is lost anyway.
+Wrap every command, declare every input, remember every time. Under real time
+pressure nobody sustains this. The discipline is dropped in week two and the
+provenance is lost anyway — and it does nothing at all for the folder you
+already have.
 
-`whence` inverts the trade. It asks for nothing up front. It reads records your
-operating system, browser and shell **already wrote** while you worked normally,
-and assembles them into one answer:
+`whence` inverts the trade. **It asks for nothing up front.**
 
-> Where did each of these files come from, and when?
+Your system has been quietly recording this all along. Your browser stores every
+download with its source URL and referrer. Windows tags downloaded files with a
+`Zone.Identifier` stream. macOS writes `kMDItemWhereFroms`. Your shell keeps a
+history. `whence` reads what is already there and joins it into one answer.
 
-It works the first time you run it, on a folder you made last month.
+The trail exists. Nobody was reading it.
 
 ## Install
 
-Python 3.10 or newer. No runtime dependencies.
+Python 3.10 or newer. **Zero runtime dependencies.**
 
 ```bash
 pipx install git+https://github.com/OWNER/whence
 ```
 
-Or run it from a checkout:
+Or run it straight from a checkout:
 
 ```bash
-PYTHONPATH=src python -m whence.cli ./case-folder/
+PYTHONPATH=src python -m whence.cli ~/Downloads
 ```
 
 ## Usage
 
 ```bash
 whence                       # current directory
-whence ./case-folder/        # one directory, recursively
+whence ~/Downloads           # any directory, recursively
+whence /mnt/evidence/        # anywhere you have read access
 whence report.pdf            # a single file
-whence . --verbose           # every origin claim, not just the strongest
+
+whence . --unknown-only      # only files nothing accounts for
 whence . --timeline          # chronological, one line per event
-whence . --json              # machine-readable
-whence . --unknown-only      # only files with no recorded origin
+whence . --verbose           # every origin claim, not just the strongest
+whence . --json              # machine-readable, for piping onward
 whence . --hash              # add SHA-256 for each file
+whence . --limit 100         # show more unexplained files (default: 25)
 whence . --no-shell-history  # skip shell correlation
 whence . --no-archives       # do not inherit origins from archives
 ```
 
 ## Sources
 
-Confidence reflects how much a source is trusted when several disagree. The
+Confidence reflects how far a source is trusted when several disagree. The
 highest wins; `--verbose` shows them all.
 
 | Source | What it gives | Conf. | Coverage in practice |
@@ -96,21 +126,51 @@ highest wins; `--verbose` shows them all.
 | Filesystem | creation and modification time | 10 | Creation time via `statx(2)` on Linux, `st_birthtime` elsewhere. Absent on some filesystems. |
 
 Browser profiles are **copied before being read**, so a running browser is
-neither disturbed nor modified.
+neither disturbed nor modified. `whence` never writes to anything it inspects.
+
+### How far back it can see
+
+This is the honest limit, and it decides whether the tool is useful to you:
+**`whence` can only reach as far back as the records still exist.**
+
+Chromium keeps download history for about 90 days by default. Clearing history
+discards it. Migrating or resetting a profile discards it. A five-year-old
+`Downloads` folder will mostly come back unexplained, and that is not a
+malfunction — the evidence is genuinely gone.
+
+`whence` says so rather than reporting a bare zero:
+
+```text
+0 of 17694 files have a recorded origin.
+
+There was little to match against: 17 download records across 4 browser profiles.
+Browsers prune download history (Chromium keeps about 90 days by default) and
+clearing history or migrating a profile discards it, so files older than the
+surviving history cannot be resolved.
+```
+
+The practical consequence: run it on work that is current, and run it *before*
+you clear history rather than after.
 
 ## What this is not
 
-- Not a disk-image forensic suite. Point it at a working directory, not a drive.
-- Not a chain of custody. It reports what local records say, and those records
+- **Not proof.** A recorded origin is evidence, not a guarantee. Read the confidence.
+- **Not a chain of custody.** It reports what local records say, and those records
   are writable by anyone with access to the machine.
-- Not proof. A recorded origin is evidence. Read the confidence.
-- Not a collector. It reads; it never writes to your files or profiles.
+- **Not a disk-image forensic suite.** Point it at a folder, not a drive. If you
+  need full-disk timelining, use [plaso](https://github.com/log2timeline/plaso).
+- **Not a collector.** It reads. It never writes to your files, or your profiles.
 
 ## Privacy
 
-`whence` runs entirely locally and makes no network requests. It reads browser
-and shell history, so its output can contain URLs you visited and commands you
-ran. Review before sharing it.
+`whence` runs entirely locally and makes no network requests, ever. It reads
+browser and shell history, so its output can contain URLs you visited and
+commands you ran. Review before sharing it.
+
+## Status
+
+Working alpha. Everything documented here is implemented and tested; nothing is
+documented that does not exist.
 
 ## Contributing
 
@@ -121,8 +181,10 @@ pytest
 ruff check .
 ```
 
-New sources are welcome. The bar: report only what the source actually knows,
-carry a confidence that reflects its reliability, and fail quietly when absent.
+New sources are the most useful contribution — messaging apps, download
+managers, package managers, sync clients all keep records worth reading. The
+bar: report only what the source actually knows, carry a confidence that
+reflects its reliability, and fail quietly when it is absent.
 
 ## License
 

@@ -16,7 +16,14 @@ def _shorten(value: str, width: int) -> str:
     return value[: width - 1] + "…"
 
 
-def render_text(records: list[FileRecord], root: Path, *, verbose: bool = False) -> str:
+def render_text(
+    records: list[FileRecord],
+    root: Path,
+    *,
+    verbose: bool = False,
+    limit: int = 25,
+    stats: dict[str, int] | None = None,
+) -> str:
     lines: list[str] = []
     known = [record for record in records if record.origins]
     unknown = [record for record in records if not record.origins]
@@ -51,17 +58,43 @@ def render_text(records: list[FileRecord], root: Path, *, verbose: bool = False)
 
     if unknown:
         lines.append(f"No recorded origin ({len(unknown)}):")
-        for record in unknown:
+        for record in unknown[:limit]:
             relative = Path(record.path)
             try:
                 relative = relative.relative_to(root)
             except ValueError:
                 pass
             lines.append(f"  {relative}    created {record.btime or record.mtime}")
+        if len(unknown) > limit:
+            lines.append(f"  ... and {len(unknown) - limit} more (--json for the full list)")
         lines.append("")
 
     lines.append(f"{len(known)} of {len(records)} files have a recorded origin.")
+    if not known and records:
+        lines.extend(explain_empty_result(stats))
     return "\n".join(lines)
+
+
+def explain_empty_result(stats: dict[str, int] | None) -> list[str]:
+    """Say why nothing matched, so zero does not read as a malfunction."""
+    if stats is None:
+        return []
+
+    profiles = stats.get("browser_profiles", 0)
+    downloads = stats.get("browser_records", 0)
+
+    if profiles == 0:
+        return ["", "No browser profile was readable, so the strongest source was unavailable."]
+
+    return [
+        "",
+        f"There was little to match against: {downloads} download "
+        f"{'record' if downloads == 1 else 'records'} across {profiles} browser "
+        f"{'profile' if profiles == 1 else 'profiles'}.",
+        "Browsers prune download history (Chromium keeps about 90 days by default) and",
+        "clearing history or migrating a profile discards it, so files older than the",
+        "surviving history cannot be resolved.",
+    ]
 
 
 def render_json(records: list[FileRecord], root: Path) -> str:

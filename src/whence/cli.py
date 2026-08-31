@@ -56,6 +56,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not inherit origins from archives the files were extracted from.",
     )
     parser.add_argument(
+        "--limit",
+        type=int,
+        default=25,
+        metavar="N",
+        help="Cap the list of files with no recorded origin (default: 25).",
+    )
+    parser.add_argument(
         "--unknown-only",
         action="store_true",
         help="List only files with no recorded origin.",
@@ -72,12 +79,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"whence: no such file or directory: {args.path}", file=sys.stderr)
         return 2
 
+    stats: dict[str, int] = {}
     records = scan(
         root,
         recursive=not args.no_recurse,
         hash_files=args.hash_files,
         use_shell_history=not args.no_shell_history,
         follow_archives=not args.no_archives,
+        stats=stats,
     )
 
     if args.unknown_only:
@@ -89,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.timeline:
         print(render_timeline(records, base))
     else:
-        print(render_text(records, base, verbose=args.verbose))
+        print(render_text(records, base, verbose=args.verbose, limit=args.limit, stats=stats))
 
     return 0
 

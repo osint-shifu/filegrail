@@ -66,12 +66,18 @@ def scan(
     use_shell_history: bool = True,
     follow_archives: bool = True,
     home: Path | None = None,
+    stats: dict[str, int] | None = None,
 ) -> list[FileRecord]:
-    """Build a FileRecord for every file under root."""
+    """Build a FileRecord for every file under root.
+
+    When `stats` is given it collects how much source material was available,
+    which lets the caller explain a result of zero rather than leave the user
+    guessing whether the tool failed.
+    """
     root = root.resolve()
     files = list(iter_files(root, recursive=recursive))
 
-    downloads = collect_browser_downloads(home=home)
+    downloads = collect_browser_downloads(home=home, stats=stats)
     # Browsers record the path at download time; index by name too so a file
     # that was later moved into the case directory still resolves.
     downloads_by_name: dict[str, list] = {}

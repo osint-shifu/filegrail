@@ -171,10 +171,19 @@ def _browser_name(database: Path) -> str:
     return "chromium-based"
 
 
-def collect_browser_downloads(home: Path | None = None) -> dict[str, list[Origin]]:
-    """Map absolute target path -> origins recorded by any local browser."""
+def collect_browser_downloads(
+    home: Path | None = None, stats: dict[str, int] | None = None
+) -> dict[str, list[Origin]]:
+    """Map absolute target path -> origins recorded by any local browser.
+
+    When `stats` is given it is filled with how many profiles were readable and
+    how many download records they held, so the caller can explain an empty
+    result instead of just reporting nothing.
+    """
     home = home or Path.home()
     found: dict[str, list[Origin]] = {}
+    profiles_read = 0
+    records = 0
 
     readers = [
         (CHROMIUM_PROFILE_GLOBS, _chromium_downloads),
@@ -183,9 +192,16 @@ def collect_browser_downloads(home: Path | None = None) -> dict[str, list[Origin
     for globs, reader in readers:
         for profile in _profiles(home, globs):
             try:
-                for target, origin in reader(profile):
-                    found.setdefault(target, []).append(origin)
+                seen = list(reader(profile))
             except (sqlite3.Error, OSError):
                 continue  # unreadable or locked profile is not fatal
+            profiles_read += 1
+            records += len(seen)
+            for target, origin in seen:
+                found.setdefault(target, []).append(origin)
+
+    if stats is not None:
+        stats["browser_profiles"] = profiles_read
+        stats["browser_records"] = records
 
     return found
