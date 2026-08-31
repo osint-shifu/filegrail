@@ -90,8 +90,8 @@ def _arrival(verdict: Verdict, acquisition: list) -> str:
 
     if verdict.state == NONE:
         return (
-            "Nothing on this machine recorded how the file arrived. Run --doctor to see "
-            "whether that evidence exists here at all before reading it as absence."
+            "Nothing on this machine recorded how the file arrived. Run `filetrail doctor` "
+            "to see whether that evidence exists here at all before reading it as absence."
         )
     if verdict.state == SINGLE:
         return (

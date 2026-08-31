@@ -48,10 +48,13 @@ def _said(record: FileRecord) -> str:
 
 
 def test_nothing_at_all_says_so_and_points_at_doctor():
+    """The advice has to name something a reader can actually type. `doctor`
+    stopped being a flag when the modes became commands."""
     said = _said(_record())
 
     assert "nothing" in said.lower()
-    assert "--doctor" in said
+    assert "filetrail doctor" in said
+    assert "--doctor" not in said
 
 
 def test_one_record_is_described_as_uncorroborated():

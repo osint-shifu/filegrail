@@ -259,7 +259,7 @@ def _command(target: Path, action: Action) -> str:
 def available(stream=None) -> bool:
     """Whether a menu can be shown at all.
 
-    Redirected output must never reach the loop: `filetrail --menu > out.txt`
+    Redirected output must never reach the loop: `filetrail menu > out.txt`
     would otherwise block on a prompt nobody can see.
     """
     stream = stream or sys.stdout
