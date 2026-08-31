@@ -33,6 +33,11 @@ PARTIAL = "partial agreement"
 #: Different hosts. Something happened that the records do not jointly explain.
 CONFLICT = "conflict"
 
+#: Not an acquisition state at all: the file's two accounts of its own origin
+#: contradict each other. It headlines the block when nothing about the
+#: acquisition records is worth headlining instead.
+CONTESTED = "contested attribution"
+
 #: What a single finding is about. Typed, so a consumer reading the JSON does
 #: not have to pattern-match English to tell one problem from another - and so
 #: the two conflicts, which are genuinely different classes of problem, stay
@@ -44,6 +49,51 @@ TIMELINE_CONFLICT = "timeline_conflict"
 WEAK_MATCH = "weak_match"
 SIZE_MISMATCH = "size_mismatch"
 SIZE_CORROBORATION = "size_corroboration"
+ATTRIBUTION_CONFLICT = "attribution_conflict"
+
+#: Every kind there is, so a consumer can enumerate them and the report can size
+#: its column to the longest of them rather than guess at a width.
+KINDS = (
+    CORROBORATION,
+    SOURCE_CONFLICT,
+    PATH_DISAGREEMENT,
+    TIMELINE_CONFLICT,
+    WEAK_MATCH,
+    SIZE_MISMATCH,
+    SIZE_CORROBORATION,
+    ATTRIBUTION_CONFLICT,
+)
+
+#: Findings that say something is wrong, as against something corroborated. The
+#: report colours by this rather than by the state, because a finding can now
+#: arrive from somewhere the state knows nothing about.
+CONFLICTS = frozenset(
+    {SOURCE_CONFLICT, PATH_DISAGREEMENT, TIMELINE_CONFLICT, SIZE_MISMATCH, ATTRIBUTION_CONFLICT}
+)
+
+#: The same fact under two names. Adobe published this pairing when it moved IIM
+#: into XMP, which is what makes the two standards comparable at all: the
+#: correspondence is documented, not inferred from whatever the values look like.
+_SAME_FACT = (
+    ("By-line", "dc:creator"),
+    ("By-lineTitle", "photoshop:AuthorsPosition"),
+    ("Credit", "photoshop:Credit"),
+    ("Source", "photoshop:Source"),
+    ("CopyrightNotice", "dc:rights"),
+    ("Headline", "photoshop:Headline"),
+    ("Caption-Abstract", "dc:description"),
+    ("ObjectName", "dc:title"),
+    ("Keywords", "dc:subject"),
+    ("City", "photoshop:City"),
+    ("Province-State", "photoshop:State"),
+    ("Country-PrimaryLocationName", "photoshop:Country"),
+    ("DateCreated", "photoshop:DateCreated"),
+    ("SpecialInstructions", "photoshop:Instructions"),
+    ("OriginalTransmissionReference", "photoshop:TransmissionReference"),
+    ("Writer-Editor", "photoshop:CaptionWriter"),
+    ("Urgency", "photoshop:Urgency"),
+    ("Category", "photoshop:Category"),
+)
 
 
 @dataclass(slots=True)
@@ -63,6 +113,27 @@ class Verdict:
     @property
     def reasons(self) -> list[str]:
         return [finding.text for finding in self.findings]
+
+    @property
+    def headline(self) -> str:
+        """What the block of findings is about.
+
+        `state` describes the acquisition records and nothing else. Once a
+        finding can come from the file's own self-description, printing the
+        acquisition state above it labels one thing with the name of another.
+        """
+        if self.state in (AGREEMENT, PARTIAL, CONFLICT):
+            return self.state
+        if any(finding.kind == ATTRIBUTION_CONFLICT for finding in self.findings):
+            return CONTESTED
+        return self.state
+
+    @property
+    def contested(self) -> bool:
+        """Whether anything here says something is wrong."""
+        return self.state in (PARTIAL, CONFLICT) or any(
+            finding.kind in CONFLICTS for finding in self.findings
+        )
 
     @property
     def notable(self) -> bool:
@@ -90,6 +161,7 @@ def reconcile(record: FileRecord) -> Verdict:
     verdict.findings.extend(_address_findings(addressed, verdict.state))
     verdict.findings.extend(_time_findings(record))
     verdict.findings.extend(_match_findings(acquisition))
+    verdict.findings.extend(_attribution_findings(record))
     return verdict
 
 
@@ -177,6 +249,46 @@ def _match_findings(acquisition: list[Origin]) -> list[Finding]:
                 Finding(WEAK_MATCH, f"{_label(origin)} was matched by file name, not by path")
             )
     return found
+
+
+def _attribution_findings(record: FileRecord) -> list[Finding]:
+    """Say when the file's two self-descriptions contradict each other.
+
+    IIM and XMP carry the same facts under different names. An editor maintains
+    the XMP and leaves the IIM block as it found it, so agreement is the ordinary
+    case and worth no line at all - while a difference is the trace of one of
+    them having been changed, and which of the two is stale is exactly the
+    question the reader has to answer.
+    """
+    iptc = _self_description(record, "iptc")
+    xmp = _self_description(record, "xmp")
+    if not iptc or not xmp:
+        return []
+
+    found = []
+    for iim_name, xmp_name in _SAME_FACT:
+        said, also = iptc.get(iim_name.lower()), xmp.get(xmp_name.lower())
+        if said and also and _plain(said) != _plain(also):
+            found.append(
+                Finding(
+                    ATTRIBUTION_CONFLICT,
+                    f"{iim_name}: {SOURCE_LABELS['iptc']} says {said}, "
+                    f"{SOURCE_LABELS['xmp']} says {also}",
+                )
+            )
+    return found
+
+
+def _self_description(record: FileRecord, source: str) -> dict[str, str]:
+    for origin in record.origins:
+        if origin.source == source:
+            return {name.lower(): value for name, value in origin.fields.items()}
+    return {}
+
+
+def _plain(value: str) -> str:
+    """Case and spacing are how two tools write one name, not two facts."""
+    return " ".join(value.split()).casefold()
 
 
 def _label(origin: Origin) -> str:

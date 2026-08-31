@@ -23,6 +23,25 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Reconciliation reaches what a file says about itself. IPTC and XMP hold the
+  same facts under different names - Adobe published the pairing when it moved
+  IIM into XMP - and an editor maintains the XMP while leaving the IIM block as
+  it found it. Two photographers in one file is therefore not a formatting
+  difference but the trace of an attribution being changed, and until now the
+  report printed both without a word and left the reader to notice.
+
+  Agreement stays silent. One editor writing both blocks at once and keeping them
+  consistent is the ordinary case, and a line on almost every photograph would
+  say nothing. Only the difference is reported, as `attribution_conflict`, and
+  the conclusion names what disagrees while saying plainly that which side was
+  rewritten is a question it can raise and not answer.
+
+  A contested file now brings both self-descriptions on screen, for the reason
+  the report already brought forward a conflicting acquisition record: a verdict
+  about evidence the reader cannot see is not a verdict. The block is headlined
+  `contested attribution` rather than the acquisition state, which described
+  something else entirely and was printed in the colour of good news.
+
 - IPTC IIM, read from the Photoshop image-resource block that carries it - which
   means JPEG, TIFF and PSD from one search, because the block is the same
   structure wherever it is embedded. TIFF gets a second path: some writers store

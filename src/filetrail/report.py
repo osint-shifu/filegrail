@@ -16,8 +16,8 @@ from pathlib import Path
 
 from .explain import conclusion, grouped
 from .identify import Identifier, extract
-from .models import ACQUISITION, SOURCE_LABELS, FileRecord, Origin, kind
-from .reconcile import CONFLICT, PARTIAL, Verdict, reconcile
+from .models import ACQUISITION, INTRINSIC, SOURCE_LABELS, FileRecord, Origin, kind
+from .reconcile import ATTRIBUTION_CONFLICT, CONFLICT, KINDS, PARTIAL, Verdict, reconcile
 from .theme import (
     ARROW,
     BRANCH,
@@ -235,12 +235,12 @@ def _entry(
         # A verdict that refers to evidence the report hid is not a verdict, so
         # a disagreement brings every acquisition record on screen with it.
         acquisition = [o for o in record.origins if kind(o) == ACQUISITION and o.url]
-        claims = [*acquisition, record.intrinsic, record.interaction]
+        claims = [*acquisition, *_self_descriptions(record, verdict), record.interaction]
     else:
         # Strongest first, and interaction last: it is the weakest of the three
         # and putting it above intrinsic would bury a camera's GPS under the
         # fact that something opened the file.
-        claims = [record.acquisition, record.intrinsic, record.interaction]
+        claims = [record.acquisition, *_self_descriptions(record, verdict), record.interaction]
 
     for index, origin in enumerate(claim for claim in claims if claim is not None):
         if index:
@@ -253,11 +253,24 @@ def _entry(
     return lines
 
 
+def _self_descriptions(record: FileRecord, verdict: Verdict) -> list[Origin | None]:
+    """What the file says about itself: the strongest claim, or all of them when
+    they contradict each other.
+
+    A finding that names a source the report did not print is a verdict about
+    evidence the reader cannot see - the same reason a conflicting acquisition
+    record is brought forward rather than ranked away.
+    """
+    if any(finding.kind == ATTRIBUTION_CONFLICT for finding in verdict.findings):
+        return [origin for origin in record.origins if kind(origin) == INTRINSIC]
+    return [record.intrinsic]
+
+
 def _verdict(theme: Theme, verdict: Verdict) -> list[str]:
     """The reconciliation, in the gutter, so it reads as part of the entry."""
-    colour = "warning" if verdict.state in (PARTIAL, CONFLICT) else "recorded"
+    colour = "warning" if verdict.contested else "recorded"
     indent = _gutter(theme)
-    label = theme.paint(verdict.state, colour)
+    label = theme.paint(verdict.headline, colour)
 
     lines = [f"  {_mark(theme, FLAG, colour)} {label}"]
     for reason in verdict.reasons:
@@ -529,9 +542,12 @@ def render_explain(record: FileRecord, theme: Theme | None = None) -> str:
             lines.extend(_explained(theme, origin))
 
     lines.extend(
-        ["", rule, "", f"  {theme.label('reconciliation')}  {theme.dim(verdict.state)}", ""]
+        ["", rule, "", f"  {theme.label('reconciliation')}  {theme.dim(verdict.headline)}", ""]
     )
-    tag_width = min(19, max(9, theme.width // 4))
+    # Wide enough for the longest kind there is. Clipping it would leave two
+    # findings sharing a prefix and no way to tell which is which - and this
+    # report does not truncate what it was asked to show.
+    tag_width = max(len(kind) for kind in KINDS)
     for finding in verdict.findings:
         for index, part in enumerate(theme.wrap(finding.text, theme.width - 6 - tag_width)):
             tag = theme.dim(theme.clip(finding.kind, tag_width).ljust(tag_width))

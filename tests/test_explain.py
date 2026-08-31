@@ -139,3 +139,19 @@ def test_it_stays_inside_the_width():
     for width in (48, 64, 88, 110):
         output = render_explain(record, theme=Theme(colour=False, unicode=False, width=width))
         assert not [line for line in output.splitlines() if len(line) > width]
+
+
+def test_the_conclusion_says_when_the_two_self_descriptions_contradict():
+    """`does not contest the record above` is true of an acquisition record and
+    silent about the thing that is actually contested here: the file's own two
+    accounts of who made it."""
+    record = FileRecord(path="/case/contested.jpg", size=494, mtime="2026-08-24T19:00:00Z")
+    record.origins.append(Origin(source="iptc", fields={"By-line": "Francisco Gonzalez"}))
+    record.origins.append(Origin(source="xmp", fields={"dc:creator": "Marta Nowak"}))
+
+    output = render_explain(record, theme=Theme(colour=False, unicode=False, width=88))
+
+    assert "contested attribution" in output
+    assert "attribution_conflict" in output  # the kind, whole, not clipped
+    assert "does not contest" not in output
+    assert "disagree about" in output

@@ -179,7 +179,10 @@ It can flag:
 - same-host or same-path mismatches;
 - filename-only matches;
 - recorded-size mismatches;
-- timelines that do not line up.
+- timelines that do not line up;
+- a file whose own two accounts of itself disagree - IPTC and XMP hold the same
+  facts under different names, and an editor maintains one while leaving the other
+  as it found it, so a difference is the trace of an attribution being changed.
 
 > [!IMPORTANT]
 > A conflict is useful evidence too. `filetrail` shows it and lets you decide what it means.

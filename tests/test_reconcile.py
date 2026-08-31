@@ -11,7 +11,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from filetrail.models import FileRecord, Origin
-from filetrail.reconcile import AGREEMENT, CONFLICT, NONE, PARTIAL, SINGLE, reconcile
+from filetrail.reconcile import (
+    AGREEMENT,
+    ATTRIBUTION_CONFLICT,
+    CONFLICT,
+    NONE,
+    PARTIAL,
+    SINGLE,
+    reconcile,
+)
 from filetrail.report import render_text
 from filetrail.theme import Theme
 
@@ -161,3 +169,78 @@ def test_agreement_is_reported_too():
     output = render_text([record], Path("/case"), theme=PLAIN)
 
     assert "agreement" in output
+
+
+# --- what the file says about itself, said twice ------------------------------
+
+
+def _iptc(**fields: str) -> Origin:
+    return Origin(source="iptc", fields=dict(fields))
+
+
+def _xmp(**fields: str) -> Origin:
+    return Origin(source="xmp", fields={name.replace("_", ":"): v for name, v in fields.items()})
+
+
+def test_two_self_descriptions_disagreeing_about_the_byline_is_a_finding():
+    """IIM and XMP hold the same facts, and tools maintain the XMP while leaving
+    the IIM block as they found it. Two different photographers in one file is
+    not a formatting difference - it is the trace of an attribution being
+    changed, and printing both without a word leaves the reader to notice."""
+    record = _record(
+        _iptc(**{"By-line": "Francisco Gonzalez", "Credit": "Reuters"}),
+        _xmp(dc_creator="Marta Nowak", photoshop_Credit="Agencja Wschod"),
+    )
+
+    findings = reconcile(record).findings
+
+    assert [f.kind for f in findings] == [ATTRIBUTION_CONFLICT, ATTRIBUTION_CONFLICT]
+    assert "IPTC says Francisco Gonzalez" in findings[0].text
+    assert "XMP says Marta Nowak" in findings[0].text
+    assert "By-line" in findings[0].text
+
+
+def test_two_self_descriptions_that_agree_are_not_a_finding():
+    """One editor writes both blocks at once and keeps them consistent, so
+    agreement here is the common case. Annotating it would put a line on almost
+    every photograph, and a line on everything says nothing."""
+    record = _record(
+        _iptc(**{"By-line": "Ansel Adams", "Credit": "Magnum"}),
+        _xmp(dc_creator="ansel  adams", photoshop_Credit="Magnum"),
+    )
+
+    assert reconcile(record).findings == []
+
+
+def test_a_contested_attribution_is_not_labelled_by_the_acquisition_state():
+    """`state` describes how the acquisition records relate. Printing it over a
+    finding that came from somewhere else labels one thing with the name of
+    another - and "no acquisition record", in the colour of good news, is a
+    strange headline for two photographers contradicting each other."""
+    record = _record(
+        _iptc(**{"By-line": "Francisco Gonzalez"}),
+        _xmp(dc_creator="Marta Nowak"),
+    )
+
+    output = render_text([record], Path("/case"), theme=PLAIN)
+
+    assert "contested attribution" in output
+    assert "no acquisition record" not in output
+
+
+def test_a_contested_attribution_brings_both_self_descriptions_on_screen():
+    """The report shows one intrinsic claim, the strongest. A finding that names
+    IPTC while the report prints only the XMP is a verdict about evidence the
+    reader cannot see - the same reason a conflicting acquisition record is
+    brought forward."""
+    iptc = _iptc(**{"By-line": "Francisco Gonzalez"})
+    iptc.tool = "Adobe Photoshop 7.0"
+    xmp = _xmp(dc_creator="Marta Nowak")
+    xmp.tool = "darktable 4.6.1"
+
+    output = render_text([_record(iptc, xmp)], Path("/case"), theme=PLAIN)
+
+    # The tool heads a rendered claim and appears nowhere in a finding's text,
+    # so seeing both is seeing both claims rather than one claim and a quotation.
+    assert "Adobe Photoshop 7.0" in output
+    assert "darktable 4.6.1" in output

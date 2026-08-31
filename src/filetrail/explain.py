@@ -16,6 +16,7 @@ from __future__ import annotations
 from .models import ACQUISITION, INTERACTION, INTRINSIC, SOURCE_LABELS, FileRecord, kind
 from .reconcile import (
     AGREEMENT,
+    ATTRIBUTION_CONFLICT,
     NONE,
     PARTIAL,
     SINGLE,
@@ -53,11 +54,20 @@ def conclusion(record: FileRecord, verdict: Verdict) -> list[str]:
 
     said.append(_arrival(verdict, acquisition))
 
-    if intrinsic:
+    contested = [f for f in verdict.findings if f.kind == ATTRIBUTION_CONFLICT]
+    if intrinsic and not contested:
         tools = ", ".join(sorted({o.tool for o in intrinsic if o.tool})) or "itself"
         said.append(
             f"The file describes an earlier life of its own - {tools} - which says nothing "
             "about how it arrived and does not contest the record above."
+        )
+    elif contested:
+        fields = ", ".join(finding.text.split(":")[0] for finding in contested)
+        said.append(
+            f"The file gives two accounts of itself and they disagree about {fields}. "
+            "An editor maintains the XMP and leaves the IPTC block as it found it, so the "
+            "IPTC side is the likelier of the two to describe an earlier state - but which "
+            "was rewritten is a question this cannot answer, only raise."
         )
 
     if interaction and not acquisition:
