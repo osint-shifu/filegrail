@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from .models import ACQUISITION, SOURCE_LABELS, FileRecord, kind
+from .models import INTRINSIC, SOURCE_LABELS, FileRecord, kind
 
 #: Fields that identify a device or an author rather than describing a picture.
 #: An identical `ExposureTime` means two photographs used the same shutter speed,
@@ -88,10 +88,15 @@ def compare(left: FileRecord, right: FileRecord) -> Comparison:
 
 
 def _fields(record: FileRecord) -> dict[str, str]:
-    """Every decoded field from the file's own metadata, flattened."""
+    """Every decoded field from the file's own metadata, flattened.
+
+    Intrinsic claims only. An application that opened the file is not software
+    that made it, and letting an interaction record supply `Software` produced
+    the nonsense of comparing a camera against a chat client.
+    """
     merged: dict[str, str] = {}
     for origin in record.origins:
-        if kind(origin) == ACQUISITION:
+        if kind(origin) != INTRINSIC:
             continue
         for name, value in origin.fields.items():
             merged.setdefault(name, str(value))

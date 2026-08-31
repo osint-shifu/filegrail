@@ -118,3 +118,22 @@ def test_short_flags_work(tmp_path: Path, capsys):
     assert main([str(tmp_path), "-j"]) == 0
 
     assert json.loads(capsys.readouterr().out)["files"]
+
+
+def test_compare_ignores_what_merely_opened_a_file(tmp_path: Path, capsys):
+    """An application that opened a file is not software that made it."""
+    from filetrail.compare import compare
+    from filetrail.models import FileRecord, Origin
+
+    def _rec(name: str, tool: str) -> FileRecord:
+        record = FileRecord(path=f"/case/{name}", size=1, mtime="2026-08-24T19:00:00Z")
+        record.origins.append(Origin(source="device-metadata", tool="Canon EOS R5"))
+        record.origins.append(
+            Origin(source="recent-documents", tool=tool, note=f"opened by {tool}")
+        )
+        return record
+
+    found = compare(_rec("a.jpg", "GIMP"), _rec("b.jpg", "Telegram Desktop"))
+
+    assert not found.differing
+    assert ("Software", "Canon EOS R5") in found.shared
