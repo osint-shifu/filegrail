@@ -66,6 +66,73 @@ you run it, on a folder you filled in months ago.
 
 ---
 
+## Three things it is actually for
+
+### A photograph you are about to publish
+
+You have an image from a source. Before it goes out, you want to know what it
+carries and whether the account of where it came from holds together.
+
+```bash
+filetrail evidence/ --type image --identify
+```
+
+The report gives you the camera, the capture time and the GPS fix for each file,
+the body serial number where the camera wrote one, and a roll-up of every
+coordinate and address found across the folder. If a file was downloaded, the URL
+sits above its EXIF rather than replacing it - the two answer different questions
+and the report never makes them compete.
+
+### A file whose story does not add up
+
+A document arrives and something about it is off.
+
+```bash
+filetrail suspicious.pdf --explain
+```
+
+```text
+  reconciliation  conflict
+
+    source_conflict     browser download says https://example.com/a.pdf
+    source_conflict     Windows zone says https://mirror.example.net/a.pdf
+    timeline_conflict   the file reports being created at 2026-08-24T09:00:00Z,
+                        after it arrived at 2026-08-10T19:02:11Z
+
+  conclusion
+
+    The acquisition records do not agree. The file may have been downloaded more
+    than once, copied after it arrived, or had its origin metadata replaced - and
+    nothing here settles which.
+```
+
+Two independent records naming different hosts is a finding. So is a file that
+reports being authored after it landed. Neither is visible if a tool prints only
+its highest-scoring record.
+
+### A folder you cannot account for
+
+Four gigabytes in `Downloads` and no memory of any of it.
+
+```bash
+filetrail ~/Downloads --unknown-only
+```
+
+What comes back is the list nothing explains - which, for security triage, is the
+interesting list. A binary that no browser ever downloaded is a question worth
+asking. Before reading that list as absence, though:
+
+```bash
+filetrail --doctor
+```
+
+`no recorded origin` means the evidence was searched and the file was not in it,
+**or** that the evidence was never there to search. Those are different findings,
+and `--doctor` is how you tell them apart: it reports which browser profiles are
+readable, whether this filesystem carries extended attributes, and how far back
+the records reach. Chromium prunes at about ninety days; if its oldest record is
+from last week, a file from March was never going to resolve.
+
 ## The problem
 
 You have a folder. It has forty files in it. You made it three months ago.
