@@ -33,7 +33,7 @@ from .theme import (
 )
 
 #: Sources describing what a file says about itself, rather than where it came from.
-SELF_REPORTED = frozenset({"document-metadata", "device-metadata", "c2pa"})
+SELF_REPORTED = frozenset({"document-metadata", "device-metadata", "c2pa", "xmp", "xmp-history"})
 
 #: Width of the label column inside an entry, so values line up across labels.
 _LABEL = 10
@@ -347,6 +347,14 @@ def _facts(origin: Origin) -> list[tuple[str, str, str | None]]:
 
 def _headline(origin: Origin, record: FileRecord) -> str:
     if origin.source in SELF_REPORTED:
+        # An edit step records what an application did to a file it did not
+        # create. "made by Photoshop" would turn a save into an origin, and the
+        # action alone would leave the timeline with an event to attribute to
+        # nobody, so the line names both.
+        if origin.source == "xmp-history":
+            if origin.note and origin.tool:
+                return f"{origin.note} in {origin.tool}"
+            return origin.note or origin.tool or "recorded edit"
         if origin.tool:
             return f"made by {origin.tool}"
         if origin.location:

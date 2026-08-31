@@ -193,3 +193,15 @@ def test_json_omits_them_otherwise():
     records = [_record("report.pdf", source="document-metadata", fields={"Author": "a@b.org"})]
 
     assert "identifiers" not in json.loads(render_json(records, Path("/case")))
+
+
+def test_a_namespaced_software_field_is_still_a_software_field():
+    """XMP names the same property `pdf:Producer`, and adds version fields of
+    its own. A dotted quad is no more an address for having a namespace in front
+    of the field it sits in."""
+    records = [
+        _record("a.pdf", source="xmp", fields={"pdf:Producer": "LibreOffice 25.2.3.2"}),
+        _record("b.jpg", source="xmp", fields={"exif:GPSVersionID": "2.2.0.0"}),
+    ]
+
+    assert not [entry for entry in extract(records) if entry.type == "ipv4"]

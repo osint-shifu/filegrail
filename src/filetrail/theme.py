@@ -53,6 +53,8 @@ EVIDENCE = {
     "archive-member": "inherited",
     "c2pa": "credentialed",
     "device-metadata": "self-reported",
+    "xmp": "self-reported",
+    "xmp-history": "self-reported",
     "document-metadata": "self-reported",
     "shell-history": "circumstantial",
     "recent-documents": "circumstantial",

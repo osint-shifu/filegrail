@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from filetrail.models import FileRecord, Origin
-from filetrail.report import render_text
+from filetrail.report import render_text, render_timeline
 from filetrail.theme import Theme
 
 #: Deterministic rendering for assertions: no colour, no box drawing.
@@ -98,3 +98,58 @@ def test_document_metadata_with_a_tool_says_what_made_it():
     output = render_text([_record("spec.pdf", origin)], Path("/case"), theme=PLAIN)
 
     assert "made by Typst 0.14.2" in output
+
+
+def test_a_dateless_xmp_packet_does_not_borrow_the_file_s_own_timestamp():
+    """The report supplies a file's creation time for a claim that carries none,
+    which is right for a download record and wrong here: a packet that names no
+    date must not be shown appearing to claim one."""
+    record = FileRecord(
+        path="/case/photo.jpg",
+        size=1,
+        mtime="2026-08-24T19:00:00Z",
+        btime="2023-06-01T08:00:00Z",
+    )
+    record.origins.append(Origin(source="xmp", tool="darktable 4.6.1", fields={"xmp:Rating": "3"}))
+
+    output = render_text([record], Path("/case"), theme=PLAIN)
+
+    assert "darktable 4.6.1" in output
+    assert "2023-06-01" not in output
+
+
+def test_an_edit_step_does_not_claim_the_editor_made_the_file():
+    """xmpMM:History records what an application did to a file it did not
+    create. "made by Photoshop" would turn a save into an origin."""
+    record = _record(
+        "export.jpg",
+        Origin(
+            source="xmp-history",
+            tool="Adobe Photoshop 22.0",
+            at="2019-03-04T12:41:55Z",
+            note="saved",
+        ),
+    )
+
+    output = render_text([record], Path("/case"), theme=PLAIN)
+
+    assert "made by Adobe Photoshop 22.0" not in output
+    assert "saved" in output
+
+
+def test_the_timeline_says_what_an_edit_was_made_with():
+    """The timeline gives an event one line, so an action printed without its
+    application is an event nobody can attribute."""
+    record = _record(
+        "export.jpg",
+        Origin(
+            source="xmp-history",
+            tool="Adobe Photoshop 22.0",
+            at="2019-03-04T12:41:55Z",
+            note="saved",
+        ),
+    )
+
+    output = render_timeline([record], Path("/case"), theme=PLAIN)
+
+    assert "saved in Adobe Photoshop 22.0" in output

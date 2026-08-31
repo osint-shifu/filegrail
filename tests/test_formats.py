@@ -410,3 +410,18 @@ def test_file_without_an_id3_tag(tmp_path: Path):
     audio.write_bytes(b"\xff\xfb\x90\x00" * 16)
 
     assert read_embedded_metadata(audio) is None
+
+
+def test_png_text_chunks_do_not_repeat_the_raw_xmp_packet(tmp_path: Path):
+    """The packet belongs to the XMP reader, which decodes it into named
+    properties. Keeping the markup here too would put a clipped, unparseable
+    copy of the same evidence in the field tree."""
+    packet = '<x:xmpmeta xmlns:x="adobe:ns:meta/">' + "<!-- pad -->" * 500 + "</x:xmpmeta>"
+    itxt = b"XML:com.adobe.xmp\x00" + b"\x00\x00" + b"\x00" + b"\x00" + packet.encode()
+    image = tmp_path / "edited.png"
+    image.write_bytes(_png([(b"iTXt", itxt), (b"tEXt", b"Software\x00Adobe Photoshop 25.0")]))
+
+    origin = read_embedded_metadata(image)
+
+    assert origin.tool == "Adobe Photoshop 25.0"
+    assert "XML:com.adobe.xmp" not in origin.fields

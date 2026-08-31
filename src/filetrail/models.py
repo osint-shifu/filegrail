@@ -13,6 +13,11 @@ CONFIDENCE = {
     # A purpose-built provenance standard, but the signature is not verified here.
     "c2pa": 60,
     "device-metadata": 55,
+    # Structured and purpose-built for editing history, but free text an editor
+    # writes about itself: weaker than a camera naming its own model, stronger
+    # than a bare document property.
+    "xmp": 52,
+    "xmp-history": 52,
     "document-metadata": 50,
     "shell-history": 40,
     # An application opening a file proves contact, not acquisition.
@@ -31,6 +36,8 @@ SOURCE_LABELS = {
     "archive-member": "archive member",
     "c2pa": "content credentials",
     "device-metadata": "device metadata",
+    "xmp": "XMP",
+    "xmp-history": "XMP history",
     "document-metadata": "document metadata",
     "shell-history": "shell history",
     "recent-documents": "recent documents",
@@ -83,6 +90,8 @@ _KINDS = {
     "recent-documents": INTERACTION,
     "c2pa": INTRINSIC,
     "device-metadata": INTRINSIC,
+    "xmp": INTRINSIC,
+    "xmp-history": INTRINSIC,
     "document-metadata": INTRINSIC,
 }
 

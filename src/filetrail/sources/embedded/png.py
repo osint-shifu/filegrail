@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import struct
 import zlib
+from collections.abc import Iterator
 from pathlib import Path
 
 SUFFIXES = {".png", ".apng"}
@@ -27,28 +28,59 @@ GENERATOR_KEYS = ("parameters", "prompt", "Comment", "workflow", "sd-metadata", 
 DATE_KEYS = ("Creation Time", "create-date", "date:create")
 AUTHOR_KEYS = ("Author", "Artist", "Copyright")
 
+#: The keyword PNG reserves for an XMP packet.
+XMP_KEYWORD = "XML:com.adobe.xmp"
+
 
 def read_png_text(path: Path) -> dict[str, str]:
     """Return the decoded text chunks of a PNG, keyed by their keyword."""
     found: dict[str, str] = {}
+    for chunk_type, payload in _text_chunks(path):
+        _absorb(chunk_type, payload, found)
+    return found
+
+
+def read_xmp_packet(path: Path) -> str | None:
+    """The XMP packet an iTXt chunk carries, inflated and unclipped.
+
+    `read_png_text` clips every value, which is right for a report and wrong for
+    a packet that still has to parse as XML afterwards. PNG is also the one
+    container that may deflate the packet, putting it beyond any search over the
+    file's raw bytes.
+    """
+    for chunk_type, payload in _text_chunks(path):
+        keyword, separator, rest = payload.partition(b"\x00")
+        if not separator or chunk_type != b"iTXt":
+            continue
+        if keyword.decode("latin-1", "replace").strip() != XMP_KEYWORD:
+            continue
+        try:
+            return _decode_itxt(rest, limit=_MAX_CHUNK)
+        except (zlib.error, ValueError, IndexError):
+            return None
+    return None
+
+
+def _text_chunks(path: Path) -> Iterator[tuple[bytes, bytes]]:
+    """Every text chunk of a PNG, as (type, payload), until the image data."""
     try:
         with path.open("rb") as handle:
             if handle.read(8) != _MAGIC:
-                return {}
+                return
             while True:
                 header = handle.read(8)
                 if len(header) < 8:
-                    return found
+                    return
                 length, chunk_type = struct.unpack(">I4s", header)
                 if chunk_type in _STOP_CHUNKS:
-                    return found
+                    return
                 if chunk_type in _TEXT_CHUNKS and length <= _MAX_CHUNK:
-                    _absorb(chunk_type, handle.read(length), found)
+                    yield chunk_type, handle.read(length)
                     handle.read(4)  # CRC
                     continue
                 handle.seek(length + 4, 1)
     except (OSError, struct.error, ValueError):
-        return found
+        return
 
 
 def _absorb(chunk_type: bytes, payload: bytes, found: dict[str, str]) -> None:
@@ -74,7 +106,7 @@ def _absorb(chunk_type: bytes, payload: bytes, found: dict[str, str]) -> None:
         found[key] = value[:_MAX_VALUE]
 
 
-def _decode_itxt(rest: bytes) -> str:
+def _decode_itxt(rest: bytes, limit: int = _MAX_VALUE) -> str:
     """iTXt: compression flag, method, language tag, translated keyword, text."""
     if len(rest) < 2:
         return ""
@@ -83,5 +115,5 @@ def _decode_itxt(rest: bytes) -> str:
     for _ in range(2):  # skip the language tag and the translated keyword
         _, _, body = body.partition(b"\x00")
     if compressed:
-        body = zlib.decompress(body, bufsize=_MAX_VALUE)
+        body = zlib.decompress(body, bufsize=limit)
     return body.decode("utf-8", "replace")

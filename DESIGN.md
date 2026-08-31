@@ -61,7 +61,7 @@ confidence meter of every origin in that class.
 | Recorded | `browser-download`, `windows-zone-identifier`, `macos-wherefroms`, `xdg-xattr` | `#5faf87` | `71` | `green` | Another system wrote this down at the time |
 | Inherited | `archive-member` | `#5fafaf` | `73` | `cyan` | Carried over from the archive it came out of |
 | Credentialed | `c2pa` | `#af87af` | `139` | `magenta` | A provenance manifest, signature unverified |
-| Self-reported | `device-metadata`, `document-metadata` | `#5f87af` | `68` | `blue` | The file's own account of itself |
+| Self-reported | `device-metadata`, `document-metadata`, `xmp`, `xmp-history` | `#5f87af` | `68` | `blue` | The file's own account of itself |
 | Circumstantial | `shell-history` | `#d7af5f` | `179` | `yellow` | A command mentioned the name; proves contact, not creation |
 | None | `filesystem`, no origin | `#585858` | `240` | `bright black` | Nothing accounts for it |
 

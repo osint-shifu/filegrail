@@ -12,10 +12,13 @@ invariant is enforced locally without third-party binaries entering the tree.
 
 from __future__ import annotations
 
+import re
+import xml.etree.ElementTree as ElementTree
 from pathlib import Path
 
 import pytest
 
+from filetrail.sources import xmp as xmp_reader
 from filetrail.sources.embedded import exif as exif_reader
 from filetrail.sources.embedded import ole as ole_reader
 from filetrail.sources.embedded import read_embedded_metadata
@@ -128,3 +131,51 @@ def test_a_compound_document_summary_is_never_missed(path: Path):
     assert ole_reader.read_ole(path) is not None, (
         f"{path.name} holds a SummaryInformation stream the reader did not decode"
     )
+
+
+# --- XMP packets -------------------------------------------------------------
+
+XMP_ROOT = re.compile(rb"<(\w+:)?xmpmeta\b.*?</(\w+:)?xmpmeta>", re.DOTALL)
+
+XMP_CANDIDATES = _corpus_files(
+    exif_reader.SUFFIXES | {".png", ".pdf", ".svg", ".mp4", ".mov", ".psd", ".ai"}
+)
+
+
+def _well_formed_packet(path: Path) -> bool:
+    """True when a packet is locatable by a search independent of the reader.
+
+    The reader narrows the file to two windows and matches the root element's
+    local name. This finds the block with a regular expression over the same
+    windows and then insists it parses, so what is under test is the decoding
+    rather than the search.
+    """
+    try:
+        with path.open("rb") as handle:
+            data = handle.read(xmp_reader._WINDOW)
+            if path.stat().st_size > xmp_reader._WINDOW:
+                handle.seek(max(0, path.stat().st_size - xmp_reader._WINDOW))
+                data += handle.read(xmp_reader._WINDOW)
+    except OSError:
+        return False
+
+    found = XMP_ROOT.search(data)
+    if not found or b"rdf:Description" not in found.group(0):
+        return False
+    try:
+        ElementTree.fromstring(found.group(0).decode("utf-8", "replace"))
+    except ElementTree.ParseError:
+        return False
+    return True
+
+
+@pytest.mark.skipif(not CORPUS.is_dir(), reason="no test-data corpus present")
+@pytest.mark.parametrize("path", XMP_CANDIDATES, ids=lambda path: path.name)
+def test_a_well_formed_xmp_packet_is_never_missed(path: Path):
+    """Every defect found here so far was a packet the reader could not locate:
+    a root element under an unexpected prefix, a namespace spelled without its
+    trailing slash. Both parsed perfectly and both came back empty."""
+    if not _well_formed_packet(path):
+        pytest.skip("carries no locatable, well-formed XMP packet")
+
+    assert xmp_reader.read_xmp(path), f"{path.name} holds an XMP packet the reader did not decode"

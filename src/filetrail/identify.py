@@ -127,6 +127,14 @@ _SOFTWARE_FIELDS = frozenset(
         "encoder",
         "template",
         "lastmodifiedby",
+        # XMP's own names for the same thing, plus the version properties it
+        # adds. `exif:GPSVersionID` is 2.2.0.0 in almost every photograph ever
+        # geotagged, and it has never been an address.
+        "creatortool",
+        "softwareagent",
+        "gpsversionid",
+        "exifversion",
+        "flashpixversion",
     }
 )
 
@@ -328,7 +336,9 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
         if host:
             hosts.add(host)
 
-    software = where.lower() in _SOFTWARE_FIELDS
+    # XMP writes `pdf:Producer` where a PDF writes `Producer`, so the namespace
+    # comes off before the name is looked up.
+    software = where.lower().rpartition(":")[2] in _SOFTWARE_FIELDS
 
     for match in IPV4_RE.finditer(text):
         if software or _looks_like_version(text, match.start(1)):

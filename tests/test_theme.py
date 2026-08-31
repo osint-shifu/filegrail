@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from filetrail.models import FileRecord, Origin
+from filetrail.models import CONFIDENCE, FileRecord, Origin
 from filetrail.report import render_text
-from filetrail.theme import Theme, detect
+from filetrail.theme import EVIDENCE, Theme, detect
 
 
 class _Stream:
@@ -100,3 +100,9 @@ def test_width_is_clamped_to_a_readable_range(monkeypatch):
 
     monkeypatch.setenv("COLUMNS", "20")
     assert detect(_Stream(tty=True)).width >= 48
+
+
+def test_every_ranked_source_has_an_evidence_colour():
+    """A source absent from the palette is painted faint, which the legend reads
+    as "filesystem timestamps only" - a silent demotion of real evidence."""
+    assert set(CONFIDENCE) <= set(EVIDENCE)

@@ -23,6 +23,34 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- XMP, read from wherever a container embeds the packet: JPEG, TIFF and raw,
+  PNG, PDF, MP4, HEIC, SVG. EXIF says which camera made a photograph. XMP is the
+  only metadata standard in wide use that says what happened to it afterwards,
+  and it keeps that as a sequence rather than one field - so `xmpMM:History`
+  becomes one claim per recorded edit instead of a flattened list, and an editing
+  sequence lands on `--timeline` beside the download that brought the file in.
+
+  An edit that records no time stays a field rather than becoming a claim: the
+  timeline supplies a file's own timestamps to a claim carrying none, which would
+  place an editing action at a moment nothing recorded. Ranked at 52, between a
+  camera naming its own model and a bare document property, because an editor
+  writing free text about itself is the weaker claim of the two. The packet is
+  located by its root element rather than by a path through each container, which
+  is what lets one reader serve every format that embeds one - and what let the
+  local corpus find the two defects a specification-shaped fixture could not: a
+  root element under an unexpected prefix, and a namespace spelled without its
+  trailing slash. Signatures do not enter into it. XMP has none.
+
+- PNG text chunks no longer repeat the raw XMP packet. It arrived clipped at 4096
+  characters, so what reached the field tree was unparseable markup sitting beside
+  the properties the XMP reader now decodes out of it.
+
+- `--identify` knows a software field by its name whatever namespace precedes it.
+  The guard that keeps `LibreOffice 25.2.3.2` out of the address list matched
+  `Producer` exactly, so `pdf:Producer` walked straight past it - as did
+  `exif:GPSVersionID`, which reads 2.2.0.0 in almost every geotagged photograph
+  ever taken and has never been an address.
+
 - `filetrail compare A B`: what two files record about themselves that agrees,
   what differs, how each one arrived, and how far apart they claim to have been
   created. Two files can share an earlier life without sharing an acquisition

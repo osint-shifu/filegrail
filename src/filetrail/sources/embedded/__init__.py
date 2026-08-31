@@ -188,8 +188,13 @@ def _from_png(path: Path, suffix: str) -> Origin | None:
     if generation:
         notes.append(f"generation parameters recorded: {_clip(generation)}")
 
+    # The XMP packet is decoded by its own reader into named properties. Left
+    # here it would be a second copy of the same evidence, clipped mid-element
+    # and unreadable as either markup or a value.
+    fields = {name: value for name, value in text.items() if name != png.XMP_KEYWORD}
+
     return _origin(
-        "document-metadata", tool=tool, at=created, note="; ".join(notes) or None, fields=dict(text)
+        "document-metadata", tool=tool, at=created, note="; ".join(notes) or None, fields=fields
     )
 
 

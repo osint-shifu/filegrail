@@ -213,6 +213,8 @@ Confidence helps rank **competing claims of the same kind**. It is not a probabi
 | Archive membership | Inherited origin of extracted members | 70 |
 | C2PA Content Credentials | Producing application, creation info, digital source type | 60 |
 | Device metadata | Camera/device, capture time, GPS and decoded fields | 55 |
+| XMP | Creating application, author, derivation ids and decoded properties | 52 |
+| XMP history | One recorded edit: which application, what it did and when | 52 |
 | Document metadata | Producer, author, creation data and format-specific fields | 50 |
 | Shell history | Fetching or handling command | 40 |
 | Recent documents | Application interaction and time | 35 |
@@ -226,6 +228,10 @@ A few details worth knowing:
 - Files extracted from ZIP/TAR-family archives can inherit the archive origin when member name and size match.
 - Linux origin xattrs are useful when present, but coverage varies a lot.
 - C2PA manifests are parsed, but their cryptographic signatures are **not verified**.
+- XMP is unsigned free text an application writes about itself. Each recorded edit
+  becomes a claim of its own, so an editing sequence lands on `--timeline` beside the
+  download that brought the file in. An edit with no recorded time stays a field
+  rather than becoming a dated event.
 - Shell history and recent-document records are intentionally treated as weaker evidence. They can show contact without proving acquisition.
 
 <p align="right"><a href="#table-of-contents">Back to contents ↑</a></p>
@@ -349,6 +355,7 @@ Supported classes include URLs, domains, email addresses, IP addresses, hashes a
 | Images | JPEG, TIFF, DNG, NEF, CR2, ARW, WebP, HEIC, AVIF | EXIF camera/device data, software, capture time, artist, GPS |
 | PNG | PNG, APNG | Text chunks, software, creation time, author, recorded generation parameters |
 | Content Credentials | PNG, JPEG | C2PA/JUMBF producing application, creation data, digital source type |
+| XMP | JPEG, TIFF and raw, PNG, PDF, MP4, HEIC, SVG and any other container that embeds a packet | Creating application, author, title, derivation ids, and every recorded editing step |
 | Video / audio | MP4, M4V, MOV, 3GP, M4A, MP3 | Encoder, device, creation time, ISO 6709 location, ID3 |
 | PDF | PDF | `Info` dictionary, including compressed object streams and hex strings |
 | Office Open XML | DOCX, XLSX, PPTX and macro/template variants | Application, author, last editor, company, creation data and document properties |

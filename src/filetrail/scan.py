@@ -18,6 +18,7 @@ from .sources import (
     read_c2pa_manifest,
     read_embedded_metadata,
     read_file_attributes,
+    read_xmp,
 )
 from .util import birth_time, iso, sha256_file
 
@@ -133,6 +134,7 @@ def scan(
             claim = reader(path)
             if claim is not None:
                 record.origins.append(claim)
+        record.origins.extend(read_xmp(path))
         record.origins.extend(history.get(path.name, []))
         record.origins.extend(recent.get(str(path), []))
         records.append(record)
