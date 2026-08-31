@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="filetrail">
+  <title>filetrail mark (light backgrounds)</title>
+  <rect x="26" y="9" width="32" height="6" rx="3" fill="#3f7a5f"></rect>
+  <rect x="16" y="19" width="42" height="6" rx="3" fill="#3d7c7c"></rect>
+  <rect x="6" y="29" width="52" height="6" rx="3" fill="#8a5f8a"></rect>
+  <rect x="16" y="39" width="42" height="6" rx="3" fill="#436a8f"></rect>
+  <rect x="26" y="49" width="32" height="6" rx="3" fill="#a8802f"></rect>
+</svg>

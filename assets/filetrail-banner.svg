@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 360" width="1280" height="360" role="img" aria-label="filetrail — trace where files came from">
+  <title>filetrail — Trace where files came from.</title>
+  <rect width="1280" height="360" fill="#0e1113"></rect>
+  <line x1="400" y1="0" x2="400" y2="360" stroke="#1b2023" stroke-width="1"></line>
+  <g transform="translate(106 86) scale(2.9375)">
+  <rect x="26" y="9" width="32" height="6" rx="3" fill="#5faf87"></rect>
+  <rect x="16" y="19" width="42" height="6" rx="3" fill="#5fafaf"></rect>
+  <rect x="6" y="29" width="52" height="6" rx="3" fill="#af87af"></rect>
+  <rect x="16" y="39" width="42" height="6" rx="3" fill="#5f87af"></rect>
+  <rect x="26" y="49" width="32" height="6" rx="3" fill="#d7af5f"></rect>
+  </g>
+  <text x="456" y="182" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &#34;Liberation Mono&#34;, monospace" font-size="62" font-weight="700" letter-spacing="-2" fill="#d0d0d0">filetrail</text>
+  <text x="456" y="226" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &#34;Liberation Mono&#34;, monospace" font-size="21" fill="#8a8a8a">Trace where files came from.</text>
+</svg>

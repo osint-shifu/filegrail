@@ -84,6 +84,32 @@ Resolved once, at startup, from `COLORTERM` and `TERM`:
 `truecolor` → `256` → `16` → none. A terminal that cannot colour gets the same
 layout in plain text, never a different one.
 
+## 2b. The mark
+
+The logo is not decoration bolted on afterwards; it is this palette, drawn.
+
+Five slots of the confidence meter, laid on their side so their left ends form
+the `←` the report uses to mean *came from*. The bars carry the evidence classes
+in table order, top to bottom: recorded `#5faf87`, inherited `#5fafaf`,
+credentialed `#af87af`, self-reported `#5f87af`, circumstantial `#d7af5f`.
+
+**Do not recolour, reorder or reweight the bars.** Their order is the evidence
+hierarchy, and changing it makes the mark say something the tool does not.
+
+| File | Use |
+| --- | --- |
+| `assets/filetrail-banner.svg` | 1280×360 README header |
+| `assets/filetrail-logo-dark.svg` | horizontal lockup, dark backgrounds |
+| `assets/filetrail-logo-light.svg` | horizontal lockup, light backgrounds |
+| `assets/filetrail-mark.svg` | square mark, dark backgrounds and favicon |
+| `assets/filetrail-mark-light.svg` | square mark, light backgrounds |
+| `assets/filetrail-mark-mono.svg` | single colour, for one-colour contexts |
+
+Light-background variants darken the same five hues for contrast on white; the
+monochrome variant uses Foreground `#d0d0d0`. Clear space is one bar-height - 6
+units on the 64-unit grid - on every side. The wordmark is any monospace at
+weight 700, letter-spacing -2%, always lowercase.
+
 ## 3. Typography & ASCII Art
 
 - **Header font**: None. No figlet, no banner. A report does not introduce itself.

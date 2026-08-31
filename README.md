@@ -1,8 +1,7 @@
 <a id="top"></a>
 
 <div align="center">
-  <h1>filetrail</h1>
-  <p><strong>Trace where files came from.</strong></p>
+  <img src="assets/filetrail-banner.svg" alt="filetrail — trace where files came from" width="820">
   <p>Retroactive file provenance from traces your machine already has.</p>
   <p>
     <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square">
