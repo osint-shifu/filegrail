@@ -1,0 +1,59 @@
+# Contributing
+
+Contributions are welcome.
+
+## Development setup
+
+```bash
+git clone https://github.com/OWNER/filetrail.git
+cd filetrail
+
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+python -m pip install -e ".[dev]"
+pytest
+ruff check .
+ruff format --check .
+```
+
+`filetrail` has **no runtime dependencies** and that is a deliberate constraint,
+not an accident. A change that adds one has to earn it; so far everything,
+including the CBOR decoder needed for C2PA, has been reachable with the standard
+library.
+
+## Adding a source
+
+A source answers "where did this file come from" from one kind of record. The
+bar for a new one:
+
+1. **Report only what the source actually knows.** If a field is absent, leave
+   it absent rather than inferring it from somewhere else.
+2. **Carry a confidence that reflects reliability.** A cryptographically signed
+   manifest and a shell command that merely mentions a filename are not the same
+   kind of claim, and the report has to keep them distinguishable.
+3. **Fail quietly when absent.** A missing profile, an unreadable file or a
+   malformed container is ordinary, not an error. One bad file must never end a
+   scan.
+4. **Never write.** The tool reads. It does not modify files, profiles or
+   histories, and a live database is copied before being opened.
+
+## Adding a format
+
+Metadata is the substance of this tool, so a format that carries any is worth
+reading. Put the reader in `src/filetrail/sources/embedded/`, one module per
+container family, and add a test that builds a minimal valid file rather than
+committing a sample.
+
+Do not compute byte lengths by hand in a test. Encode the structure with a small
+helper instead, so a miscounted length cannot silently produce a passing test on
+malformed input.
+
+## Pull requests
+
+Keep changes focused and include tests for behaviour changes.
+
+Priorities, in order: correctness, honesty about what a source does and does not
+prove, privacy, portability, and only then breadth.
+
+Commit messages describe what changed and why, in prose. No trailers.

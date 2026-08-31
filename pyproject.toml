@@ -9,19 +9,46 @@ description = "Reconstruct where the files in a directory came from, after the f
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
-keywords = ["osint", "dfir", "provenance", "forensics", "investigations", "downloads"]
+keywords = [
+  "provenance",
+  "metadata",
+  "exif",
+  "gps",
+  "c2pa",
+  "content-credentials",
+  "osint",
+  "dfir",
+  "forensics",
+  "investigations",
+  "downloads",
+  "file-origin",
+]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
+  "Intended Audience :: Information Technology",
+  "Intended Audience :: Legal Industry",
   "License :: OSI Approved :: Apache Software License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Security",
+  "Topic :: System :: Filesystems",
+  "Topic :: Utilities",
 ]
 dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8.2,<9", "ruff>=0.6,<1"]
+
+[project.urls]
+Homepage = "https://github.com/OWNER/filetrail"
+Repository = "https://github.com/OWNER/filetrail"
+Issues = "https://github.com/OWNER/filetrail/issues"
+Changelog = "https://github.com/OWNER/filetrail/blob/main/CHANGELOG.md"
 
 [project.scripts]
 filetrail = "filetrail.cli:main"

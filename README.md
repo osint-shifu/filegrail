@@ -101,7 +101,7 @@ download with its source URL and referrer. Windows tags downloaded files with a
 `Zone.Identifier` stream. macOS writes `kMDItemWhereFroms`. Your shell keeps a
 history. `filetrail` reads what is already there and joins it into one answer.
 
-The trail exists. Nobody was reading it.
+The trail is already there. Nobody was reading it.
 
 ## Install
 
@@ -236,6 +236,8 @@ documented that does not exist.
 
 ## Contributing
 
+See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ```bash
 python -m venv .venv && source .venv/bin/activate
 python -m pip install -e ".[dev]"
@@ -243,13 +245,19 @@ pytest
 ruff check .
 ```
 
-New sources are the most useful contribution — messaging apps, download
-managers, package managers, sync clients all keep records worth reading. The
-bar: report only what the source actually knows, carry a confidence that
-reflects its reliability, and fail quietly when it is absent.
+New sources and new formats are the most useful contribution — messaging apps,
+download managers, package managers and sync clients all keep records worth
+reading, and every format that carries metadata is one more file the report can
+account for.
+
+## Security
+
+Report anything that could expose investigation data, leak a secret past
+`--redact`, or let a crafted file read outside the scanned directory through the
+process in [`SECURITY.md`](SECURITY.md), not a public issue.
 
 ## License
 
 Apache License 2.0. See [`LICENSE`](LICENSE).
 
-> **You already left a trail. `filetrail` reads it back.**
+> **Every file left a trail getting here. This reads it back.**
