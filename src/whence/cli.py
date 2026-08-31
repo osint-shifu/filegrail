@@ -9,6 +9,7 @@ from pathlib import Path
 from . import __version__
 from .report import render_json, render_text, render_timeline
 from .scan import scan
+from .theme import detect
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -54,6 +55,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-archives",
         action="store_true",
         help="Do not inherit origins from archives the files were extracted from.",
+    )
+    colour = parser.add_mutually_exclusive_group()
+    colour.add_argument(
+        "--color",
+        "--colour",
+        dest="colour",
+        action="store_true",
+        default=None,
+        help="Force styled output even when not writing to a terminal.",
+    )
+    colour.add_argument(
+        "--no-color",
+        "--no-colour",
+        dest="colour",
+        action="store_false",
+        help="Plain text with no escape sequences.",
     )
     parser.add_argument(
         "--redact",
@@ -101,12 +118,23 @@ def main(argv: list[str] | None = None) -> int:
         records = [record.redacted() for record in records]
 
     base = root if root.is_dir() else root.parent
+    theme = detect(colour=args.colour)
+
     if args.json:
         print(render_json(records, base))
     elif args.timeline:
-        print(render_timeline(records, base))
+        print(render_timeline(records, base, theme=theme))
     else:
-        print(render_text(records, base, verbose=args.verbose, limit=args.limit, stats=stats))
+        print(
+            render_text(
+                records,
+                base,
+                verbose=args.verbose,
+                limit=args.limit,
+                stats=stats,
+                theme=theme,
+            )
+        )
 
     return 0
 
