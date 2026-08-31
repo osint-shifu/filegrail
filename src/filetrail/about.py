@@ -41,11 +41,22 @@ USAGE = (
     ("filetrail <command> [options]", ""),
 )
 
+#: Ordered as a progression rather than a list: point it somewhere, narrow the
+#: view, ask why, then take the answer away with you. Each one is a different
+#: job, and none of them restates the flag it uses - a description that only
+#: expands the option name is a line the reader can skip, and once they learn
+#: they can skip one they skip the rest.
 EXAMPLES = (
     ("filetrail ~/Downloads", "everything in a folder"),
     ("filetrail suspicious.pdf", "one file"),
-    ("filetrail explain suspicious.pdf", "and why it says that"),
-    ("filetrail ~/Downloads --json", "for piping onward"),
+    ("filetrail . --unknown-only", "what nothing accounts for"),
+    ("filetrail photos/ --type image", "cameras and phones only"),
+    ("filetrail explain suspicious.pdf", "why it concluded that"),
+    ("filetrail compare a.jpg b.jpg", "same camera? same route here?"),
+    ("filetrail . --identify", "emails, domains, coordinates found"),
+    ("filetrail . --timeline", "in the order things happened"),
+    ("filetrail . --redact --json", "safe to hand to someone else"),
+    ("filetrail doctor", "what this machine can answer at all"),
 )
 
 COMMANDS = (
