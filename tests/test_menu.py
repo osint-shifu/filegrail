@@ -73,6 +73,7 @@ def test_end_of_input_leaves_quietly(tmp_path: Path):
         ("8", ["--redact", "--json"]),
         ("i", ["--type", "image"]),
         ("d", ["--type", "document"]),
+        ("s", ["--doctor"]),
     ],
 )
 def test_each_action_builds_its_command_line(tmp_path: Path, key: str, flags: list[str]):

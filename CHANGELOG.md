@@ -9,6 +9,15 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `--doctor`, which reports what this machine can be asked before anything is
+  asked of it: which browser profiles are readable and how many records they
+  hold, whether this filesystem carries extended attributes (tested, not assumed
+  from the platform), whether the shell kept timestamps, whether creation times
+  exist, and how far back the browser records reach. `no recorded origin` can
+  mean the evidence was searched and the file was not in it, or that the
+  evidence was never there to search, and a reader who assumes the first when
+  the second is true has drawn a conclusion the tool never supported.
+
 - Reconciliation between acquisition records. Where two independent sources say
   how a file arrived, the report now says whether they agree, agree only about
   the host, or contradict each other, and prints what each one claims. It also

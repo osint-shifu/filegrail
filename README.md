@@ -152,6 +152,7 @@ filetrail . --no-shell-history  # skip shell correlation
 filetrail . --no-archives       # do not inherit origins from archives
 filetrail . --no-color          # plain text, no escape sequences
 
+filetrail --doctor              # which evidence sources this machine has
 filetrail --menu                # pick a view from a list, no flags to remember
 filetrail --about               # the landing screen again
 filetrail --help                # every flag
@@ -246,6 +247,24 @@ Browsers prune download history (Chromium keeps about 90 days by default) and
 clearing history or migrating a profile discards it, so files older than the
 surviving history cannot be resolved.
 ```
+
+`filetrail --doctor` says what this machine can be asked before anything is
+asked of it: which browser profiles are readable, whether the filesystem carries
+extended attributes, whether the shell kept timestamps, and how far back the
+records reach.
+
+```text
+  Chromium family downloads  available
+                               17 records across 3 of 3 profiles
+  Shell history              partial
+                               .bash_history, without timestamps
+
+  Chromium family oldest record  2026-08-30
+```
+
+That last line is the honest limit. `no recorded origin` means the evidence was
+searched and the file was not in it, or that the evidence was never there to
+search - and those are different findings.
 
 The practical consequence: run it on work that is current, and run it *before*
 you clear history rather than after.

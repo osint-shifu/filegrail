@@ -77,6 +77,7 @@ START = (
     ("filetrail ~/Downloads", "scan any folder, recursively"),
     ("filetrail report.pdf", "one file"),
     ("filetrail --menu", "pick a view from a list"),
+    ("filetrail --doctor", "what this machine can be asked"),
 )
 
 VIEWS = (

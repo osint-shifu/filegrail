@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import __version__
 from .filters import UnknownType, describe, selection
-from .report import render_json, render_text, render_timeline
+from .report import render_doctor, render_json, render_json_doctor, render_text, render_timeline
 from .scan import scan
 from .theme import detect
 
@@ -120,6 +120,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="List only files with no recorded origin.",
     )
     parser.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Report which evidence sources this machine has, and how far back they reach.",
+    )
+    parser.add_argument(
         "--about",
         action="store_true",
         help="Print what this is, who wrote it, and how to use it.",
@@ -144,6 +149,14 @@ def main(argv: list[str] | None = None) -> int:
         from .about import render
 
         print(render(detect(colour=args.colour)))
+        return 0
+
+    if args.doctor:
+        from .doctor import survey
+
+        found = survey()
+        theme = detect(colour=args.colour)
+        print(render_json_doctor(found) if args.json else render_doctor(found, theme))
         return 0
 
     if args.menu:

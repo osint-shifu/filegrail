@@ -454,6 +454,49 @@ def _file_json(record: FileRecord) -> dict[str, object]:
     return data
 
 
+def render_doctor(found, theme: Theme | None = None) -> str:
+    """What could be searched on this machine, and how far back it reaches."""
+    theme = theme or detect()
+    rule = f"  {theme.rule(theme.width - 2)}"
+    width = max(len(check.name) for check in found.checks)
+
+    lines = ["", f"  {theme.bold('filetrail')}  {theme.dim('evidence sources')}", rule, ""]
+
+    for check in found.checks:
+        colour = {
+            "available": "recorded",
+            "partial": "circumstantial",
+        }.get(check.state, "warning")
+        label = theme.paint(check.name.ljust(width), "body")
+        state = theme.paint(check.state, colour)
+        lines.append(f"  {label}  {state}")
+        for part in theme.wrap(check.detail, theme.width - width - 8):
+            lines.append(f"  {' ' * width}    {theme.dim(part)}")
+
+    if found.horizon:
+        lines.extend(["", rule, "", f"  {theme.label('how far back the records reach')}", ""])
+        edge = max(len(check.name) for check in found.horizon)
+        for check in found.horizon:
+            lines.append(
+                f"  {theme.paint(check.name.ljust(edge), 'body')}  {theme.dim(check.detail)}"
+            )
+        lines.append("")
+        lines.append(
+            _note_line(theme, "A file older than this cannot be resolved from browser history.")
+        )
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _note_line(theme: Theme, text: str) -> str:
+    return f"  {theme.dim(theme.clip(text, theme.width - 4))}"
+
+
+def render_json_doctor(found) -> str:
+    return json.dumps(found.to_dict(), ensure_ascii=False, indent=2)
+
+
 def render_json(records: list[FileRecord], root: Path, *, identify: bool = False) -> str:
     payload: dict[str, object] = {
         "root": str(root),

@@ -50,6 +50,7 @@ ACTIONS = (
     Action("7", "identifiers in the metadata", ("--identify",)),
     Action("i", "images only", ("--type", "image")),
     Action("d", "documents only", ("--type", "document")),
+    Action("s", "what this machine can be asked", ("--doctor",)),
     Action("6", "add a SHA-256 for each file", ("--hash",)),
     Action("8", "redacted JSON, safe to share", ("--redact", "--json")),
 )
