@@ -113,8 +113,17 @@ def test_reads_jpeg_camera_and_capture_time(tmp_path: Path):
     origin = read_embedded_metadata(photo)
 
     assert origin is not None
-    assert origin.tool == "Canon Canon EOS 5D"
+    # The maker is not repeated when the model already carries it.
+    assert origin.tool == "Canon EOS 5D"
     assert origin.at == "2026-04-19T21:43:48Z"
+    assert origin.source == "device-metadata"
+
+
+def test_maker_is_kept_when_the_model_does_not_carry_it(tmp_path: Path):
+    photo = tmp_path / "photo.jpg"
+    _jpeg_with_exif(photo, "NIKON", "COOLPIX P6000", "2026:04:19 21:43:48")
+
+    assert read_embedded_metadata(photo).tool == "NIKON COOLPIX P6000"
 
 
 def test_jpeg_without_exif_yields_nothing(tmp_path: Path):

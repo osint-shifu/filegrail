@@ -9,6 +9,9 @@ from .models import FileRecord
 
 _ARROW = "  <- "
 
+#: Sources describing what a file says about itself, rather than where it came from.
+_SELF_REPORTED = frozenset({"document-metadata", "device-metadata", "c2pa"})
+
 
 def _shorten(value: str, width: int) -> str:
     if len(value) <= width:
@@ -40,11 +43,16 @@ def render_text(
         for origin in origins:
             if origin is None:
                 continue
-            if origin.source in ("document-metadata", "c2pa"):
+            if origin.source in _SELF_REPORTED:
                 target = _document_summary(origin, record)
             else:
                 target = origin.url or origin.command or origin.tool or "(no detail)"
-            stamp = origin.at or record.btime or record.mtime
+            # A self-reported source shows only its own timestamp: falling back
+            # to the filesystem would present a copy date as a creation date.
+            if origin.source in _SELF_REPORTED:
+                stamp = origin.at
+            else:
+                stamp = origin.at or record.btime or record.mtime
             lines.append(f"{_ARROW}{_shorten(target, 96)}")
             detail = f"     {origin.source}"
             if origin.tool and origin.tool not in target:
@@ -53,6 +61,8 @@ def render_text(
                 detail += f"  {stamp}"
             detail += f"  confidence {origin.confidence}"
             lines.append(detail)
+            if origin.location:
+                lines.append(f"     location  {origin.location}")
             if verbose and origin.referrer:
                 lines.append(f"     referrer  {_shorten(origin.referrer, 88)}")
             if origin.note:

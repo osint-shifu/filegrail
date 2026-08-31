@@ -5,32 +5,29 @@ different question - what produced it, who authored it and when - and it is
 often the only answer available, because it survives copying, renaming, moving
 between machines and the expiry of every browser history on the system.
 
-Three containers are read, all with the standard library so the tool keeps no
+Two containers are read here with the standard library, so the tool keeps no
 runtime dependencies:
 
     PDF     the Info dictionary: Producer, Creator, Author, CreationDate
     OOXML   docProps/core.xml and app.xml: creator, lastModifiedBy, Company
-    JPEG    the TIFF header: Make, Model, Software, DateTimeOriginal
 
-This never reports a URL, so it does not compete with a download record. It
-fills the gap underneath one.
+Neither reports a URL, so neither competes with a download record. They fill the
+gap underneath one.
 """
 
 from __future__ import annotations
 
 import re
-import struct
 import xml.etree.ElementTree as ElementTree
 import zipfile
 import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..models import Origin
+from ...models import Origin
 
 PDF_SUFFIXES = {".pdf"}
-OOXML_SUFFIXES = {".docx", ".xlsx", ".pptx", ".docm", ".xlsm", ".pptm"}
-JPEG_SUFFIXES = {".jpg", ".jpeg"}
+OOXML_SUFFIXES = {".docx", ".xlsx", ".pptx", ".docm", ".xlsm", ".pptm", ".dotx", ".xltx"}
 
 # Only the head of a PDF trailer is scanned; the Info dictionary lives near the
 # start or the end, and reading whole multi-gigabyte files would be pointless.
@@ -56,29 +53,15 @@ _DCTERMS = "http://purl.org/dc/terms/"
 _COREPROPS = "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
 _EXTPROPS = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
 
-# TIFF tags worth reading. Anything else is camera trivia, not provenance.
-_TIFF_MAKE = 0x010F
-_TIFF_MODEL = 0x0110
-_TIFF_SOFTWARE = 0x0131
-_TIFF_DATETIME = 0x0132
-_TIFF_EXIF_IFD = 0x8769
-_EXIF_DATETIME_ORIGINAL = 0x9003
-_TIFF_ASCII = 2
+
+def read_pdf(path: Path) -> Origin | None:
+    """Return what a PDF says about its own creation."""
+    return _read_pdf(path)
 
 
-def read_embedded_metadata(path: Path) -> Origin | None:
-    """Return what the file says about its own creation, if anything."""
-    suffix = path.suffix.lower()
-    try:
-        if suffix in PDF_SUFFIXES:
-            return _read_pdf(path)
-        if suffix in OOXML_SUFFIXES:
-            return _read_ooxml(path)
-        if suffix in JPEG_SUFFIXES:
-            return _read_jpeg(path)
-    except (OSError, ValueError, struct.error, zipfile.BadZipFile, ElementTree.ParseError):
-        return None
-    return None
+def read_ooxml(path: Path) -> Origin | None:
+    """Return what an Office Open XML document says about its own creation."""
+    return _read_ooxml(path)
 
 
 def _origin(tool: str | None, at: str | None, note: str | None) -> Origin | None:
@@ -234,103 +217,3 @@ def _normalise_timestamp(value: str | None) -> str | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _read_jpeg(path: Path) -> Origin | None:
-    tags = _read_exif_tags(path)
-    if not tags:
-        return None
-
-    make = tags.get(_TIFF_MAKE)
-    model = tags.get(_TIFF_MODEL)
-    camera = " ".join(part for part in (make, model) if part) or None
-    software = tags.get(_TIFF_SOFTWARE)
-
-    tool = camera or software
-    if camera and software:
-        tool = f"{camera} (processed with {software})"
-
-    taken = tags.get(_EXIF_DATETIME_ORIGINAL) or tags.get(_TIFF_DATETIME)
-    return _origin(tool, _parse_exif_date(taken), None)
-
-
-def _parse_exif_date(value: str | None) -> str | None:
-    """EXIF stores 'YYYY:MM:DD HH:MM:SS' with no zone; treat it as UTC."""
-    if not value:
-        return None
-    try:
-        parsed = datetime.strptime(value.strip().strip("\x00"), "%Y:%m:%d %H:%M:%S")
-    except ValueError:
-        return None
-    return parsed.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _read_exif_tags(path: Path) -> dict[int, str]:
-    """Minimal TIFF/EXIF reader for the handful of provenance tags."""
-    with path.open("rb") as handle:
-        if handle.read(2) != b"\xff\xd8":
-            return {}
-        exif = _find_app1(handle)
-    if exif is None or len(exif) < 8:
-        return {}
-
-    byte_order = exif[:2]
-    if byte_order == b"II":
-        endian = "<"
-    elif byte_order == b"MM":
-        endian = ">"
-    else:
-        return {}
-
-    (first_ifd,) = struct.unpack_from(endian + "I", exif, 4)
-    tags: dict[int, str] = {}
-    _read_ifd(exif, first_ifd, endian, tags)
-
-    if _TIFF_EXIF_IFD in tags:
-        try:
-            _read_ifd(exif, int(tags.pop(_TIFF_EXIF_IFD)), endian, tags)
-        except (ValueError, struct.error):
-            pass
-    return tags
-
-
-def _find_app1(handle) -> bytes | None:
-    """Walk JPEG segments until the Exif APP1 marker, then return its payload."""
-    while True:
-        marker = handle.read(2)
-        if len(marker) < 2 or marker[0] != 0xFF:
-            return None
-        if marker[1] in (0xDA, 0xD9):  # start of scan, end of image
-            return None
-        length_bytes = handle.read(2)
-        if len(length_bytes) < 2:
-            return None
-        (length,) = struct.unpack(">H", length_bytes)
-        payload = handle.read(length - 2)
-        if marker[1] == 0xE1 and payload.startswith(b"Exif\x00\x00"):
-            return payload[6:]
-
-
-def _read_ifd(data: bytes, offset: int, endian: str, tags: dict[int, str]) -> None:
-    if offset <= 0 or offset + 2 > len(data):
-        return
-    (count,) = struct.unpack_from(endian + "H", data, offset)
-    for index in range(min(count, 512)):
-        entry = offset + 2 + index * 12
-        if entry + 12 > len(data):
-            return
-        tag, kind, length = struct.unpack_from(endian + "HHI", data, entry)
-        if tag == _TIFF_EXIF_IFD:
-            (value,) = struct.unpack_from(endian + "I", data, entry + 8)
-            tags[tag] = str(value)
-            continue
-        if kind != _TIFF_ASCII or length == 0 or length > 1024:
-            continue
-        if length <= 4:
-            raw = data[entry + 8 : entry + 8 + length]
-        else:
-            (value_offset,) = struct.unpack_from(endian + "I", data, entry + 8)
-            raw = data[value_offset : value_offset + length]
-        text = raw.split(b"\x00")[0].decode("utf-8", "replace").strip()
-        if text:
-            tags[tag] = text

@@ -1,0 +1,177 @@
+"""Zip-based and text-based document containers.
+
+Each of these keeps its provenance in a well-known place, and each is reachable
+with nothing but the standard library:
+
+    ODF     meta.xml: meta:generator, dc:creator, meta:creation-date
+    EPUB    the OPF package: dc:creator, dc:date, the generator meta
+    RTF     the \\*\\generator group
+    SVG     inkscape:version, an Illustrator comment, or Dublin Core
+    IPYNB   the kernel and language recorded by Jupyter
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import xml.etree.ElementTree as ElementTree
+import zipfile
+from dataclasses import dataclass
+from pathlib import Path
+
+ODF_SUFFIXES = {".odt", ".ods", ".odp", ".odg", ".odf", ".otp", ".ott"}
+EPUB_SUFFIXES = {".epub"}
+RTF_SUFFIXES = {".rtf"}
+SVG_SUFFIXES = {".svg"}
+NOTEBOOK_SUFFIXES = {".ipynb"}
+SUFFIXES = ODF_SUFFIXES | EPUB_SUFFIXES | RTF_SUFFIXES | SVG_SUFFIXES | NOTEBOOK_SUFFIXES
+
+_OFFICE_META = "urn:oasis:names:tc:opendocument:xmlns:meta:1.0"
+_OFFICE = "urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+_DC = "http://purl.org/dc/elements/1.1/"
+_OPF = "http://www.idpf.org/2007/opf"
+_CONTAINER_NS = "urn:oasis:names:tc:opendocument:xmlns:container"
+_INKSCAPE = "http://www.inkscape.org/namespaces/inkscape"
+
+_TEXT_SCAN_BYTES = 256 * 1024
+_RTF_GENERATOR = re.compile(rb"\{\\\*\\generator ([^;}]{1,200})")
+_SVG_COMMENT = re.compile(r"<!--\s*(?:Generator|Created with)\s*:?\s*([^->]{3,120?})\s*-->", re.I)
+
+
+@dataclass(slots=True)
+class Document:
+    """What a container says about its own creation."""
+
+    tool: str | None = None
+    author: str | None = None
+    created: str | None = None
+    title: str | None = None
+
+    def __bool__(self) -> bool:
+        return any((self.tool, self.author, self.created, self.title))
+
+
+def read_container(path: Path) -> Document | None:
+    suffix = path.suffix.lower()
+    try:
+        if suffix in ODF_SUFFIXES:
+            found = _read_odf(path)
+        elif suffix in EPUB_SUFFIXES:
+            found = _read_epub(path)
+        elif suffix in RTF_SUFFIXES:
+            found = _read_rtf(path)
+        elif suffix in SVG_SUFFIXES:
+            found = _read_svg(path)
+        elif suffix in NOTEBOOK_SUFFIXES:
+            found = _read_notebook(path)
+        else:
+            return None
+    except (OSError, ValueError, zipfile.BadZipFile, ElementTree.ParseError, KeyError):
+        return None
+    return found if found else None
+
+
+def _read_odf(path: Path) -> Document:
+    with zipfile.ZipFile(path) as archive:
+        if "meta.xml" not in archive.namelist():
+            return Document()
+        root = ElementTree.fromstring(archive.read("meta.xml"))
+
+    meta = root.find(f"{{{_OFFICE}}}meta")
+    if meta is None:
+        meta = root
+    return Document(
+        tool=_text(meta.findtext(f"{{{_OFFICE_META}}}generator")),
+        author=_text(meta.findtext(f"{{{_DC}}}creator"))
+        or _text(meta.findtext(f"{{{_OFFICE_META}}}initial-creator")),
+        created=_text(meta.findtext(f"{{{_OFFICE_META}}}creation-date")),
+        title=_text(meta.findtext(f"{{{_DC}}}title")),
+    )
+
+
+def _read_epub(path: Path) -> Document:
+    with zipfile.ZipFile(path) as archive:
+        names = archive.namelist()
+        opf_name = None
+        if "META-INF/container.xml" in names:
+            container = ElementTree.fromstring(archive.read("META-INF/container.xml"))
+            root_file = container.find(f".//{{{_CONTAINER_NS}}}rootfile")
+            if root_file is not None:
+                opf_name = root_file.get("full-path")
+        if opf_name is None:
+            opf_name = next((name for name in names if name.endswith(".opf")), None)
+        if opf_name is None or opf_name not in names:
+            return Document()
+        package = ElementTree.fromstring(archive.read(opf_name))
+
+    generator = None
+    for meta in package.iter(f"{{{_OPF}}}meta"):
+        if (meta.get("name") or "").lower() in ("generator", "calibre:timestamp"):
+            generator = generator or _text(meta.get("content"))
+    return Document(
+        tool=generator,
+        author=_text(package.findtext(f".//{{{_DC}}}creator")),
+        created=_text(package.findtext(f".//{{{_DC}}}date")),
+        title=_text(package.findtext(f".//{{{_DC}}}title")),
+    )
+
+
+def _read_rtf(path: Path) -> Document:
+    with path.open("rb") as handle:
+        head = handle.read(_TEXT_SCAN_BYTES)
+    match = _RTF_GENERATOR.search(head)
+    if not match:
+        return Document()
+    return Document(tool=match.group(1).decode("latin-1", "replace").strip())
+
+
+def _read_svg(path: Path) -> Document:
+    with path.open("rb") as handle:
+        head = handle.read(_TEXT_SCAN_BYTES)
+    text = head.decode("utf-8", "replace")
+
+    tool = None
+    comment = _SVG_COMMENT.search(text)
+    if comment:
+        tool = comment.group(1).strip()
+
+    author = None
+    try:
+        root = ElementTree.fromstring(text) if text.rstrip().endswith(">") else None
+    except ElementTree.ParseError:
+        root = None
+    if root is not None:
+        version = root.get(f"{{{_INKSCAPE}}}version")
+        if version:
+            tool = tool or f"Inkscape {version}"
+        author = _text(root.findtext(f".//{{{_DC}}}creator"))
+    elif "inkscape:version" in text:
+        found = re.search(r'inkscape:version="([^"]{1,60})"', text)
+        if found:
+            tool = tool or f"Inkscape {found.group(1)}"
+
+    return Document(tool=tool, author=author)
+
+
+def _read_notebook(path: Path) -> Document:
+    with path.open("rb") as handle:
+        payload = json.loads(handle.read(_TEXT_SCAN_BYTES * 8).decode("utf-8", "replace"))
+    if not isinstance(payload, dict):
+        return Document()
+    metadata = payload.get("metadata") or {}
+    kernel = (metadata.get("kernelspec") or {}).get("display_name")
+    language = metadata.get("language_info") or {}
+    name = _text(language.get("name"))
+    version = _text(language.get("version"))
+
+    runtime = f"{name} {version}".strip() if name else None
+    parts = [part for part in (_text(kernel), runtime) if part]
+    tool = f"Jupyter ({', '.join(parts)})" if parts else "Jupyter notebook"
+
+    authors = metadata.get("authors")
+    author = _text(authors[0].get("name")) if isinstance(authors, list) and authors else None
+    return Document(tool=tool, author=author)
+
+
+def _text(value: object) -> str | None:
+    return value.strip() if isinstance(value, str) and value.strip() else None

@@ -12,6 +12,7 @@ CONFIDENCE = {
     "archive-member": 70,
     # A purpose-built provenance standard, but the signature is not verified here.
     "c2pa": 60,
+    "device-metadata": 55,
     "document-metadata": 50,
     "shell-history": 40,
     "filesystem": 10,
@@ -28,6 +29,7 @@ class Origin:
     tool: str | None = None
     command: str | None = None
     at: str | None = None
+    location: str | None = None
     bytes: int | None = None
     mime: str | None = None
     sha256: str | None = None
