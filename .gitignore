@@ -13,5 +13,9 @@ venv/
 .coverage
 htmlcov/
 
+# Review archives built with `git archive` - the repository already is the
+# source of truth, so a snapshot of it inside itself only goes stale.
+*.zip
+
 # Local sample files for manual runs - never commit real documents
 test-data/
