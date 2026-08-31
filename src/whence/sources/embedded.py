@@ -22,6 +22,7 @@ import re
 import struct
 import xml.etree.ElementTree as ElementTree
 import zipfile
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,9 +36,19 @@ JPEG_SUFFIXES = {".jpg", ".jpeg"}
 # start or the end, and reading whole multi-gigabyte files would be pointless.
 _PDF_SCAN_BYTES = 512 * 1024
 
-_PDF_FIELDS = ("Producer", "Creator", "Author", "CreationDate", "ModDate")
+#: Since PDF 1.5 the Info dictionary is often inside a Flate-compressed object
+#: stream, where a scan of the raw bytes cannot see it. WeasyPrint, pandoc and
+#: most modern writers do this, so the compressed streams are decompressed too.
+_PDF_STREAM = re.compile(rb"stream\r?\n(.*?)endstream", re.DOTALL)
+_PDF_MAX_STREAMS = 64
+_PDF_MAX_INFLATED = 4 * 1024 * 1024
+
+#: Values appear either as literal strings, ``/Producer (LibreOffice)``, or as
+#: hex strings, ``/Producer<FEFF004C0069...>``, which is what LibreOffice and
+#: several other writers actually emit. Both forms have to be read.
 _PDF_ENTRY = re.compile(
-    rb"/(Producer|Creator|Author|CreationDate|ModDate)\s*\((?P<value>(?:\\.|[^\\)])*)\)"
+    rb"/(Producer|Creator|Author|CreationDate|ModDate)\s*"
+    rb"(?:\((?P<literal>(?:\\.|[^\\)])*)\)|<(?P<hex>[0-9A-Fa-f\s]*)>)"
 )
 
 _DC = "http://purl.org/dc/elements/1.1/"
@@ -84,10 +95,15 @@ def _read_pdf(path: Path) -> Origin | None:
             head += handle.read(_PDF_SCAN_BYTES)
 
     found: dict[str, str] = {}
-    for match in _PDF_ENTRY.finditer(head):
+    for match in _PDF_ENTRY.finditer(head + _inflated_streams(head)):
         key = match.group(1).decode("ascii")
-        if key not in found:
-            found[key] = _decode_pdf_string(match.group("value"))
+        if match.group("hex") is not None:
+            value = _decode_pdf_hex(match.group("hex"))
+        else:
+            value = _decode_pdf_string(match.group("literal"))
+        # An empty /Producer () is common; do not let it mask a later real one.
+        if value and key not in found:
+            found[key] = value
 
     tool = found.get("Producer") or found.get("Creator")
     if found.get("Producer") and found.get("Creator") not in (None, found.get("Producer")):
@@ -97,11 +113,52 @@ def _read_pdf(path: Path) -> Origin | None:
     return _origin(tool, _parse_pdf_date(found.get("CreationDate")), "; ".join(notes) or None)
 
 
+def _inflated_streams(data: bytes) -> bytes:
+    """Return the concatenated contents of the Flate streams in `data`.
+
+    Failures are ignored on purpose: most streams are page content or fonts and
+    are of no interest, and a stream that will not inflate is not an error.
+    """
+    parts: list[bytes] = []
+    budget = _PDF_MAX_INFLATED
+
+    for index, match in enumerate(_PDF_STREAM.finditer(data)):
+        if index >= _PDF_MAX_STREAMS or budget <= 0:
+            break
+        try:
+            inflated = zlib.decompressobj().decompress(match.group(1), budget)
+        except zlib.error:
+            continue
+        if b"/Producer" in inflated or b"/Creator" in inflated or b"/CreationDate" in inflated:
+            parts.append(inflated)
+            budget -= len(inflated)
+
+    return b"".join(parts)
+
+
+def _decode_pdf_hex(raw: bytes) -> str:
+    """Decode a PDF hex string, ``<FEFF004C...>``, honouring the BOM if present."""
+    digits = bytes(raw).translate(None, delete=b" \t\r\n")
+    if len(digits) % 2:
+        digits += b"0"  # the specification pads an odd final digit with zero
+    try:
+        data = bytes.fromhex(digits.decode("ascii"))
+    except ValueError:
+        return ""
+    if data.startswith(b"\xfe\xff"):
+        text = data[2:].decode("utf-16-be", "replace")
+    else:
+        text = data.decode("latin-1", "replace")
+    return text.replace("\ufeff", "").strip("\x00").strip()
+
+
 def _decode_pdf_string(raw: bytes) -> str:
     value = re.sub(rb"\\([()\\])", rb"\1", raw)
     if value.startswith(b"\xfe\xff"):
-        return value.decode("utf-16-be", "replace").strip("\x00").strip()
-    return value.decode("latin-1", "replace").strip()
+        text = value[2:].decode("utf-16-be", "replace")
+    else:
+        text = value.decode("latin-1", "replace")
+    return text.replace("\ufeff", "").strip("\x00").strip()
 
 
 def _parse_pdf_date(value: str | None) -> str | None:

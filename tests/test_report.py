@@ -58,3 +58,30 @@ def test_no_explanation_when_something_matched():
 
     assert "prune download history" not in output
     assert "1 of 1 files have a recorded origin." in output
+
+
+def test_limit_zero_lists_everything():
+    records = [_record(f"f{index}.txt") for index in range(40)]
+
+    output = render_text(records, Path("/case"), limit=0)
+
+    assert "more (--limit 0" not in output
+    assert output.count("    created ") == 40
+
+
+def test_document_metadata_without_a_tool_reports_the_date_it_found():
+    origin = Origin(source="document-metadata", at="2026-07-20T19:05:21Z")
+    record = _record("invoice.pdf", origin)
+
+    output = render_text([record], Path("/case"))
+
+    assert "self-reported creation date" in output
+    assert "self-reported metadata" not in output
+
+
+def test_document_metadata_with_a_tool_says_what_made_it():
+    origin = Origin(source="document-metadata", tool="Typst 0.14.2", at="2026-07-07T14:41:23Z")
+
+    output = render_text([_record("spec.pdf", origin)], Path("/case"))
+
+    assert "made by Typst 0.14.2" in output

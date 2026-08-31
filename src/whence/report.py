@@ -41,7 +41,7 @@ def render_text(
             if origin is None:
                 continue
             if origin.source == "document-metadata":
-                target = f"made by {origin.tool}" if origin.tool else "self-reported metadata"
+                target = _document_summary(origin, record)
             else:
                 target = origin.url or origin.command or origin.tool or "(no detail)"
             stamp = origin.at or record.btime or record.mtime
@@ -61,15 +61,17 @@ def render_text(
 
     if unknown:
         lines.append(f"No recorded origin ({len(unknown)}):")
-        for record in unknown[:limit]:
+        shown = unknown if limit <= 0 else unknown[:limit]
+        for record in shown:
             relative = Path(record.path)
             try:
                 relative = relative.relative_to(root)
             except ValueError:
                 pass
             lines.append(f"  {relative}    created {record.btime or record.mtime}")
-        if len(unknown) > limit:
-            lines.append(f"  ... and {len(unknown) - limit} more (--json for the full list)")
+        if len(shown) < len(unknown):
+            hidden = len(unknown) - len(shown)
+            lines.append(f"  ... and {hidden} more (--limit 0 for all, --json for the full list)")
         lines.append("")
 
     lines.append(f"{len(known)} of {len(records)} files have a recorded origin.")
@@ -98,6 +100,20 @@ def explain_empty_result(stats: dict[str, int] | None) -> list[str]:
         "clearing history or migrating a profile discards it, so files older than the",
         "surviving history cannot be resolved.",
     ]
+
+
+def _document_summary(origin, record: FileRecord) -> str:
+    """Describe embedded metadata by what it actually carries.
+
+    A file often records a creation date but leaves the producer empty, and
+    saying only "self-reported metadata" hides the one fact that was found.
+    """
+    if origin.tool:
+        return f"made by {origin.tool}"
+    if origin.at:
+        note = "" if origin.at == record.mtime else ", which the filesystem does not show"
+        return f"self-reported creation date{note}"
+    return "self-reported metadata"
 
 
 def render_json(records: list[FileRecord], root: Path) -> str:

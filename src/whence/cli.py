@@ -65,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=25,
         metavar="N",
-        help="Cap the list of files with no recorded origin (default: 25).",
+        help="Cap the list of files with no recorded origin; 0 for all (default: 25).",
     )
     parser.add_argument(
         "--unknown-only",

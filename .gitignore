@@ -12,3 +12,6 @@ venv/
 .DS_Store
 .coverage
 htmlcov/
+
+# Local sample files for manual runs - never commit real documents
+test-data/

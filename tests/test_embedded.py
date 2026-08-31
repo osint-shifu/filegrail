@@ -132,3 +132,69 @@ def test_unsupported_and_corrupt_files_are_not_an_error(tmp_path: Path):
 
     assert read_embedded_metadata(plain) is None
     assert read_embedded_metadata(broken) is None
+
+
+def test_reads_hex_string_info_values(tmp_path: Path):
+    """LibreOffice writes /Producer<FEFF...> rather than a literal string."""
+    document = tmp_path / "hex.pdf"
+    producer = "LibreOffice 24.2".encode("utf-16-be").hex().upper()
+    author = "OSINT360".encode("utf-16-be").hex().upper()
+    document.write_bytes(
+        b"%PDF-1.6\n<< /Producer<FEFF"
+        + producer.encode()
+        + b"> /Author<FEFF"
+        + author.encode()
+        + b"> >>\n"
+    )
+
+    origin = read_embedded_metadata(document)
+
+    assert origin is not None
+    assert origin.tool == "LibreOffice 24.2"
+    assert origin.note == "author OSINT360"
+    assert "﻿" not in origin.tool  # the byte-order mark must not survive
+
+
+def test_empty_info_values_do_not_mask_a_real_date(tmp_path: Path):
+    document = tmp_path / "empty-producer.pdf"
+    document.write_bytes(
+        b"%PDF-1.4\n<< /Creator () /Producer () /CreationDate (D:20260720190521+00'00') >>\n"
+    )
+
+    origin = read_embedded_metadata(document)
+
+    assert origin is not None
+    assert origin.tool is None
+    assert origin.at == "2026-07-20T19:05:21Z"
+
+
+def test_reads_info_from_a_compressed_object_stream(tmp_path: Path):
+    """PDF 1.5+ writers put the Info dictionary inside a Flate stream."""
+    import zlib
+
+    inner = b"<< /Producer (WeasyPrint 68.0) /Creator (pandoc) >>"
+    compressed = zlib.compress(inner)
+    document = tmp_path / "objstm.pdf"
+    document.write_bytes(
+        b"%PDF-1.7\n5 0 obj\n<< /Type /ObjStm /Filter /FlateDecode >>\nstream\n"
+        + compressed
+        + b"\nendstream\nendobj\n"
+    )
+
+    origin = read_embedded_metadata(document)
+
+    assert origin is not None
+    assert origin.tool == "WeasyPrint 68.0 (created in pandoc)"
+
+
+def test_undecompressable_stream_is_not_an_error(tmp_path: Path):
+    document = tmp_path / "broken-stream.pdf"
+    document.write_bytes(
+        b"%PDF-1.7\nstream\nnot actually deflate data at all\nendstream\n"
+        b"<< /Producer (Fallback 1.0) >>\n"
+    )
+
+    origin = read_embedded_metadata(document)
+
+    assert origin is not None
+    assert origin.tool == "Fallback 1.0"
