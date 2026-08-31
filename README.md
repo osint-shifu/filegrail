@@ -533,5 +533,5 @@ Apache License 2.0. See [`LICENSE`](LICENSE).
 ---
 
 <div align="center">
-  <strong>Trace where files came from. After the fact.</strong>
+  <strong>Trace where files came from.</strong>
 </div>
