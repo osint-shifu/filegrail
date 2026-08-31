@@ -15,6 +15,8 @@ CONFIDENCE = {
     "device-metadata": 55,
     "document-metadata": 50,
     "shell-history": 40,
+    # An application opening a file proves contact, not acquisition.
+    "recent-documents": 35,
     "filesystem": 10,
 }
 
@@ -31,6 +33,7 @@ SOURCE_LABELS = {
     "device-metadata": "device metadata",
     "document-metadata": "document metadata",
     "shell-history": "shell history",
+    "recent-documents": "recent documents",
     "filesystem": "filesystem",
 }
 
@@ -44,6 +47,7 @@ ACQUISITION = frozenset(
         "xdg-xattr",
         "archive-member",
         "shell-history",
+        "recent-documents",
         "filesystem",
     }
 )

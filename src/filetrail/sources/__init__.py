@@ -5,6 +5,7 @@ from .browser import collect_browser_downloads
 from .c2pa import read_c2pa_manifest
 from .embedded import read_embedded_metadata
 from .fsattrs import read_file_attributes
+from .recent import collect_recent_files
 from .shell import collect_shell_history
 
 __all__ = [
@@ -13,6 +14,7 @@ __all__ = [
     "read_embedded_metadata",
     "read_c2pa_manifest",
     "collect_shell_history",
+    "collect_recent_files",
     "is_archive",
     "list_members",
     "inherited_origin",

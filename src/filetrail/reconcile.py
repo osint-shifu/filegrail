@@ -121,11 +121,16 @@ def _match_reasons(acquisition: list[Origin]) -> list[str]:
     A name match survives the file being moved, which is why it is made, but it
     also matches a different file that happens to share the name.
     """
-    return [
-        f"{_label(origin)} was matched by file name, not by path"
-        for origin in acquisition
-        if origin.note and "matched by file name" in origin.note
-    ]
+    reasons = []
+    for origin in acquisition:
+        note = origin.note or ""
+        if "size differs" in note or "recorded size differs" in note:
+            reasons.append(f"{_label(origin)} matched by name, but its recorded size differs")
+        elif "matched by file name and size" in note:
+            reasons.append(f"{_label(origin)} matched by name, and its recorded size agrees")
+        elif "matched by file name" in note:
+            reasons.append(f"{_label(origin)} was matched by file name, not by path")
+    return reasons
 
 
 def _label(origin: Origin) -> str:

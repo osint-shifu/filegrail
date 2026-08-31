@@ -10,6 +10,7 @@ from pathlib import Path
 from .models import FileRecord, Origin
 from .sources import (
     collect_browser_downloads,
+    collect_recent_files,
     collect_shell_history,
     inherited_origin,
     is_archive,
@@ -104,6 +105,7 @@ def scan(
     history = (
         collect_shell_history({path.name for path in files}, home=home) if use_shell_history else {}
     )
+    recent = collect_recent_files(home=home)
 
     records: list[FileRecord] = []
     for path in files:
@@ -124,7 +126,7 @@ def scan(
         record.origins.extend(exact)
         if not exact:
             for origin in downloads_by_name.get(path.name, []):
-                record.origins.append(_matched_by_name(origin))
+                record.origins.append(matched_by_name(origin, stat.st_size))
 
         record.origins.extend(read_file_attributes(path))
         for reader in (read_c2pa_manifest, read_embedded_metadata):
@@ -132,6 +134,7 @@ def scan(
             if claim is not None:
                 record.origins.append(claim)
         record.origins.extend(history.get(path.name, []))
+        record.origins.extend(recent.get(str(path), []))
         records.append(record)
 
     if follow_archives:
@@ -184,7 +187,23 @@ def _attach_archive_origins(
                     record.origins.append(inherited_origin(best, archive_name))
 
 
-def _matched_by_name(origin: Origin) -> Origin:
-    """Copy an origin, recording that it was matched by name and not by path."""
+def matched_by_name(origin: Origin, size: int) -> Origin:
+    """Copy an origin, recording that it was matched by name and not by path.
+
+    A name match is made on purpose: it survives the file being moved or
+    renamed, which is exactly when a path match fails. But it also matches a
+    different file that happens to share the name, so where the record kept a
+    byte count it is checked - a size that agrees is corroboration the name
+    alone cannot give, and one that disagrees very likely means this is not the
+    file the record is about.
+    """
     note = "matched by file name; the file was moved or renamed since download"
+    if origin.bytes:
+        if origin.bytes == size:
+            note = "matched by file name and size; the file was moved or renamed since download"
+        else:
+            note = (
+                f"matched by file name, but the recorded size differs "
+                f"({origin.bytes} bytes recorded, {size} on disk)"
+            )
     return replace(origin, note=f"{origin.note}; {note}" if origin.note else note)

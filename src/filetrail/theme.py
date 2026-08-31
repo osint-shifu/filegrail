@@ -55,7 +55,23 @@ EVIDENCE = {
     "device-metadata": "self-reported",
     "document-metadata": "self-reported",
     "shell-history": "circumstantial",
+    "recent-documents": "circumstantial",
     "filesystem": "faint",
+}
+
+#: How each class reads as a strength, on the meter line.
+#:
+#: The number behind it ranks sources against each other and stays in `--json`,
+#: but printing `55` in a report invites it to be read as a probability, which
+#: it never was. There is no statistical basis for `55`; there is a defensible
+#: ordering of how directly a source knows what it claims.
+STRENGTH = {
+    "recorded": "direct",
+    "inherited": "inherited",
+    "credentialed": "credentialed",
+    "self-reported": "self-reported",
+    "circumstantial": "circumstantial",
+    "faint": "weak",
 }
 
 #: How each class reads as a section heading, in the order the report uses.

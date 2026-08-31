@@ -26,6 +26,7 @@ from .theme import (
     LAST,
     MIDDOT,
     RAIL,
+    STRENGTH,
     Theme,
     detect,
 )
@@ -280,7 +281,7 @@ def _origin(theme: Theme, origin: Origin, record: FileRecord, *, brief: bool = F
 
     # The meter keeps the first line's right edge; anything that does not fit
     # beside it continues underneath rather than being cut off.
-    meter = f"{theme.meter(origin.confidence, colour)} {theme.dim(str(origin.confidence))}"
+    meter = f"{theme.meter(origin.confidence, colour)} {theme.dim(STRENGTH.get(colour, colour))}"
     room = theme.width - indent - _visible(meter) - 2
     for index, part in enumerate(theme.wrap(detail, room)):
         if index == 0:

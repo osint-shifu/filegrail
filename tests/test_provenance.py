@@ -122,3 +122,33 @@ def test_the_summary_counts_a_file_once():
     output = render_text([_record(DOWNLOAD, CAMERA)], Path("/case"), theme=PLAIN)
 
     assert "1 of 1 files have a recorded origin." in output
+
+
+# --- how strength reads ------------------------------------------------------
+
+
+def test_the_meter_names_the_strength_rather_than_a_score():
+    """`55` invites being read as a probability. It never was one."""
+    output = render_text([_record(DOWNLOAD, CAMERA)], Path("/case"), theme=PLAIN)
+
+    assert "direct" in output
+    assert "self-reported" in output
+    assert "▰▰▰▰▱ 90" not in output
+
+
+def test_the_number_survives_in_json():
+    """It still ranks sources against each other; it just is not printed."""
+    import json
+
+    from filetrail.report import render_json
+
+    payload = json.loads(render_json([_record(DOWNLOAD, CAMERA)], Path("/case")))
+    scores = {origin["confidence"] for origin in payload["files"][0]["origins"]}
+
+    assert scores == {90, 55}
+
+
+def test_every_evidence_class_has_a_strength_word():
+    from filetrail.theme import EVIDENCE, STRENGTH
+
+    assert set(EVIDENCE.values()) <= set(STRENGTH)

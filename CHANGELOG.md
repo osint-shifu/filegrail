@@ -9,6 +9,22 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Evidence strength replaces the bare number on the meter line: `direct`,
+  `inherited`, `credentialed`, `self-reported`, `circumstantial`, `weak`.
+  Printing `55` invited it to be read as a probability, which it never was -
+  there is no statistical basis for `55`, only a defensible ordering of how
+  directly a source knows what it claims. The number still ranks sources against
+  each other and still appears in `--json`.
+- A download record matched to a file by name is now checked against the size
+  the record kept. A size that agrees is corroboration the name alone cannot
+  give; one that disagrees very likely means the record is about a different
+  file that happens to share the name, and the reconciliation says so.
+- The desktop's recently-used list, read from the freedesktop
+  `recently-used.xbel` every GTK application writes. It names the application
+  that opened a file and when - the graphical equivalent of shell history, and
+  ranked just below it, because opening a file proves contact rather than
+  acquisition.
+
 - `--doctor`, which reports what this machine can be asked before anything is
   asked of it: which browser profiles are readable and how many records they
   hold, whether this filesystem carries extended attributes (tested, not assumed
