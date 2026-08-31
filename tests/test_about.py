@@ -72,7 +72,7 @@ def test_an_installed_run_says_nothing_about_installing(monkeypatch):
 def test_it_shows_examples_and_flags():
     screen = _screen()
 
-    for flag in ("--unknown-only", "--full", "--timeline", "--json", "--redact", "--menu"):
+    for flag in ("--unknown-only", "--brief", "--timeline", "--json", "--redact", "--menu"):
         assert flag in screen, flag
     assert "--help" in screen
 

@@ -16,7 +16,17 @@ from pathlib import Path
 
 from .identify import Identifier, extract
 from .models import FileRecord, Origin
-from .theme import ARROW, BULLET, EVIDENCE_HEADINGS, MIDDOT, Theme, detect
+from .theme import (
+    ARROW,
+    BRANCH,
+    BULLET,
+    EVIDENCE_HEADINGS,
+    LAST,
+    MIDDOT,
+    RAIL,
+    Theme,
+    detect,
+)
 
 #: Sources describing what a file says about itself, rather than where it came from.
 SELF_REPORTED = frozenset({"document-metadata", "device-metadata", "c2pa"})
@@ -38,20 +48,40 @@ SOURCE_LABELS = {
 #: Width of the label column inside an entry, so values line up across labels.
 _LABEL = 10
 
-#: Where an entry's text begins: two spaces, one gutter glyph, one space.
+#: Where an entry's text begins: two spaces, the gutter glyph, one space.
 _INDENT = 4
 
 
-def _row(theme: Theme, prefix: str, body: str, right: str, *, paint=None) -> str:
+def _gutter(theme: Theme) -> int:
+    """How wide the gutter column is for this theme.
+
+    Unicode glyphs are all one column, but the ASCII arrow is `<-`, two. Padding
+    every glyph to the widest keeps the left edge straight in both, which is the
+    whole point of having a gutter.
+    """
+    return 2 + len(theme.glyph(ARROW)) + 1
+
+
+def _mark(theme: Theme, symbol: str, colour: str | None = None) -> str:
+    """One gutter glyph, padded so every line starts its text in one column."""
+    width = len(theme.glyph(ARROW))
+    glyph = theme.glyph(symbol).ljust(width)
+    return theme.paint(glyph, colour) if colour else theme.paint(glyph, "rail")
+
+
+def _row(theme: Theme, prefix: str, body: str, right: str, *, paint=None, wrap: bool = True) -> str:
     """One line carrying a single right-aligned column.
 
     `prefix` and `right` arrive painted, so only their visible width matters.
-    `body` arrives plain and is clipped to whatever the right-hand column leaves
-    before being painted - clipping afterwards would cut an escape sequence in
-    half, and not clipping at all is how a narrow terminal wraps into nonsense.
+    `body` arrives plain and is sized before painting - doing it afterwards
+    would cut an escape sequence in half.
+
+    `wrap=False` says the caller has already broken the text and this is one
+    piece of it, so it must be left alone.
     """
     room = theme.width - _visible(prefix) - _visible(right) - 2
-    body = theme.clip(body, max(8, room))
+    if wrap:
+        body = theme.clip(body, max(8, room))
     painted = paint(body) if paint else body
     gap = max(1, theme.width - _visible(prefix) - _visible(painted) - _visible(right))
     return f"{prefix}{painted}{' ' * gap}{right}"
@@ -62,7 +92,7 @@ def render_text(
     root: Path,
     *,
     verbose: bool = False,
-    full: bool = False,
+    brief: bool = False,
     limit: int = 25,
     stats: dict[str, int] | None = None,
     theme: Theme | None = None,
@@ -74,7 +104,7 @@ def render_text(
     unknown = [record for record in records if not record.origins]
 
     lines = _masthead(theme, root, len(records), len(known))
-    lines.extend(_sections(theme, known, root, verbose=verbose, full=full))
+    lines.extend(_sections(theme, known, root, verbose=verbose, brief=brief))
 
     if unknown:
         lines.extend(_unknown(theme, unknown, root, limit))
@@ -141,7 +171,7 @@ def _masthead(theme: Theme, root: Path, total: int, traced: int) -> list[str]:
 
 
 def _sections(
-    theme: Theme, known: list[FileRecord], root: Path, *, verbose: bool, full: bool
+    theme: Theme, known: list[FileRecord], root: Path, *, verbose: bool, brief: bool
 ) -> list[str]:
     """Group entries by the class of evidence that explains them.
 
@@ -168,11 +198,11 @@ def _sections(
         if show_headings:
             lines.extend(_heading(theme, heading, len(members)))
         for record in members:
-            lines.extend(_entry(theme, record, root, verbose=verbose, full=full))
+            lines.extend(_entry(theme, record, root, verbose=verbose, brief=brief))
 
     for members in grouped.values():  # any class the table above did not name
         for record in members:
-            lines.extend(_entry(theme, record, root, verbose=verbose, full=full))
+            lines.extend(_entry(theme, record, root, verbose=verbose, brief=brief))
     return lines
 
 
@@ -185,69 +215,95 @@ def _heading(theme: Theme, text: str, count: int, noun: str = "file") -> list[st
     ]
 
 
-def _entry(theme: Theme, record: FileRecord, root: Path, *, verbose: bool, full: bool) -> list[str]:
+def _entry(
+    theme: Theme, record: FileRecord, root: Path, *, verbose: bool, brief: bool
+) -> list[str]:
     colour = theme.evidence(record.best.source if record.best else "filesystem")
-    prefix = f"  {theme.paint(theme.glyph(BULLET), colour)} "
+    indent = _gutter(theme)
+    bullet = _mark(theme, BULLET, colour)
+    size = theme.dim(_size(record.size))
+    name = _relative(record.path, root)
+
+    room = theme.width - indent - _visible(size) - 2
+    wrapped = theme.wrap(name, room)
     lines = [
-        _row(
-            theme,
-            prefix,
-            _relative(record.path, root),
-            theme.dim(_size(record.size)),
-            paint=theme.bold,
-        )
+        _row(theme, f"  {bullet} ", wrapped[0], size, wrap=False, paint=theme.bold),
+        *(f"{' ' * indent}{theme.bold(part)}" for part in wrapped[1:]),
     ]
 
     for origin in record.origins if verbose else [record.best]:
         if origin is not None:
-            lines.extend(_origin(theme, origin, record, full=full))
+            lines.extend(_origin(theme, origin, record, brief=brief))
     lines.append("")
     return lines
 
 
-def _origin(theme: Theme, origin: Origin, record: FileRecord, *, full: bool = False) -> list[str]:
+def _origin(theme: Theme, origin: Origin, record: FileRecord, *, brief: bool = False) -> list[str]:
     colour = theme.evidence(origin.source)
-    arrow = theme.paint(theme.glyph(ARROW), colour)
-    rail = theme.rail_glyph()
+    indent = _gutter(theme)
+    arrow = _mark(theme, ARROW, colour)
+    rail = _mark(theme, RAIL)
 
-    headline = _headline(origin, record)
-    room = theme.width - _INDENT - len(theme.glyph(ARROW))
-    lines = [f"  {arrow} {theme.paint(theme.clip(headline, room), colour)}"]
+    claim = _headline(origin, record)
+    wrapped = theme.wrap(claim, theme.width - indent)
+    lines = [f"  {arrow} {theme.paint(wrapped[0], colour)}"]
+    lines.extend(f"  {rail} {theme.paint(part, colour)}" for part in wrapped[1:])
 
     facts = [SOURCE_LABELS.get(origin.source, origin.source)]
-    if origin.tool and origin.tool not in headline:
+    if origin.tool and origin.tool not in claim:
         facts.append(origin.tool)
     stamp = origin.at if origin.source in SELF_REPORTED else (origin.at or record.btime)
     if stamp:
         facts.append(stamp)
     detail = theme.glyph(MIDDOT).join(f" {fact} " for fact in facts).strip()
 
+    # The meter keeps the first line's right edge; anything that does not fit
+    # beside it continues underneath rather than being cut off.
     meter = f"{theme.meter(origin.confidence, colour)} {theme.dim(str(origin.confidence))}"
-    lines.append(_row(theme, f"  {rail} ", detail, meter, paint=theme.label))
+    room = theme.width - indent - _visible(meter) - 2
+    for index, part in enumerate(theme.wrap(detail, room)):
+        if index == 0:
+            lines.append(_row(theme, f"  {rail} ", part, meter, wrap=False, paint=theme.label))
+        else:
+            lines.append(f"  {rail} {theme.label(part)}")
 
     for label, value, paint in _facts(origin):
-        text = theme.clip(value, theme.width - _INDENT - _LABEL)
-        painted = theme.paint(text, paint) if paint else theme.dim(text)
-        lines.append(f"  {rail} {theme.dim(label.ljust(_LABEL))}{painted}")
+        for index, part in enumerate(theme.wrap(value, theme.width - indent - _LABEL)):
+            head = theme.dim(label.ljust(_LABEL)) if index == 0 else " " * _LABEL
+            painted = theme.paint(part, paint) if paint else theme.dim(part)
+            lines.append(f"  {rail} {head}{painted}")
 
-    if full and origin.fields:
-        lines.extend(_fields_block(theme, rail, origin.fields))
+    if not brief and origin.fields:
+        lines.extend(_fields_block(theme, origin.fields, indent))
     return lines
 
 
-def _fields_block(theme: Theme, rail: str, fields: dict[str, str]) -> list[str]:
-    """Every decoded field, one per line, in the entry's own rail.
+def _fields_block(theme: Theme, fields: dict[str, str], indent: int) -> list[str]:
+    """Every decoded field, as a tree hanging off the claim above it.
 
-    The label column is sized to the names actually present rather than to a
-    constant: EXIF names run to seventeen characters and a fixed column would
-    either waste width on every other reader or wrap on this one.
+    Shown by default rather than behind a flag. A report is read to find things
+    out, and a reader who has to run the command a second time with `--full` has
+    already been told less than the tool knew.
+
+    The label column is sized to the names actually present: EXIF names run to
+    seventeen characters and a fixed column would either waste width on every
+    other reader or wrap on this one.
     """
     width = min(max(len(name) for name in fields), 24)
-    room = theme.width - _INDENT - width - 2
-    out = [f"  {rail}"]
-    for name, value in fields.items():
+    room = theme.width - indent - width - 2
+    items = list(fields.items())
+
+    out = [f"  {_mark(theme, RAIL)}".rstrip()]
+    for index, (name, value) in enumerate(items):
+        last = index == len(items) - 1
+        branch = _mark(theme, LAST if last else BRANCH)
         label = theme.dim(theme.clip(name, width).ljust(width))
-        out.append(f"  {rail} {label}  {theme.paint(theme.clip(str(value), room), 'body')}")
+        spacer = " " * len(theme.glyph(ARROW)) if last else _mark(theme, RAIL)
+
+        for line, part in enumerate(theme.wrap(str(value), room)):
+            gutter = branch if line == 0 else spacer
+            head = label if line == 0 else " " * width
+            out.append(f"  {gutter} {head}  {theme.paint(part, 'body')}")
     return out
 
 

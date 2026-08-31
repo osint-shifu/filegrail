@@ -76,6 +76,8 @@ BAR_EMPTY = "▱"
 BULLET = "●"
 ARROW = "←"
 RAIL = "│"
+BRANCH = "├"
+LAST = "└"
 RULE = "─"
 MIDDOT = "·"
 ELLIPSIS = "…"
@@ -86,6 +88,8 @@ _ASCII = {
     BULLET: "*",
     ARROW: "<-",
     RAIL: "|",
+    BRANCH: "+",
+    LAST: "\\",
     RULE: "-",
     # Not "|": the rail already claims that glyph, and a separator that looks
     # like a gutter destroys the one alignment cue the ASCII layout has.
@@ -132,8 +136,41 @@ class Theme:
     def label(self, text: str) -> str:
         return self.paint(text, "muted")
 
-    def rail_glyph(self) -> str:
-        return self.paint(self.glyph(RAIL), "rail")
+    def rail_glyph(self, symbol: str = RAIL) -> str:
+        return self.paint(self.glyph(symbol), "rail")
+
+    def wrap(self, value: str, width: int) -> list[str]:
+        """Break `value` into lines no wider than `width`, losing nothing.
+
+        Truncation is not an option here: a provenance report exists to be read,
+        and a value cut off at an ellipsis is one the reader now has to fetch
+        another way. Words are kept whole where they fit; a single token longer
+        than the line - a URL, a hash - is split, because the alternative is a
+        line that overflows the terminal.
+        """
+        collapsed = " ".join(value.split())
+        if width < 8:
+            width = 8
+
+        lines: list[str] = []
+        current = ""
+        for word in collapsed.split(" "):
+            while len(word) > width:
+                if current:
+                    lines.append(current)
+                    current = ""
+                lines.append(word[:width])
+                word = word[width:]
+            if not current:
+                current = word
+            elif len(current) + 1 + len(word) <= width:
+                current += f" {word}"
+            else:
+                lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        return lines or [""]
 
     def bold(self, text: str) -> str:
         return f"\x1b[1m{text}{RESET}" if self.colour and text else text

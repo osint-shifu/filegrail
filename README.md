@@ -139,7 +139,7 @@ filetrail report.pdf            # a single file
 filetrail . --unknown-only      # only files nothing accounts for
 filetrail . --timeline          # chronological, one line per event
 filetrail . --verbose           # every origin claim, not just the strongest
-filetrail . --full              # every metadata field a reader decoded
+filetrail . --brief             # summarise, instead of listing every field
 filetrail . --json              # machine-readable, for piping onward
 filetrail . --hash              # add SHA-256 for each file
 filetrail . --redact            # strip credentials from URLs and commands
@@ -204,12 +204,13 @@ the report says plainly rather than leaving blank.
 The report summarises. An investigation cannot know in advance which field will
 matter, so **readers keep everything they decode** and two surfaces expose it:
 
-```bash
-filetrail photo.jpg --full      # every field, in the terminal
-filetrail . --json              # every field, always, no flag needed
-```
+Every field is printed by default, as a tree under the file it belongs to, and
+`--json` carries the same. `--brief` collapses it back to one line per claim for
+anyone scanning a large tree.
 
-A geotagged JPEG summarises to four facts and carries fifty. Among them are the
+Nothing is truncated: a value too long for the terminal wraps rather than ending
+in an ellipsis, because a report exists to be read and a cut-off value is one the
+reader has to go and fetch another way. A geotagged JPEG carries fifty fields. Among them are the
 ones that decide cases: `BodySerialNumber` ties an image to one physical camera,
 `GPSDateStamp` and `GPSTimeStamp` come from the satellite fix rather than the
 camera clock, and `DateTimeDigitized` beside `DateTimeOriginal` shows whether the

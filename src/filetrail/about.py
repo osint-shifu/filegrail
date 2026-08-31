@@ -105,7 +105,7 @@ COMMANDS = (
 
 FLAGS = (
     ("--unknown-only", "only files nothing accounts for"),
-    ("--full", "every metadata field decoded"),
+    ("--brief", "summarise instead of listing every field"),
     ("--timeline", "chronological, one line per event"),
     ("--json", "machine-readable, for piping onward"),
     ("--redact", "strip credentials before sharing"),

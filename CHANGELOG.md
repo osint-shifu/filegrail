@@ -7,6 +7,20 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Changed
+
+- Nothing in the report is truncated any more. A value too long for the line
+  wraps onto the next one instead of ending in an ellipsis - the file name, the
+  origin, the source line, every labelled fact and every field. A cut-off value
+  is one the reader has to go and fetch another way, which defeats having read
+  the file at all.
+- Every decoded field is printed by default, as a tree (`+-` / `\\-`) hanging off
+  the claim it belongs to. `--full` is gone; `--brief` collapses the tree back to
+  a summary for anyone scanning a large tree.
+- Gutter glyphs are padded to a common width. The ASCII arrow is `<-`, two
+  characters, so the left edge previously stepped sideways in ASCII mode and one
+  wrapped line ran a column past the terminal width.
+
 ### Fixed
 
 - HEIC, HEIF and AVIF now yield their EXIF. The reader took the first

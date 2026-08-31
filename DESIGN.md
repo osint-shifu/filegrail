@@ -107,6 +107,23 @@ edge of the report is a single readable column:
 | `●` | `*` | This is a file. Painted in its evidence class. |
 | `←` | `<-` | This is where it came from. Painted in its evidence class. |
 | `│` | `\|` | A continuation of the claim above. Always Faint. |
+| `├` | `+` | One decoded field. Always Faint. |
+| `└` | `\\` | The last decoded field. Always Faint. |
+
+Every glyph is padded to the width of the widest, because the ASCII arrow is two
+characters and a gutter that is not one column is not a gutter.
+
+## Nothing is truncated
+
+A value too long for the line **wraps**; it never ends in an ellipsis. A report
+exists to be read, and a cut-off value is one the reader now has to fetch another
+way, which defeats having read the file at all. Words stay whole where they fit;
+a single token longer than the line - a URL, a hash - is split, because the
+alternative is a line that overflows the terminal.
+
+Every field a reader decoded is printed **by default**, as a tree hanging off the
+claim it belongs to. `--brief` collapses it. A reader who has to run the command
+a second time to see what the tool already knew has been told less than it knew.
 
 ```
   ● invoice-scan.pdf                                              1.2 MB

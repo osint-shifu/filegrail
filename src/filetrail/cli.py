@@ -63,9 +63,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Only these extensions, e.g. --ext jpg,pdf. The leading dot is optional.",
     )
     parser.add_argument(
-        "--full",
+        "--brief",
         action="store_true",
-        help="Print every metadata field a reader decoded, not just the summary.",
+        help="Summarise each file instead of listing every metadata field.",
     )
     parser.add_argument(
         "--no-recurse", action="store_true", help="Do not descend into subdirectories."
@@ -190,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
                 records,
                 base,
                 verbose=args.verbose,
-                full=args.full,
+                brief=args.brief,
                 limit=args.limit,
                 stats=stats,
                 theme=theme,

@@ -67,7 +67,7 @@ def test_end_of_input_leaves_quietly(tmp_path: Path):
         ("2", ["--unknown-only"]),
         ("3", ["--timeline"]),
         ("4", ["--verbose"]),
-        ("5", ["--full"]),
+        ("5", ["--brief"]),
         ("6", ["--hash"]),
         ("7", ["--identify"]),
         ("8", ["--redact", "--json"]),

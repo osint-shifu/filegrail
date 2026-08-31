@@ -48,26 +48,26 @@ def test_fields_reach_the_json_without_a_flag():
     assert fields["GPSDateStamp"] == "2008:10:22"
 
 
-def test_the_default_report_stays_short():
+def test_the_report_shows_every_field_by_default():
     output = render_text([_record()], Path("/case"), theme=PLAIN)
-
-    assert "NIKON COOLPIX P6000" in output
-    assert "BodySerialNumber" not in output
-
-
-def test_full_shows_every_field():
-    output = render_text([_record()], Path("/case"), theme=PLAIN, full=True)
 
     for name, value in FIELDS.items():
         assert name in output, name
         assert value in output, value
 
 
-def test_full_keeps_the_report_inside_the_width():
+def test_brief_summarises_instead():
+    output = render_text([_record()], Path("/case"), theme=PLAIN, brief=True)
+
+    assert "NIKON COOLPIX P6000" in output
+    assert "BodySerialNumber" not in output
+
+
+def test_the_field_block_keeps_the_report_inside_the_width():
     theme = Theme(colour=False, unicode=False, width=56)
     long_fields = {"UserComment": "x" * 400, "ImageDescription": "y" * 200}
 
-    output = render_text([_record(long_fields)], Path("/case"), theme=theme, full=True)
+    output = render_text([_record(long_fields)], Path("/case"), theme=theme)
 
     assert not [line for line in output.splitlines() if len(line) > 56]
 

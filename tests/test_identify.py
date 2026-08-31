@@ -163,10 +163,11 @@ def test_nothing_found_is_an_empty_list():
 # --- through the report ------------------------------------------------------
 
 
-def test_identifiers_are_absent_unless_asked_for():
+def test_the_identifier_section_is_absent_unless_asked_for():
+    """The field itself is on screen by default; the cross-file roll-up is not."""
     records = [_record("report.pdf", source="document-metadata", fields={"Author": "a@b.org"})]
 
-    assert "a@b.org" not in render_text(records, Path("/case"), theme=PLAIN)
+    assert "identifiers" not in render_text(records, Path("/case"), theme=PLAIN)
 
 
 def test_the_report_lists_them_on_request():
