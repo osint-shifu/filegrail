@@ -5,7 +5,7 @@ Contributions are welcome.
 ## Development setup
 
 ```bash
-git clone https://github.com/OWNER/filetrail.git
+git clone https://github.com/osint-shifu/filetrail.git
 cd filetrail
 
 python -m venv .venv
@@ -48,6 +48,24 @@ committing a sample.
 Do not compute byte lengths by hand in a test. Encode the structure with a small
 helper instead, so a miscounted length cannot silently produce a passing test on
 malformed input.
+
+Build the fixture the way a real encoder writes the file, not the way the
+specification reads. The two differ, and where they differ is where the bugs
+are: a HEIC names an `Exif` item in its item table long before the payload
+appears, so a reader that stops at the first marker decodes the table and
+reports nothing — on a green suite, because no synthetic fixture had a table.
+
+## The local corpus
+
+`tests/test_corpus.py` reads whatever real files you have put in `test-data/`,
+which is deliberately not committed. It asserts one invariant: a file holding a
+payload the TIFF parser can decode must not come back empty. That catches the
+class of bug a synthetic fixture cannot, without third-party binaries entering
+the tree.
+
+It skips when the directory is absent, so it is a local net rather than a CI
+gate. Point it at a directory of real photographs and documents before sending a
+change that touches a reader.
 
 ## Pull requests
 
