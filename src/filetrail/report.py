@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from .explain import conclusion, grouped
 from .identify import Identifier, extract
 from .models import ACQUISITION, SOURCE_LABELS, FileRecord, Origin, kind
 from .reconcile import CONFLICT, PARTIAL, Verdict, reconcile
@@ -495,6 +496,84 @@ def render_doctor(found, theme: Theme | None = None) -> str:
 
 def _note_line(theme: Theme, text: str) -> str:
     return f"  {theme.dim(theme.clip(text, theme.width - 4))}"
+
+
+def render_explain(record: FileRecord, theme: Theme | None = None) -> str:
+    """Every source for one file, grouped by the question it answers."""
+    theme = theme or detect()
+    rule = f"  {theme.rule(theme.width - 2)}"
+    verdict = reconcile(record)
+
+    name = Path(record.path).name
+    lines = ["", f"  {theme.bold('filetrail')}  {theme.dim('explain')}  {theme.bold(name)}", rule]
+
+    for name_of_kind, question, claims in grouped(record):
+        head = f"  {theme.label(name_of_kind)}"
+        room = theme.width - len(name_of_kind) - 6
+        if room >= 12:
+            head += f"  {theme.dim(theme.clip(question, room))}"
+        lines.extend(["", head, ""])
+        for origin in claims:
+            lines.extend(_explained(theme, origin))
+
+    lines.extend(
+        ["", rule, "", f"  {theme.label('reconciliation')}  {theme.dim(verdict.state)}", ""]
+    )
+    tag_width = min(19, max(9, theme.width // 4))
+    for finding in verdict.findings:
+        for index, part in enumerate(theme.wrap(finding.text, theme.width - 6 - tag_width)):
+            tag = theme.dim(theme.clip(finding.kind, tag_width).ljust(tag_width))
+            lines.append(
+                f"    {tag if index == 0 else ' ' * tag_width} {theme.paint(part, 'body')}"
+            )
+    if not verdict.findings:
+        lines.append(f"    {theme.dim('nothing to reconcile')}")
+
+    lines.extend(["", rule, "", f"  {theme.label('conclusion')}", ""])
+    for sentence in conclusion(record, verdict):
+        for part in theme.wrap(sentence, theme.width - 6):
+            lines.append(f"    {theme.paint(part, 'body')}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _explained(theme: Theme, origin: Origin) -> list[str]:
+    """One claim: what it says, then the detail underneath.
+
+    The label column and the strength both give way on a narrow terminal, in
+    that order, because what the record actually says is the part worth keeping.
+    """
+    colour = theme.evidence(origin.source)
+    label = SOURCE_LABELS.get(origin.source, origin.source)
+    word = STRENGTH.get(colour, colour)
+    said = origin.url or origin.command or origin.tool or origin.note or "(no detail)"
+
+    column = min(20, max(10, theme.width // 3))
+    room = theme.width - 4 - column - 2 - len(word)
+    show_strength = room >= 12
+    if not show_strength:
+        room = theme.width - 4 - column
+
+    lines = []
+    for index, part in enumerate(theme.wrap(said, room)):
+        head = theme.paint(theme.clip(label, column).ljust(column), colour)
+        if index:
+            head = " " * column
+        tail = f"  {theme.dim(word)}" if index == 0 and show_strength else ""
+        lines.append(f"    {head}{theme.paint(part.ljust(room), 'body')}{tail}".rstrip())
+
+    # Whatever became the headline must not be repeated underneath it.
+    detail = [
+        value for value in (origin.tool, origin.at, origin.location) if value and value != said
+    ]
+    if origin.note and origin.note != said:
+        detail.append(origin.note)
+    if detail:
+        text = theme.glyph(MIDDOT).join(f" {value} " for value in detail).strip()
+        for part in theme.wrap(text, theme.width - 6 - column):
+            lines.append(f"    {' ' * column}{theme.dim(part)}")
+    lines.append("")
+    return lines
 
 
 def render_json_doctor(found) -> str:

@@ -9,6 +9,14 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `--explain`, for one file. The report answers *what do we know*; this answers
+  *why should I believe it*, which is the question that decides whether a finding
+  can be used. It adds no data. It lays out every record under the question it
+  answers, names the ones that support each other and the ones that contradict
+  each other, and draws the conclusion in sentences - so that a reader can
+  disagree with it. A verdict nobody can argue with is a verdict nobody should
+  trust.
+
 - Evidence strength replaces the bare number on the meter line: `direct`,
   `inherited`, `credentialed`, `self-reported`, `circumstantial`, `weak`.
   Printing `55` invited it to be read as a probability, which it never was -

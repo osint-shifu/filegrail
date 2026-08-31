@@ -8,7 +8,14 @@ from pathlib import Path
 
 from . import __version__
 from .filters import UnknownType, describe, selection
-from .report import render_doctor, render_json, render_json_doctor, render_text, render_timeline
+from .report import (
+    render_doctor,
+    render_explain,
+    render_json,
+    render_json_doctor,
+    render_text,
+    render_timeline,
+)
 from .scan import scan
 from .theme import detect
 
@@ -120,6 +127,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="List only files with no recorded origin.",
     )
     parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="For one file: every source found, which agree, which do not, and why.",
+    )
+    parser.add_argument(
         "--doctor",
         action="store_true",
         help="Report which evidence sources this machine has, and how far back they reach.",
@@ -183,6 +195,13 @@ def main(argv: list[str] | None = None) -> int:
         suffixes=suffixes,
         stats=stats,
     )
+
+    if args.explain:
+        if not root.is_file():
+            print("filetrail: --explain takes one file, not a directory.", file=sys.stderr)
+            return 2
+        print(render_explain(records[0], theme=detect(colour=args.colour)))
+        return 0
 
     if args.unknown_only:
         records = [record for record in records if not record.origins]

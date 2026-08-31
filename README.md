@@ -152,6 +152,7 @@ filetrail . --no-shell-history  # skip shell correlation
 filetrail . --no-archives       # do not inherit origins from archives
 filetrail . --no-color          # plain text, no escape sequences
 
+filetrail a.pdf --explain       # every source for one file, and why the verdict holds
 filetrail --doctor              # which evidence sources this machine has
 filetrail --menu                # pick a view from a list, no flags to remember
 filetrail --about               # the landing screen again
