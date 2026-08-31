@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from whence.models import FileRecord, Origin
-from whence.report import render_text
-from whence.theme import Theme
+from filetrail.models import FileRecord, Origin
+from filetrail.report import render_text
+from filetrail.theme import Theme
 
 #: Deterministic rendering for assertions: no colour, no box drawing.
 PLAIN = Theme(colour=False, unicode=False, width=88)

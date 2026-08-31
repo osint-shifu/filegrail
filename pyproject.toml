@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "whence"
+name = "filetrail"
 version = "0.1.0"
 description = "Reconstruct where the files in a directory came from, after the fact."
 readme = "README.md"
@@ -24,10 +24,10 @@ dependencies = []
 dev = ["pytest>=8.2,<9", "ruff>=0.6,<1"]
 
 [project.scripts]
-whence = "whence.cli:main"
+filetrail = "filetrail.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/whence"]
+packages = ["src/filetrail"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

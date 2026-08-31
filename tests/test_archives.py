@@ -2,8 +2,8 @@ import sqlite3
 import zipfile
 from pathlib import Path
 
-from whence.scan import scan
-from whence.sources.archives import is_archive, list_members
+from filetrail.scan import scan
+from filetrail.sources.archives import is_archive, list_members
 
 from .test_browser import CHROMIUM_SCHEMA, START_TIME
 

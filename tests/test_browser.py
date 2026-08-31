@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-from whence.sources.browser import collect_browser_downloads
+from filetrail.sources.browser import collect_browser_downloads
 
 CHROMIUM_SCHEMA = """
 CREATE TABLE downloads (

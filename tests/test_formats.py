@@ -6,8 +6,8 @@ import zipfile
 import zlib
 from pathlib import Path
 
-from whence.sources.embedded import read_embedded_metadata
-from whence.sources.embedded.exif import camera, coordinates, read_exif
+from filetrail.sources.embedded import read_embedded_metadata
+from filetrail.sources.embedded.exif import camera, coordinates, read_exif
 
 # --- EXIF, and the containers that carry it ----------------------------------
 

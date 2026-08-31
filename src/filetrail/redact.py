@@ -1,6 +1,6 @@
 """Redaction for output that is about to leave the machine.
 
-`whence` reads browser and shell history, so its own output is sensitive in a
+`filetrail` reads browser and shell history, so its own output is sensitive in a
 way the scanned files are not: a URL can carry `?api_key=`, a session token or
 a password reset link, and a recorded command can carry a credential in an
 argument. Printing that into a bug report or a shared JSON file is the one

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from whence.sources.shell import collect_shell_history
+from filetrail.sources.shell import collect_shell_history
 
 
 def _write_history(home: Path, name: str, content: str) -> None:

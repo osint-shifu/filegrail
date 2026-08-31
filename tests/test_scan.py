@@ -1,8 +1,8 @@
 import sqlite3
 from pathlib import Path
 
-from whence.scan import scan
-from whence.sources.fsattrs import read_file_attributes
+from filetrail.scan import scan
+from filetrail.sources.fsattrs import read_file_attributes
 
 from .test_browser import CHROMIUM_SCHEMA, START_TIME
 

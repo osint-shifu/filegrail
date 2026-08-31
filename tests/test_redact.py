@@ -1,5 +1,5 @@
-from whence.models import FileRecord, Origin
-from whence.redact import fingerprint, looks_like_secret, redact_text, redact_url
+from filetrail.models import FileRecord, Origin
+from filetrail.redact import fingerprint, looks_like_secret, redact_text, redact_url
 
 
 def test_strips_credential_query_parameters_but_keeps_the_url_readable():

@@ -1,6 +1,6 @@
 import pytest
 
-from whence.cbor import CborError, loads
+from filetrail.cbor import CborError, loads
 
 
 def test_unsigned_and_negative_integers():

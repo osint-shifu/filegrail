@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from whence.models import FileRecord, Origin
-from whence.report import render_text
-from whence.theme import Theme, detect
+from filetrail.models import FileRecord, Origin
+from filetrail.report import render_text
+from filetrail.theme import Theme, detect
 
 
 class _Stream:

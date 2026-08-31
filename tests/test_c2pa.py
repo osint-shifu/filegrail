@@ -2,7 +2,7 @@ import struct
 import zlib
 from pathlib import Path
 
-from whence.sources.c2pa import read_c2pa_manifest
+from filetrail.sources.c2pa import read_c2pa_manifest
 
 
 def _box(box_type: bytes, payload: bytes) -> bytes:

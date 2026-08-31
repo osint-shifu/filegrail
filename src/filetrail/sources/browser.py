@@ -55,7 +55,7 @@ def _open_readonly(database: Path) -> tuple[sqlite3.Connection, Path]:
     A live browser holds a write lock and may leave a hot WAL, so reading the
     original risks both failure and modification of the user's profile.
     """
-    temp_dir = Path(tempfile.mkdtemp(prefix="whence-"))
+    temp_dir = Path(tempfile.mkdtemp(prefix="filetrail-"))
     copy = temp_dir / database.name
     shutil.copy2(database, copy)
     for suffix in ("-wal", "-shm"):

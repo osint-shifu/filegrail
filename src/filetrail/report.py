@@ -56,7 +56,7 @@ def render_text(
 
 
 def _header(theme: Theme, root: Path, total: int, traced: int) -> list[str]:
-    name = theme.bold("whence")
+    name = theme.bold("filetrail")
     where = theme.paint(_display(root), "white")
     count = theme.dim(f"{traced}/{total} traced")
     gap = max(1, theme.width - _visible(f"{name} {where}") - _visible(count))

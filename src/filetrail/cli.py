@@ -14,9 +14,10 @@ from .theme import detect
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="whence",
+        prog="filetrail",
         description="Reconstruct where the files in a directory came from, after the fact.",
-        epilog="whence reads records that already exist. It never asks you to change how you work.",
+        epilog="filetrail reads records that already exist. "
+        "It never asks you to change how you work.",
     )
     parser.add_argument(
         "path",
@@ -89,7 +90,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="List only files with no recorded origin.",
     )
-    parser.add_argument("--version", action="version", version=f"whence {__version__}")
+    parser.add_argument("--version", action="version", version=f"filetrail {__version__}")
     return parser
 
 
@@ -98,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
 
     root = args.path.resolve()
     if not root.exists():
-        print(f"whence: no such file or directory: {args.path}", file=sys.stderr)
+        print(f"filetrail: no such file or directory: {args.path}", file=sys.stderr)
         return 2
 
     stats: dict[str, int] = {}
