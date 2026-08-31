@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ...models import Origin
-from . import containers, documents, exif, id3, isobmff, ole, png
+from . import containers, documents, exif, id3, isobmff, ole, png, riff
 
 #: A malformed container is ordinary: truncated downloads, Office lock files and
 #: files with a misleading extension all land here, and none is an error.
@@ -41,6 +41,7 @@ SUFFIXES = (
     | isobmff.SUFFIXES
     | containers.SUFFIXES
     | id3.SUFFIXES
+    | riff.SUFFIXES
     | ole.SUFFIXES
 )
 
@@ -58,6 +59,7 @@ def read_embedded_metadata(path: Path) -> Origin | None:
         _from_png,
         _from_container,
         _from_compound,
+        _from_riff,
         _from_audio,
     ):
         try:
@@ -254,6 +256,34 @@ def _from_compound(path: Path, suffix: str) -> Origin | None:
             )
             if value
         },
+    )
+
+
+def _from_riff(path: Path, suffix: str) -> Origin | None:
+    if suffix not in riff.SUFFIXES:
+        return None
+    found = riff.read_riff(path)
+    if not found:
+        return None
+
+    notes = []
+    for label, value in (
+        ("artist", found.info.get("Artist") or found.frames.get("artist")),
+        ("title", found.info.get("Title") or found.frames.get("title")),
+        ("engineer", found.info.get("Engineer")),
+        ("copyright", found.info.get("Copyright")),
+    ):
+        if value:
+            notes.append(f"{label} {_clip(value, 80)}")
+
+    return _origin(
+        "document-metadata",
+        tool=found.info.get("Software") or found.frames.get("encoder"),
+        at=_normalise(found.info.get("DateCreated") or found.frames.get("date")),
+        note="; ".join(notes) or None,
+        # The tag's frames are named apart from the INFO fields: the two can
+        # disagree, and a merged dictionary would silently hide one of them.
+        fields=dict(found.info) | {f"id3:{k}": v for k, v in found.frames.items()},
     )
 
 

@@ -13,6 +13,7 @@ import pytest
 
 from filetrail.cli import main
 from filetrail.filters import FAMILIES, UnknownType, selection
+from filetrail.sources.embedded import SUFFIXES as READABLE
 
 MIXED = ("holiday.jpg", "figure.PNG", "report.pdf", "notes.md", "clip.mp4", "book.epub")
 
@@ -62,6 +63,14 @@ def test_every_family_is_non_empty():
     """A family that resolves to nothing would silently scan no files."""
     for name, suffixes in FAMILIES.items():
         assert suffixes, name
+
+
+def test_every_readable_format_can_be_asked_for():
+    """A family that cannot name a format this tool can read would exclude the
+    very files a narrowed scan was meant to find - and say nothing about it."""
+    selectable = set().union(*FAMILIES.values())
+
+    assert READABLE <= selectable, sorted(READABLE - selectable)
 
 
 def test_an_unknown_family_says_what_is_available():

@@ -23,6 +23,31 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- RIFF `LIST/INFO`, which is where a WAV or an AVI records who edited it.
+  `ISFT` names the software, `ICRD` the date, `IART` and `IENG` the people
+  credited; the twenty-odd remaining codes are kept under their published
+  names, or under the code itself where a writer invented one.
+
+  This began as a repair rather than an addition. `.wav` was on the ID3
+  reader's list of extensions, and that reader requires the tag at byte zero
+  while a WAV begins with `RIFF` - so the format was advertised and could never
+  return anything. A WAV that does carry an ID3 tag keeps it in a chunk, which
+  is read there now, and `.wav` has left the ID3 reader's list, because the
+  claim it made was false.
+
+  AVI arrives with it and costs nothing: the container is the same list of
+  chunks and the INFO block is the same block. In a large file it sits after
+  the frames, so the walk seeks over payloads instead of reading them - three
+  megabytes of video cost 0.08 ms - and it does not descend into the lists
+  holding sample data. Anything at all can appear inside a frame, chunk headers
+  included, and a file must not be able to forge its own provenance in its own
+  payload.
+
+  Verified against files written by ffmpeg and by alsa-utils, including one
+  carrying no metadata at all, which is reported as carrying none. The `id3 `
+  chunk is the exception: nothing available here writes one, so that path rests
+  on the specification and on constructed files.
+
 - Reconciliation reaches what a file says about itself. IPTC and XMP hold the
   same facts under different names - Adobe published the pairing when it moved
   IIM into XMP - and an editor maintains the XMP while leaving the IIM block as

@@ -438,3 +438,40 @@ def test_decoded_coordinates_land_in_geo_not_location(tmp_path: Path):
 
     assert origin.geo.startswith("43.4674")
     assert origin.location is None
+
+
+# --- RIFF --------------------------------------------------------------------
+
+
+def _chunk(fourcc: bytes, payload: bytes) -> bytes:
+    """One RIFF chunk: a name, a little-endian length, and even padding."""
+    return fourcc + struct.pack("<I", len(payload)) + payload + b"\x00" * (len(payload) % 2)
+
+
+def _riff(form: bytes, chunks: list[bytes]) -> bytes:
+    body = form + b"".join(chunks)
+    return b"RIFF" + struct.pack("<I", len(body)) + body
+
+
+def _info(entries: list[tuple[bytes, str]]) -> bytes:
+    fields = b"".join(_chunk(name, text.encode("latin-1") + b"\x00") for name, text in entries)
+    return _chunk(b"LIST", b"INFO" + fields)
+
+
+def test_wav_info_chunk_names_the_editor(tmp_path: Path):
+    audio = tmp_path / "interview.wav"
+    audio.write_bytes(
+        _riff(
+            b"WAVE",
+            [
+                _chunk(b"fmt ", b"\x01\x00\x01\x00" + b"\x00" * 12),
+                _info([(b"ISFT", "Adobe Audition 3.0"), (b"ICRD", "2019-03-04")]),
+                _chunk(b"data", b"\x00" * 8),
+            ],
+        )
+    )
+
+    origin = read_embedded_metadata(audio)
+
+    assert origin.tool == "Adobe Audition 3.0"
+    assert origin.at == "2019-03-04T00:00:00Z"

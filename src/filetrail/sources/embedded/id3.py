@@ -2,6 +2,9 @@
 
 Only the frames that say how the file came to exist are read: the encoder, the
 software that wrote it, the recording date and the credited artist.
+
+The tag is read from bytes as well as from a path, because WAV carries the very
+same tag inside a RIFF chunk instead of at the start of the file.
 """
 
 from __future__ import annotations
@@ -9,7 +12,9 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-SUFFIXES = {".mp3", ".aac", ".tta", ".wav"}
+#: Files that open with the tag. WAV does not - it keeps one in a chunk,
+#: which is the RIFF reader's business.
+SUFFIXES = {".mp3", ".aac", ".tta"}
 
 _MAX_TAG = 2 * 1024 * 1024
 _MAX_FRAMES = 256
@@ -33,21 +38,31 @@ FRAMES = {
 
 
 def read_id3(path: Path) -> dict[str, str]:
-    """Return the interesting ID3 frames, keyed by meaning."""
+    """Return the interesting ID3 frames of a file that opens with a tag."""
     try:
         with path.open("rb") as handle:
             header = handle.read(10)
             if len(header) < 10 or header[:3] != b"ID3":
                 return {}
-            major = header[3]
             size = _synchsafe(header[6:10])
             if size <= 0 or size > _MAX_TAG:
                 return {}
-            body = handle.read(size)
+            return read_tag(header + handle.read(size))
     except (OSError, struct.error, ValueError):
         return {}
 
-    return _parse_frames(body, major)
+
+def read_tag(raw: bytes) -> dict[str, str]:
+    """Return the interesting frames of a complete ID3v2 tag, header included."""
+    if len(raw) < 10 or raw[:3] != b"ID3":
+        return {}
+    size = _synchsafe(raw[6:10])
+    if size <= 0 or size > _MAX_TAG:
+        return {}
+    try:
+        return _parse_frames(raw[10 : 10 + size], raw[3])
+    except (struct.error, ValueError):
+        return {}
 
 
 def _synchsafe(raw: bytes) -> int:
