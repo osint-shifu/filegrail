@@ -1,19 +1,17 @@
 """The screen a bare `filetrail` prints.
 
 Typing a tool's name and having it silently start work on the current directory
-is a surprise, and in a home directory an expensive one - tens of thousands of
-files, minutes of scanning, nothing asked for. So a run with no arguments
-introduces the tool and says how to point it somewhere.
+is a surprise, and in a home directory an expensive one. So a run with no
+arguments introduces the tool and says how to point it somewhere.
 
-The shape is the one `neofetch` made familiar: a wordmark on the left, the
-attributes beside it, then what you can actually type. Under the wordmark runs a
-trail, read right to left - the same direction the report's `←` reads.
+The shape below the wordmark is the one every modern command-line tool uses -
+usage, examples, commands, options - because a reader who has used any of them
+already knows how to read it in a second, and a landing screen's job is to get
+someone to the right command rather than to be memorable.
 
-Two things it has to get right. It is a landing screen, not a menu, so nothing
-waits for input and it works piped or in a script. And **every command it prints
-must run in the shell that printed it**: suggesting `filetrail` to someone who
-has not installed it is how a landing screen loses their trust on the first
-thing they try.
+What is deliberately *not* here any more: the table of evidence sources. It is a
+good table and it belongs in `doctor`, where a reader is asking what this machine
+can answer. On the front door it answered a question nobody had asked yet.
 """
 
 from __future__ import annotations
@@ -38,21 +36,48 @@ WORDMARK = (
 #: Read the way the report reads: right to left, back towards a source.
 TRAIL = "file {arrow} zip {arrow} download {arrow} web"
 
+USAGE = (
+    ("filetrail <path> [options]", ""),
+    ("filetrail <command> [options]", ""),
+)
+
+EXAMPLES = (
+    ("filetrail ~/Downloads", "everything in a folder"),
+    ("filetrail suspicious.pdf", "one file"),
+    ("filetrail explain suspicious.pdf", "and why it says that"),
+    ("filetrail ~/Downloads --json", "for piping onward"),
+)
+
+COMMANDS = (
+    ("scan", "analyze a file or directory (the default)"),
+    ("explain", "why filetrail reached a conclusion about one file"),
+    ("compare", "what two files share, and how each arrived"),
+    ("doctor", "which evidence sources this machine has"),
+    ("menu", "pick a view from a list"),
+    ("help", "show help for a command"),
+)
+
+OPTIONS = (
+    ("-v, --verbose", "show every evidence record"),
+    ("-j, --json", "machine-readable output"),
+    ("    --brief", "summarise instead of listing every field"),
+    ("    --identify", "emails, domains, addresses, coordinates"),
+    ("    --type image", "only these kinds of file"),
+    ("    --unknown-only", "only files nothing accounts for"),
+    ("    --redact", "redact credentials before printing"),
+    ("    --no-recurse", "this directory only"),
+    ("    --no-color", "disable ANSI colors"),
+    ("    --version", "show version"),
+)
+
 #: Below this the wordmark and the attributes cannot sit side by side.
 _SIDE_BY_SIDE = 78
 
 #: Below this there is no room for a description beside a command.
 _MIN_DESCRIPTION = 14
 
-#: Source, what it gives, confidence, and the evidence class that colours it.
-SOURCES = (
-    ("browser downloads", "URL, referrer, timestamp", 90, "recorded"),
-    ("OS origin metadata", "Windows zone, macOS where-from", 85, "recorded"),
-    ("archive membership", "the origin of the archive", 70, "inherited"),
-    ("content credentials", "C2PA, signature unverified", 60, "credentialed"),
-    ("embedded metadata", "EXIF/GPS, PDF, Office, video", 50, "self-reported"),
-    ("shell history", "the command that named the file", 40, "circumstantial"),
-)
+#: The label column, wide enough for the longest section name.
+_LABEL = 9
 
 
 def invocation() -> str:
@@ -69,114 +94,92 @@ def invocation() -> str:
     return f"{prefix}{Path(sys.executable).name} -m filetrail.cli"
 
 
-#: Examples always read `filetrail`. Repeating a long checkout invocation on
-#: every line buries the descriptions and makes the screen unreadable; the one
-#: line that makes `filetrail` work is printed once instead.
-START = (
-    ("filetrail .", "scan the folder you are standing in"),
-    ("filetrail ~/Downloads", "scan any folder, recursively"),
-    ("filetrail report.pdf", "one file"),
-    ("filetrail a.pdf --explain", "why one file's verdict says what it does"),
-    ("filetrail --menu", "pick a view from a list"),
-    ("filetrail --doctor", "what this machine can be asked"),
-)
-
-VIEWS = (
-    ("filetrail . --unknown-only", "only files nothing accounts for"),
-    ("filetrail . --full", "every metadata field decoded"),
-    ("filetrail . --timeline", "chronological, one line per event"),
-    ("filetrail . --json", "machine-readable, for piping onward"),
-    ("filetrail . --redact", "strip credentials before sharing"),
-)
-
-
-#: Every section below the wordmark hangs off one label column, the same shape
-#: the attributes use. That is the whole structure - no rules, no boxes. A
-#: horizontal line between two aligned lists separates nothing that the blank
-#: line above it had not already separated.
-_LABEL = 9
-
-#: Flags are shown as flags. Repeating `filetrail . ` in front of each one costs
-#: twelve columns on every line and teaches nothing after the first.
-COMMANDS = (
-    ("filetrail .", "scan the folder you are standing in"),
-    ("filetrail ~/Downloads", "any folder, recursively"),
-    ("filetrail report.pdf", "one file"),
-    ("filetrail --menu", "pick a view from a list"),
-)
-
-FLAGS = (
-    ("--unknown-only", "only files nothing accounts for"),
-    ("--brief", "summarise instead of listing every field"),
-    ("--timeline", "chronological, one line per event"),
-    ("--json", "machine-readable, for piping onward"),
-    ("--redact", "strip credentials before sharing"),
-    ("--type image", "only images; also video, audio, document, archive"),
-    ("--ext jpg,pdf", "only these extensions"),
-    ("--identify", "emails, domains, addresses, coordinates"),
-)
-
-
 def render(theme: Theme | None = None) -> str:
     theme = theme or detect()
     run = invocation()
 
-    # One body-column width for the whole screen, so every description starts on
-    # the same vertical line. Computing it per section is what makes a layout
-    # look almost aligned, which reads worse than not aligning it at all.
-    described = [*COMMANDS, *FLAGS, ("filetrail <path> [options]", "-")]
-    column = min(max(len(body) for body, _ in described), theme.width - _LABEL - 22)
-
     lines = ["", *_head(theme), ""]
     if run != "filetrail":
-        lines.extend(_install(theme, run, column))
-    lines.extend(_usage(theme, column))
-    lines.extend(_sources(theme))
-    lines.append(_row(theme, "help", "filetrail --help", "every flag and what it does", column))
+        lines.extend(_install(theme, run))
+
+    # The label column is the spine and stays fixed. The body column is sized
+    # per section: forcing a seven-character command into the width of a
+    # thirty-character example opens a gutter across half the screen and pushes
+    # the descriptions into an ellipsis, which is the one thing this report does
+    # not do anywhere else.
+    lines.extend(_section(theme, "usage", USAGE))
+    lines.extend(_section(theme, "examples", EXAMPLES))
+    lines.extend(_section(theme, "commands", COMMANDS, emphasise=True))
+    lines.extend(_section(theme, "options", OPTIONS))
+
+    lines.append(_row(theme, "", "filetrail help <command>", "for any of it in detail", 24))
     lines.append("")
     return "\n".join(lines)
 
 
-def _row(theme: Theme, label: str, body: str, detail: str = "", column: int = 0) -> str:
+# --- the body ----------------------------------------------------------------
+
+
+def _row(
+    theme: Theme,
+    label: str,
+    body: str,
+    detail: str = "",
+    column: int = 0,
+    *,
+    emphasise: bool = False,
+) -> str:
     """One line of the two-column spine that runs the length of the screen."""
     prefix = f"  {theme.label(label.ljust(_LABEL))} "
     room = theme.width - _LABEL - 5
 
-    # A body longer than the shared column keeps its full length and gives up its
-    # description, rather than being cut in half to protect the alignment.
     if not detail or len(body) > column:
         return f"{prefix}{theme.paint(theme.clip(body, room), 'body')}"
 
-    text = theme.paint(body.ljust(column), "body")
+    text = theme.bold(body.ljust(column)) if emphasise else theme.paint(body.ljust(column), "body")
     return f"{prefix}{text}  {theme.dim(theme.clip(detail, room - column - 2))}"
 
 
-def _install(theme: Theme, run: str, column: int) -> list[str]:
-    """What makes the examples below work, said once and never repeated.
+def _section(
+    theme: Theme,
+    label: str,
+    rows: tuple[tuple[str, str], ...],
+    *,
+    emphasise: bool = False,
+) -> list[str]:
+    """A labelled block, with the label beside its first line rather than above.
 
-    Without it the screen prints commands the reader's shell rejects, which is
-    the fastest way to make everything else on it look untrustworthy.
+    Above would cost a line and a blank one per section, and the label column is
+    already carrying that job everywhere else on the screen.
     """
-    return [
-        _row(theme, "install", "pipx install filetrail", "to get the bare command", column),
-        _row(theme, "", f"alias filetrail='{run}'"),
-        "",
-    ]
+    column = max(len(body) for body, _ in rows)
 
-
-def _usage(theme: Theme, column: int) -> list[str]:
+    # On a narrow terminal the description gives way rather than the command:
+    # a command you cannot read is useless, a command with no gloss beside it
+    # is merely terse.
+    room = theme.width - _LABEL - 7 - column
     lines = [
-        _row(theme, "usage", "filetrail <path> [options]", "there is no default path", column),
-        "",
+        _row(
+            theme,
+            label if index == 0 else "",
+            body,
+            detail if room >= _MIN_DESCRIPTION else "",
+            column,
+            emphasise=emphasise,
+        )
+        for index, (body, detail) in enumerate(rows)
     ]
-    lines.extend(_row(theme, "", command, detail, column) for command, detail in COMMANDS)
-    lines.append("")
-    lines.extend(_row(theme, "", flag, detail, column) for flag, detail in FLAGS)
     lines.append("")
     return lines
 
 
-# --- the head ----------------------------------------------------------------
+def _install(theme: Theme, run: str) -> list[str]:
+    """What makes the examples below work, said once and never repeated."""
+    return [
+        _row(theme, "install", "pipx install filetrail", "to get the bare command", 22),
+        _row(theme, "", f"alias filetrail='{run}'"),
+        "",
+    ]
 
 
 def _rows() -> tuple[tuple[str, str], ...]:
@@ -247,35 +250,6 @@ def _block(theme: Theme, rule: str, heading: str, rows: tuple[tuple[str, str], .
             lines.append(f"    {text}")
             continue
         lines.append(f"    {text}  {theme.dim(theme.clip(description, room))}")
-    lines.append("")
-    return lines
-
-
-def _sources(theme: Theme) -> list[str]:
-    """What the tool reads, coloured by evidence class.
-
-    The colour code is the one thing a reader has to learn to use the report at
-    speed, so the landing screen teaches it here rather than leaving it to be
-    inferred from a folder of results.
-
-    Paired two to a line: six full-width rows would be half a screen of legend,
-    and the meters are what carry the meaning, not the horizontal space.
-    """
-    width = max(len(name) for name, _, _, _ in SOURCES)
-    cell = width + 7  # label, gap, five-slot meter
-    paired = theme.width - 2 - _LABEL - 1 >= cell * 2 + 4
-
-    def draw(entry: tuple[str, str, int, str]) -> str:
-        name, _, confidence, evidence = entry
-        return f"{theme.paint(name.ljust(width), evidence)}  {theme.meter(confidence, evidence)}"
-
-    lines = []
-    step = 2 if paired else 1
-    for index in range(0, len(SOURCES), step):
-        label = "reads" if index == 0 else ""
-        row = "    ".join(draw(entry) for entry in SOURCES[index : index + step])
-        prefix = f"  {theme.label(label.ljust(_LABEL))} "
-        lines.append(f"{prefix}{row}")
     lines.append("")
     return lines
 

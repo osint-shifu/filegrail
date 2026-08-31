@@ -50,8 +50,8 @@ ACTIONS = (
     Action("7", "identifiers in the metadata", ("--identify",)),
     Action("i", "images only", ("--type", "image")),
     Action("d", "documents only", ("--type", "document")),
-    Action("s", "what this machine can be asked", ("--doctor",)),
-    Action("e", "explain one file (point it at a file)", ("--explain",)),
+    Action("s", "what this machine can be asked", ("doctor",)),
+    Action("e", "explain one file (point it at a file)", ("explain",)),
     Action("6", "add a SHA-256 for each file", ("--hash",)),
     Action("8", "redacted JSON, safe to share", ("--redact", "--json")),
 )
@@ -144,7 +144,12 @@ def _invoke(
     action: Action,
     target: Path,
 ) -> None:
-    argv = [str(target), *action.flags]
+    # A command word leads; a bare scan keeps the path first.
+    argv = (
+        [*action.flags, str(target)]
+        if action.flags and not action.flags[0].startswith("-")
+        else [str(target), *action.flags]
+    )
     write("")
     write(f"  {theme.dim('running')}  {theme.paint(_command(target, action), 'recorded')}")
     write(f"  {theme.rule(theme.width - 2)}")
@@ -246,6 +251,8 @@ def _short(target: Path) -> str:
 
 
 def _command(target: Path, action: Action) -> str:
+    if action.flags and not action.flags[0].startswith("-"):
+        return " ".join(["filetrail", *action.flags, _short(target)])
     return " ".join(["filetrail", _short(target), *action.flags])
 
 

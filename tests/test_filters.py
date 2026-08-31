@@ -123,7 +123,7 @@ def test_types_can_be_repeated(tmp_path: Path, capsys):
 def test_an_unknown_type_is_refused_before_scanning(tmp_path: Path, capsys):
     _folder(tmp_path)
 
-    assert main([str(tmp_path), "--type", "pictures"]) == 2
+    assert main(["scan", str(tmp_path), "--type", "pictures"]) == 2
 
     assert "pictures" in capsys.readouterr().err
 

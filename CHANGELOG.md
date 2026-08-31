@@ -7,6 +7,29 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Changed
+
+- Modes are commands now, not flags: `filetrail explain FILE`,
+  `filetrail compare A B`, `filetrail doctor`, `filetrail menu`,
+  `filetrail help <command>`. `--doctor` and `--explain` were modes wearing an
+  option's clothes - each ignored most of the other options, and every pair of
+  them was mutually exclusive, which is exactly the shape subcommands exist to
+  express. `filetrail <path>` still scans with no command word, because that is
+  what people do most of the time and making them type `scan` would be ceremony.
+- `-v`, `-j` and `-h` short forms; the landing screen is the conventional
+  usage / examples / commands / options shape, so a reader who has used any
+  modern command-line tool can read it at a glance. The evidence-source table
+  moved off it into `doctor`, where the question has actually been asked.
+
+### Added
+
+- `filetrail compare A B`: what two files record about themselves that agrees,
+  what differs, how each one arrived, and how far apart they claim to have been
+  created. Two files can share an earlier life without sharing an acquisition
+  path, and that combination - one camera, two routes - says something neither
+  file says alone. It reports what agrees; it never concludes that two files are
+  "the same".
+
 ### Added
 
 - `--explain`, for one file. The report answers *what do we know*; this answers

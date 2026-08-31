@@ -1,4 +1,14 @@
-"""Command line interface. Standard library only, no runtime dependencies."""
+"""Command line interface. Standard library only, no runtime dependencies.
+
+The tool does several distinct things, and they are commands rather than flags.
+`--doctor` and `--explain` were modes wearing an option's clothes: each one
+ignored most of the other options, and every pair of them was mutually
+exclusive, which is exactly the shape subcommands exist to express.
+
+`filetrail <path>` still scans, with no command word, because that is the thing
+people do ninety per cent of the time and making them type `scan` for it would
+be ceremony.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +19,7 @@ from pathlib import Path
 from . import __version__
 from .filters import UnknownType, describe, selection
 from .report import (
+    render_compare,
     render_doctor,
     render_explain,
     render_json,
@@ -19,81 +30,17 @@ from .report import (
 from .scan import scan
 from .theme import detect
 
+COMMANDS = ("scan", "explain", "compare", "doctor", "menu", "help")
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="filetrail",
-        description="Reconstruct where the files in a directory came from, after the fact.",
-        epilog="filetrail reads records that already exist. "
-        "It never asks you to change how you work.",
-    )
-    parser.add_argument(
-        "path",
-        nargs="?",
-        default=".",
-        type=Path,
-        help="File or directory to examine (default: current directory).",
-    )
-    parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
-    parser.add_argument(
-        "--timeline",
-        action="store_true",
-        help="Emit one chronological line per event instead of grouping by file.",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Show every origin claim, not only the highest-confidence one.",
-    )
-    parser.add_argument(
-        "--identify",
-        action="store_true",
-        help="List the emails, domains, URLs, addresses, hashes and coordinates "
-        "found in the metadata that was read.",
-    )
-    parser.add_argument(
-        "--type",
-        dest="families",
-        action="append",
-        default=[],
-        metavar="NAME",
-        help="Only these kinds of file: image, video, audio, document, archive, text. "
-        "Repeatable, and accepts a comma-separated list.",
-    )
-    parser.add_argument(
-        "--ext",
-        dest="extensions",
-        action="append",
-        default=[],
-        metavar="LIST",
-        help="Only these extensions, e.g. --ext jpg,pdf. The leading dot is optional.",
-    )
-    parser.add_argument(
-        "--brief",
-        action="store_true",
-        help="Summarise each file instead of listing every metadata field.",
-    )
-    parser.add_argument(
-        "--no-recurse", action="store_true", help="Do not descend into subdirectories."
-    )
-    parser.add_argument(
-        "--no-shell-history",
-        action="store_true",
-        help="Skip shell history correlation.",
-    )
-    parser.add_argument(
-        "--hash",
-        action="store_true",
-        dest="hash_files",
-        help="Compute SHA-256 for each file.",
-    )
-    parser.add_argument(
-        "--no-archives",
-        action="store_true",
-        help="Do not inherit origins from archives the files were extracted from.",
-    )
-    colour = parser.add_mutually_exclusive_group()
+
+# --- parsers -----------------------------------------------------------------
+
+
+def _common() -> argparse.ArgumentParser:
+    """Options every command understands."""
+    shared = argparse.ArgumentParser(add_help=False)
+    shared.add_argument("-j", "--json", action="store_true", help="Output machine-readable JSON.")
+    colour = shared.add_mutually_exclusive_group()
     colour.add_argument(
         "--color",
         "--colour",
@@ -107,12 +54,68 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-colour",
         dest="colour",
         action="store_false",
-        help="Plain text with no escape sequences.",
+        help="Disable ANSI colors.",
+    )
+    return shared
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """The scan parser, which is also what a bare path is parsed with."""
+    parser = argparse.ArgumentParser(
+        prog="filetrail scan",
+        parents=[_common()],
+        description="Analyze a file or directory and report where its files came from.",
     )
     parser.add_argument(
-        "--redact",
+        "path",
+        nargs="?",
+        default=".",
+        type=Path,
+        help="File or directory to examine (default: current directory).",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
         action="store_true",
-        help="Remove credentials from URLs and commands before printing.",
+        help="Show every evidence record, not the strongest of each kind.",
+    )
+    parser.add_argument(
+        "--brief",
+        action="store_true",
+        help="Summarise each file instead of listing every metadata field.",
+    )
+    parser.add_argument(
+        "--timeline",
+        action="store_true",
+        help="Emit one chronological line per event instead of grouping by file.",
+    )
+    parser.add_argument(
+        "--unknown-only", action="store_true", help="List only files with no recorded origin."
+    )
+    parser.add_argument(
+        "--identify",
+        action="store_true",
+        help="List the emails, domains, addresses, hashes and coordinates found.",
+    )
+    parser.add_argument("--redact", action="store_true", help="Redact credentials before printing.")
+    parser.add_argument(
+        "--hash", action="store_true", dest="hash_files", help="Compute SHA-256 for each file."
+    )
+    parser.add_argument(
+        "--type",
+        dest="families",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Only these kinds of file: image, video, audio, document, archive, text.",
+    )
+    parser.add_argument(
+        "--ext",
+        dest="extensions",
+        action="append",
+        default=[],
+        metavar="LIST",
+        help="Only these extensions, e.g. --ext jpg,pdf.",
     )
     parser.add_argument(
         "--limit",
@@ -122,62 +125,124 @@ def build_parser() -> argparse.ArgumentParser:
         help="Cap the list of files with no recorded origin; 0 for all (default: 25).",
     )
     parser.add_argument(
-        "--unknown-only",
-        action="store_true",
-        help="List only files with no recorded origin.",
+        "--no-recurse", action="store_true", help="Do not descend into subdirectories."
     )
     parser.add_argument(
-        "--explain",
-        action="store_true",
-        help="For one file: every source found, which agree, which do not, and why.",
+        "--no-shell-history", action="store_true", help="Skip shell history correlation."
     )
     parser.add_argument(
-        "--doctor",
-        action="store_true",
-        help="Report which evidence sources this machine has, and how far back they reach.",
-    )
-    parser.add_argument(
-        "--about",
-        action="store_true",
-        help="Print what this is, who wrote it, and how to use it.",
-    )
-    parser.add_argument(
-        "--menu",
-        action="store_true",
-        help="Choose what to run from a list instead of remembering flags.",
+        "--no-archives", action="store_true", help="Do not inherit origins from archives."
     )
     parser.add_argument("--version", action="version", version=f"filetrail {__version__}")
     return parser
 
 
+def _explain_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="filetrail explain",
+        parents=[_common()],
+        description="Explain why filetrail reached a conclusion about one file.",
+    )
+    parser.add_argument("path", type=Path, help="The file to explain.")
+    return parser
+
+
+def _compare_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="filetrail compare",
+        parents=[_common()],
+        description="Compare what two files record about themselves and how each arrived.",
+    )
+    parser.add_argument("left", type=Path, help="The first file.")
+    parser.add_argument("right", type=Path, help="The second file.")
+    return parser
+
+
+def _doctor_parser() -> argparse.ArgumentParser:
+    return argparse.ArgumentParser(
+        prog="filetrail doctor",
+        parents=[_common()],
+        description="Report which evidence sources this machine has, and how far back they reach.",
+    )
+
+
+def _menu_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="filetrail menu",
+        parents=[_common()],
+        description="Choose what to run from a list instead of remembering flags.",
+    )
+    parser.add_argument("path", nargs="?", default=".", type=Path, help="Where to start.")
+    return parser
+
+
+PARSERS = {
+    "scan": build_parser,
+    "explain": _explain_parser,
+    "compare": _compare_parser,
+    "doctor": _doctor_parser,
+    "menu": _menu_parser,
+}
+
+
+# --- dispatch ----------------------------------------------------------------
+
+
 def main(argv: list[str] | None = None) -> int:
-    given = sys.argv[1:] if argv is None else argv
-    args = build_parser().parse_args(argv)
+    given = sys.argv[1:] if argv is None else list(argv)
 
     # A bare run introduces the tool rather than scanning the current directory.
     # Starting an unasked-for scan of wherever the shell happens to be is a
     # surprise, and in a home directory an expensive one.
-    if args.about or not given:
+    if not given:
         from .about import render
 
-        print(render(detect(colour=args.colour)))
+        print(render(detect()))
         return 0
 
-    if args.doctor:
-        from .doctor import survey
+    if given[0] in COMMANDS:
+        command, rest = given[0], given[1:]
+    else:
+        command, rest = "scan", given
 
-        found = survey()
-        theme = detect(colour=args.colour)
-        print(render_json_doctor(found) if args.json else render_doctor(found, theme))
+    if command == "help":
+        return _help(rest)
+    return {
+        "scan": _scan,
+        "explain": _explain,
+        "compare": _compare,
+        "doctor": _doctor,
+        "menu": _menu,
+    }[command](rest)
+
+
+def _help(rest: list[str]) -> int:
+    """`filetrail help <command>`, and the landing screen without one."""
+    if not rest:
+        from .about import render
+
+        print(render(detect()))
         return 0
 
-    if args.menu:
-        return _menu(args.path)
+    name = rest[0]
+    if name not in PARSERS:
+        print(f"filetrail: no such command: {name}", file=sys.stderr)
+        print(f"filetrail: try one of: {', '.join(COMMANDS)}", file=sys.stderr)
+        return 2
+    PARSERS[name]().print_help()
+    return 0
 
+
+def _missing(path: Path) -> int:
+    print(f"filetrail: no such file or directory: {path}", file=sys.stderr)
+    return 2
+
+
+def _scan(rest: list[str]) -> int:
+    args = build_parser().parse_args(rest)
     root = args.path.resolve()
     if not root.exists():
-        print(f"filetrail: no such file or directory: {args.path}", file=sys.stderr)
-        return 2
+        return _missing(args.path)
 
     try:
         suffixes = selection(args.families, args.extensions)
@@ -196,16 +261,8 @@ def main(argv: list[str] | None = None) -> int:
         stats=stats,
     )
 
-    if args.explain:
-        if not root.is_file():
-            print("filetrail: --explain takes one file, not a directory.", file=sys.stderr)
-            return 2
-        print(render_explain(records[0], theme=detect(colour=args.colour)))
-        return 0
-
     if args.unknown_only:
         records = [record for record in records if not record.origins]
-
     if args.redact:
         records = [record.redacted() for record in records]
 
@@ -230,25 +287,96 @@ def main(argv: list[str] | None = None) -> int:
                 identify=args.identify,
             )
         )
-
     return 0
 
 
-def _menu(start: Path) -> int:
+def _one(path: Path):
+    """Scan exactly one file, for the commands that take one."""
+    resolved = path.resolve()
+    if not resolved.is_file():
+        return None
+    found = scan(resolved)
+    return found[0] if found else None
+
+
+def _explain(rest: list[str]) -> int:
+    args = _explain_parser().parse_args(rest)
+    record = _one(args.path)
+    if record is None:
+        print(f"filetrail: explain takes one file: {args.path}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        import json as _json
+
+        from .explain import conclusion
+        from .reconcile import reconcile
+
+        verdict = reconcile(record)
+        print(
+            _json.dumps(
+                {
+                    "file": record.to_dict(),
+                    "reconciliation": verdict.to_dict(),
+                    "conclusion": conclusion(record, verdict),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0
+
+    print(render_explain(record, theme=detect(colour=args.colour)))
+    return 0
+
+
+def _compare(rest: list[str]) -> int:
+    args = _compare_parser().parse_args(rest)
+    left, right = _one(args.left), _one(args.right)
+    for path, record in ((args.left, left), (args.right, right)):
+        if record is None:
+            print(f"filetrail: compare takes two files: {path}", file=sys.stderr)
+            return 2
+
+    from .compare import compare
+
+    found = compare(left, right)
+    if args.json:
+        import json as _json
+
+        print(_json.dumps(found.to_dict(), ensure_ascii=False, indent=2))
+        return 0
+
+    print(render_compare(left, right, found, theme=detect(colour=args.colour)))
+    return 0
+
+
+def _doctor(rest: list[str]) -> int:
+    args = _doctor_parser().parse_args(rest)
+    from .doctor import survey
+
+    found = survey()
+    if args.json:
+        print(render_json_doctor(found))
+        return 0
+    print(render_doctor(found, detect(colour=args.colour)))
+    return 0
+
+
+def _menu(rest: list[str]) -> int:
     """Hand over to the interactive front end, if there is a terminal for it."""
+    args = _menu_parser().parse_args(rest)
     from . import menu
 
     if not menu.available():
         print(
-            "filetrail: --menu needs a terminal; it cannot be piped or redirected.",
+            "filetrail: menu needs a terminal; it cannot be piped or redirected.",
             file=sys.stderr,
         )
         return 2
-    if not start.exists():
-        print(f"filetrail: no such file or directory: {start}", file=sys.stderr)
-        return 2
-
-    return menu.run(start, execute=main)
+    if not args.path.exists():
+        return _missing(args.path)
+    return menu.run(args.path, execute=main)
 
 
 if __name__ == "__main__":

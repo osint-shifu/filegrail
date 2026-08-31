@@ -136,8 +136,8 @@ def test_every_check_has_a_state_and_a_name(tmp_path: Path):
 # --- through the command line ------------------------------------------------
 
 
-def test_the_flag_prints_the_survey(capsys):
-    assert main(["--doctor", "--no-color"]) == 0
+def test_the_command_prints_the_survey(capsys):
+    assert main(["doctor", "--no-color"]) == 0
 
     out = capsys.readouterr().out
     assert "evidence sources" in out
@@ -145,7 +145,7 @@ def test_the_flag_prints_the_survey(capsys):
 
 
 def test_json_is_machine_readable(capsys):
-    assert main(["--doctor", "--json"]) == 0
+    assert main(["doctor", "--json"]) == 0
 
     payload = json.loads(capsys.readouterr().out)
     assert {entry["name"] for entry in payload["sources"]}

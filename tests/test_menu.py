@@ -73,8 +73,8 @@ def test_end_of_input_leaves_quietly(tmp_path: Path):
         ("8", ["--redact", "--json"]),
         ("i", ["--type", "image"]),
         ("d", ["--type", "document"]),
-        ("s", ["--doctor"]),
-        ("e", ["--explain"]),
+        ("s", ["doctor"]),
+        ("e", ["explain"]),
     ],
 )
 def test_each_action_builds_its_command_line(tmp_path: Path, key: str, flags: list[str]):
@@ -82,7 +82,12 @@ def test_each_action_builds_its_command_line(tmp_path: Path, key: str, flags: li
 
     session.go(tmp_path)
 
-    assert session.ran == [[str(tmp_path.resolve()), *flags]]
+    expected = (
+        [*flags, str(tmp_path.resolve())]
+        if flags and not flags[0].startswith("-")
+        else [str(tmp_path.resolve()), *flags]
+    )
+    assert session.ran == [expected]
 
 
 def test_bare_enter_runs_the_obvious_thing(tmp_path: Path):

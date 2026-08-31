@@ -39,7 +39,7 @@ def test_it_says_what_it_is():
 def test_it_says_how_to_scan_the_current_folder():
     """The one thing someone needs next, and the one thing a bare run no
     longer does for them."""
-    assert "filetrail ." in _screen()
+    assert "filetrail <path>" in _screen()
 
 
 def test_it_shows_the_wordmark():
@@ -72,16 +72,18 @@ def test_an_installed_run_says_nothing_about_installing(monkeypatch):
 def test_it_shows_examples_and_flags():
     screen = _screen()
 
-    for flag in ("--unknown-only", "--brief", "--timeline", "--json", "--redact", "--menu"):
+    for flag in ("--unknown-only", "--brief", "--identify", "--json", "--redact", "--version"):
         assert flag in screen, flag
-    assert "--help" in screen
+    for command in ("scan", "explain", "compare", "doctor", "menu", "help"):
+        assert command in screen, command
 
 
-def test_it_names_the_sources_it_reads():
+def test_it_does_not_list_the_evidence_sources():
+    """That table belongs in `doctor`, where the question has been asked."""
     screen = _screen()
 
-    for source in ("browser", "archive", "content credentials", "shell history"):
-        assert source in screen.lower(), source
+    assert "content credentials" not in screen
+    assert "doctor" in screen
 
 
 @pytest.mark.parametrize("width", WIDTHS)
@@ -111,8 +113,8 @@ def test_a_bare_run_introduces_itself_and_scans_nothing(capsys):
     assert "traced" not in out  # the report's masthead, which must not appear
 
 
-def test_the_about_flag_works_anywhere(capsys):
-    assert main(["--about"]) == 0
+def test_help_with_no_command_shows_the_same_screen(capsys):
+    assert main(["help"]) == 0
 
     assert SHOWN_REPOSITORY in capsys.readouterr().out
 

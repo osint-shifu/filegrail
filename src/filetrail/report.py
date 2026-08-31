@@ -576,6 +576,60 @@ def _explained(theme: Theme, origin: Origin) -> list[str]:
     return lines
 
 
+def render_compare(left: FileRecord, right: FileRecord, found, theme: Theme | None = None) -> str:
+    """What two files share, where they differ, and how each one arrived."""
+    theme = theme or detect()
+    rule = f"  {theme.rule(theme.width - 2)}"
+    names = [Path(record.path).name for record in (left, right)]
+
+    lines = [
+        "",
+        f"  {theme.bold('filetrail')}  {theme.dim('compare')}  "
+        f"{theme.bold(names[0])} {theme.dim(theme.glyph(MIDDOT))} {theme.bold(names[1])}",
+        rule,
+    ]
+
+    width = max(
+        [len(name) for name, _ in found.shared]
+        + [len(name) for name, _, _ in found.differing]
+        + [len(name) for name, _ in found.acquisition]
+        + [8]
+    )
+
+    if found.shared:
+        lines.extend(["", f"  {theme.label('identical')}", ""])
+        for name, value in found.shared:
+            lines.extend(_pair(theme, name, value, width, "recorded"))
+
+    if found.differing:
+        lines.extend(["", f"  {theme.label('differing')}", ""])
+        for name, one, other in found.differing:
+            lines.extend(_pair(theme, name, f"{one}  vs  {other}", width, "warning"))
+
+    lines.extend(["", f"  {theme.label('arrived by')}", ""])
+    for name, route in found.acquisition:
+        lines.extend(_pair(theme, name, route, width, "inherited"))
+
+    if found.interval:
+        lines.extend(["", f"  {theme.label('created')}", ""])
+        lines.extend(_pair(theme, "apart", found.interval, width, "body"))
+
+    lines.extend(["", rule, "", f"  {theme.label('assessment')}", ""])
+    for part in theme.wrap(found.assessment, theme.width - 6):
+        lines.append(f"    {theme.paint(part, 'body')}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _pair(theme: Theme, name: str, value: str, width: int, colour: str) -> list[str]:
+    room = theme.width - 6 - width
+    lines = []
+    for index, part in enumerate(theme.wrap(value, room)):
+        head = theme.dim(name.ljust(width)) if index == 0 else " " * width
+        lines.append(f"    {head}  {theme.paint(part, colour)}")
+    return lines
+
+
 def render_json_doctor(found) -> str:
     return json.dumps(found.to_dict(), ensure_ascii=False, indent=2)
 

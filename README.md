@@ -88,7 +88,7 @@ and the report never makes them compete.
 A document arrives and something about it is off.
 
 ```bash
-filetrail suspicious.pdf --explain
+filetrail explain suspicious.pdf
 ```
 
 ```text
@@ -123,7 +123,7 @@ interesting list. A binary that no browser ever downloaded is a question worth
 asking. Before reading that list as absence, though:
 
 ```bash
-filetrail --doctor
+filetrail doctor
 ```
 
 `no recorded origin` means the evidence was searched and the file was not in it,
@@ -198,6 +198,7 @@ PYTHONPATH=src python -m filetrail.cli ~/Downloads
 
 ```bash
 filetrail                       # what this is, and how to use it
+filetrail help <command>        # details for any one command
 filetrail .                     # scan the folder you are standing in
 filetrail ~/Downloads           # any directory, recursively
 filetrail /mnt/evidence/        # anywhere you have read access
@@ -219,11 +220,10 @@ filetrail . --no-shell-history  # skip shell correlation
 filetrail . --no-archives       # do not inherit origins from archives
 filetrail . --no-color          # plain text, no escape sequences
 
-filetrail a.pdf --explain       # every source for one file, and why the verdict holds
-filetrail --doctor              # which evidence sources this machine has
-filetrail --menu                # pick a view from a list, no flags to remember
-filetrail --about               # the landing screen again
-filetrail --help                # every flag
+filetrail explain a.pdf         # every source for one file, and why the verdict holds
+filetrail compare a.jpg b.jpg   # what two files share, and how each arrived
+filetrail doctor                # which evidence sources this machine has
+filetrail menu                  # pick a view from a list, no flags to remember
 ```
 
 ## Sources
@@ -317,7 +317,7 @@ clearing history or migrating a profile discards it, so files older than the
 surviving history cannot be resolved.
 ```
 
-`filetrail --doctor` says what this machine can be asked before anything is
+`filetrail doctor` says what this machine can be asked before anything is
 asked of it: which browser profiles are readable, whether the filesystem carries
 extended attributes, whether the shell kept timestamps, and how far back the
 records reach.
