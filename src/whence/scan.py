@@ -14,6 +14,7 @@ from .sources import (
     inherited_origin,
     is_archive,
     list_members,
+    read_c2pa_manifest,
     read_embedded_metadata,
     read_file_attributes,
 )
@@ -111,9 +112,10 @@ def scan(
                 record.origins.append(_matched_by_name(origin))
 
         record.origins.extend(read_file_attributes(path))
-        embedded = read_embedded_metadata(path)
-        if embedded is not None:
-            record.origins.append(embedded)
+        for reader in (read_c2pa_manifest, read_embedded_metadata):
+            claim = reader(path)
+            if claim is not None:
+                record.origins.append(claim)
         record.origins.extend(history.get(path.name, []))
         records.append(record)
 

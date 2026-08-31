@@ -10,6 +10,8 @@ CONFIDENCE = {
     "macos-wherefroms": 85,
     "xdg-xattr": 80,
     "archive-member": 70,
+    # A purpose-built provenance standard, but the signature is not verified here.
+    "c2pa": 60,
     "document-metadata": 50,
     "shell-history": 40,
     "filesystem": 10,

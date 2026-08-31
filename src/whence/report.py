@@ -40,7 +40,7 @@ def render_text(
         for origin in origins:
             if origin is None:
                 continue
-            if origin.source == "document-metadata":
+            if origin.source in ("document-metadata", "c2pa"):
                 target = _document_summary(origin, record)
             else:
                 target = origin.url or origin.command or origin.tool or "(no detail)"
