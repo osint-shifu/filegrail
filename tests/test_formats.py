@@ -295,6 +295,79 @@ def test_odf_generator_and_author(tmp_path: Path):
     assert "author Jan Kowalski" in origin.note
 
 
+#: What a document that has passed through Word looks like: a statistics
+#: element that keeps its counts in attributes, and a list of user-defined
+#: properties whose names are attributes too. Both need attributes read, and
+#: they need them read differently.
+ODF_USER_DEFINED = """<?xml version="1.0"?>
+<office:document-meta
+  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"
+  xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <office:meta>
+    <meta:generator>LibreOffice/5.4.7.2$Linux_X86_64</meta:generator>
+    <dc:creator>Debra Dalgleish</dc:creator>
+    <meta:document-statistic meta:table-count="2" meta:cell-count="63"/>
+    <meta:user-defined meta:name="AppVersion">16.0300</meta:user-defined>
+    <meta:user-defined meta:name="DocSecurity" meta:value-type="float">0</meta:user-defined>
+    <meta:user-defined meta:name="Case reference">OSINT-2026-014</meta:user-defined>
+  </office:meta>
+</office:document-meta>"""
+
+
+def _user_defined(tmp_path: Path) -> dict[str, str]:
+    document = tmp_path / "book.ods"
+    with zipfile.ZipFile(document, "w") as archive:
+        archive.writestr("meta.xml", ODF_USER_DEFINED)
+    return read_embedded_metadata(document).fields
+
+
+def test_every_user_defined_property_is_kept_under_its_own_name(tmp_path: Path):
+    """They are a list, not one field, and their names live in an attribute.
+
+    Read like every other child element they collapse into one: the first
+    value wins, the rest are dropped, and a property called `Case reference`
+    disappears from a document that was filed under it.
+    """
+    fields = _user_defined(tmp_path)
+
+    assert fields["AppVersion"] == "16.0300"
+    assert fields["DocSecurity"] == "0"
+    assert fields["Case reference"] == "OSINT-2026-014"
+
+
+def test_the_attributes_that_name_them_do_not_become_fields(tmp_path: Path):
+    """`name AppVersion` and `value-type float` are not things a document said."""
+    fields = _user_defined(tmp_path)
+
+    assert "user-defined" not in fields
+    assert "name" not in fields
+    assert "value-type" not in fields
+
+
+def test_the_statistics_element_still_reads_its_attributes(tmp_path: Path):
+    """The reason attributes are read at all; the counts live nowhere else."""
+    fields = _user_defined(tmp_path)
+
+    assert fields["table-count"] == "2"
+    assert fields["cell-count"] == "63"
+
+
+def test_a_user_defined_property_does_not_shadow_a_real_field(tmp_path: Path):
+    """Anyone may name one `creator`. The document's own element wins."""
+    document = tmp_path / "sneaky.odt"
+    with zipfile.ZipFile(document, "w") as archive:
+        archive.writestr(
+            "meta.xml",
+            ODF_USER_DEFINED.replace(
+                '<meta:user-defined meta:name="AppVersion">16.0300</meta:user-defined>',
+                '<meta:user-defined meta:name="creator">Somebody Else</meta:user-defined>',
+            ),
+        )
+
+    assert read_embedded_metadata(document).fields["creator"] == "Debra Dalgleish"
+
+
 def test_epub_package_metadata(tmp_path: Path):
     container = """<?xml version="1.0"?>
     <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">

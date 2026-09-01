@@ -83,6 +83,10 @@ def read_container(path: Path) -> Document | None:
     return None
 
 
+#: ODF keeps arbitrary document properties here, one element per property.
+_USER_DEFINED = f"{{{_OFFICE_META}}}user-defined"
+
+
 def _read_odf(path: Path) -> Document:
     with zipfile.ZipFile(path) as archive:
         if "meta.xml" not in archive.namelist():
@@ -105,17 +109,42 @@ def _read_odf(path: Path) -> Document:
 def _declared(element) -> dict[str, str]:
     """Every child element that carries text, by local name.
 
-    Attributes are included for the statistics element, which is where ODF puts
-    its page and word counts.
+    Attributes are included because the statistics element keeps its page, table
+    and word counts in them and nowhere else.
+
+    `meta:user-defined` is the exception, and it needs its own reading. It is a
+    *list* of properties whose names live in an attribute rather than in the tag,
+    so treating it like every other child collapses the whole list into one
+    field: the first value wins, the rest are dropped, and the attribute names of
+    the others scatter into fields of their own - a document reporting `name
+    AppVersion` and `value-type float`, neither of which anybody wrote. The
+    developer's corpus has a spreadsheet with six of them where three fields came
+    out and five properties went missing.
+
+    They are collected apart and merged afterwards so that a real element always
+    wins the name: a user-defined property may legitimately be called `creator`,
+    and it does not get to answer for `dc:creator`.
     """
     found: dict[str, str] = {}
+    defined: dict[str, str] = {}
+
     for child in element:
+        if child.tag == _USER_DEFINED:
+            name = _text(child.get(f"{{{_OFFICE_META}}}name"))
+            value = (child.text or "").strip()
+            if name and value:
+                defined.setdefault(name, value)
+            continue
+
         name = child.tag.rsplit("}", 1)[-1]
         value = (child.text or "").strip()
         if value and name not in found:
             found[name] = value
         for key, attribute in child.attrib.items():
             found.setdefault(key.rsplit("}", 1)[-1], attribute)
+
+    for name, value in defined.items():
+        found.setdefault(name, value)
     return found
 
 

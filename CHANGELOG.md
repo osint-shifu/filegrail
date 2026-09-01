@@ -521,6 +521,23 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- An ODF document reported three fields where it carried eight, and two of the
+  three were invented. `meta:user-defined` is a list of arbitrary document
+  properties whose names live in an attribute rather than in the tag, and it was
+  read like every other child element: the first value won, the rest were
+  dropped, and the attribute names of the others scattered into fields of their
+  own. The corpus spreadsheet came back saying `user-defined 16.0300`, `name
+  AppVersion` and `value-type float` - three lines, none of which anybody wrote,
+  in place of six properties.
+
+  They are now keyed on the name the document gave them, and collected apart so
+  that a real element always wins: a user-defined property may legitimately be
+  called `creator`, and it does not get to answer for `dc:creator`.
+
+  Attributes are still read from every other child, because the statistics
+  element keeps its page, table and word counts in them and nowhere else. That
+  was the reason the rule existed; `user-defined` was the case it did not fit.
+
 - The macOS where-from attribute could never be read on macOS. `os.getxattr`
   is a Linux interface - the standard library does not expose the call on macOS
   at all - and every reader here guarded on `hasattr(os, "getxattr")`, so on
