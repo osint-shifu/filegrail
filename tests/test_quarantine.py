@@ -39,6 +39,14 @@ STAMP = "68b4bd35"
 
 
 def _tag(path: Path, value: str) -> None:
+    """Write the attribute, or skip where the test cannot write one.
+
+    `os.setxattr` is a Linux interface: the standard library does not expose
+    the call on macOS or Windows at all, which is a fact about the test rig and
+    not about the format.
+    """
+    if not hasattr(os, "setxattr"):  # pragma: no cover - depends on the platform
+        pytest.skip("the standard library exposes extended attributes on Linux only")
     try:
         os.setxattr(str(path), ATTRIBUTE, value.encode("ascii"))
     except OSError as unsupported:  # pragma: no cover - depends on the mount
