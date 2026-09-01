@@ -14,10 +14,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from . import __version__
+from . import TAGLINE, __version__
+from .about import WORDMARK
 from .explain import conclusion, grouped
-from .identify import Identifier, extract
+from .identify import PLACE, Identifier, extract
 from .models import ACQUISITION, INTRINSIC, FileRecord, Origin, kind, label
+from .overview import Alert, Inventory, Tally, attention, findings, inventory
 from .reconcile import ATTRIBUTION_CONFLICT, CONFLICT, KINDS, PARTIAL, Verdict, reconcile
 from .theme import (
     ARROW,
@@ -64,6 +66,11 @@ _LABEL = 10
 #: Where an entry's text begins: two spaces, the gutter glyph, one space.
 _INDENT = 4
 
+#: The widest a field name may be before it stops sharing a line with its value.
+#: Past this the column is eating the terminal; a longer name is not truncated,
+#: it takes a line of its own.
+_FIELD_NAME = 24
+
 
 def _gutter(theme: Theme) -> int:
     """How wide the gutter column is for this theme.
@@ -106,7 +113,7 @@ def render_text(
     *,
     verbose: bool = False,
     brief: bool = False,
-    limit: int = 25,
+    limit: int = 0,
     stats: dict[str, int] | None = None,
     theme: Theme | None = None,
     filtered: str = "",
@@ -116,19 +123,31 @@ def render_text(
     theme = theme or detect()
     known = [record for record in records if record.origins]
     unknown = [record for record in records if not record.origins]
+    found = extract(records)
+    contents = inventory(records)
 
-    lines = _masthead(theme, root, len(records), len(known))
+    lines = _masthead(theme, root, contents, len(known), len(unknown))
     if home:
         lines.extend([*_whose_machine(theme, home, "evidence read from the profile at"), ""])
+
+    # A directory is answered from the top down: what is in it, what was found
+    # in it, what wants a second look, and only then one file at a time. A
+    # single file has none of those questions - there is nothing to inventory
+    # but itself - so it goes straight to the answer.
+    if len(records) > 1:
+        lines.extend(_inventory(theme, contents))
+        lines.extend(_findings(theme, findings(records)))
+        lines.extend(_attention(theme, attention(records, found, listed=identify), root))
+
     lines.extend(_sections(theme, known, root, verbose=verbose, brief=brief))
 
     if unknown:
         lines.extend(_unknown(theme, unknown, root, limit))
 
     if identify:
-        lines.extend(_identifiers(theme, extract(records)))
+        lines.extend(_identifiers(theme, found))
 
-    lines.extend(_summary(theme, records, known, stats, filtered))
+    lines.extend(_summary(theme, records, known, unknown, stats, filtered))
     return "\n".join(lines)
 
 
@@ -159,31 +178,262 @@ def _identifiers(theme: Theme, found: list[Identifier]) -> list[str]:
 
     for entry in found:
         colour = _IDENTIFIER_COLOURS.get(entry.type, "self-reported")
-        value = theme.paint(theme.clip(entry.normalized, width).ljust(width), colour)
         kind = theme.dim(entry.type.ljust(7))
         seen = theme.dim(f"{entry.count} in {entry.files}")
-        lines.append(f"    {kind} {value}  {seen}")
-        lines.append(f"    {' ' * 8}{theme.dim(theme.clip(entry.where[0], theme.width - 14))}")
+
+        # An identifier is what somebody pivots on next, so it wraps like every
+        # other value. Half an address is not a shorter address.
+        parts = theme.wrap(entry.normalized, width)
+        lines.append(f"    {kind} {theme.paint(parts[0].ljust(width), colour)}  {seen}")
+        lines.extend(f"    {' ' * 8}{theme.paint(part, colour)}" for part in parts[1:])
+        # The place string carries a middot because that is the form `--json`
+        # promises. A terminal that cannot print one gets the ASCII separator
+        # this report uses everywhere else.
+        where = entry.where[0].replace(PLACE, f" {theme.glyph(MIDDOT)} ")
+        lines.extend(
+            f"    {' ' * 8}{theme.dim(part)}" for part in theme.wrap(where, theme.width - 14)
+        )
     lines.append("")
     return lines
 
 
-def _masthead(theme: Theme, root: Path, total: int, traced: int) -> list[str]:
-    prefix = f"  {theme.bold('filetrail')}  "
-    count = theme.label(f"{traced} of {total} traced")
+def _plural(count: int, noun: str) -> str:
+    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
 
-    # The meter is decoration and the count is the information, so on a narrow
-    # terminal the meter goes first rather than the path being clipped to nothing.
-    right = f"{theme.coverage(traced, total)}  {count}"
-    if _visible(prefix) + _visible(right) + 12 > theme.width:
-        right = count
 
+def _facts_line(theme: Theme, facts: list[str]) -> str:
+    return theme.glyph(MIDDOT).join(f" {fact} " for fact in facts).strip()
+
+
+#: The label column of the banner, wide enough for the longest of its rows.
+_BANNER_LABEL = 8
+
+#: Below this the version cannot sit beside the wordmark and takes its own line.
+_VERSION_BESIDE = 52
+
+#: Which line of the wordmark the version sits on. The third, where the mark is
+#: at its widest and the eye is already.
+_VERSION_LINE = 2
+
+
+def _masthead(theme: Theme, root: Path, found: Inventory, known: int, unknown: int) -> list[str]:
+    """The report's own letterhead: what wrote this, and what it was pointed at.
+
+    A report is redirected to a file more often than it is read on screen, and
+    a file that does not say what produced it is a wall of text somebody has to
+    identify from memory. The wordmark is the landing screen's, so the two are
+    recognisably the same tool; everything that belongs to a front door - the
+    repository, the licence, the usage - is not here, because a report is not
+    an introduction.
+
+    The scale and the yield are separate rows because they answer separate
+    questions: what is in here, and how much of it answered. It used to read
+    `73 of 105 traced` over a count of files carrying an origin of any kind,
+    and a PDF with an Info dictionary has not been traced anywhere - it has
+    described itself.
+    """
+    stamp = theme.label(f"filetrail {__version__}")
+    beside = theme.width >= _VERSION_BESIDE
+    gutter = len(WORDMARK[0]) + 5
+
+    lines = [""]
+    for index, line in enumerate(WORDMARK):
+        mark = f"  {theme.paint(line, 'recorded')}"
+        if beside and index == _VERSION_LINE:
+            lines.append(f"{mark}{' ' * max(1, gutter - len(line) - 2)}{stamp}".rstrip())
+        else:
+            lines.append(mark.rstrip())
+    if not beside:
+        lines.append(f"  {stamp}")
+
+    lines.append("")
+    lines.extend(_wrapped(theme, TAGLINE, "  ", theme.dim))
+    lines.append("")
+
+    scale = [_plural(found.files, "file")]
+    if found.files > 1:
+        scale.append(_plural(len(found.types), "type"))
+    scale.append(_size(found.size))
+
+    rows = [("target", _display(root)), ("scanned", _facts_line(theme, scale))]
+    if found.files > 1:
+        rows.append(
+            ("findings", _facts_line(theme, [f"{known} files", f"{unknown} without findings"]))
+        )
+    for name, value in rows:
+        lines.extend(_labelled(theme, name, value))
+
+    lines.extend(["", f"  {theme.rule(theme.width - 2)}", ""])
+    return lines
+
+
+def _labelled(theme: Theme, name: str, value: str) -> list[str]:
+    """One banner row: a fixed label column, and a value that wraps under it.
+
+    The target wraps rather than clips for the reason every path in this report
+    does - half a mount path still looks like a path, and a reader who cannot
+    see what was scanned cannot check anything below it.
+    """
+    head = f"  {theme.label(name.ljust(_BANNER_LABEL))}  "
+    room = max(8, theme.width - _BANNER_LABEL - 6)
+    parts = theme.wrap(value, room)
     return [
-        "",
-        _row(theme, prefix, _display(root), right, paint=theme.dim),
-        f"  {theme.rule(theme.width - 2)}",
-        "",
+        f"{head if index == 0 else ' ' * (_BANNER_LABEL + 4)}{theme.paint(part, 'body')}"
+        for index, part in enumerate(parts)
     ]
+
+
+def _wrapped(theme: Theme, text: str, indent: str, paint) -> list[str]:
+    """One run of text over as many lines as the terminal needs for all of it."""
+    return [f"{indent}{paint(part)}" for part in theme.wrap(text, theme.width - len(indent) - 2)]
+
+
+def _inventory(theme: Theme, found: Inventory) -> list[str]:
+    """Every type present, how many of each, and how much of the scan it is.
+
+    One table rather than two. Counts and sizes answer the same question - what
+    is this directory made of - and splitting them makes the reader hold half
+    the answer while they find the other half.
+    """
+    if not found.types:
+        return []
+
+    digits = max(len(str(entry.count)) for entry in found.types)
+    sizes = {entry.name: _size(entry.size) for entry in found.types}
+    span = max(len(value) for value in sizes.values())
+
+    # The name column is bounded by what still leaves a whole cell inside the
+    # terminal. An extension wider than that is not shortened - it steps out of
+    # the grid and takes lines of its own underneath, because an extension is
+    # data and the grid is a layout.
+    room = theme.width - _INDENT
+    column = min(max(len(entry.name) for entry in found.types), max(4, room - digits - span - 4))
+    fits = [entry for entry in found.types if len(entry.name) <= column]
+    wide = [entry for entry in found.types if len(entry.name) > column]
+
+    lines = _heading(theme, "inventory", len(found.types), noun="type")
+    if fits:
+        lines.extend(
+            _grid(
+                theme,
+                [
+                    theme.paint(entry.name.ljust(column), "body")
+                    + theme.label(str(entry.count).rjust(digits + 2))
+                    + theme.dim(sizes[entry.name].rjust(span + 2))
+                    for entry in fits
+                ],
+                column + digits + span + 4,
+            )
+        )
+    for entry in wide:
+        lines.extend(
+            f"{' ' * _INDENT}{theme.paint(part, 'body')}" for part in theme.wrap(entry.name, room)
+        )
+        tail = theme.label(str(entry.count).rjust(digits)) + theme.dim(
+            sizes[entry.name].rjust(span + 2)
+        )
+        lines.append(_row(theme, " " * _INDENT, "", tail, wrap=False))
+
+    if found.families:
+        width = max(len(family) for family, _ in found.families)
+        counts = max(len(str(count)) for _, count in found.families)
+        lines.append("")
+        lines.extend(
+            _grid(
+                theme,
+                [
+                    theme.label(family.ljust(width)) + theme.dim(str(count).rjust(counts + 2))
+                    for family, count in found.families
+                ],
+                width + counts + 2,
+            )
+        )
+    lines.append("")
+    return lines
+
+
+#: Space between the columns of a grid. Wide enough that two cells never read
+#: as one, narrow enough to keep a column on an eighty-column terminal.
+_GAP = 4
+
+
+def _grid(theme: Theme, cells: list[str], width: int, indent: int = _INDENT) -> list[str]:
+    """Lay equal-width cells across the terminal, as many per row as fit.
+
+    Columns give way one at a time as the terminal narrows, down to one. The
+    cells themselves never give way: an inventory that dropped a digit to keep
+    four columns would be trading the answer for the layout.
+
+    The cells arrive painted and each one is already `width` columns wide, so
+    nothing here has to measure an escape sequence.
+    """
+    room = theme.width - indent
+    columns = max(1, (room + _GAP) // (width + _GAP))
+    return [
+        " " * indent + (" " * _GAP).join(cells[start : start + columns])
+        for start in range(0, len(cells), columns)
+    ]
+
+
+def _findings(theme: Theme, tallies: list[Tally]) -> list[str]:
+    """What was found, in the words of what it is rather than what read it.
+
+    `which readers returned results` is a real question and it has its own
+    table at the end of the report. It is not this one: an analyst reading down
+    a list of parser names still has to work out what any of it means.
+    """
+    if not tallies:
+        return []
+
+    width = max(len(tally.name) for tally in tallies)
+    # The digits line up, not the phrases: `1 file` and `66 files` right-aligned
+    # as whole phrases puts the 1 under the s of files, which is a column of
+    # nothing.
+    digits = max(len(str(tally.files)) for tally in tallies)
+
+    lines = _heading(theme, "findings")
+    for tally in tallies:
+        noun = "file" if tally.files == 1 else "files"
+        lines.append(
+            f"{' ' * _INDENT}{theme.paint(tally.name.ljust(width), 'body')}"
+            f"  {theme.label(str(tally.files).rjust(digits))} {theme.dim(noun)}"
+        )
+    lines.append("")
+    return lines
+
+
+def _attention(theme: Theme, raised: list[Alert], root: Path) -> list[str]:
+    """The few things a long report would otherwise bury.
+
+    Not an alarm panel: coordinates and Content Credentials are findings, not
+    problems, and the heading says so. No colour is spent beyond the one the
+    palette already has for evidence that disagrees with itself - these lines
+    are counts, not claims, and painting a count by how alarming it is would be
+    the one thing this interface never does with colour.
+    """
+    if not raised:
+        return []
+
+    lines = _heading(theme, "notable findings")
+    for alert in raised:
+        colour = "warning" if alert.contested else None
+        # `●` means "this is a file" everywhere else in the report, and a count
+        # line is not a file. Only the contested flag keeps a glyph; the rest
+        # are indented to the same column and left unmarked, which is quieter
+        # and does not spend a symbol the gutter is already using.
+        glyph = _mark(theme, FLAG, colour) if alert.contested else _mark(theme, " ")
+        for index, part in enumerate(theme.wrap(alert.text, theme.width - _gutter(theme) - 2)):
+            gutter = glyph if index == 0 else _mark(theme, RAIL)
+            lines.append(f"  {gutter} {theme.paint(part, colour or 'body')}")
+
+        for path in alert.files:
+            for part in theme.wrap(_relative(path, root), theme.width - _gutter(theme) - 4):
+                lines.append(f"  {_mark(theme, RAIL)}   {theme.dim(part)}")
+        if alert.hidden:
+            more = f"and {alert.hidden} more, each marked in the report below"
+            lines.append(f"  {_mark(theme, RAIL)}   {theme.dim(more)}")
+    lines.append("")
+    return lines
 
 
 def _sections(
@@ -222,10 +472,15 @@ def _sections(
     return lines
 
 
-def _heading(theme: Theme, text: str, count: int, noun: str = "file") -> list[str]:
-    right = theme.dim(f"{count} {noun}" + ("" if count == 1 else "s"))
+def _heading(theme: Theme, text: str, count: int | None = None, noun: str = "file") -> list[str]:
+    """A section name and its rule, with what it holds on the right.
+
+    The count is optional: a section whose rows each carry their own count has
+    nothing to put up there that is not already below it.
+    """
+    right = theme.dim(_plural(count, noun)) if count is not None else ""
     return [
-        _row(theme, "  ", text, right, paint=theme.label),
+        _row(theme, "  ", text, right, paint=theme.label).rstrip(),
         f"  {theme.rule(theme.width - 2)}",
         "",
     ]
@@ -373,7 +628,7 @@ def _fields_block(theme: Theme, fields: dict[str, str], indent: int) -> list[str
     seventeen characters and a fixed column would either waste width on every
     other reader or wrap on this one.
     """
-    width = min(max(len(name) for name in fields), 24)
+    width = min(max(len(name) for name in fields), _FIELD_NAME)
     room = theme.width - indent - width - 2
     items = list(fields.items())
 
@@ -381,13 +636,27 @@ def _fields_block(theme: Theme, fields: dict[str, str], indent: int) -> list[str
     for index, (name, value) in enumerate(items):
         last = index == len(items) - 1
         branch = _mark(theme, LAST if last else BRANCH)
-        painted = theme.dim(theme.clip(name, width).ljust(width))
         spacer = " " * len(theme.glyph(ARROW)) if last else _mark(theme, RAIL)
 
-        for line, part in enumerate(theme.wrap(str(value), room)):
-            gutter = branch if line == 0 else spacer
-            head = painted if line == 0 else " " * width
-            out.append(f"  {gutter} {head}  {theme.paint(part, 'body')}")
+        rows: list[str] = []
+        if len(name) > width:
+            # A name too long for the column takes lines of its own and the
+            # value follows underneath. Cutting it instead left four XMP fields
+            # printed as `xmpMM:DerivedFrom/stRef…` - four rows nobody can tell
+            # apart, and four values nobody can attribute to a field.
+            rows.extend(theme.dim(part) for part in theme.wrap(name, theme.width - indent - 2))
+            rows.extend(
+                f"{' ' * width}  {theme.paint(part, 'body')}"
+                for part in theme.wrap(str(value), room)
+            )
+        else:
+            head = theme.dim(name.ljust(width))
+            rows.extend(
+                f"{head if line == 0 else ' ' * width}  {theme.paint(part, 'body')}"
+                for line, part in enumerate(theme.wrap(str(value), room))
+            )
+
+        out.extend(f"  {branch if line == 0 else spacer} {text}" for line, text in enumerate(rows))
     return out
 
 
@@ -429,13 +698,36 @@ def _headline(origin: Origin, record: FileRecord) -> str:
 
 
 def _unknown(theme: Theme, unknown: list[FileRecord], root: Path, limit: int) -> list[str]:
+    """Files nothing was found for.
+
+    Not `no recorded origin`, which names a narrower case than this list holds:
+    a file here has no acquisition record, no metadata and nothing that touched
+    it. It is a list of open questions, not of failures.
+    """
     shown = unknown if limit <= 0 else unknown[:limit]
-    lines = _heading(theme, "no recorded origin", len(unknown))
+    lines = _heading(theme, "no findings", len(unknown))
 
     for record in shown:
         when = theme.dim(_moment(record.btime or record.mtime))
         prefix = " " * _INDENT
-        lines.append(_row(theme, prefix, _relative(record.path, root), when, paint=theme.dim))
+        beside = max(8, theme.width - _INDENT - _visible(when) - 2)
+        name = _relative(record.path, root)
+
+        if len(name) <= beside:
+            lines.append(_row(theme, prefix, name, when, wrap=False, paint=theme.dim))
+            continue
+
+        # It did not fit beside the timestamp, so it takes the whole width and
+        # the timestamp follows it. Splitting `...9B53.xml` into `...9B53.x`
+        # and `ml` to keep a timestamp company is the layout winning an
+        # argument it should not have had.
+        parts = theme.wrap(name, theme.width - _INDENT - 2)
+        lines.extend(f"{prefix}{theme.dim(part)}" for part in parts[:-1])
+        if len(parts[-1]) <= beside:
+            lines.append(_row(theme, prefix, parts[-1], when, wrap=False, paint=theme.dim))
+        else:
+            lines.append(f"{prefix}{theme.dim(parts[-1])}")
+            lines.append(_row(theme, prefix, "", when, wrap=False))
 
     if len(shown) < len(unknown):
         hidden = len(unknown) - len(shown)
@@ -451,9 +743,17 @@ def _summary(
     theme: Theme,
     records: list[FileRecord],
     known: list[FileRecord],
+    unknown: list[FileRecord],
     stats: dict[str, int] | None,
     filtered: str = "",
 ) -> list[str]:
+    """Which readers produced results, and the one line that closes the report.
+
+    This table answers a technical question - what ran and what came back - so
+    it sits at the end, after the evidence it is describing. It is not the
+    findings section and must not stand in for it: a reader working down a list
+    of parser names still has to work out what any of it meant.
+    """
     # Tallied by the name the entries above were printed under, not by the
     # source behind it: one report calling the same claim `PDF Info` in the body
     # and `document metadata` in the summary reads as two kinds of evidence.
@@ -465,12 +765,12 @@ def _summary(
             counts[name] = counts.get(name, 0) + 1
             behind[name] = (record.best.source, record.best.confidence)
 
-    lines = [f"  {theme.rule(theme.width - 2)}"]
-
+    lines: list[str] = []
     if counts:
         ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
         widest = max(len(name) for name, _ in ordered)
         digits = max(len(str(count)) for _, count in ordered)
+        lines.extend(_heading(theme, "metadata sources", len(ordered), noun="source"))
         for name, count in ordered:
             source, confidence = behind[name]
             colour = theme.evidence(source)
@@ -479,8 +779,17 @@ def _summary(
             lines.append(f"    {painted}  {meter}  {theme.dim(str(count).rjust(digits))}")
         lines.append("")
 
-    total = theme.bold(f"{len(known)} of {len(records)}")
-    lines.append(f"    {total} files have a recorded origin.")
+    lines.append(f"  {theme.rule(theme.width - 2)}")
+
+    closing = _facts_line(
+        theme,
+        [
+            f"{_plural(len(records), 'file')} analyzed",
+            f"{len(known)} with findings",
+            f"{len(unknown)} with no findings",
+        ],
+    )
+    lines.extend(_wrapped(theme, closing, " " * _INDENT, theme.bold))
 
     if filtered:
         # An empty report after a filter has to name the filter. Otherwise it
@@ -812,7 +1121,7 @@ def render_timeline(
         if not record.origins:
             when = record.btime or record.mtime
             if when:
-                events.append((when, name, "(no recorded origin)", "filesystem"))
+                events.append((when, name, "(nothing found)", "filesystem"))
 
     if not events:
         return "No datable events found."
@@ -825,9 +1134,13 @@ def render_timeline(
     for when, name, detail, source in sorted(events):
         colour = theme.evidence(source)
         moment = theme.dim(when[:19].replace("T", " "))
-        lines.append(f"  {moment}  {theme.bold(theme.clip(name, theme.width - stamp_width - 4))}")
-        claim = theme.clip(detail, theme.width - stamp_width - 6)
-        lines.append(f"  {' ' * (stamp_width - 2)}{rail} {theme.paint(claim, colour)}")
+        under = " " * (stamp_width - 2)
+
+        for index, part in enumerate(theme.wrap(name, theme.width - stamp_width - 4)):
+            head = f"  {moment}  " if index == 0 else f"  {under}  "
+            lines.append(f"{head}{theme.bold(part)}")
+        for part in theme.wrap(detail, theme.width - stamp_width - 6):
+            lines.append(f"  {under}{rail} {theme.paint(part, colour)}")
     return "\n".join(lines)
 
 

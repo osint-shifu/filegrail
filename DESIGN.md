@@ -17,6 +17,24 @@ actually emits — this is a description of the implementation, not an aspiratio
   as on a terminal.
 - **Terminal**: 16-colour minimum, 256 preferred, TrueColor used when offered.
 
+### The order of the answers
+
+A report is read from the directory down to the file, never the other way. The
+sections come in the order an analyst asks for them:
+
+1. **Scan overview** — what was scanned, how much of it, how much of it answered
+2. **Inventory** — every type present, with its share of the files and the bytes
+3. **Findings** — what was found, named for what it is
+4. **Attention** — the few things a long report would otherwise bury
+5. **Entries** — one file at a time, grouped by evidence class
+6. **No findings** — the files nothing was found for
+7. **Metadata sources** — which readers produced results, which is a technical
+   question and belongs after the evidence rather than in front of it
+
+The first four are skipped for a scan of a single file. There is nothing to
+inventory but itself, and a findings table over one file is ceremony in front of
+the answer.
+
 ### Two questions, never ranked against each other
 
 A file can answer two different questions, and the report keeps them apart:
@@ -161,6 +179,21 @@ way, which defeats having read the file at all. Words stay whole where they fit;
 a single token longer than the line - a URL, a hash - is split, because the
 alternative is a line that overflows the terminal.
 
+**The names of things are data too.** A field name, a file name, an identifier
+and a scanned path all wrap on the same rule as a value. A field name cut to
+`xmpMM:DerivedFrom/stRef…` leaves four rows nobody can tell apart and four values
+nobody can attribute to a field; half a path still looks like a path. A name too
+wide for its column takes lines of its own, and the value follows underneath it:
+
+```
+  ├ xmpMM:DerivedFrom/stRef:documentID
+  │                         xmp.did:dac92226-1901-469c-9e41-22f9d830ec3a
+```
+
+The one exception is navigational chrome — the landing screen, where a gloss
+beside a command may give way on a narrow terminal. Nothing in the analytic
+material of a report is ever abbreviated.
+
 Every field a reader decoded is printed **by default**, as a tree hanging off the
 claim it belongs to. `--brief` collapses it. A reader who has to run the command
 a second time to see what the tool already knew has been told less than it knew.
@@ -183,25 +216,162 @@ starts the next claim on the same file, and the gutter still parses.
 
 ## 5. Components
 
-### Masthead
+### Two headers, one mark
+
+The wordmark appears in two places and says a different amount in each.
+
+**Start screen** — the front door. Wordmark, repository, licence, version,
+tagline, the three areas the tool covers, usage, six ways in, the command names,
+and where the rest of the help is. Its job is to get somebody to a first command.
+
+**Report banner** — the letterhead. Wordmark, version, tagline, target, scan
+statistics. Nothing else: a report is not an introduction, and a reader holding
+one already knows what they ran.
 
 ```
-  filetrail  ~/Downloads                    ▰▰▰▰▰▰▰▱▱▱▱▱  70 of 105 traced
+    __ _ _     _           _ _
+   / _(_) |___| |_ _ _ __ _(_) |
+  |  _| | / -_)  _| '_/ _` | | |   filetrail 0.1.0
+  |_| |_|_\___|\__|_| \__,_|_|_|
+
+  Trace where files came from. Extract what they reveal.
+
+  target    /data/case-files
+  scanned   105 files · 32 types · 19.8 MB
+  findings  73 files · 32 without findings
+
   ────────────────────────────────────────────────────────────────────────
 ```
 
-Name bold, path faint, coverage meter and count right-aligned. Twelve slots, so
-it never reads as one of the five-slot confidence meters.
+A report is redirected to a file more often than it is read on screen, and a
+`report.txt` that does not say what produced it is a wall of text somebody has
+to identify from memory. Below 52 columns the version drops to its own line
+under the mark; the target wraps rather than clips, like every path here.
+
+The scale and the yield are separate rows because they answer separate
+questions. It used to read `73 of 105 traced` over a count of files carrying any
+origin at all — a PDF with an Info dictionary has not been traced anywhere, it
+has described itself, so the word claimed something the tool does not know.
+Nothing outside the acquisition sections is called a trace.
+
+### Inventory
+
+```
+  inventory                                                      33 types
+  ────────────────────────────────────────────────────────────────────────
+
+    JPG   20    3.6 MB    PDF   18    3.4 MB    DOCX   9  200.2 KB
+    PNG    6    2.8 MB    XLSX   6  143.7 KB    PPTX   5  258.9 KB
+
+    image  37    video  2    document  45    text  14    other  5
+```
+
+Every extension present, with how many files and how many bytes, then the same
+files by family. No top ten and no `…`: which types are in a directory you did
+not assemble is the first thing worth knowing, and a list that stops at the tenth
+answers it for the part you had already guessed.
+
+The families are the ones `--type` already filters on, read from the same table,
+so a name in the inventory is a word you can type. A file belongs to exactly one
+of them, by a fixed precedence, so the counts add up to the total.
+
+**Formats, not extensions.** `JPG 20` beside `JPEG 1` counts one format twice,
+so the obvious spellings fold to the name the format is usually called by —
+`jpg`/`jpe` → `JPEG`, `tif` → `TIFF`, `yml` → `YAML`, `htm` → `HTML` — and a
+compressed tarball is `TAR.GZ` rather than `GZ`, which said nothing the file name
+had not. Presentation only: `--type`, `--ext`, the record and the JSON keep the
+extension the filesystem has, and folding a name never moves a file out of the
+family `--type` would select.
+
+Columns are laid out to the terminal: four, three, two, one, as it narrows. The
+cells never shrink. **Give up a column before giving up a digit.**
+
+### Findings
+
+```
+  findings
+  ────────────────────────────────────────────────────────────────────────
+
+    creating software     66 files
+    device information    18 files
+    content credentials    1 file
+    coordinates            8 files
+    conflicting evidence   3 files
+```
+
+What was found, named for what it is rather than for the reader that found it.
+A row nothing matched is left out rather than printed as a zero — a column of
+zeroes reads as a list of the things the tool cannot do.
+
+**Two rows are printed even at zero**: `metadata` and `acquisition evidence`.
+The tool stands on those two things, and a scan that read a great deal of the
+first and none of the second has *found that out*. Leaving the row off would make
+an answer look like an omission.
+
+Units say what they count. `73 files` is files; `15 unique identifiers` is
+identifiers, because one address across forty files is one lead. Labels are the
+words an analyst uses rather than the model's — `timestamps`, not `dated claims`.
+
+`authors / creators` is keyed on the block, not on the field name. `Creator` is
+the application in a PDF Info dictionary and the person in OOXML core
+properties; one flat list of names would count every PDF's typesetter as its
+author. Every block is either given an author field or declared to have none,
+and a test holds both lists against the readers.
+
+The digits are aligned, not the phrases: `1 file` and `66 files` right-aligned
+whole puts the 1 under the s of files, which is a column of nothing.
+
+How many files said anything at all is not a row here. The masthead counts it,
+and a second number under a slightly different name is a second number to keep
+in agreement with the first.
+
+### Notable Findings
+
+```
+  notable findings
+  ────────────────────────────────────────────────────────────────────────
+
+  ! 3 files contain conflicting evidence
+  │   Investigative_Case_File_Review_Final.pdf
+  │   OSINT360 Target Architecture v0.3.pdf
+    8 files contain coordinates
+    1 file contains Content Credentials
+    15 unique identifiers extracted
+```
+
+Printed **only when there is something in it**. Not an alarm panel: coordinates
+and Content Credentials are findings, not problems, which is why the heading is
+`notable findings` and not `attention`.
+
+`!` is the only glyph here, and only for evidence that disagrees with itself.
+**`●` is not used.** It means *this is a file* everywhere else in the report, and
+a count line is not a file; spending it here would cost the gutter the one
+symbol it has for that. The remaining rows are indented to the same column and
+left unmarked.
+
+A conflict names the files behind it, up to five, and then says how many more
+there were and that each is marked below — a capped list that does not admit it
+reads as the whole list.
+
+No colour is spent beyond Warning on the contested line, which is the one thing
+in the palette that already means *this disagrees*. These lines are counts, not
+claims, and painting a count by how alarming it is is the one thing this
+interface never does with colour.
 
 ### Section Header
 
 ```
-  recorded by another system                                     2 files
+  file metadata                                                 72 files
   ────────────────────────────────────────────────────────────────────────
 ```
 
 Printed **only when more than one class is present**. A folder whose files all
 resolve the same way gets no headers at all — the grouping would be noise.
+
+The self-reported class is headed `file metadata`. It used to read `claimed by
+the file itself`, which is true, methodologically careful, and says nothing about
+what is in the section. Nothing is lost by the change: every claim inside still
+carries its own source and reads `▰▰▱▱▱ self-reported` beside it.
 
 ### Entry
 
@@ -225,35 +395,57 @@ the same line, so neither has to compete for width.
 Twelve slots, same glyphs, Foreground rather than an evidence colour, because it
 describes the run and not a claim.
 
-### Unknown List
+### No Findings
 
 ```
-  no recorded origin (38)
+  no findings                                                     32 files
   ────────────────────────────────────────────────────────────────────────
 
     notes.md                                        2026-08-24T19:31:08Z
     scratch.bin                                     2026-08-24T19:33:11Z
-    ... and 33 more (--limit 0 for all, --json for each)
+    ... and 7 more (--limit 0 for all, --json for each)
 ```
 
-Faint throughout, name left, timestamp right. It is a list of open questions,
-not a list of failures, and it is styled to sit quietly at the end.
+Faint throughout, name left, timestamp right, the name wrapping onto a second
+line rather than being cut. It is a list of open questions, not a list of
+failures, and it is styled to sit quietly at the end.
 
-### Summary Table
+Headed `no findings`, not `no recorded origin`. The list holds every file with no
+acquisition record, no metadata and nothing that touched it — a wider case than
+the old heading named.
+
+**Every one of them is listed by default.** Nobody should have to run the tool a
+second time to see a list it already had, which is the same objection that puts
+every decoded field on screen without asking. `--brief` caps it at 25 and says
+how many are left; an explicit `--limit N` is obeyed as given.
+
+### Metadata Sources
 
 ```
+  metadata sources                                              12 sources
   ────────────────────────────────────────────────────────────────────────
+
     OOXML properties     ▰▰▱▱▱   19
     device metadata      ▰▰▰▱▱   18
     XMP                  ▰▰▰▱▱   15
     PDF Info             ▰▰▱▱▱    6
     content credentials  ▰▰▰▱▱    1
 
-    70 of 105 files have a recorded origin.
+  ────────────────────────────────────────────────────────────────────────
+    105 files analyzed · 73 with findings · 32 with no findings
 ```
 
 Aligned columns, ordered by count. The meter repeats each class's confidence so
-the summary teaches the colour code rather than assuming it.
+the table teaches the colour code rather than assuming it.
+
+It answers *which readers produced results*, which is a technical question, so it
+sits at the end — after the evidence it describes. It is **not** the findings
+section and must not stand in for it: a reader working down a list of parser
+names still has to work out what any of it meant.
+
+The closing line counts files. It used to read `70 of 105 files have a recorded
+origin`, over the same number the masthead miscounted, and the same objection
+applies: most of those files had metadata, not an origin.
 
 The rows are named the way the entries above them are, which for most sources is
 the source itself. `document-metadata` is the exception: nine readers answer to
@@ -282,6 +474,10 @@ column so the claim stays tied to its moment.
   to grow past this even on a wide terminal
 - **Gutter**: 2 spaces, then 1 glyph, then 1 space. Content starts at column 4.
 - **Label column**: 10 characters, left-aligned, so values line up across labels
+- **Field name column**: sized to the names present, to a maximum of 24; a longer
+  name takes a line of its own rather than an ellipsis
+- **Grid columns**: as many equal-width cells as fit, with a 4-space gap, giving
+  way one column at a time down to one. The cells never shrink
 - **Gap between entries**: 1 empty line
 - **Gap between sections**: 1 empty line above the header, 1 below its rule
 
@@ -303,7 +499,8 @@ column so the claim stays tied to its moment.
 | Meter empty | `▱` | `.` | Faint |
 | Rule | `─` | `-` | Faint |
 | Separator | `·` | `\|` | Between facts on the source line |
-| Ellipsis | `…` | `...` | Truncation |
+| Contested | `!` | `!` | Notable findings, and a verdict that disagrees with itself |
+| Ellipsis | `…` | `...` | Available, and used nowhere in a report |
 
 No emoji, ever: widths are inconsistent and this output gets pasted into
 fixed-width documents where a two-column glyph destroys the alignment.
@@ -360,6 +557,11 @@ Style:      forensic, no chrome, colour only ever encodes evidence class
   should be greppable.
 - Say why a result is empty. A pruned browser history is missing evidence, not
   a malfunction, and the report has room to say so.
+- Answer the directory before answering the file. Overview, inventory, findings,
+  attention, and only then one entry at a time.
+- Name a section for what is in it. `file metadata` over `claimed by the file
+  itself`; `no findings` over `no recorded origin`.
+- Say when a list has been capped, and how to lift the cap.
 
 ### Don't
 
@@ -369,3 +571,14 @@ Style:      forensic, no chrome, colour only ever encodes evidence class
 - Don't print section headers when there is only one section.
 - Don't use emoji or any glyph wider than one column.
 - Don't let the report exceed 110 columns even when the terminal allows it.
+- Don't truncate a name to keep a column. Wrap it, or give the column up.
+- Don't call a metadata block a trace. Nothing outside the acquisition sections
+  has been traced anywhere.
+- Don't let the reader table stand in for the findings. Which parsers returned
+  results is not what was found.
+- Don't spend `●` on anything that is not a file. It is the gutter's word for
+  one, and there is no second one.
+- Don't print a namespace URI where a prefix exists. `xmpMM:History/rdf:Seq` is
+  a name; the URI spelled out four times is a wall.
+- Don't hide part of a list the report already has. Bound it only where a bound
+  is stated and countable, and say what it dropped.

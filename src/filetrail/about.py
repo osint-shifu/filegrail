@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 from . import LICENSE, REPOSITORY, TAGLINE, __version__
-from .theme import Theme, detect
+from .theme import MIDDOT, Theme, detect
 
 #: Plain ASCII, so the wordmark survives a terminal that cannot print box
 #: drawing and never needs a second variant.
@@ -33,53 +33,39 @@ WORDMARK = (
     r"|_| |_|_\___|\__|_| \__,_|_|_|",
 )
 
+#: The three things the tool is for, and enough of what is under each one that
+#: a reader recognises their own case instead of having to infer it. Not a
+#: feature list: three lines, one per area, and the option table stays in
+#: `filetrail help`.
+AREAS = (
+    ("metadata", ("EXIF", "XMP", "IPTC", "C2PA", "PDF", "Office", "media", "email")),
+    ("provenance", ("browser history", "OS origin", "archives", "shell history")),
+    ("analysis", ("conflicts", "timelines", "related files", "identifiers")),
+)
+
 USAGE = (
     ("filetrail <path> [options]", ""),
     ("filetrail <command> [options]", ""),
 )
 
-#: Ordered as a progression rather than a list: point it somewhere, narrow the
-#: view, ask why, then take the answer away with you. Each one is a different
-#: job, and none of them restates the flag it uses - a description that only
-#: expands the option name is a line the reader can skip, and once they learn
-#: they can skip one they skip the rest.
-EXAMPLES = (
-    ("filetrail ~/Downloads", "everything in a folder"),
-    ("filetrail suspicious.pdf", "one file, every field it carries"),
-    ("filetrail . --unknown-only", "what nothing accounts for"),
-    ("filetrail photos/ --type image", "cameras and phones only"),
-    ("filetrail explain suspicious.pdf", "why it concluded that"),
-    ("filetrail compare a.jpg b.jpg", "same camera? same route here?"),
-    ("filetrail . --identify", "emails, domains, coordinates found"),
-    ("filetrail . --timeline", "in the order things happened"),
-    ("filetrail . --redact --json", "safe to hand to someone else"),
-    ("filetrail doctor", "what this machine can answer at all"),
-    ("filetrail case/ --home /mnt/case", "somebody else's machine"),
+#: Six ways in, ordered as a progression: one file, a directory, the two views
+#: that turn a scan into leads, the reasoning behind a finding, and what this
+#: machine can answer at all. Not eleven examples and not the whole option
+#: table - a landing screen exists to get somebody to their first command, and
+#: a reader who has to choose from eleven has been given the choosing to do.
+START = (
+    ("filetrail suspicious.pdf", "analyze one file"),
+    ("filetrail ~/Downloads", "analyze a directory"),
+    ("filetrail . --identify", "extract investigation pivots"),
+    ("filetrail . --timeline", "reconstruct recorded events"),
+    ("filetrail explain file.pdf", "inspect evidence behind findings"),
+    ("filetrail doctor", "check available local sources"),
 )
 
-COMMANDS = (
-    ("scan", "analyze a file or directory (the default)"),
-    ("explain", "why filetrail reached a conclusion about one file"),
-    ("compare", "what two files share, and how each arrived"),
-    ("doctor", "which evidence sources this machine has"),
-    ("menu", "pick a view from a list"),
-    ("help", "show help for a command"),
-)
-
-OPTIONS = (
-    ("-v, --verbose", "show every evidence record"),
-    ("-j, --json", "machine-readable output"),
-    ("    --brief", "summarise instead of listing every field"),
-    ("    --identify", "emails, domains, addresses, coordinates"),
-    ("    --type image", "only these kinds of file"),
-    ("    --unknown-only", "only files nothing accounts for"),
-    ("    --timeline", "one line per event, in order"),
-    ("    --redact", "redact credentials before printing"),
-    ("    --home DIR", "read another profile, not this machine's"),
-    ("    --no-recurse", "this directory only"),
-    ("    --no-color", "disable ANSI colors"),
-    ("    --version", "show version"),
-)
+#: Named rather than described. What each one does is a sentence away in
+#: `filetrail help <command>`, and six sentences here would double the screen.
+#: `help` is not in the list because it is the line underneath it.
+COMMANDS = ("scan", "explain", "compare", "doctor", "menu")
 
 #: Below this the wordmark and the attributes cannot sit side by side.
 _SIDE_BY_SIDE = 78
@@ -88,7 +74,7 @@ _SIDE_BY_SIDE = 78
 _MIN_DESCRIPTION = 14
 
 #: The label column, wide enough for the longest section name.
-_LABEL = 9
+_LABEL = 11
 
 
 def invocation() -> str:
@@ -118,14 +104,43 @@ def render(theme: Theme | None = None) -> str:
     # thirty-character example opens a gutter across half the screen and pushes
     # the descriptions into an ellipsis, which is the one thing this report does
     # not do anywhere else.
+    lines.extend(_areas(theme))
     lines.extend(_section(theme, "usage", USAGE))
-    lines.extend(_section(theme, "examples", EXAMPLES))
-    lines.extend(_section(theme, "commands", COMMANDS, emphasise=True))
-    lines.extend(_section(theme, "options", OPTIONS))
+    lines.extend(_section(theme, "start", START))
+    lines.extend(_listed(theme, "commands", COMMANDS))
 
-    lines.append(_row(theme, "", "filetrail help <command>", "for any of it in detail", 24))
+    lines.append(_row(theme, "help", "filetrail help <command>"))
     lines.append("")
     return "\n".join(lines)
+
+
+def _areas(theme: Theme) -> list[str]:
+    """The three lines that say what this is, before any command appears."""
+    lines = []
+    for label, parts in AREAS:
+        said = f" {theme.glyph(MIDDOT)} ".join(parts)
+        lines.extend(_wrapped(theme, label, said))
+    lines.append("")
+    return lines
+
+
+def _listed(theme: Theme, label: str, names: tuple[str, ...]) -> list[str]:
+    """One labelled line naming things, rather than a row for each of them."""
+    return [*_wrapped(theme, label, f" {theme.glyph(MIDDOT)} ".join(names)), ""]
+
+
+def _wrapped(theme: Theme, label: str, body: str) -> list[str]:
+    """A labelled run of text over as many lines as the terminal needs.
+
+    It wraps rather than clips because there is nowhere else to read it: the
+    option table has `filetrail help`, but nothing repeats these three lines.
+    """
+    room = max(12, theme.width - _LABEL - 5)
+    parts = theme.wrap(body, room)
+    return [
+        f"  {theme.label((label if index == 0 else '').ljust(_LABEL))} {theme.paint(part, 'body')}"
+        for index, part in enumerate(parts)
+    ]
 
 
 # --- the body ----------------------------------------------------------------
@@ -216,7 +231,7 @@ def _head(theme: Theme) -> list[str]:
     if theme.width < _SIDE_BY_SIDE:
         room = theme.width - width - 6
         return [
-            *(f"  {line}" for line in mark),
+            *(f"  {line}".rstrip() for line in mark),
             tagline,
             "",
             *(
@@ -235,7 +250,7 @@ def _head(theme: Theme) -> list[str]:
             for name, value in rows
         ),
     ]
-    left = [*(f"  {line}" for line in mark), tagline]
+    left = [*(f"  {line}".rstrip() for line in mark), tagline]
 
     out = []
     for index in range(max(len(left), len(right))):

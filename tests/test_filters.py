@@ -144,5 +144,5 @@ def test_a_filter_that_matches_nothing_explains_itself(tmp_path: Path, capsys):
     main([str(tmp_path), "--ext", "xyz", "--no-color"])
 
     out = capsys.readouterr().out
-    assert "0 of 0" in out
+    assert "0 files analyzed" in out
     assert "xyz" in out

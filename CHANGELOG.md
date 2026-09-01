@@ -9,6 +9,69 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The report carries the wordmark. It is redirected to a file more often than
+  it is read on screen, and a `report.txt` that does not say what produced it is
+  a wall of text somebody has to identify from memory. The banner is the landing
+  screen's mark with the version, the tagline, the target and the scan
+  statistics - and none of the repository, licence, usage or commands, because a
+  report is not an introduction.
+
+- The inventory counts formats rather than spellings. `JPG 20` beside `JPEG 1`
+  was one format counted twice; `jpg`, `jpe`, `tif`, `yml` and `htm` fold to the
+  name the format is usually called by, and `audit.tar.gz` is `TAR.GZ` rather
+  than `GZ`, which said nothing the file name had not. Presentation only -
+  `--type`, `--ext` and the record keep the extension the filesystem has.
+
+- `findings` prints `metadata` and `acquisition evidence` even at zero. This
+  tool stands on those two things, and a scan that read a great deal of the
+  first and none of the second has found that out; leaving the row off made an
+  answer look like an omission. `authors / creators` joins them, keyed on the
+  block rather than on the field name - `Creator` is the application in a PDF
+  Info dictionary and the person in OOXML core properties, and one flat list of
+  names would have counted every PDF's typesetter as its author. `dated claims`
+  is `timestamps`, and identifiers are counted in identifiers rather than files.
+
+- `attention` is `notable findings`, and it no longer uses `●`. Coordinates and
+  Content Credentials are findings, not problems, and the heading said
+  otherwise. `●` means *this is a file* everywhere else in the report, so
+  spending it on a count line cost the gutter the one symbol it has for that;
+  only the contested `!` keeps a glyph. `carry` became `contain` throughout.
+
+- Every file with no findings is listed by default. `--limit` defaulted to 25
+  and hid the rest behind a line saying how to see them, which is the same
+  objection that put every decoded field on screen without asking: nobody should
+  run the tool twice for data it had the first time. `--brief` caps the list at
+  25 now, and an explicit `--limit N` is obeyed as given.
+
+- The report answers the directory before it answers a file. It used to open on
+  its first entry, which is the seventh question an analyst asks; the six that
+  come first now have sections of their own. A masthead saying what was scanned
+  and how much of it answered, an `inventory` of every type present with its
+  share of the files and the bytes, a `findings` table naming what was found, and
+  an `attention` block for the few things a long report otherwise buries. A scan
+  of a single file skips all four - there is nothing to inventory but itself.
+
+- Three names that described the model rather than the contents. The masthead
+  said `73 of 105 traced` over a count of files carrying any origin at all: a
+  PDF with an Info dictionary has not been traced anywhere, it has described
+  itself, and the closing line repeated the same number as `have a recorded
+  origin`. Both now count files, findings and silence separately. The
+  self-reported section is headed `file metadata` rather than `claimed by the
+  file itself`, and the list at the end is `no findings` rather than `no recorded
+  origin` - which named a narrower case than the list has ever held, since a file
+  is in it only when nothing at all was found. Each claim inside still reads
+  `self-reported` beside its own source, so no methodological care is lost.
+
+- The reader table moved to the end, under `metadata sources`. It answers which
+  readers produced results, which is a technical question and was standing in
+  for what was actually found.
+
+- The landing screen is twenty-four lines instead of forty. It says what the
+  tool is for in three - metadata, provenance, analysis - then six ways in, the
+  command names, and where the rest is. The option table it used to reprint is
+  in `filetrail help <command>`, which is where somebody looking for an option
+  goes anyway. The tagline says both halves of the job.
+
 - Every claim records which metadata block it was decoded from, beside the
   source it already carried. The two answer different questions. `source` names
   what the reader *found* - `device-metadata` where a file named a camera,
@@ -69,10 +132,21 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   them was mutually exclusive, which is exactly the shape subcommands exist to
   express. `filetrail <path>` still scans with no command word, because that is
   what people do most of the time and making them type `scan` would be ceremony.
-- `-v`, `-j` and `-h` short forms; the landing screen is the conventional
-  usage / examples / commands / options shape, so a reader who has used any
-  modern command-line tool can read it at a glance. The evidence-source table
-  moved off it into `doctor`, where the question has actually been asked.
+- `-v`, `-j` and `-h` short forms. The evidence-source table moved off the
+  landing screen into `doctor`, where the question has actually been asked;
+  what the screen says instead is described above.
+
+### Fixed
+
+- Field names, file names, identifiers and scanned paths wrap instead of being
+  cut. `DESIGN.md` has said nothing is truncated since the first release, and
+  four XMP fields were printing as `xmpMM:DerivedFrom/stRef…` - four rows nobody
+  could tell apart, over four values nobody could attribute to a field. A name
+  too wide for its column now takes a line of its own and its value follows
+  underneath. `--timeline` was cutting names and claims for the same reason.
+
+- The identifiers section is ASCII on a terminal that cannot print a middot. The
+  separator inside a place string was written once and printed as written.
 
 ### Added
 

@@ -120,7 +120,8 @@ def test_the_summary_counts_a_file_once():
     """Two claims about one file is still one file with a recorded origin."""
     output = render_text([_record(DOWNLOAD, CAMERA)], Path("/case"), theme=PLAIN)
 
-    assert "1 of 1 files have a recorded origin." in output
+    assert "1 file analyzed" in output
+    assert "1 with findings" in output
 
 
 # --- how strength reads ------------------------------------------------------

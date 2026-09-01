@@ -39,6 +39,12 @@ from .models import FileRecord
 #: value repeated across a huge tree cannot dominate the output.
 MAX_SAMPLES = 20
 
+#: How a file and the field it was found in are joined into one place
+#: string. It goes into `--json` in exactly this form, so it is a constant
+#: rather than a literal in two places - and the report re-renders the
+#: separator with whatever the terminal can actually print.
+PLACE = " · "
+
 EMAIL_RE = re.compile(
     r"\b[A-Za-z0-9._%+\-]+@([A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?"
     r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?)+)\b"
@@ -304,7 +310,7 @@ def extract(records: list[FileRecord]) -> list[Identifier]:
     found: dict[tuple[str, str], Identifier] = {}
 
     for name, where, text in _texts(records):
-        origin = f"{name} · {where}"
+        origin = f"{name}{PLACE}{where}"
         for kind, raw, normalized, private in _scan(text, where):
             key = (kind, normalized)
             entry = found.get(key)
@@ -317,7 +323,7 @@ def extract(records: list[FileRecord]) -> list[Identifier]:
                     entry.where.append(origin)
 
     for entry in found.values():
-        entry.files = len({place.split(" · ", 1)[0] for place in entry.where})
+        entry.files = len({place.split(PLACE, 1)[0] for place in entry.where})
 
     return sorted(found.values(), key=lambda i: (i.type, -i.count, i.normalized))
 

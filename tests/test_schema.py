@@ -110,3 +110,18 @@ def test_every_command_that_can_emit_json_is_covered_here():
     assert set(DOCUMENTS) | INTERACTIVE == set(PARSERS), sorted(
         set(PARSERS) - set(DOCUMENTS) - INTERACTIVE
     )
+
+
+def test_the_terminal_report_does_not_leak_into_the_document(case: Path, capsys):
+    """The report grew an overview, an inventory and a findings table. None of
+    that belongs here: a consumer counts the files itself, and a key added to
+    match a heading is a key somebody now has to keep.
+
+    `with_origin` in particular keeps its name. The report stopped calling that
+    number `traced` because the word claimed too much on screen; the JSON field
+    has always said exactly what it counts.
+    """
+    document = _run(capsys, "scan", case)
+
+    assert set(document["summary"]) == {"total", "with_origin"}
+    assert not {"inventory", "findings", "attention", "overview"} & set(document)

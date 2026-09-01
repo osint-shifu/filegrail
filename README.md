@@ -280,13 +280,13 @@ filetrail compare a.jpg b.jpg
 
 Comparison can expose shared device metadata, creation context, timing and differences in acquisition history.
 
-### Find files with no recorded origin
+### Find files nothing was found for
 
 ```bash
 filetrail ./case-files --unknown-only
 ```
 
-`no recorded origin` means exactly that: **no surviving acquisition record was found**.
+`no findings` means exactly that: **no acquisition record, no metadata, and nothing on this machine that touched the file**.
 
 It does not mean the file appeared from nowhere.
 

@@ -13,7 +13,7 @@ import pytest
 
 from filetrail.models import FileRecord, Origin
 from filetrail.report import render_text, render_timeline
-from filetrail.theme import ARROW, BULLET, RAIL, Theme
+from filetrail.theme import ARROW, BULLET, FLAG, RAIL, Theme
 
 ROOT = Path("/case")
 
@@ -97,15 +97,23 @@ def test_the_timeline_also_stays_inside_the_width(width: int):
 
 
 def test_every_entry_line_starts_in_the_gutter():
-    """Two spaces, one glyph, one space - and only the three glyphs that mean
-    something there."""
+    """Two spaces, one glyph, one space - and only the glyphs that mean
+    something there.
+
+    Measured from the first rule down, which is where the report proper starts.
+    Above it is the banner - a wordmark and three labelled rows, none of them an
+    entry and none of them in the gutter's language.
+    """
     theme = Theme(colour=False, unicode=True, width=88)
 
     output = render_text(_corpus(), ROOT, theme=theme, limit=0)
 
-    body = [line for line in output.splitlines() if line[:2] == "  " and line[2:3].strip()]
+    lines = output.splitlines()
+    first = next(index for index, line in enumerate(lines) if set(line.strip()) == {"─"})
+    body = [line for line in lines[first:] if line[:2] == "  " and line[2:3].strip()]
+
     gutter = {line[2] for line in body}
-    assert gutter <= {BULLET, ARROW, RAIL, "─", *"abcdefghijklmnopqrstuvwxyz."}, gutter
+    assert gutter <= {BULLET, ARROW, RAIL, FLAG, "─", *"abcdefghijklmnopqrstuvwxyz."}, gutter
 
 
 def test_headings_appear_only_when_classes_differ():
@@ -117,7 +125,7 @@ def test_headings_appear_only_when_classes_differ():
 
     output = render_text(one_class, ROOT, theme=theme)
 
-    assert "claimed by the file itself" not in output
+    assert "file metadata" not in output
     assert "Canon EOS 40D" in output
 
 
@@ -131,7 +139,7 @@ def test_headings_appear_once_a_class_collects_more_than_one_file():
 
     output = render_text(mixed, ROOT, theme=theme)
 
-    assert "claimed by the file itself" in output
+    assert "file metadata" in output
     assert "recorded by another system" in output
 
 
@@ -145,7 +153,7 @@ def test_no_headings_when_every_class_holds_one_file():
 
     output = render_text(scattered, ROOT, theme=theme)
 
-    assert "claimed by the file itself" not in output
+    assert "file metadata" not in output
     assert "recorded by another system" not in output
     assert "b.pdf" in output
 
@@ -161,3 +169,47 @@ def test_the_strongest_class_is_reported_first():
     output = render_text(mixed, ROOT, theme=theme)
 
     assert output.index("b.pdf") < output.index("a.jpg")
+
+
+# --- the sections that describe the whole scan -------------------------------
+
+
+def _typed(count: int) -> list[FileRecord]:
+    """One file per extension, so the inventory has something to lay out."""
+    return [_record(f"file{index}.ext{index}") for index in range(count)]
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_the_inventory_names_every_type_at_every_width(width: int):
+    """Columns give way as the terminal narrows. Data never does."""
+    output = render_text(_typed(20), ROOT, theme=Theme(colour=False, unicode=True, width=width))
+
+    for index in range(20):
+        assert f"EXT{index}" in output, index
+
+
+def test_the_inventory_drops_a_column_before_it_drops_anything_else():
+    def rows(width: int) -> int:
+        output = render_text(_typed(20), ROOT, theme=Theme(colour=False, unicode=True, width=width))
+        return len([line for line in output.splitlines() if "EXT" in line])
+
+    assert rows(110) < rows(48)
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+@pytest.mark.parametrize("unicode_ok", [True, False])
+def test_nothing_in_the_report_ends_in_an_ellipsis(width: int, unicode_ok: bool):
+    """`DESIGN.md` says nothing is truncated, and the field names used to be."""
+    theme = Theme(colour=False, unicode=unicode_ok, width=width)
+
+    output = render_text(_corpus(), ROOT, theme=theme, limit=0, identify=True)
+
+    assert "…" not in output
+
+
+def test_the_whole_report_is_ascii_when_the_terminal_is():
+    theme = Theme(colour=False, unicode=False, width=88)
+
+    output = render_text(_corpus(), ROOT, theme=theme, limit=0, identify=True)
+
+    assert output.isascii()

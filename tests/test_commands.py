@@ -28,7 +28,7 @@ def test_a_bare_path_still_scans(tmp_path: Path, capsys):
 
     assert main([str(tmp_path), "--no-color"]) == 0
 
-    assert "traced" in capsys.readouterr().out
+    assert "analyzed" in capsys.readouterr().out
 
 
 def test_scan_can_be_named_explicitly(tmp_path: Path, capsys):
@@ -36,7 +36,7 @@ def test_scan_can_be_named_explicitly(tmp_path: Path, capsys):
 
     assert main(["scan", str(tmp_path), "--no-color"]) == 0
 
-    assert "traced" in capsys.readouterr().out
+    assert "analyzed" in capsys.readouterr().out
 
 
 def test_help_lists_a_command(capsys):
@@ -109,7 +109,7 @@ def test_a_path_named_like_a_command_still_needs_the_command_form(tmp_path: Path
     reader of the usage line expects."""
     assert main(["scan", "--no-color", "--limit", "0"]) == 0
 
-    assert "traced" in capsys.readouterr().out
+    assert "analyzed" in capsys.readouterr().out
 
 
 def test_short_flags_work(tmp_path: Path, capsys):

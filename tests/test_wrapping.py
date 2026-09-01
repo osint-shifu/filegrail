@@ -8,16 +8,21 @@ reader decoded is on screen without asking for it.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
 
 from filetrail.lineage import Link
 from filetrail.models import FileRecord, Origin
-from filetrail.report import render_text
+from filetrail.report import render_text, render_timeline
 from filetrail.theme import Theme
 
 WIDTHS = [48, 56, 64, 80, 88, 110]
+
+#: The right-aligned timestamp column, which shares a line with the name beside
+#: it and has to be removed before that name can be reassembled.
+_STAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 
 LONG_TOOL = "EASTMAN KODAK COMPANY KODAK CX7530 ZOOM DIGITAL CAMERA (processed with GIMP 2.4.5)"
 LONG_URL = "https://portal.example.org/" + "billing-department/" * 6 + "invoice-scan.pdf"
@@ -189,3 +194,110 @@ def test_the_ascii_tree_has_no_box_drawing():
     output = render_text([record], Path("/case"), theme=Theme(False, False, 88))
 
     assert output.isascii()
+
+
+# --- the names of things are data too ----------------------------------------
+
+LONG_FIELD = "xmpMM:DerivedFrom/stRef:originalDocumentID"
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_a_long_field_name_survives_intact(width: int):
+    """A field name is half of what a field says. `xmpMM:DerivedFrom/stRef…`
+    four times over is four rows the reader cannot tell apart, and the value
+    beside each of them is then unattributable."""
+    record = _record(source="xmp", tool="Illustrator", fields={LONG_FIELD: "xmp.did:1234"})
+
+    output = render_text([record], Path("/case"), theme=_plain(width))
+
+    assert "…" not in output
+    assert LONG_FIELD in _flat(output)
+    assert "xmp.did:1234" in _flat(output)
+
+
+def test_field_names_that_differ_late_stay_distinguishable():
+    """The real case: four XMP names sharing a thirty-character prefix."""
+    fields = {f"xmpMM:DerivedFrom/stRef:{tail}": tail for tail in ("documentID", "instanceID")}
+    record = _record(source="xmp", tool="Illustrator", fields=fields)
+
+    flat = _flat(render_text([record], Path("/case"), theme=_plain(88)))
+
+    for name in fields:
+        assert name in flat, name
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_a_file_with_no_findings_keeps_its_whole_name(width: int):
+    """It is a list of open questions. A name cut short is a question the
+    reader cannot go and answer."""
+    name = "isamples/ark_28722_k27w68z78metadata-E555826E-42A5-4293-3B0A-0C76553A9B53.json"
+    record = FileRecord(path=f"/case/{name}", size=1, mtime="2026-08-24T19:00:00Z")
+
+    other = _record(source="device-metadata", tool="Canon")
+
+    output = render_text([record, other], Path("/case"), theme=_plain(width))
+
+    # The timestamp is right-aligned on the name's first line, so it has to come
+    # out before the wrapped halves of the name are contiguous again.
+    assert "…" not in output
+    assert name in _flat(_STAMP.sub("", output))
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_an_identifier_is_not_cut_to_fit_its_column(width: int):
+    """An identifier is what somebody pivots on next. Half of one is nothing."""
+    address = "a-very-long-mailbox-name-indeed@subdomain.department.example.org"
+    record = _record(source="document-metadata", tool="Word", fields={"Author": address})
+
+    output = render_text([record], Path("/case"), theme=_plain(width), identify=True)
+
+    assert "…" not in output
+    assert address in _flat(output)
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_the_timeline_does_not_cut_a_name_or_a_claim(width: int):
+    """`--timeline` is the same evidence in a different order, held to the same
+    rule as the report it came from."""
+    name = "a-deeply-descriptive-file-name-that-keeps-going-and-going.jpg"
+    record = FileRecord(path=f"/case/{name}", size=1, mtime="2026-08-24T19:00:00Z")
+    record.origins.append(
+        Origin(source="browser-download", url=LONG_URL, at="2026-08-24T19:02:11Z")
+    )
+
+    output = render_timeline([record], Path("/case"), theme=_plain(width))
+
+    assert "…" not in output
+    assert name in _flat(output)
+    assert LONG_URL in _flat(output)
+    assert not [line for line in output.splitlines() if len(line) > width]
+
+
+def test_an_absurd_extension_is_named_in_full_and_stays_inside_the_terminal():
+    """An extension is data like anything else. It is not cut to keep the grid,
+    and it does not push the grid past the edge of the terminal either."""
+    absurd = "backup-2026-08-24T19-02-11Z-part0001"
+    records = [
+        FileRecord(path=f"/case/a.{absurd}", size=10, mtime="2026-08-24T19:00:00Z"),
+        _record("b.pdf", source="document-metadata", tool="Word"),
+    ]
+
+    output = render_text(records, Path("/case"), theme=_plain(48))
+
+    assert "…" not in output
+    assert absurd.upper() in _flat(output)
+    assert not [line for line in output.splitlines() if len(line) > 48]
+
+
+def test_a_name_that_fits_the_line_is_not_split_by_the_timestamp_beside_it():
+    """Splitting `...9B53.xml` into `...9B53.x` and `ml` to keep a timestamp
+    company is the layout winning an argument it should not have had. The name
+    takes the width and the timestamp follows it."""
+    name = "isamples/ark_28722_k27w68z78metadata-E555826E-42A5-4293-3B0A-0C76553A9B53.xml"
+    record = FileRecord(path=f"/case/{name}", size=1, mtime="2026-08-24T19:00:00Z")
+    other = _record(source="device-metadata", tool="Canon")
+
+    output = render_text([record, other], Path("/case"), theme=_plain(100))
+
+    assert any(name in line for line in output.splitlines()), "the name was broken up"
+    assert not [line for line in output.splitlines() if len(line) > 100]

@@ -111,7 +111,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit one chronological line per event instead of grouping by file.",
     )
     parser.add_argument(
-        "--unknown-only", action="store_true", help="List only files with no recorded origin."
+        "--unknown-only", action="store_true", help="List only files nothing was found for."
     )
     parser.add_argument(
         "--identify",
@@ -141,9 +141,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--limit",
         type=int,
-        default=25,
+        default=None,
         metavar="N",
-        help="Cap the list of files with no recorded origin; 0 for all (default: 25).",
+        help="Cap the list of files with no findings; 0 for all "
+        f"(default: all, or {BRIEF_LIMIT} under --brief).",
     )
     parser.add_argument(
         "--no-recurse", action="store_true", help="Do not descend into subdirectories."
@@ -254,6 +255,25 @@ def _help(rest: list[str]) -> int:
     return 0
 
 
+#: How many unexplained files `--brief` lists before it says how many are left.
+#: `--brief` is the flag for somebody scanning a large tree, and it is the only
+#: place the default report shortens anything.
+BRIEF_LIMIT = 25
+
+
+def _limit(args) -> int:
+    """How much of the `no findings` list to print.
+
+    All of it, unless asked otherwise. A report that hides part of a list it
+    already has makes somebody run the tool twice for data it had the first
+    time, which is the same objection that put every decoded field on screen
+    by default.
+    """
+    if args.limit is not None:
+        return args.limit
+    return BRIEF_LIMIT if args.brief else 0
+
+
 def _missing(path: Path) -> int:
     print(f"filetrail: no such file or directory: {path}", file=sys.stderr)
     return 2
@@ -322,7 +342,7 @@ def _scan(rest: list[str]) -> int:
                 base,
                 verbose=args.verbose,
                 brief=args.brief,
-                limit=args.limit,
+                limit=_limit(args),
                 stats=stats,
                 theme=theme,
                 filtered=describe(args.families, args.extensions),

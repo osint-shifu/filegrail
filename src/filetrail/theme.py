@@ -89,7 +89,7 @@ EVIDENCE_HEADINGS = [
     ("recorded", "recorded by another system"),
     ("inherited", "inherited from an archive"),
     ("credentialed", "content credentials"),
-    ("self-reported", "claimed by the file itself"),
+    ("self-reported", "file metadata"),
     ("circumstantial", "mentioned in shell history"),
     ("faint", "filesystem timestamps only"),
 ]
