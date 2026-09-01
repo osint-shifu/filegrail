@@ -23,6 +23,31 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Matroska and WebM, read through EBML. `.mkv` and `.webm` were already
+  selectable with `--type video` and no reader claimed them, so a scan narrowed
+  to the films read nothing out of them. The container names the application a
+  person used and the library that muxed the file, and those are only reported
+  separately when they differ - ffmpeg writes its own name into both, and
+  "Lavf60.16.100 (muxed with Lavf60.16.100)" is a sentence about nothing.
+
+  The tag block is open by design: a muxer puts anything there the format has no
+  field for, under whatever name it likes. Those names are kept as written,
+  because a reader that knows only a fixed list throws away the ones that
+  mattered.
+
+  Matroska counts its segment date in nanoseconds from the start of 2001, not
+  from 1970. Read as a Unix time it puts every file made this century
+  thirty-one years early, which is wrong in a way that looks plausible enough to
+  go unnoticed. The field is also signed, so a muxer handed a wrong clock has
+  what it wrote read back rather than turned into the year 586.
+
+  A segment can decline to state its own length - a muxer writing to a pipe does
+  not know it - and then it runs to the end of its parent. `ffmpeg -f webm
+  pipe:1` writes exactly that, and the first draft of this reader returned
+  nothing at all for such a file. Only a master element may do it; a leaf that
+  tries is refused, because there the value would be however much of the file
+  happened to follow.
+
 - Files in one scan are linked to each other by the identifiers XMP carries for
   exactly that purpose. A master, the export made from it and the web rendition
   made from that now say so in the report, in both directions - `derived from`,

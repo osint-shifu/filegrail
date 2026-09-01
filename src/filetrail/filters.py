@@ -15,7 +15,7 @@ reader also adds it here.
 from __future__ import annotations
 
 from .sources.archives import ARCHIVE_SUFFIXES
-from .sources.embedded import containers, documents, exif, id3, ole, png, riff
+from .sources.embedded import containers, documents, exif, id3, matroska, ole, png, riff
 
 
 class UnknownType(ValueError):
@@ -24,19 +24,14 @@ class UnknownType(ValueError):
 
 #: Extensions an ISO base media file uses for moving pictures. `isobmff.SUFFIXES`
 #: cannot be reused wholesale: it also claims `.heic` and `.avif`, which are
-#: still images and belong under `image`. `riff.SUFFIXES` is split for the same
-#: reason - one container, and a WAV is not a film.
-_VIDEO = {
-    ".mp4",
-    ".m4v",
-    ".mov",
-    ".qt",
-    ".3gp",
-    ".mkv",
-    ".webm",
-    ".wmv",
-    ".flv",
-} | riff.AVI_SUFFIXES
+#: still images and belong under `image`. `riff.SUFFIXES` and
+#: `matroska.SUFFIXES` are split for the same reason - one container each, and
+#: neither a WAV nor an MKA is a film.
+_VIDEO = (
+    {".mp4", ".m4v", ".mov", ".qt", ".3gp", ".wmv", ".flv"}
+    | riff.AVI_SUFFIXES
+    | matroska.VIDEO_SUFFIXES
+)
 
 #: Formats no reader claims yet, listed so a filter still selects them - a file
 #: this tool cannot read is exactly the sort a report should be able to include.
@@ -47,7 +42,7 @@ _EXTRA_TEXT = {".txt", ".md", ".csv", ".tsv", ".json", ".xml", ".yaml", ".yml", 
 FAMILIES: dict[str, frozenset[str]] = {
     "image": frozenset(exif.SUFFIXES | png.SUFFIXES | containers.SVG_SUFFIXES | _EXTRA_IMAGE),
     "video": frozenset(_VIDEO),
-    "audio": frozenset(id3.SUFFIXES | riff.WAVE_SUFFIXES | _EXTRA_AUDIO),
+    "audio": frozenset(id3.SUFFIXES | riff.WAVE_SUFFIXES | matroska.AUDIO_SUFFIXES | _EXTRA_AUDIO),
     "document": frozenset(
         documents.PDF_SUFFIXES
         | documents.OOXML_SUFFIXES

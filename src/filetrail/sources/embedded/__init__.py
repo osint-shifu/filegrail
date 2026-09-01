@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ...models import Origin
-from . import containers, documents, exif, id3, isobmff, ole, png, riff
+from . import containers, documents, exif, id3, isobmff, matroska, ole, png, riff
 
 #: A malformed container is ordinary: truncated downloads, Office lock files and
 #: files with a misleading extension all land here, and none is an error.
@@ -42,6 +42,7 @@ SUFFIXES = (
     | containers.SUFFIXES
     | id3.SUFFIXES
     | riff.SUFFIXES
+    | matroska.SUFFIXES
     | ole.SUFFIXES
 )
 
@@ -60,6 +61,7 @@ def read_embedded_metadata(path: Path) -> Origin | None:
         _from_container,
         _from_compound,
         _from_riff,
+        _from_matroska,
         _from_audio,
     ):
         try:
@@ -297,6 +299,32 @@ def _from_riff(path: Path, suffix: str) -> Origin | None:
         fields=dict(found.info)
         | {f"bext:{name}": value for name, value in found.broadcast.items()}
         | {f"id3:{name}": value for name, value in found.frames.items()},
+    )
+
+
+def _from_matroska(path: Path, suffix: str) -> Origin | None:
+    if suffix not in matroska.SUFFIXES:
+        return None
+    found = matroska.read_matroska(path)
+    if not found:
+        return None
+
+    # The library that muxed the file and the application a person used are two
+    # different answers, and ffmpeg writes its own name into both - so they are
+    # only named separately when they are actually different.
+    writing = found.fields.get("WritingApp")
+    muxing = found.fields.get("MuxingApp")
+    tool = writing or muxing
+    if writing and muxing and muxing.lower() != writing.lower():
+        tool = f"{writing} (muxed with {muxing})"
+
+    title = found.fields.get("Title")
+    return _origin(
+        "document-metadata",
+        tool=tool,
+        at=found.at,
+        note=f"title {_clip(title, 80)}" if title else None,
+        fields=dict(found.fields),
     )
 
 
