@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import NamedTuple
 
 from .identify import normalize_url
 from .models import ACQUISITION, INTRINSIC, FileRecord, Origin, kind, label
@@ -177,6 +179,11 @@ _CLOCK = re.compile(r"[T ](\d{2}):?(\d{2}):?(\d{2})")
 #: it comes back unreadable, and an unreadable stamp is never compared - so
 #: every PDF timestamp would be skipped in silence rather than checked.
 _PDF_STAMP = re.compile(r"D:(\d{4})(\d{2})(\d{2})(?:(\d{2})(\d{2})(\d{2}))?")
+
+#: What a writer said about its own zone, in either punctuation: ISO writes
+#: `+02:00` or `Z`, a PDF writes `+02'00'`. Anchored at the end, where a zone
+#: is, so the hyphens inside a date cannot be read as one.
+_ZONE = re.compile(r"(?:(Z)|([+-])(\d{2})'?:?(\d{2}))'?\s*$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -432,35 +439,81 @@ def _same_text(left: str, right: str) -> bool:
 def _same_moment(left: str, right: str) -> bool | None:
     """Whether two timestamps say the same thing, or None if one cannot be read.
 
-    The zone is dropped. EXIF writes none at all and its XMP mirror writes the
-    same clock reading with one attached, so reading the tag as UTC and the
-    mirror as an instant would make every photograph taken outside Greenwich
-    contradict itself. The clock is optional because IIM records a bare day, and
-    a day that agrees is no conflict merely because the other writer also wrote
-    down a time.
+    Where both writers said what zone they were in, the two are compared as
+    instants. A PDF's Info dictionary and its XMP both carry an offset, and one
+    machine varies it across the year - the same export can write -04'00' into
+    one block and -05:00 into the other - so comparing the readings would call a
+    single moment a contested attribution.
+
+    Where either did not, the reading is compared instead. EXIF writes no zone
+    at all and its XMP mirror writes the same clock with one attached, so
+    reading the tag as UTC and the mirror as an instant would make every
+    photograph taken outside Greenwich contradict itself. The clock is optional
+    for the same reason: IIM records a bare day, and a day that agrees is no
+    conflict merely because the other writer also wrote down a time.
     """
     first, second = _instant(left), _instant(right)
     if first is None or second is None:
         return None
-    if first[0] != second[0]:
+
+    here, there = _utc(first), _utc(second)
+    if here is not None and there is not None:
+        return here == there
+
+    if first.day != second.day:
         return False
-    return not (first[1] and second[1]) or first[1] == second[1]
+    return not (first.clock and second.clock) or first.clock == second.clock
 
 
-def _instant(value: str) -> tuple[str, str | None] | None:
+class _Stamp(NamedTuple):
+    """A timestamp as its writer spelled it: a day, a reading, and a zone."""
+
+    day: str
+    clock: str | None
+
+    #: Minutes east of UTC, or None where the writer said nothing about it.
+    offset: int | None
+
+
+def _utc(stamp: _Stamp) -> datetime | None:
+    """The moment this stamp names, or None if it does not name one.
+
+    A stamp without a clock or without a zone is a reading rather than an
+    instant, and an impossible date - month 13, day 32 - is neither.
+    """
+    if stamp.clock is None or stamp.offset is None:
+        return None
+    try:
+        moment = datetime.strptime(stamp.day + stamp.clock, "%Y%m%d%H%M%S")
+    except ValueError:
+        return None
+    return moment - timedelta(minutes=stamp.offset)
+
+
+def _instant(value: str) -> _Stamp | None:
     text = value.strip()
+    offset = _offset(text)
 
     stamp = _PDF_STAMP.match(text)
     if stamp:
-        day = "".join(stamp.group(1, 2, 3))
         clock = stamp.group(4, 5, 6)
-        return day, "".join(clock) if all(clock) else None
+        return _Stamp("".join(stamp.group(1, 2, 3)), "".join(clock) if all(clock) else None, offset)
 
     day = _DAY.match(text)
     if not day:
         return None
     clock = _CLOCK.search(text)
-    return "".join(day.groups()), "".join(clock.groups()) if clock else None
+    return _Stamp("".join(day.groups()), "".join(clock.groups()) if clock else None, offset)
+
+
+def _offset(text: str) -> int | None:
+    zone = _ZONE.search(text)
+    if not zone:
+        return None
+    if zone.group(1):
+        return 0
+    sign = -1 if zone.group(2) == "-" else 1
+    return sign * (int(zone.group(3)) * 60 + int(zone.group(4)))
 
 
 def _plain(value: str) -> str:

@@ -400,6 +400,42 @@ def test_a_pdf_stamp_without_punctuation_still_reads_as_a_moment():
     assert reconcile(record).findings == []
 
 
+def test_one_instant_written_in_two_zones_is_not_a_disagreement():
+    """Both of a PDF's stamps carry an offset, and one machine varies it across
+    the year - the corpus has a file whose Info says -04'00' and whose XMP says
+    -05:00. Comparing the readings and ignoring what the writers said about
+    their zone would call a single instant a contested attribution."""
+    record = _record(
+        _info(CreationDate="D:20180511143720-04'00'"),
+        _xmp(xmp_CreateDate="2018-05-11T13:37:20-05:00"),
+    )
+
+    assert reconcile(record).findings == []
+
+
+def test_one_reading_in_two_zones_is_a_disagreement():
+    """The other side of the same rule. Two stamps an hour apart are two
+    moments, and sharing a wall clock does not make them one."""
+    record = _record(
+        _info(CreationDate="D:20180511143720-04'00'"),
+        _xmp(xmp_CreateDate="2018-05-11T14:37:20-05:00"),
+    )
+
+    assert [f.kind for f in reconcile(record).findings] == [ATTRIBUTION_CONFLICT]
+
+
+def test_a_zone_can_carry_a_stamp_across_midnight():
+    """Both name 2018-05-12T03:37:20Z, on either side of local midnight. The
+    readings disagree about the day, and the day is all a zoneless comparison
+    has to go on."""
+    record = _record(
+        _info(CreationDate="D:20180511233720-04'00'"),
+        _xmp(xmp_CreateDate="2018-05-12T00:37:20-03:00"),
+    )
+
+    assert reconcile(record).findings == []
+
+
 def test_the_producer_string_is_left_out_of_the_comparison():
     """One library writes its own name into both blocks at one save, and Adobe
     PDF Library 15 writes it two ways: `Adobe PDF Library 15.0` into the Info
