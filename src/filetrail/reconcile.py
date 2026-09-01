@@ -227,15 +227,28 @@ class Mirror:
     text: tuple[tuple[str, str], ...]
     moments: tuple[tuple[str, str], ...]
 
+    #: Which of the two an editor ordinarily keeps current, where the pairing
+    #: has a direction at all. Modern tools maintain XMP and copy the IIM block
+    #: and a camera's EXIF tags through as they found them, so for those the
+    #: other side is the likelier to describe an earlier state.
+    #:
+    #: A PDF has no such direction. One producer writes both blocks, and an
+    #: exporter stamps a fresh Info dictionary at export while carrying the XMP
+    #: through from the source document - which is what the corpus shows, XMP
+    #: from February beside an Info dictionary from May. Naming the Info as the
+    #: stale one would state the opposite of what happened. None says so, so a
+    #: conclusion does not rank two blocks it has no basis to rank.
+    maintained: str | None
+
 
 #: Every pairing there is, so a consumer can enumerate them and a test can
 #: check the comparison against a corpus without restating which fields mirror
 #: which.
 MIRRORS = (
-    Mirror(left="iptc", right="xmp", text=_IIM_IN_XMP, moments=_IIM_MOMENTS),
-    Mirror(left="exif", right="xmp", text=_EXIF_IN_XMP, moments=_EXIF_MOMENTS),
-    Mirror(left="pdf-info", right="xmp", text=_PDF_IN_XMP, moments=_PDF_MOMENTS),
-    Mirror(left="png-text", right="xmp", text=_PNG_IN_XMP, moments=_PNG_MOMENTS),
+    Mirror("iptc", "xmp", _IIM_IN_XMP, _IIM_MOMENTS, maintained="xmp"),
+    Mirror("exif", "xmp", _EXIF_IN_XMP, _EXIF_MOMENTS, maintained="xmp"),
+    Mirror("pdf-info", "xmp", _PDF_IN_XMP, _PDF_MOMENTS, maintained=None),
+    Mirror("png-text", "xmp", _PNG_IN_XMP, _PNG_MOMENTS, maintained=None),
 )
 
 
@@ -250,10 +263,16 @@ class Finding:
     #: parse English to learn which two pieces of evidence disagree.
     sources: tuple[str, str] | None = None
 
+    #: Which of `sources` an editor ordinarily keeps current, where the pairing
+    #: has a direction. None where it does not, and the two are then not ranked.
+    maintained: str | None = None
+
     def to_dict(self) -> dict[str, object]:
         found: dict[str, object] = {"kind": self.kind, "text": self.text}
         if self.sources:
             found["sources"] = list(self.sources)
+        if self.maintained:
+            found["maintained"] = self.maintained
         return found
 
 
@@ -427,6 +446,7 @@ def _disagreements(record: FileRecord, mirror: Mirror) -> list[Finding]:
 
     theirs = _named(left)
     ours = _named(right)
+    kept = {mirror.left: left, mirror.right: right}.get(mirror.maintained or "")
     found = []
     for name, other, agree in (
         *((a, b, _same_text) for a, b in mirror.text),
@@ -441,6 +461,7 @@ def _disagreements(record: FileRecord, mirror: Mirror) -> list[Finding]:
                     ATTRIBUTION_CONFLICT,
                     f"{name}: {_label(left)} says {said}, {_label(right)} says {also}",
                     sources=(_label(left), _label(right)),
+                    maintained=_label(kept) if kept else None,
                 )
             )
     return found

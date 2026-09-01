@@ -26,6 +26,17 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   `Mirror.right` now name blocks, and `left` is a plain string rather than a
   tuple of source names.
 
+- The conclusion no longer ranks two blocks it has no basis to rank. IIM and a
+  camera's EXIF tags go stale because an editor rewrites the XMP and copies them
+  through untouched, and the sentence said so. A PDF has no such direction: one
+  producer writes both blocks, and an exporter stamps a fresh Info dictionary
+  while carrying the XMP through from the source document - the corpus file has
+  XMP from February beside an Info dictionary from May, so naming the Info as
+  the likelier to be stale would have stated the opposite of what happened.
+  A pairing now carries which of its two sides an editor keeps current, or that
+  it has no answer, and the conclusion follows it. `--json` carries it too, as
+  `maintained` on a finding that has one.
+
 - A claim is named by its block where the source would only say `document
   metadata`. That label names a category rather than a thing, and the summary
   collapsed a whole corpus into one line reading `document metadata 39` when it
