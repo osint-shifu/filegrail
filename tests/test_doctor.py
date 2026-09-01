@@ -298,3 +298,53 @@ def test_the_horizon_note_covers_every_source_it_lists(tmp_path: Path):
 
     assert "Recent documents oldest entry" in out
     assert "browser history" not in out
+
+
+def _quarantine(home: Path, rows: int) -> None:
+    import sqlite3
+
+    from filetrail.sources.quarantine import QUARANTINE_DB
+
+    path = home / QUARANTINE_DB
+    path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(path)
+    connection.executescript("""
+        CREATE TABLE LSQuarantineEvent (
+          LSQuarantineEventIdentifier TEXT PRIMARY KEY,
+          LSQuarantineTimeStamp REAL,
+          LSQuarantineAgentName TEXT,
+          LSQuarantineDataURLString TEXT,
+          LSQuarantineOriginURLString TEXT);
+    """)
+    for index in range(rows):
+        connection.execute(
+            "INSERT INTO LSQuarantineEvent VALUES (?,?,?,?,?)",
+            (f"id-{index}", 750_000_000.0 + index, "Safari", f"https://x.org/{index}.zip", None),
+        )
+    connection.commit()
+    connection.close()
+
+
+def test_a_quarantine_database_is_reported_with_what_it_holds(tmp_path: Path):
+    _quarantine(tmp_path, rows=3)
+
+    found = survey(home=tmp_path)
+
+    assert _state(found, "macOS quarantine") == AVAILABLE
+    assert "3 downloads" in _detail(found, "macOS quarantine")
+
+
+def test_no_quarantine_database_says_so(tmp_path: Path):
+    found = survey(home=tmp_path)
+
+    assert _state(found, "macOS quarantine") == UNAVAILABLE
+
+
+def test_the_quarantine_database_reports_how_far_back_it_reaches(tmp_path: Path):
+    """Counted from 2001 like every Core Foundation timestamp."""
+    _quarantine(tmp_path, rows=3)
+
+    found = survey(home=tmp_path)
+
+    horizon = {check.name: check.detail for check in found.horizon}
+    assert horizon["macOS quarantine oldest download"] == "2024-10-07"

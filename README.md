@@ -211,7 +211,7 @@ file made from it, and those files share an ancestor and nothing else.
 
 | Class | Question | Typical sources |
 |:---|:---|:---|
-| **Acquisition** | How did this file reach this machine? | Browser history, `Zone.Identifier`, macOS where-from metadata, Linux XDG attributes, archive inheritance, fetch commands, mail `Received:` hops |
+| **Acquisition** | How did this file reach this machine? | Browser history, `Zone.Identifier`, macOS where-from metadata, macOS quarantine records, Linux XDG attributes, archive inheritance, fetch commands, mail `Received:` hops |
 | **Intrinsic** | What does the file say about its earlier life? | EXIF, document metadata, C2PA, camera/device metadata |
 | **Interaction** | What touched it after arrival? | Recent documents, non-fetching shell commands |
 
@@ -551,6 +551,12 @@ a file the originating software produced, because nothing available here writes
 one: Outlook `.msg` messages, and the `id3 ` chunk a WAV file may carry. The
 container walk under the `.msg` reader is not in that position - it is the same
 one real `.doc` files exercise.
+
+The macOS quarantine attribute is read under both `com.apple.quarantine` and
+`user.com.apple.quarantine`. Only the first exists on macOS itself; the second
+is how a copy carries it onto another system, and it is the only one that can be
+written outside macOS. The quarantine database is ordinary SQLite and is read
+the same way anywhere.
 
 `--home` reads another user profile, which is not the same as reading a disk
 image. It expects a mounted or copied home directory, and it reads the same

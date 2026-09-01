@@ -365,6 +365,33 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   ordinary length does not skip one field, it loses the reader's place in the
   stream and every dataset after it.
 
+- macOS quarantine is read: the `com.apple.quarantine` attribute on the file,
+  and the LaunchServices `QuarantineEventsV2` database under the user's home.
+  The attribute names the application, the moment and an event identifier; the
+  database says what that identifier stands for - the URL the bytes came from
+  and the page that linked to it.
+
+  They are two halves of one record rather than two witnesses, so they are
+  reported as one claim. Emitting both would read as corroboration, and a
+  subsystem agreeing with itself corroborates nothing.
+
+  Two epochs, which is the trap in the format. The attribute counts seconds
+  from 1970 and writes them in hexadecimal; the database counts them from 2001,
+  the way every Core Foundation timestamp does. Reading either with the other's
+  epoch puts the download decades from where it happened.
+
+  The database is what makes this worth having away from a Mac. It sits under
+  the home directory, so `--home` reaches it from anywhere - and since a file
+  copied out of an image rarely keeps its extended attributes, a row whose
+  recorded URL ends in the file's name is matched that way, marked as a name
+  match like any other.
+
+  `matched_by_name` now takes the reason a name was all there was. A download
+  record keeps the path the file was saved to, so a name match there really
+  does mean it moved; a quarantine row keeps no path at all, and saying it
+  moved would describe a disagreement between two things where only one of them
+  exists.
+
 - A saved Outlook message is read for how it travelled. `.msg` was already
   opened as a compound document, because its Office-style summary properties
   sit where a `.doc`'s do; what was never read is

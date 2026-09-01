@@ -11,6 +11,7 @@ from .lineage import attach_lineage
 from .models import FileRecord, Origin
 from .sources import (
     collect_browser_downloads,
+    collect_quarantine_events,
     collect_recent_files,
     collect_shell_history,
     inherited_origin,
@@ -21,6 +22,7 @@ from .sources import (
     read_file_attributes,
     read_iptc,
     read_mail,
+    read_quarantine,
     read_xmp,
 )
 from .util import basename, birth_time, iso, sha256_file
@@ -112,6 +114,7 @@ def scan(
         collect_shell_history({path.name for path in files}, home=home) if use_shell_history else {}
     )
     recent = collect_recent_files(home=home)
+    quarantined = collect_quarantine_events(home=home)
 
     records: list[FileRecord] = []
     for path in files:
@@ -135,6 +138,7 @@ def scan(
                 record.origins.append(matched_by_name(origin, stat.st_size))
 
         record.origins.extend(read_file_attributes(path))
+        record.origins.extend(read_quarantine(path, quarantined))
         for reader in (read_c2pa_manifest, read_embedded_metadata, read_iptc):
             claim = reader(path)
             if claim is not None:
@@ -196,7 +200,12 @@ def _attach_archive_origins(
                     record.origins.append(inherited_origin(best, archive_name))
 
 
-def matched_by_name(origin: Origin, size: int) -> Origin:
+#: Why a name match was needed, for a source that recorded where the file was
+#: saved. A match on the name means it is no longer there.
+MOVED = "the file was moved or renamed since download"
+
+
+def matched_by_name(origin: Origin, size: int, because: str = MOVED) -> Origin:
     """Copy an origin, recording that it was matched by name and not by path.
 
     A name match is made on purpose: it survives the file being moved or
@@ -205,11 +214,17 @@ def matched_by_name(origin: Origin, size: int) -> Origin:
     byte count it is checked - a size that agrees is corroboration the name
     alone cannot give, and one that disagrees very likely means this is not the
     file the record is about.
+
+    Why the name was all there was differs by source, so the caller says. A
+    download record keeps the path the file was saved to, and a name match
+    there really does mean it has moved; a quarantine row keeps the URL and no
+    path at all, and saying it moved would describe a disagreement between two
+    things where only one of them exists.
     """
-    note = "matched by file name; the file was moved or renamed since download"
+    note = f"matched by file name; {because}"
     if origin.bytes:
         if origin.bytes == size:
-            note = "matched by file name and size; the file was moved or renamed since download"
+            note = f"matched by file name and size; {because}"
         else:
             note = (
                 f"matched by file name, but the recorded size differs "

@@ -49,6 +49,7 @@ EVIDENCE = {
     "browser-download": "recorded",
     "windows-zone-identifier": "recorded",
     "macos-wherefroms": "recorded",
+    "macos-quarantine": "recorded",
     "xdg-xattr": "recorded",
     # Both are a note another system wrote as the message passed through. How
     # much that system is worth believing is what the rank says, not the colour.

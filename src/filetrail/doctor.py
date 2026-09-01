@@ -28,6 +28,7 @@ from .sources.browser import (
     _firefox_downloads,
     _profiles,
 )
+from .sources.quarantine import QUARANTINE_DB, collect_quarantine_events
 from .sources.recent import RECENT_FILES, collect_recent_files
 from .sources.shell import HISTORY_FILES, _parse_history
 from .util import birth_time, iso
@@ -46,6 +47,7 @@ HOME_SOURCES = {
     "collect_browser_downloads": ("Chromium family downloads", "Firefox downloads"),
     "collect_shell_history": ("Shell history",),
     "collect_recent_files": ("Recent documents",),
+    "collect_quarantine_events": ("macOS quarantine database",),
 }
 
 
@@ -77,6 +79,7 @@ def survey(home: Path | None = None) -> Survey:
     found.checks.append(_os_origin())
     found.checks.append(_shell(home, found))
     found.checks.append(_recent(home, found))
+    found.checks.append(_quarantine(home, found))
     found.checks.append(_birth_times())
     found.checks.append(_c2pa())
     return found
@@ -220,6 +223,25 @@ def _recent(home: Path, found: Survey) -> Check:
         AVAILABLE,
         f"{len(opened)} files in {', '.join(Path(name).name for name in where)}",
     )
+
+
+def _quarantine(home: Path, found: Survey) -> Check:
+    """The LaunchServices record of what was downloaded and from where.
+
+    A home directory rather than a platform: the database is the reason this
+    can be asked of a copied macOS profile from anywhere, which is exactly the
+    case where saying whether it was there matters most.
+    """
+    events = collect_quarantine_events(home)
+    if not (home / QUARANTINE_DB).is_file():
+        return Check("macOS quarantine database", UNAVAILABLE, "no database in this profile")
+    if not events.by_uuid and not events.by_name:
+        return Check("macOS quarantine database", PARTIAL, "present but nothing could be read")
+
+    moments = sorted(claim.at for claim in events.by_uuid.values() if claim.at)
+    if moments:
+        found.horizon.append(Check("macOS quarantine oldest download", AVAILABLE, moments[0][:10]))
+    return Check("macOS quarantine database", AVAILABLE, f"{len(events.by_uuid)} downloads")
 
 
 def _birth_times() -> Check:

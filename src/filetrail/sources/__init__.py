@@ -7,6 +7,7 @@ from .embedded import read_embedded_metadata
 from .fsattrs import read_file_attributes
 from .iptc import read_iptc
 from .mail import read_mail
+from .quarantine import collect_quarantine_events, read_quarantine
 from .recent import collect_recent_files
 from .shell import collect_shell_history
 from .xmp import read_xmp
@@ -21,6 +22,8 @@ __all__ = [
     "read_xmp",
     "collect_shell_history",
     "collect_recent_files",
+    "collect_quarantine_events",
+    "read_quarantine",
     "is_archive",
     "list_members",
     "inherited_origin",

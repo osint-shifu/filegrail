@@ -13,6 +13,9 @@ CONFIDENCE = {
     "email-delivery": 78,
     "windows-zone-identifier": 85,
     "macos-wherefroms": 85,
+    # Written by LaunchServices at download time, the same authority as a
+    # where-from attribute and recorded beside it rather than instead of it.
+    "macos-quarantine": 85,
     "xdg-xattr": 80,
     "archive-member": 70,
     # A purpose-built provenance standard, but the signature is not verified here.
@@ -50,6 +53,7 @@ SOURCE_LABELS = {
     "email-header": "mail headers",
     "windows-zone-identifier": "Windows zone",
     "macos-wherefroms": "macOS where-from",
+    "macos-quarantine": "macOS quarantine",
     "xdg-xattr": "XDG attribute",
     "archive-member": "archive member",
     "c2pa": "content credentials",
@@ -135,6 +139,7 @@ _KINDS = {
     "browser-download": ACQUISITION,
     "windows-zone-identifier": ACQUISITION,
     "macos-wherefroms": ACQUISITION,
+    "macos-quarantine": ACQUISITION,
     "xdg-xattr": ACQUISITION,
     "email-delivery": ACQUISITION,
     "email-relay": ACQUISITION,
