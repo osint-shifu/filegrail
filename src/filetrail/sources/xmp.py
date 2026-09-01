@@ -27,6 +27,8 @@ _RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 #: unlisted namespace keeps its URI, because a name a reader cannot look up is
 #: worse than a long one.
 _PREFIXES = {
+    _RDF: "rdf",
+    "http://www.w3.org/XML/1998/namespace": "xml",
     "http://purl.org/dc/elements/1.1/": "dc",
     "http://purl.org/dc/terms/": "dcterms",
     "http://ns.adobe.com/xap/1.0/": "xmp",
@@ -34,6 +36,7 @@ _PREFIXES = {
     "http://ns.adobe.com/xap/1.0/rights/": "xmpRights",
     "http://ns.adobe.com/xap/1.0/bj/": "xmpBJ",
     "http://ns.adobe.com/xap/1.0/t/pg/": "xmpTPg",
+    "http://ns.adobe.com/xap/1.0/g/": "xmpG",
     "http://ns.adobe.com/xmp/1.0/DynamicMedia/": "xmpDM",
     "http://ns.adobe.com/xmp/note/": "xmpNote",
     "http://ns.adobe.com/xap/1.0/sType/ResourceEvent#": "stEvt",
@@ -50,6 +53,7 @@ _PREFIXES = {
     "http://cipa.jp/exif/1.0/": "exifEX",
     "http://ns.adobe.com/pdf/1.3/": "pdf",
     "http://ns.adobe.com/pdfx/1.3/": "pdfx",
+    "http://www.aiim.org/pdfua/ns/id/": "pdfuaid",
     "http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/": "Iptc4xmpCore",
     "http://iptc.org/std/Iptc4xmpExt/2008-02-29/": "Iptc4xmpExt",
     "http://ns.useplus.org/ldf/xmp/1.0/": "plus",
@@ -69,6 +73,13 @@ _PREFIXES = {
 _BY_NAMESPACE = {uri.rstrip("/#"): prefix for uri, prefix in _PREFIXES.items()}
 
 _HISTORY = "{http://ns.adobe.com/xap/1.0/mm/}History"
+
+#: Which language a value is in. Beside a value it adds nothing the value does
+#: not already carry, and beside an empty one it is all that is left: Acrobat
+#: writes `<rdf:li xml:lang="x-default"/>` for a title nobody set, which used to
+#: be reported as a field whose entire content was the word `x-default`. It
+#: describes the encoding, which is why `rdf:about` is skipped too.
+_XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 
 #: RDF's three array spellings. A property holding one wraps its real values in
 #: rdf:li elements, so the value is a level below where a reader first looks.
@@ -100,6 +111,13 @@ _MAX_EDITS = 25
 #: How far into nested structs to descend. Real XMP nests one or two levels; the
 #: bound exists so a crafted file cannot recurse this reader off its stack.
 _MAX_DEPTH = 6
+
+#: How many entries of one array are reported in full. Illustrator writes its
+#: entire default palette into `xmpTPg:SwatchGroups` - forty-five colorants of
+#: seven fields each - and printing all of it buries a file's provenance under
+#: its colour picker. The first few are enough to recognise a palette somebody
+#: built; how many there were is stated rather than left to be guessed at.
+_MAX_ENTRIES = 3
 
 
 def read_xmp(path: Path) -> list[Origin]:
@@ -285,21 +303,48 @@ def _fields(element: ElementTree.Element, depth: int = 0) -> dict[str, str]:
     """
     found: dict[str, str] = {}
     for name, value in element.attrib.items():
-        # rdf:about and rdf:parseType describe the encoding, not the file.
-        if not name.startswith(f"{{{_RDF}}}") and value.strip():
+        # rdf:about, rdf:parseType and xml:lang describe the encoding, not the
+        # file.
+        if name.startswith(f"{{{_RDF}}}") or name == _XML_LANG:
+            continue
+        if value.strip():
             found.setdefault(_prefixed(name), value.strip())
+
     for child in element:
+        # The edit history is a sequence of events, not a struct, and it has a
+        # reader of its own that reports each step as a dated claim. Walking it
+        # here as well printed every step twice.
+        if depth == 0 and child.tag == _HISTORY:
+            continue
+
         name = _prefixed(child.tag)
         value = _value(child)
         if value:
             found.setdefault(name, value)
         elif depth < _MAX_DEPTH:
-            # A struct - DerivedFrom, ManagedFrom, a region list - carries its
+            # A struct - DerivedFrom, ManagedFrom, a swatch group - carries its
             # meaning a level down. The path keeps two structs from colliding on
-            # the shared name of a field inside them.
-            for inner, text in _fields(child, depth + 1).items():
-                found.setdefault(f"{name}/{inner}", text)
+            # the shared name of a field inside them; the array wrapper around
+            # them does not go into it, because `rdf:Seq` and `rdf:li` are how
+            # RDF spells "several of these" and say nothing about the property.
+            entries = _entries(child)
+            if len(entries) > _MAX_ENTRIES:
+                found.setdefault(name, f"{len(entries)} entries, {_MAX_ENTRIES} shown")
+            for index, entry in enumerate(entries[:_MAX_ENTRIES], start=1):
+                label = name if len(entries) == 1 else f"{name}[{index}]"
+                for inner, text in _fields(entry, depth + 1).items():
+                    found.setdefault(f"{label}/{inner}", text)
     return found
+
+
+def _entries(element: ElementTree.Element) -> list[ElementTree.Element]:
+    """The elements carrying a property's fields, past RDF's array wrappers.
+
+    Several of them where the property holds an array of structs, so the second
+    swatch group is reported rather than dropped on the first one's name.
+    """
+    items = [item for child in element if child.tag in _ARRAYS for item in child]
+    return items or [element]
 
 
 def _value(element: ElementTree.Element) -> str:

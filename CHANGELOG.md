@@ -138,6 +138,31 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Metadata field names are names. A packet whose namespace the prefix table had
+  never listed printed the URI instead, four times over inside one name:
+  `xmpMM:History/http://www.w3.org/1999/02/22-rdf-syntax-ns#:Seq/...:li/stEvt:action`.
+  RDF's own namespace was the worst of them, and this file had been defining it
+  two lines above the table since the reader was written; `xmpG`, `xml` and
+  `pdfuaid` were missing too.
+
+  The array wrappers went with them. `rdf:Seq` and `rdf:li` are how RDF spells
+  "several of these" and say nothing about the property, so they are no longer
+  path segments - a swatch group is `xmpTPg:SwatchGroups/xmpG:groupName`, and
+  several of them are numbered rather than dropped on each other's name, which
+  is what `setdefault` had been doing in silence. One corpus PDF carries
+  Illustrator's entire default palette, so an array reports its first three
+  entries and states how many there were, the way the edit history already
+  bounds itself.
+
+  The edit history is no longer flattened into the fields at all. Every step is
+  already its own dated claim with its own `stEvt:` fields, and walking the
+  sequence a second time printed each of them twice.
+
+  `--json` carries the corrected names. The document's shape is unchanged and no
+  field changed meaning, so the schema number stands: what moved is the reader's
+  own naming of things inside an open dictionary, and the names it moved from
+  were not usable.
+
 - Field names, file names, identifiers and scanned paths wrap instead of being
   cut. `DESIGN.md` has said nothing is truncated since the first release, and
   four XMP fields were printing as `xmpMM:DerivedFrom/stRef…` - four rows nobody
