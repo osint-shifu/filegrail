@@ -15,7 +15,17 @@ reader also adds it here.
 from __future__ import annotations
 
 from .sources.archives import ARCHIVE_SUFFIXES
-from .sources.embedded import containers, documents, exif, id3, matroska, ole, png, riff
+from .sources.embedded import (
+    containers,
+    documents,
+    exif,
+    id3,
+    matroska,
+    ole,
+    png,
+    riff,
+    vorbis,
+)
 
 
 class UnknownType(ValueError):
@@ -36,13 +46,15 @@ _VIDEO = (
 #: Formats no reader claims yet, listed so a filter still selects them - a file
 #: this tool cannot read is exactly the sort a report should be able to include.
 _EXTRA_IMAGE = {".gif", ".bmp", ".ico", ".psd", ".raf", ".srw", ".pef"}
-_EXTRA_AUDIO = {".m4a", ".flac", ".ogg", ".opus", ".aiff", ".wma"}
+_EXTRA_AUDIO = {".m4a", ".aiff", ".wma"}
 _EXTRA_TEXT = {".txt", ".md", ".csv", ".tsv", ".json", ".xml", ".yaml", ".yml", ".log", ".html"}
 
 FAMILIES: dict[str, frozenset[str]] = {
     "image": frozenset(exif.SUFFIXES | png.SUFFIXES | containers.SVG_SUFFIXES | _EXTRA_IMAGE),
     "video": frozenset(_VIDEO),
-    "audio": frozenset(id3.SUFFIXES | riff.WAVE_SUFFIXES | matroska.AUDIO_SUFFIXES | _EXTRA_AUDIO),
+    "audio": frozenset(
+        id3.SUFFIXES | riff.WAVE_SUFFIXES | matroska.AUDIO_SUFFIXES | vorbis.SUFFIXES | _EXTRA_AUDIO
+    ),
     "document": frozenset(
         documents.PDF_SUFFIXES
         | documents.OOXML_SUFFIXES

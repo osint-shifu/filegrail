@@ -377,7 +377,7 @@ Supported classes include URLs, domains, email addresses, IP addresses, hashes a
 | Content Credentials | PNG, JPEG | C2PA/JUMBF producing application, creation data, digital source type |
 | XMP | JPEG, TIFF and raw, PNG, PDF, MP4, HEIC, SVG and any other container that embeds a packet | Creating application, author, title, derivation ids, and every recorded editing step |
 | IPTC IIM | JPEG, TIFF, PSD - any Photoshop image-resource block, plus TIFF tag 33723 | By-line, credit, source, copyright, headline, caption, keywords, place and date of creation |
-| Video / audio | MP4, M4V, MOV, 3GP, M4A, MP3, WAV, AVI, MKV, WebM, MKA | Encoder, device, creation time, ISO 6709 location, ID3 frames, RIFF `INFO` fields, BWF `bext` recorder and coding history, Matroska writing application, segment date and tags |
+| Video / audio | MP4, M4V, MOV, 3GP, M4A, MP3, WAV, AVI, MKV, WebM, MKA, FLAC, OGG, Opus | Encoder, device, creation time, ISO 6709 location, ID3 frames, RIFF `INFO` fields, BWF `bext` recorder and coding history, Matroska writing application, segment date and tags, Vorbis comments |
 | PDF | PDF | `Info` dictionary, including compressed object streams and hex strings |
 | Office Open XML | DOCX, XLSX, PPTX and macro/template variants | Application, author, last editor, company, creation data and document properties |
 | Legacy Office | DOC, XLS, PPT and template variants | SummaryInformation / DocumentSummaryInformation properties |

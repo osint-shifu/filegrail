@@ -23,6 +23,27 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Vorbis comments, which FLAC, Ogg Vorbis and Opus all carry: one layout in
+  three containers. FLAC keeps the block among the metadata blocks at the front
+  of the file and those can be walked exactly; Ogg keeps it in the second packet
+  and it is found by the marker that opens it, rather than by reassembling Ogg
+  pages for a block that has already been located. The cost of that shortcut is
+  named where it lands: a comment block long enough to be split across pages
+  stops being readable partway, so every length is checked against what was
+  actually read and whatever was recovered is returned as it stands.
+
+  The names are case-insensitive by specification, and ffmpeg takes it at its
+  word - every field it writes is in lower case. The first draft looked them up
+  shouted and so found nothing at all in the files ffmpeg produces, which is a
+  reader agreeing with the specification and disagreeing with reality. They are
+  looked up without regard to case now and kept in the record exactly as the
+  writer wrote them; shouting a studio's own field names back at it is editing
+  the evidence.
+
+  Cover art arrives base64-encoded in a comment like any other and is left out.
+  It is not provenance, and a screenful of it would bury the handful of values
+  that are.
+
 - Matroska and WebM, read through EBML. `.mkv` and `.webm` were already
   selectable with `--type video` and no reader claimed them, so a scan narrowed
   to the films read nothing out of them. The container names the application a

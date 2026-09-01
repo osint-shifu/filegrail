@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ...models import Origin
-from . import containers, documents, exif, id3, isobmff, matroska, ole, png, riff
+from . import containers, documents, exif, id3, isobmff, matroska, ole, png, riff, vorbis
 
 #: A malformed container is ordinary: truncated downloads, Office lock files and
 #: files with a misleading extension all land here, and none is an error.
@@ -43,6 +43,7 @@ SUFFIXES = (
     | id3.SUFFIXES
     | riff.SUFFIXES
     | matroska.SUFFIXES
+    | vorbis.SUFFIXES
     | ole.SUFFIXES
 )
 
@@ -62,6 +63,7 @@ def read_embedded_metadata(path: Path) -> Origin | None:
         _from_compound,
         _from_riff,
         _from_matroska,
+        _from_vorbis,
         _from_audio,
     ):
         try:
@@ -325,6 +327,32 @@ def _from_matroska(path: Path, suffix: str) -> Origin | None:
         at=found.at,
         note=f"title {_clip(title, 80)}" if title else None,
         fields=dict(found.fields),
+    )
+
+
+def _from_vorbis(path: Path, suffix: str) -> Origin | None:
+    if suffix not in vorbis.SUFFIXES:
+        return None
+    found = vorbis.read_comments(path)
+    if not found:
+        return None
+
+    # The specification calls these names case-insensitive and ffmpeg takes it
+    # at its word, writing every one in lower case - so they are looked up that
+    # way and kept in the record exactly as the writer wrote them.
+    notes = []
+    for label, name in (("artist", "ARTIST"), ("title", "TITLE"), ("engineer", "ENGINEER")):
+        if value := _first(found, (name,)):
+            notes.append(f"{label} {_clip(value, 80)}")
+
+    return _origin(
+        "document-metadata",
+        # The vendor string is written by whatever produced the file, so it is
+        # the weaker answer of the two and never the wrong one.
+        tool=_first(found, ("ENCODER", "Vendor")),
+        at=_normalise(_first(found, ("DATE",))),
+        note="; ".join(notes) or None,
+        fields=dict(found),
     )
 
 
