@@ -45,6 +45,18 @@ GUTTER = "●←│├└*|+\\"
 GUTTER_TOKENS = ("<-",)
 
 
+def _survives(name: str, flattened: str) -> bool:
+    """Whether a path survived wrapping, whichever separator the platform uses.
+
+    Both sides lose their separators before they are compared. The report
+    prints a path the way the host spells it, and on Windows that is the same
+    character the ASCII gutter uses for `└` - so a wrapped path cannot be
+    reassembled with the separators left in.
+    """
+    stripped = flattened.replace("\\", "").replace("/", "")
+    return name.replace("/", "") in stripped
+
+
 def _flat(output: str) -> str:
     """The report with its gutter and all whitespace removed.
 
@@ -240,7 +252,7 @@ def test_a_file_with_no_findings_keeps_its_whole_name(width: int):
     # The timestamp is right-aligned on the name's first line, so it has to come
     # out before the wrapped halves of the name are contiguous again.
     assert "…" not in output
-    assert name in _flat(_STAMP.sub("", output))
+    assert _survives(name, _flat(_STAMP.sub("", output)))
 
 
 @pytest.mark.parametrize("width", WIDTHS)
@@ -299,5 +311,6 @@ def test_a_name_that_fits_the_line_is_not_split_by_the_timestamp_beside_it():
 
     output = render_text([record, other], Path("/case"), theme=_plain(100))
 
-    assert any(name in line for line in output.splitlines()), "the name was broken up"
+    shown = str(Path(name))  # the report prints it the way the platform spells it
+    assert any(shown in line for line in output.splitlines()), "the name was broken up"
     assert not [line for line in output.splitlines() if len(line) > 100]

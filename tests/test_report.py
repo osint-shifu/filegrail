@@ -356,7 +356,7 @@ def test_the_banner_says_what_was_scanned_and_what_came_back():
     output = render_text(_corpus(), Path("/case"), theme=PLAIN)
 
     assert "target" in output
-    assert "/case" in output
+    assert str(Path("/case")) in output  # spelled the way this platform does
     assert "scanned" in output
     assert "8 files" in output
     assert "5 types" in output
