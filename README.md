@@ -376,6 +376,8 @@ Supported classes include URLs, domains, email addresses, IP addresses, hashes a
 
 `filetrail` keeps the fields its readers can actually decode. Normal output shows them as a tree, `--brief` folds them down, and `--json` keeps them for scripts and other tooling.
 
+The table below is the summary. [`FORMATS.md`](FORMATS.md) has the complete list — every extension, the metadata block each one produces, what is deliberately not read, and which readers are written from a specification rather than tested against real files. It is checked against the code by a test, so it cannot go stale.
+
 | Family | Formats | Examples of data read |
 |:---|:---|:---|
 | Images | JPEG, TIFF, DNG, NEF, CR2, ARW, WebP, HEIC, AVIF | EXIF camera/device data, software, capture time, artist, GPS |

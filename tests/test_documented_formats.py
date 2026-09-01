@@ -1,0 +1,155 @@
+"""`FORMATS.md` is held against the readers, so it cannot quietly go stale.
+
+A list of formats in prose is the one kind of documentation guaranteed to rot:
+`CONTRIBUTING.md` asks for new readers, every new reader is a line somebody has
+to remember to add, and nothing notices when they do not. Two years of that and
+the file is a liability - it reads like a promise and is not one.
+
+So it is parsed. Every extension a reader declares has to appear in the table,
+and every extension in the table has to be one a reader actually reads. Either
+direction failing is a red test rather than a wrong document.
+
+This checks what `filetrail` reads out of the *files it is pointed at*. What it
+reads from the machine - browser history, quarantine records, shell history,
+Recent shortcuts - is a different axis, and `filetrail doctor` reports it.
+"""
+
+from __future__ import annotations
+
+import ast
+import re
+from pathlib import Path
+
+from filetrail.models import BLOCK_LABELS
+from filetrail.sources import mail
+from filetrail.sources.archives import ARCHIVE_SUFFIXES
+from filetrail.sources.c2pa import SUPPORTED_SUFFIXES as C2PA_SUFFIXES
+from filetrail.sources.embedded import SUFFIXES as EMBEDDED_SUFFIXES
+
+FORMATS = Path(__file__).resolve().parent.parent / "FORMATS.md"
+
+#: The header rows that mark the two tables this test reads. Anything else in
+#: the file is prose and is left alone.
+METADATA_HEADER = ("block", "extensions", "what comes out")
+CROSS_HEADER = ("block", "where it is found", "what comes out")
+MAIL_HEADER = ("extension", "what comes out")
+ARCHIVE_HEADER = ("extensions", "what filetrail does with them")
+
+_EXTENSION = re.compile(r"`(\.[a-z0-9]+)`")
+_NAME = re.compile(r"`([a-z0-9][a-z0-9-]*)`")
+
+
+def _rows(header: tuple[str, ...]) -> list[tuple[str, ...]]:
+    """Every row under every table whose header row matches."""
+    found: list[tuple[str, ...]] = []
+    inside = False
+    for line in FORMATS.read_text(encoding="utf-8").splitlines():
+        if not line.lstrip().startswith("|"):
+            inside = False
+            continue
+        cells = tuple(cell.strip() for cell in line.strip().strip("|").split("|"))
+        if tuple(cell.lower() for cell in cells) == header:
+            inside = True
+            continue
+        if inside and set("".join(cells)) <= set(":- "):
+            continue  # the separator under the header
+        if inside:
+            found.append(cells)
+    return found
+
+
+def _documented(header: tuple[str, ...], column: int) -> set[str]:
+    return {
+        extension
+        for row in _rows(header)
+        if len(row) > column
+        for extension in _EXTENSION.findall(row[column])
+    }
+
+
+def _documented_formats() -> set[str]:
+    """Every extension the document claims, wherever it claims it.
+
+    Three tables rather than one, because a mail message and a PNG do not
+    answer the same question and forcing them into one table made the document
+    worse to read. The test reads the document as written rather than the other
+    way round.
+    """
+    return _documented(METADATA_HEADER, 1) | _documented(MAIL_HEADER, 0)
+
+
+def _readable() -> set[str]:
+    """Every extension something will try to decode metadata out of."""
+    return EMBEDDED_SUFFIXES | C2PA_SUFFIXES | mail.SUFFIXES | mail.OUTLOOK_SUFFIXES
+
+
+def _declared_blocks() -> set[str]:
+    """Every block name the source tree actually passes to an `Origin`."""
+    found = set(BLOCK_LABELS)
+    for path in (Path(__file__).resolve().parent.parent / "src" / "filetrail").rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not isinstance(node, ast.Call):
+                continue
+            for keyword in node.keywords:
+                if keyword.arg == "block" and isinstance(keyword.value, ast.Constant):
+                    if isinstance(keyword.value.value, str):
+                        found.add(keyword.value.value)
+    return found
+
+
+# --- the tables are there at all ---------------------------------------------
+
+
+def test_the_metadata_table_is_found():
+    """A header nobody can parse would make every check below vacuous."""
+    assert _rows(METADATA_HEADER), f"no table headed {METADATA_HEADER} in {FORMATS.name}"
+
+
+def test_the_archive_table_is_found():
+    assert _rows(ARCHIVE_HEADER), f"no table headed {ARCHIVE_HEADER} in {FORMATS.name}"
+
+
+def test_the_mail_table_is_found():
+    assert _rows(MAIL_HEADER), f"no table headed {MAIL_HEADER} in {FORMATS.name}"
+
+
+def test_the_cross_format_table_is_found():
+    assert _rows(CROSS_HEADER), f"no table headed {CROSS_HEADER} in {FORMATS.name}"
+
+
+# --- and they say what the code does -----------------------------------------
+
+
+def test_every_format_a_reader_declares_is_documented():
+    documented = _documented_formats()
+
+    missing = _readable() - documented
+    assert not missing, f"read but undocumented: {sorted(missing)}"
+
+
+def test_nothing_is_documented_that_no_reader_reads():
+    """A promise the tool does not keep is worse than a gap in the table."""
+    documented = _documented_formats()
+
+    invented = documented - _readable()
+    assert not invented, f"documented but unread: {sorted(invented)}"
+
+
+def test_every_archive_format_is_documented():
+    documented = _documented(ARCHIVE_HEADER, 0)
+
+    assert documented == set(ARCHIVE_SUFFIXES), sorted(documented ^ set(ARCHIVE_SUFFIXES))
+
+
+def test_every_block_the_table_names_is_one_the_code_declares():
+    """The first column is a `--json` value, not a label invented here."""
+    declared = _declared_blocks()
+
+    named = {
+        name
+        for header in (METADATA_HEADER, CROSS_HEADER)
+        for row in _rows(header)
+        for name in _NAME.findall(row[0])
+    }
+    assert named, "the table names no blocks at all"
+    assert named <= declared, sorted(named - declared)

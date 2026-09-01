@@ -365,6 +365,23 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   ordinary length does not skip one field, it loses the reader's place in the
   stream and every dataset after it.
 
+- [`FORMATS.md`](FORMATS.md): the complete list of what can be read out of a
+  file, with the metadata block each format produces, what is deliberately not
+  read, and which three readers are written from a specification rather than
+  tested against files the originating software wrote.
+
+  It lives outside the README because it is the one table guaranteed to grow -
+  `CONTRIBUTING.md` asks for new readers, and a README that swells with every
+  one of them rots. And because out here it can be held against the code:
+  `tests/test_documented_formats.py` parses the tables and compares them with
+  what the readers actually declare, in both directions. A format that is read
+  and undocumented fails, and so does one documented that nothing reads.
+
+  That makes it the first document in this repository that cannot quietly stop
+  being true. A list of formats in prose is otherwise the kind of documentation
+  most certain to rot: every new reader is a line somebody has to remember, and
+  nothing notices when they do not.
+
 - The Windows Recent folder is read. A `.lnk` under
   `AppData/Roaming/Microsoft/Windows/Recent` is the counterpart of a
   `recently-used.xbel` entry and is ranked with it: opening a file proves
