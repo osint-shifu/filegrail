@@ -290,6 +290,145 @@ def test_two_self_descriptions_that_agree_are_not_a_finding():
     assert reconcile(record).findings == []
 
 
+def _info(**fields: str) -> Origin:
+    return Origin(source="document-metadata", block="pdf-info", fields=dict(fields))
+
+
+def test_an_info_dictionary_and_its_xmp_naming_different_applications_is_a_finding():
+    """A PDF carries the same facts twice, and XMP Part 3 publishes the pairing.
+    Two different applications in one file is an export that stamped a fresh
+    Info dictionary over XMP it carried through from the source document."""
+    record = _record(
+        _info(Creator="Adobe InDesign CC 13.1 (Macintosh)"),
+        _xmp(xmp_CreatorTool="Adobe Illustrator CC 22.0 (Macintosh)"),
+    )
+
+    findings = reconcile(record).findings
+
+    assert [f.kind for f in findings] == [ATTRIBUTION_CONFLICT]
+    assert "Creator: PDF Info says Adobe InDesign CC 13.1 (Macintosh)" in findings[0].text
+    assert "XMP says Adobe Illustrator CC 22.0 (Macintosh)" in findings[0].text
+
+
+def test_an_info_dictionary_and_its_xmp_disagreeing_about_the_title_is_a_finding():
+    record = _record(
+        _info(Title="Szybki wniosek", Author="OSINT360"),
+        _xmp(dc_title="OSINT360 - potencjalni klienci", dc_creator="OSINT360"),
+    )
+
+    findings = reconcile(record).findings
+
+    assert [f.kind for f in findings] == [ATTRIBUTION_CONFLICT]
+    assert "Title" in findings[0].text
+
+
+def test_an_info_dictionary_agreeing_with_its_xmp_says_nothing():
+    """One producer writes both blocks at the same save and keeps them
+    consistent, which is the ordinary case and worth no line at all."""
+    record = _record(
+        _info(
+            Title="Szybki wniosek",
+            Author="OSINT360",
+            Subject="Segmentacja klientow",
+            Keywords="OSINT360, klienci",
+            Creator="Writer",
+            Producer="LibreOffice 25.2.3.2",
+        ),
+        _xmp(
+            dc_title="Szybki wniosek",
+            dc_creator="OSINT360",
+            dc_description="Segmentacja klientow",
+            pdf_Keywords="OSINT360, klienci",
+            xmp_CreatorTool="Writer",
+            pdf_Producer="LibreOffice 25.2.3.2",
+        ),
+    )
+
+    assert reconcile(record).findings == []
+
+
+def test_an_info_dictionary_dated_months_from_its_xmp_is_a_finding():
+    """A PDF writes `D:YYYYMMDDHHmmSS` with the offset in its own punctuation,
+    and its XMP writes the same fact as ISO 8601. Three months between the two
+    is an export stamped long after the XMP it carried through."""
+    record = _record(
+        _info(CreationDate="D:20180511143720-04'00'"),
+        _xmp(xmp_CreateDate="2018-02-28T13:44:18-05:00"),
+    )
+
+    findings = reconcile(record).findings
+
+    assert [f.kind for f in findings] == [ATTRIBUTION_CONFLICT]
+    assert "CreationDate" in findings[0].text
+
+
+def test_an_info_dictionary_dated_with_its_xmp_says_nothing():
+    record = _record(
+        _info(CreationDate="D:20180511143720-04'00'", ModDate="D:20180511143721-04'00'"),
+        _xmp(
+            xmp_CreateDate="2018-05-11T14:37:20-04:00",
+            xmp_ModifyDate="2018-05-11T14:37:21-04:00",
+        ),
+    )
+
+    assert reconcile(record).findings == []
+
+
+def test_a_modification_date_moved_away_from_its_xmp_is_a_finding():
+    """Unlike EXIF `DateTime`, whose XMP mirror is maintained by tools that
+    leave the tag alone, both of a PDF's modification dates are written by the
+    producer at the same save. A gap between them is one of the two blocks not
+    having been rewritten."""
+    record = _record(
+        _info(ModDate="D:20180511143721-04'00'"),
+        _xmp(xmp_ModifyDate="2018-04-05T17:19:03-04:00"),
+    )
+
+    assert [f.kind for f in reconcile(record).findings] == [ATTRIBUTION_CONFLICT]
+
+
+def test_a_pdf_stamp_without_punctuation_still_reads_as_a_moment():
+    """LibreOffice writes `D:20260707080205Z'` - no separator before the clock,
+    where every other writer this compares puts a `T` or a space. Read as
+    unreadable it would be silently skipped, and the thirteen years between
+    this and its XMP would go unreported."""
+    record = _record(
+        _info(CreationDate="D:20260707080205Z'"),
+        _xmp(xmp_CreateDate="2026-07-07T08:02:05Z"),
+    )
+
+    assert reconcile(record).findings == []
+
+
+def test_the_producer_string_is_left_out_of_the_comparison():
+    """One library writes its own name into both blocks at one save, and Adobe
+    PDF Library 15 writes it two ways: `Adobe PDF Library 15.0` into the Info
+    dictionary and `Adobe PDF library 15.00` into the XMP. Case and spacing are
+    already forgiven; the trailing zero is not, and a pair that reports a tool
+    disagreeing with itself would put a line on Adobe exports at large."""
+    record = _record(
+        _info(Producer="Adobe PDF Library 15.0"),
+        _xmp(pdf_Producer="Adobe PDF library 15.00"),
+    )
+
+    assert reconcile(record).findings == []
+
+
+def test_a_camera_software_tag_is_not_paired_with_the_creating_application():
+    """EXIF `Software` is the last thing that processed the file and
+    `xmp:CreatorTool` is the application that made it. They are different facts
+    and differ in ordinary use - a photograph edited in GIMP after being
+    exported from Photoshop Elements says both, truthfully. The pairing belongs
+    to a PDF Info dictionary, where `/Creator` does mean the creating
+    application, and applying it to EXIF would invent a conflict."""
+    record = _record(
+        _exif(Software="GIMP 2.4.5"),
+        _xmp(xmp_CreatorTool="Adobe Photoshop Elements 3.0"),
+    )
+
+    assert reconcile(record).findings == []
+
+
 def test_a_riff_software_field_is_not_read_as_a_tiff_tag():
     """`tiff:Software` is the XMP serialisation of the EXIF tag, and the mirror
     exists because that correspondence is published. A WAV's INFO list also has

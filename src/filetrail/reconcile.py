@@ -120,6 +120,33 @@ _EXIF_IN_XMP = (
     ("BodySerialNumber", "aux:SerialNumber"),
 )
 
+#: And for a PDF's Info dictionary and its XMP, where the pairing is again the
+#: XMP specification's own - Part 3 defines the Info entries as the legacy form
+#: of these properties, and PDF/A requires the two to agree.
+#:
+#: `/Creator` is the application that made the document; XMP keeps it under
+#: `xmp:CreatorTool`. An exporter that stamps a fresh Info dictionary over XMP
+#: carried through from the source document leaves the two naming different
+#: applications, which is the trace worth reporting.
+#:
+#: `/Producer` is left out. It names the library that wrote the PDF, and that
+#: library writes both blocks at one save - so it disagrees with itself rather
+#: than with anything: Adobe PDF Library 15 puts `Adobe PDF Library 15.0` in the
+#: Info dictionary and `Adobe PDF library 15.00` in the XMP. Case and spacing
+#: are already forgiven, the trailing zero is not, and the pair would put a line
+#: on Adobe exports at large while catching a rewrite the other pairs also see.
+#:
+#: `/Trapped` is left out for a duller reason: it is a PDF name object, `/False`
+#: rather than `(False)`, and the reader takes only string values - so the pair
+#: could never fire.
+_PDF_IN_XMP = (
+    ("Title", "dc:title"),
+    ("Author", "dc:creator"),
+    ("Subject", "dc:description"),
+    ("Keywords", "pdf:Keywords"),
+    ("Creator", "xmp:CreatorTool"),
+)
+
 #: Pairs holding a timestamp, compared as moments rather than as text. IIM
 #: writes a bare eight-digit day, EXIF writes a zoneless local reading, XMP
 #: writes the same reading with an offset attached - three spellings of one
@@ -131,9 +158,25 @@ _EXIF_MOMENTS = (
     ("DateTimeDigitized", "exif:DateTimeDigitized"),
 )
 
+#: A PDF's two dates. `ModDate` is here where EXIF's `DateTime` is not: an XMP
+#: writer maintains `xmp:ModifyDate` while leaving the EXIF tag as it found it,
+#: so the two drift apart in ordinary use, but a PDF producer writes both of its
+#: blocks at the same save and a gap between them is one of them being stale.
+_PDF_MOMENTS = (
+    ("CreationDate", "xmp:CreateDate"),
+    ("ModDate", "xmp:ModifyDate"),
+)
+
 #: A day, however the writer punctuated it, and a clock reading if one is there.
 _DAY = re.compile(r"(\d{4})\D?(\d{2})\D?(\d{2})")
 _CLOCK = re.compile(r"[T ](\d{2}):?(\d{2}):?(\d{2})")
+
+#: A PDF date, which is neither: `D:20180511143720-04'00'` opens with two
+#: letters `_DAY` will not match past and runs the clock straight into the day
+#: with none of the separators `_CLOCK` looks for. Read by the general pattern
+#: it comes back unreadable, and an unreadable stamp is never compared - so
+#: every PDF timestamp would be skipped in silence rather than checked.
+_PDF_STAMP = re.compile(r"D:(\d{4})(\d{2})(\d{2})(?:(\d{2})(\d{2})(\d{2}))?")
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +202,7 @@ class Mirror:
 MIRRORS = (
     Mirror(left="iptc", right="xmp", text=_IIM_IN_XMP, moments=_IIM_MOMENTS),
     Mirror(left="exif", right="xmp", text=_EXIF_IN_XMP, moments=_EXIF_MOMENTS),
+    Mirror(left="pdf-info", right="xmp", text=_PDF_IN_XMP, moments=_PDF_MOMENTS),
 )
 
 
@@ -404,10 +448,18 @@ def _same_moment(left: str, right: str) -> bool | None:
 
 
 def _instant(value: str) -> tuple[str, str | None] | None:
-    day = _DAY.match(value.strip())
+    text = value.strip()
+
+    stamp = _PDF_STAMP.match(text)
+    if stamp:
+        day = "".join(stamp.group(1, 2, 3))
+        clock = stamp.group(4, 5, 6)
+        return day, "".join(clock) if all(clock) else None
+
+    day = _DAY.match(text)
     if not day:
         return None
-    clock = _CLOCK.search(value)
+    clock = _CLOCK.search(text)
     return "".join(day.groups()), "".join(clock.groups()) if clock else None
 
 
