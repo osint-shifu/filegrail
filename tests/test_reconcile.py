@@ -175,15 +175,19 @@ def test_agreement_is_reported_too():
 
 
 def _iptc(**fields: str) -> Origin:
-    return Origin(source="iptc", fields=dict(fields))
+    return Origin(source="iptc", block="iptc", fields=dict(fields))
 
 
 def _xmp(**fields: str) -> Origin:
-    return Origin(source="xmp", fields={name.replace("_", ":"): v for name, v in fields.items()})
+    return Origin(
+        source="xmp",
+        block="xmp",
+        fields={name.replace("_", ":"): v for name, v in fields.items()},
+    )
 
 
 def _exif(**fields: str) -> Origin:
-    return Origin(source="device-metadata", fields=dict(fields))
+    return Origin(source="device-metadata", block="exif", fields=dict(fields))
 
 
 def test_a_camera_and_its_xmp_mirror_naming_different_models_is_a_finding():
@@ -281,6 +285,24 @@ def test_two_self_descriptions_that_agree_are_not_a_finding():
     record = _record(
         _iptc(**{"By-line": "Ansel Adams", "Credit": "Magnum"}),
         _xmp(dc_creator="ansel  adams", photoshop_Credit="Magnum"),
+    )
+
+    assert reconcile(record).findings == []
+
+
+def test_a_riff_software_field_is_not_read_as_a_tiff_tag():
+    """`tiff:Software` is the XMP serialisation of the EXIF tag, and the mirror
+    exists because that correspondence is published. A WAV's INFO list also has
+    a field spelled Software, and it is a different fact - the mirror is between
+    two standards, not between two words. Both claims are `document-metadata`,
+    so a mirror keyed on the source cannot tell them apart."""
+    record = _record(
+        Origin(
+            source="document-metadata",
+            block="riff-info",
+            fields={"Software": "Audacity 3.4.2"},
+        ),
+        Origin(source="xmp", block="xmp", fields={"tiff:Software": "Adobe Audition 24.0"}),
     )
 
     assert reconcile(record).findings == []

@@ -149,8 +149,10 @@ def test_the_conclusion_says_when_the_two_self_descriptions_contradict():
     silent about the thing that is actually contested here: the file's own two
     accounts of who made it."""
     record = FileRecord(path="/case/contested.jpg", size=494, mtime="2026-08-24T19:00:00Z")
-    record.origins.append(Origin(source="iptc", fields={"By-line": "Francisco Gonzalez"}))
-    record.origins.append(Origin(source="xmp", fields={"dc:creator": "Marta Nowak"}))
+    record.origins.append(
+        Origin(source="iptc", block="iptc", fields={"By-line": "Francisco Gonzalez"})
+    )
+    record.origins.append(Origin(source="xmp", block="xmp", fields={"dc:creator": "Marta Nowak"}))
 
     output = render_explain(record, theme=Theme(colour=False, unicode=False, width=88))
 
@@ -167,8 +169,10 @@ def test_the_conclusion_names_the_blocks_that_actually_disagree():
     talks about the IPTC block of a file that has none is telling the reader
     about a piece of evidence that is not there."""
     record = FileRecord(path="/case/tampered.jpg", size=494, mtime="2026-08-24T19:00:00Z")
-    record.origins.append(Origin(source="device-metadata", fields={"Model": "Canon PowerShot G9"}))
-    record.origins.append(Origin(source="xmp", fields={"tiff:Model": "NIKON D700"}))
+    record.origins.append(
+        Origin(source="device-metadata", block="exif", fields={"Model": "Canon PowerShot G9"})
+    )
+    record.origins.append(Origin(source="xmp", block="xmp", fields={"tiff:Model": "NIKON D700"}))
 
     output = render_explain(record, theme=Theme(colour=False, unicode=False, width=88))
 

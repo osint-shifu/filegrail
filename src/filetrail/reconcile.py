@@ -140,12 +140,14 @@ _CLOCK = re.compile(r"[T ](\d{2}):?(\d{2}):?(\d{2})")
 class Mirror:
     """Two self-descriptions a file is supposed to keep saying the same thing.
 
-    `left` lists the sources that can supply the first of them, because a
-    reader that decodes EXIF names its claim after what it found - a camera or
-    a bare document - rather than after the standard it read.
+    Both sides name a metadata block rather than a source, because the pairing
+    is between two standards. The source says what a reader found - a camera or
+    a bare document - and one block arrives under either name, while nine
+    different blocks arrive under `document-metadata` alone. Keyed on that, a
+    mirror would read a WAV's INFO list with the field names of a TIFF tag.
     """
 
-    left: tuple[str, ...]
+    left: str
     right: str
     text: tuple[tuple[str, str], ...]
     moments: tuple[tuple[str, str], ...]
@@ -155,13 +157,8 @@ class Mirror:
 #: check the comparison against a corpus without restating which fields mirror
 #: which.
 MIRRORS = (
-    Mirror(left=("iptc",), right="xmp", text=_IIM_IN_XMP, moments=_IIM_MOMENTS),
-    Mirror(
-        left=("device-metadata", "document-metadata"),
-        right="xmp",
-        text=_EXIF_IN_XMP,
-        moments=_EXIF_MOMENTS,
-    ),
+    Mirror(left="iptc", right="xmp", text=_IIM_IN_XMP, moments=_IIM_MOMENTS),
+    Mirror(left="exif", right="xmp", text=_EXIF_IN_XMP, moments=_EXIF_MOMENTS),
 )
 
 
@@ -347,7 +344,7 @@ def _attribution_findings(record: FileRecord) -> list[Finding]:
 
 def _disagreements(record: FileRecord, mirror: Mirror) -> list[Finding]:
     left = _describing(record, mirror.left)
-    right = _describing(record, (mirror.right,))
+    right = _describing(record, mirror.right)
     if left is None or right is None:
         return []
 
@@ -372,9 +369,9 @@ def _disagreements(record: FileRecord, mirror: Mirror) -> list[Finding]:
     return found
 
 
-def _describing(record: FileRecord, sources: tuple[str, ...]) -> Origin | None:
+def _describing(record: FileRecord, block: str) -> Origin | None:
     for origin in record.origins:
-        if origin.source in sources:
+        if origin.block == block:
             return origin
     return None
 

@@ -261,8 +261,8 @@ def test_two_spellings_of_one_fact_are_not_reported_as_a_conflict(path: Path):
     }
 
     for mirror in MIRRORS:
-        left = next((o for o in record.origins if o.source in mirror.left), None)
-        right = next((o for o in record.origins if o.source == mirror.right), None)
+        left = next((o for o in record.origins if o.block == mirror.left), None)
+        right = next((o for o in record.origins if o.block == mirror.right), None)
         if left is None or right is None:
             continue
         theirs = {name.lower(): value for name, value in left.fields.items()}
