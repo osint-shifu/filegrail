@@ -31,7 +31,14 @@ from .sources.browser import (
 from .sources.quarantine import QUARANTINE_DB, collect_quarantine_events
 from .sources.recent import RECENT_FILES, collect_recent_files
 from .sources.shell import HISTORY_FILES, _parse_history
+from .sources.shortcut import RECENT_LINKS, collect_windows_recent
 from .util import birth_time, iso
+
+
+def counted(number: int, noun: str) -> str:
+    """`1 shortcut`, `4 shortcuts`. Every noun this file counts is regular."""
+    return f"{number} {noun}" if number == 1 else f"{number} {noun}s"
+
 
 AVAILABLE = "available"
 UNAVAILABLE = "unavailable"
@@ -48,6 +55,7 @@ HOME_SOURCES = {
     "collect_shell_history": ("Shell history",),
     "collect_recent_files": ("Recent documents",),
     "collect_quarantine_events": ("macOS quarantine database",),
+    "collect_windows_recent": ("Windows Recent shortcuts",),
 }
 
 
@@ -80,6 +88,7 @@ def survey(home: Path | None = None) -> Survey:
     found.checks.append(_shell(home, found))
     found.checks.append(_recent(home, found))
     found.checks.append(_quarantine(home, found))
+    found.checks.append(_shortcuts(home))
     found.checks.append(_birth_times())
     found.checks.append(_c2pa())
     return found
@@ -124,7 +133,9 @@ def _browsers(home: Path, found: Survey) -> list[Check]:
         state = AVAILABLE if readable else UNAVAILABLE
         if readable and readable < len(profiles):
             state = PARTIAL
-        detail = f"{records} records across {readable} of {len(profiles)} profiles"
+        detail = (
+            f"{counted(records, 'record')} across {readable} of {counted(len(profiles), 'profile')}"
+        )
         checks.append(Check(f"{label} downloads", state, detail))
 
         if oldest:
@@ -221,7 +232,7 @@ def _recent(home: Path, found: Survey) -> Check:
     return Check(
         "Recent documents",
         AVAILABLE,
-        f"{len(opened)} files in {', '.join(Path(name).name for name in where)}",
+        f"{counted(len(opened), 'file')} in {', '.join(Path(name).name for name in where)}",
     )
 
 
@@ -241,7 +252,26 @@ def _quarantine(home: Path, found: Survey) -> Check:
     moments = sorted(claim.at for claim in events.by_uuid.values() if claim.at)
     if moments:
         found.horizon.append(Check("macOS quarantine oldest download", AVAILABLE, moments[0][:10]))
-    return Check("macOS quarantine database", AVAILABLE, f"{len(events.by_uuid)} downloads")
+    return Check("macOS quarantine database", AVAILABLE, counted(len(events.by_uuid), "download"))
+
+
+def _shortcuts(home: Path) -> Check:
+    """The Windows Recent folder, which keeps a shortcut per file opened.
+
+    No horizon: a shortcut is rewritten every time the file is opened, so the
+    oldest one says when the least-recently-used file was last touched, which
+    is not a limit on what the folder can answer.
+    """
+    if not (home / RECENT_LINKS).is_dir():
+        return Check("Windows Recent shortcuts", UNAVAILABLE, "no Recent folder in this profile")
+
+    found = collect_windows_recent(home)
+    if not found:
+        return Check(
+            "Windows Recent shortcuts", PARTIAL, "a Recent folder with nothing readable in it"
+        )
+    total = sum(len(claims) for claims in found.values())
+    return Check("Windows Recent shortcuts", AVAILABLE, counted(total, "shortcut"))
 
 
 def _birth_times() -> Check:

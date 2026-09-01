@@ -48,3 +48,15 @@ def test_a_size_match_is_not_reported_as_a_problem():
     verdict = reconcile(record)
 
     assert not any("differs" in reason for reason in verdict.reasons)
+
+
+def test_a_source_that_has_already_explained_itself_adds_nothing():
+    """The reason is optional, because not every source needs to give one.
+
+    A shortcut's note already says where the file was opened from, so
+    restating that the recorded path is not this one makes a third clause out
+    of something the first clause said.
+    """
+    found = matched_by_name(_origin(4096), 4096, "")
+
+    assert found.note == "matched by file name and size"

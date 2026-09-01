@@ -10,6 +10,7 @@ from .mail import read_mail
 from .quarantine import collect_quarantine_events, read_quarantine
 from .recent import collect_recent_files
 from .shell import collect_shell_history
+from .shortcut import collect_windows_recent, read_shortcuts
 from .xmp import read_xmp
 
 __all__ = [
@@ -24,6 +25,8 @@ __all__ = [
     "collect_recent_files",
     "collect_quarantine_events",
     "read_quarantine",
+    "collect_windows_recent",
+    "read_shortcuts",
     "is_archive",
     "list_members",
     "inherited_origin",

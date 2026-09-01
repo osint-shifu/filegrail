@@ -36,6 +36,9 @@ CONFIDENCE = {
     "email-relay": 45,
     "shell-history": 40,
     # An application opening a file proves contact, not acquisition.
+    # A Windows shortcut says the same thing and records the size of what it
+    # pointed at, which is one check more than the desktop list offers.
+    "windows-recent": 36,
     "recent-documents": 35,
     # The weakest self-description there is: forging a From line takes nothing
     # but typing it.
@@ -64,6 +67,7 @@ SOURCE_LABELS = {
     "document-metadata": "document metadata",
     "shell-history": "shell history",
     "recent-documents": "recent documents",
+    "windows-recent": "recent shortcut",
     "filesystem": "filesystem",
 }
 
@@ -146,6 +150,7 @@ _KINDS = {
     "archive-member": ACQUISITION,
     "filesystem": ACQUISITION,
     "recent-documents": INTERACTION,
+    "windows-recent": INTERACTION,
     "c2pa": INTRINSIC,
     "device-metadata": INTRINSIC,
     "xmp": INTRINSIC,

@@ -14,6 +14,7 @@ from .sources import (
     collect_quarantine_events,
     collect_recent_files,
     collect_shell_history,
+    collect_windows_recent,
     inherited_origin,
     is_archive,
     list_members,
@@ -23,6 +24,7 @@ from .sources import (
     read_iptc,
     read_mail,
     read_quarantine,
+    read_shortcuts,
     read_xmp,
 )
 from .util import basename, birth_time, iso, sha256_file
@@ -115,6 +117,7 @@ def scan(
     )
     recent = collect_recent_files(home=home)
     quarantined = collect_quarantine_events(home=home)
+    shortcuts = collect_windows_recent(home=home)
 
     records: list[FileRecord] = []
     for path in files:
@@ -147,6 +150,7 @@ def scan(
         record.origins.extend(read_mail(path))
         record.origins.extend(history.get(path.name, []))
         record.origins.extend(recent.get(str(path), []))
+        record.origins.extend(read_shortcuts(path, stat.st_size, shortcuts))
         records.append(record)
 
     if follow_archives:
@@ -215,16 +219,18 @@ def matched_by_name(origin: Origin, size: int, because: str = MOVED) -> Origin:
     alone cannot give, and one that disagrees very likely means this is not the
     file the record is about.
 
-    Why the name was all there was differs by source, so the caller says. A
-    download record keeps the path the file was saved to, and a name match
-    there really does mean it has moved; a quarantine row keeps the URL and no
-    path at all, and saying it moved would describe a disagreement between two
-    things where only one of them exists.
+    Why the name was all there was differs by source, so the caller says, and
+    a caller whose own note has already said it passes nothing. A download
+    record keeps the path the file was saved to, and a name match there really
+    does mean it has moved; a quarantine row keeps the URL and no path at all,
+    and saying it moved would describe a disagreement between two things where
+    only one of them exists.
     """
-    note = f"matched by file name; {because}"
+    reason = f"; {because}" if because else ""
+    note = f"matched by file name{reason}"
     if origin.bytes:
         if origin.bytes == size:
-            note = f"matched by file name and size; {because}"
+            note = f"matched by file name and size{reason}"
         else:
             note = (
                 f"matched by file name, but the recorded size differs "

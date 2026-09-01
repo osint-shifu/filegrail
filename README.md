@@ -213,7 +213,7 @@ file made from it, and those files share an ancestor and nothing else.
 |:---|:---|:---|
 | **Acquisition** | How did this file reach this machine? | Browser history, `Zone.Identifier`, macOS where-from metadata, macOS quarantine records, Linux XDG attributes, archive inheritance, fetch commands, mail `Received:` hops |
 | **Intrinsic** | What does the file say about its earlier life? | EXIF, document metadata, C2PA, camera/device metadata |
-| **Interaction** | What touched it after arrival? | Recent documents, non-fetching shell commands |
+| **Interaction** | What touched it after arrival? | Recent documents, Windows Recent shortcuts, non-fetching shell commands |
 
 ### Evidence sources
 
@@ -546,9 +546,10 @@ That is why `filetrail doctor` exists: it tells you what sources are available a
 
 C2PA manifests are parsed, but signatures are not cryptographically verified.
 
-Two readers are written from the specification and have never been run against
-a file the originating software produced, because nothing available here writes
-one: Outlook `.msg` messages, and the `id3 ` chunk a WAV file may carry. The
+Three readers are written from the specification and have never been run
+against a file the originating software produced, because nothing available
+here writes one: Outlook `.msg` messages, Windows `.lnk` shortcuts, and the
+`id3 ` chunk a WAV file may carry. The
 container walk under the `.msg` reader is not in that position - it is the same
 one real `.doc` files exercise.
 

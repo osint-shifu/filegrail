@@ -365,6 +365,28 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   ordinary length does not skip one field, it loses the reader's place in the
   stream and every dataset after it.
 
+- The Windows Recent folder is read. A `.lnk` under
+  `AppData/Roaming/Microsoft/Windows/Recent` is the counterpart of a
+  `recently-used.xbel` entry and is ranked with it: opening a file proves
+  contact, not acquisition, and this does not pretend otherwise.
+
+  What a shortcut adds is *where the file was when it was opened*. It records
+  the volume by type, serial number and label, a network share by name, and -
+  where the tracker block survives - the NetBIOS name of the machine that
+  created the link. That supports a statement nothing else here could make:
+  this file was opened from a removable volume, or from an optical disc, or
+  from `\\fileserver\projects`. It remains a fact about handling rather than
+  about arrival, however suggestive it reads, and it is filed as one.
+
+  The shortcut also records the size and last-write time of what it pointed at,
+  so a name match can be corroborated the way a download record's is. The
+  recorded path is a Windows one and is split as such, which is the fix from
+  earlier in these notes doing its work a second time.
+
+  Spec-only in one direction: nothing available writes a `.lnk`, so the
+  fixtures are assembled from [MS-SHLLINK]. The folder walk and the matching
+  around it are ordinary.
+
 - macOS quarantine is read: the `com.apple.quarantine` attribute on the file,
   and the LaunchServices `QuarantineEventsV2` database under the user's home.
   The attribute names the application, the moment and an event identifier; the
@@ -434,6 +456,10 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   limit at all.
 
 ### Fixed
+
+- `doctor` counts in the singular where there is one of something. Four checks
+  wrote `1 records`, `1 files`, `1 downloads` and `1 shortcuts`, which is the
+  kind of seam that makes a report look assembled rather than written.
 
 - A download record written by another operating system never matched by name.
   `Path` knows only the separator of the machine reading it, so

@@ -65,7 +65,7 @@ def test_a_readable_profile_reports_its_record_count(tmp_path: Path):
     found = survey(home=tmp_path)
 
     assert _state(found, "Chromium") == AVAILABLE
-    assert "1 records" in _detail(found, "Chromium")
+    assert "1 record across" in _detail(found, "Chromium")
 
 
 def test_the_oldest_record_sets_the_horizon(tmp_path: Path):
@@ -348,3 +348,47 @@ def test_the_quarantine_database_reports_how_far_back_it_reaches(tmp_path: Path)
 
     horizon = {check.name: check.detail for check in found.horizon}
     assert horizon["macOS quarantine oldest download"] == "2024-10-07"
+
+
+def _shortcuts(home: Path, count: int) -> None:
+    from filetrail.sources.shortcut import RECENT_LINKS
+    from tests.shortcut import DRIVE_FIXED, link_info, shortcut, volume_id
+
+    folder = home / RECENT_LINKS
+    folder.mkdir(parents=True, exist_ok=True)
+    for index in range(count):
+        raw = shortcut(
+            info=link_info(
+                rf"C:\Users\Alice\Documents\file{index}.docx",
+                volume=volume_id(DRIVE_FIXED, 0x1A2B3C4D, "Windows"),
+            )
+        )
+        (folder / f"file{index}.docx.lnk").write_bytes(raw)
+
+
+def test_a_windows_recent_folder_is_reported_with_what_it_holds(tmp_path: Path):
+    _shortcuts(tmp_path, count=4)
+
+    found = survey(home=tmp_path)
+
+    assert _state(found, "Windows Recent shortcuts") == AVAILABLE
+    assert "4 shortcuts" in _detail(found, "Windows Recent shortcuts")
+
+
+def test_no_windows_recent_folder_says_so(tmp_path: Path):
+    found = survey(home=tmp_path)
+
+    assert _state(found, "Windows Recent shortcuts") == UNAVAILABLE
+
+
+def test_a_single_record_is_counted_in_the_singular(tmp_path: Path):
+    """`1 shortcuts` is the kind of seam that makes a report look generated."""
+    _shortcuts(tmp_path, count=1)
+    _quarantine(tmp_path, rows=1)
+    _recent(tmp_path, "2026-04-17T09:00:00Z", "2026-04-17T09:00:00Z")
+
+    found = survey(home=tmp_path)
+
+    assert _detail(found, "Windows Recent shortcuts") == "1 shortcut"
+    assert _detail(found, "macOS quarantine") == "1 download"
+    assert "2 files" in _detail(found, "Recent documents")

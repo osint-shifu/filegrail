@@ -65,6 +65,7 @@ EVIDENCE = {
     "document-metadata": "self-reported",
     "shell-history": "circumstantial",
     "recent-documents": "circumstantial",
+    "windows-recent": "circumstantial",
     "filesystem": "faint",
 }
 
