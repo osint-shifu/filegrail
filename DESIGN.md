@@ -243,8 +243,10 @@ not a list of failures, and it is styled to sit quietly at the end.
 
 ```
   ────────────────────────────────────────────────────────────────────────
-    document metadata    ▰▰▱▱▱   51
+    OOXML properties     ▰▰▱▱▱   19
     device metadata      ▰▰▰▱▱   18
+    XMP                  ▰▰▰▱▱   15
+    PDF Info             ▰▰▱▱▱    6
     content credentials  ▰▰▰▱▱    1
 
     70 of 105 files have a recorded origin.
@@ -252,6 +254,15 @@ not a list of failures, and it is styled to sit quietly at the end.
 
 Aligned columns, ordered by count. The meter repeats each class's confidence so
 the summary teaches the colour code rather than assuming it.
+
+The rows are named the way the entries above them are, which for most sources is
+the source itself. `document-metadata` is the exception: nine readers answer to
+it, so a row saying `document metadata 39` names a category rather than a thing.
+Those rows are named by the block instead - `PDF Info`, `OOXML properties`,
+`PNG text` - while keeping the colour and the meter of the source behind them,
+because what is being reported is still one class of evidence. `device metadata`
+keeps its own name: it says the block held a make and a model, which is more
+than `EXIF` says.
 
 ### Timeline
 
