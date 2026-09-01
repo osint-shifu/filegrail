@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass, field
 
 from .identify import normalize_url
-from .models import ACQUISITION, INTRINSIC, SOURCE_LABELS, FileRecord, Origin, kind
+from .models import ACQUISITION, INTRINSIC, FileRecord, Origin, kind, label
 
 #: No acquisition record at all: nothing said how the file got here.
 NONE = "no acquisition record"
@@ -419,4 +419,4 @@ def _plain(value: str) -> str:
 
 
 def _label(origin: Origin) -> str:
-    return SOURCE_LABELS.get(origin.source, origin.source)
+    return label(origin)

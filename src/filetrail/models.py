@@ -49,6 +49,36 @@ SOURCE_LABELS = {
     "filesystem": "filesystem",
 }
 
+#: How each block reads in prose, where naming it says more than the source
+#: does. Only a `document-metadata` claim is renamed by it: that source names a
+#: category rather than a thing - nine readers answer to it - so a reader told
+#: only that has been told the claim is self-reported and nothing else. Every
+#: other source already names something specific, and a camera naming its own
+#: model is `device metadata`, which says more than `EXIF`.
+BLOCK_LABELS = {
+    "pdf-info": "PDF Info",
+    "ooxml-properties": "OOXML properties",
+    "odf-meta": "ODF meta",
+    "epub-package": "EPUB package",
+    "rtf-generator": "RTF generator",
+    "svg-metadata": "SVG metadata",
+    "notebook-kernel": "notebook kernel",
+    "exif": "EXIF",
+    "isobmff": "movie metadata",
+    "png-text": "PNG text",
+    "ole-summary": "OLE summary",
+    "riff-info": "RIFF INFO",
+    "id3": "ID3",
+}
+
+
+def label(origin: Origin) -> str:
+    """What to call the source of this claim, in the words the report uses."""
+    if origin.source == "document-metadata" and origin.block in BLOCK_LABELS:
+        return BLOCK_LABELS[origin.block]
+    return SOURCE_LABELS.get(origin.source, origin.source)
+
+
 #: Commands that plausibly fetch a file. Kept here rather than in the shell
 #: reader because deciding what kind of claim an origin makes is a question
 #: about sources, and the reader imports this module rather than the reverse.

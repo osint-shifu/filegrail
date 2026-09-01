@@ -241,3 +241,52 @@ def test_a_claim_that_read_no_block_does_not_invent_one():
     from filetrail.models import Origin
 
     assert Origin(source="browser-download", url="https://example.org/a.pdf").block is None
+
+
+# --- what the report calls it ------------------------------------------------
+
+
+def test_a_block_is_named_where_the_source_would_only_say_document():
+    """`document metadata` names a category rather than a thing: nine readers
+    answer to it, and a reader told only that has been told the claim is
+    self-reported and nothing else."""
+    from filetrail.models import Origin, label
+
+    pdf = Origin(source="document-metadata", block="pdf-info", tool="LibreOffice 25.2")
+
+    assert label(pdf) == "PDF Info"
+
+
+def test_a_camera_keeps_the_name_that_says_a_camera_made_the_claim():
+    """`device metadata` says more than `EXIF`: it says the block held a make
+    and a model, which is why it outranks a bare document property. Replacing
+    it with the name of the standard would throw that away."""
+    from filetrail.models import Origin, label
+
+    camera = Origin(source="device-metadata", block="exif", tool="NIKON COOLPIX P6000")
+
+    assert label(camera) == "device metadata"
+
+
+def test_a_record_that_read_no_block_is_named_by_its_source():
+    from filetrail.models import Origin, label
+
+    assert label(Origin(source="browser-download", url="https://example.org/a.pdf")) == (
+        "browser download"
+    )
+
+
+def test_the_report_calls_a_pdf_claim_by_the_block_it_read(tmp_path: Path):
+    from filetrail.models import FileRecord, Origin
+    from filetrail.report import render_text
+    from filetrail.theme import Theme
+
+    record = FileRecord(path="/case/paper.pdf", size=4096, mtime="2026-08-24T19:00:00Z")
+    record.origins.append(
+        Origin(source="document-metadata", block="pdf-info", tool="Adobe PDF Library 15.0")
+    )
+
+    output = render_text([record], Path("/case"), theme=Theme(colour=False, unicode=True, width=88))
+
+    assert "PDF Info" in output
+    assert "document metadata" not in output
