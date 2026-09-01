@@ -365,6 +365,18 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   ordinary length does not skip one field, it loses the reader's place in the
   stream and every dataset after it.
 
+- The README is rewritten around what the tool does rather than around how its
+  evidence model works. `What filetrail does` opens with metadata extraction and
+  provenance reconstruction as two named capabilities; `Metadata analysis` is a
+  section of its own rather than a table two thirds of the way down; the
+  contents list and the per-section back-links are gone, and the anchors that
+  remain are the six a reader actually jumps to.
+
+  Some reference material moved out rather than being reworded: the confidence
+  table, the four reconciliation pairings, the `source` and `block` fields in
+  `--json`, and the spec-only readers. [`FORMATS.md`](FORMATS.md) carries the
+  format and block detail; the rest is in `CHANGELOG.md` and `DESIGN.md`.
+
 - The README says what it can read before it says how it ranks it. The metadata
   half was one item in a list of seven in the opening paragraph, which is a
   strange way to describe the substance of the tool - `CONTRIBUTING.md` calls it
