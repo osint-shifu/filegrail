@@ -205,3 +205,24 @@ def test_a_namespaced_software_field_is_still_a_software_field():
     ]
 
     assert not [entry for entry in extract(records) if entry.type == "ipv4"]
+
+
+def test_a_message_id_is_not_offered_as_an_address():
+    """RFC 5322 builds a message id the same shape as a mailbox, so it matches
+    every test for one. Nobody can write to it, and a lead nobody can follow is
+    worse than no lead - the field name is known here, so it can be told."""
+    record = FileRecord(path="/case/note.eml", size=10, mtime="")
+    record.origins.append(
+        Origin(
+            source="email-header",
+            fields={
+                "Message-ID": "<20190304182228.7ttQ1a@example.com>",
+                "From": "Jan Kowalski <jan@example.com>",
+            },
+        )
+    )
+
+    found = {(identifier.type, identifier.normalized) for identifier in extract([record])}
+
+    assert ("email", "jan@example.com") in found
+    assert not [value for kind, value in found if kind == "email" and "7ttq1a" in value]

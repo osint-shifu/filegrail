@@ -14,6 +14,7 @@ reader also adds it here.
 
 from __future__ import annotations
 
+from .sources import mail
 from .sources.archives import ARCHIVE_SUFFIXES
 from .sources.embedded import (
     containers,
@@ -65,6 +66,9 @@ FAMILIES: dict[str, frozenset[str]] = {
         | containers.NOTEBOOK_SUFFIXES
     ),
     "archive": frozenset(ARCHIVE_SUFFIXES),
+    # `.msg` is in `document` as well: it is a compound document that happens
+    # to hold a message, and an analyst asking for either should get it.
+    "mail": frozenset(mail.SUFFIXES | {".mbox", ".msg"}),
     "text": frozenset(_EXTRA_TEXT),
 }
 

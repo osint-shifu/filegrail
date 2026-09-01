@@ -208,7 +208,7 @@ file made from it, and those files share an ancestor and nothing else.
 
 | Class | Question | Typical sources |
 |:---|:---|:---|
-| **Acquisition** | How did this file reach this machine? | Browser history, `Zone.Identifier`, macOS where-from metadata, Linux XDG attributes, archive inheritance, fetch commands |
+| **Acquisition** | How did this file reach this machine? | Browser history, `Zone.Identifier`, macOS where-from metadata, Linux XDG attributes, archive inheritance, fetch commands, mail `Received:` hops |
 | **Intrinsic** | What does the file say about its earlier life? | EXIF, document metadata, C2PA, camera/device metadata |
 | **Interaction** | What touched it after arrival? | Recent documents, non-fetching shell commands |
 
@@ -222,6 +222,7 @@ Confidence helps rank **competing claims of the same kind**. It is not a probabi
 | Windows `Zone.Identifier` | `HostUrl`, `ReferrerUrl`, zone | 85 |
 | macOS `kMDItemWhereFroms` | URL, referrer | 85 |
 | Linux XDG xattrs | Origin URL, referrer | 80 |
+| Mail delivery | The topmost `Received:` hop: the connecting address and the server that saw it | 78 |
 | Archive membership | Inherited origin of extracted members | 70 |
 | C2PA Content Credentials | Producing application, creation info, digital source type | 60 |
 | Device metadata | Camera/device, capture time, GPS and decoded fields | 55 |
@@ -229,8 +230,10 @@ Confidence helps rank **competing claims of the same kind**. It is not a probabi
 | XMP history | One recorded edit: which application, what it did and when | 52 |
 | IPTC IIM | Press byline, credit, source, copyright, place and date | 51 |
 | Document metadata | Producer, author, creation data and format-specific fields | 50 |
+| Mail relay | Any hop below the top, which the sender may have written | 45 |
 | Shell history | Fetching or handling command | 40 |
 | Recent documents | Application interaction and time | 35 |
+| Mail headers | What the message says about itself: sender, subject, composing client | 30 |
 | Filesystem | Creation/modification timestamps where available | 10 |
 
 A few details worth knowing:
@@ -384,6 +387,7 @@ Supported classes include URLs, domains, email addresses, IP addresses, hashes a
 | OpenDocument | ODT, ODS, ODP, ODG, OTT, OTP | Generator, author, creation and editing metadata |
 | Books / markup | EPUB, RTF, SVG | Package metadata, generator information |
 | Notebooks | IPYNB | Kernel and language runtime |
+| Mail | EML | Every `Received:` hop as its own event, the connecting address each server saw, and the sender's own headers kept apart from them |
 | Archives | ZIP, TAR and compressed TAR variants | Member names and uncompressed sizes used for origin inheritance |
 
 Other files are still scanned. If `filetrail` does not understand metadata in a format, it says so instead of making something up.

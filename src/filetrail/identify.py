@@ -115,6 +115,11 @@ _TRUSTED_COORDINATE_FIELDS = frozenset({"geo"})
 #: and a dotted quad or a forty-character build hash inside one is never an
 #: address or a document digest. DirSifu could not make this call because it
 #: reads prose; here the field name is known, so it can.
+#: Fields holding a message identifier. RFC 5322 builds one to the same shape
+#: as a mailbox - `<id@domain>` - so it matches every test for an address, and
+#: nobody can write to it. A lead nobody can follow is worse than no lead.
+_MESSAGE_ID_FIELDS = frozenset({"message-id", "in-reply-to", "references", "content-id"})
+
 _SOFTWARE_FIELDS = frozenset(
     {
         "tool",
@@ -321,11 +326,16 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
     """Yield (type, raw, normalized, private) for one value."""
     hosts: set[str] = set()
 
+    identifier = where.lower().rpartition(":")[2] in _MESSAGE_ID_FIELDS
+
     for match in EMAIL_RE.finditer(text):
         host = normalize_domain(match.group(1))
         if host is None:
             continue  # unknown TLD: almost always a false positive
-        yield "email", match.group(0), match.group(0).lower(), None
+        # The domain is still worth having: a message id names the host that
+        # minted it, which is a real fact about where the message was written.
+        if not identifier:
+            yield "email", match.group(0), match.group(0).lower(), None
         hosts.add(host)
 
     for match in URL_RE.finditer(text):

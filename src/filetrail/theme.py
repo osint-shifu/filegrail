@@ -50,12 +50,17 @@ EVIDENCE = {
     "windows-zone-identifier": "recorded",
     "macos-wherefroms": "recorded",
     "xdg-xattr": "recorded",
+    # Both are a note another system wrote as the message passed through. How
+    # much that system is worth believing is what the rank says, not the colour.
+    "email-delivery": "recorded",
+    "email-relay": "recorded",
     "archive-member": "inherited",
     "c2pa": "credentialed",
     "device-metadata": "self-reported",
     "xmp": "self-reported",
     "xmp-history": "self-reported",
     "iptc": "self-reported",
+    "email-header": "self-reported",
     "document-metadata": "self-reported",
     "shell-history": "circumstantial",
     "recent-documents": "circumstantial",

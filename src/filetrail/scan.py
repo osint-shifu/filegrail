@@ -20,6 +20,7 @@ from .sources import (
     read_embedded_metadata,
     read_file_attributes,
     read_iptc,
+    read_mail,
     read_xmp,
 )
 from .util import birth_time, iso, sha256_file
@@ -137,6 +138,7 @@ def scan(
             if claim is not None:
                 record.origins.append(claim)
         record.origins.extend(read_xmp(path))
+        record.origins.extend(read_mail(path))
         record.origins.extend(history.get(path.name, []))
         record.origins.extend(recent.get(str(path), []))
         records.append(record)

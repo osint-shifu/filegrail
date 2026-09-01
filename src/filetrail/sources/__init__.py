@@ -6,6 +6,7 @@ from .c2pa import read_c2pa_manifest
 from .embedded import read_embedded_metadata
 from .fsattrs import read_file_attributes
 from .iptc import read_iptc
+from .mail import read_mail
 from .recent import collect_recent_files
 from .shell import collect_shell_history
 from .xmp import read_xmp
@@ -16,6 +17,7 @@ __all__ = [
     "read_embedded_metadata",
     "read_c2pa_manifest",
     "read_iptc",
+    "read_mail",
     "read_xmp",
     "collect_shell_history",
     "collect_recent_files",

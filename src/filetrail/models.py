@@ -6,6 +6,11 @@ from typing import Any
 # How much a source is trusted when several disagree. Higher wins.
 CONFIDENCE = {
     "browser-download": 90,
+    # A mail server on the recipient's side wrote this down as the message
+    # arrived. Independent of the sender, like a download record - and unlike
+    # one it travels inside the file it describes, which is why it sits below
+    # the attributes an operating system keeps outside the bytes.
+    "email-delivery": 78,
     "windows-zone-identifier": 85,
     "macos-wherefroms": 85,
     "xdg-xattr": 80,
@@ -23,9 +28,15 @@ CONFIDENCE = {
     # often a record of an earlier state rather than the current one.
     "iptc": 51,
     "document-metadata": 50,
+    # A hop the sender may have written in full before sending. Recorded by
+    # something, but not by anything the recipient has reason to trust.
+    "email-relay": 45,
     "shell-history": 40,
     # An application opening a file proves contact, not acquisition.
     "recent-documents": 35,
+    # The weakest self-description there is: forging a From line takes nothing
+    # but typing it.
+    "email-header": 30,
     "filesystem": 10,
 }
 
@@ -34,6 +45,9 @@ CONFIDENCE = {
 #: source too, and importing the renderer to do it would be a cycle.
 SOURCE_LABELS = {
     "browser-download": "browser download",
+    "email-delivery": "mail delivery",
+    "email-relay": "mail relay",
+    "email-header": "mail headers",
     "windows-zone-identifier": "Windows zone",
     "macos-wherefroms": "macOS where-from",
     "xdg-xattr": "XDG attribute",
@@ -90,6 +104,8 @@ _KINDS = {
     "windows-zone-identifier": ACQUISITION,
     "macos-wherefroms": ACQUISITION,
     "xdg-xattr": ACQUISITION,
+    "email-delivery": ACQUISITION,
+    "email-relay": ACQUISITION,
     "archive-member": ACQUISITION,
     "filesystem": ACQUISITION,
     "recent-documents": INTERACTION,
@@ -98,6 +114,7 @@ _KINDS = {
     "xmp": INTRINSIC,
     "xmp-history": INTRINSIC,
     "iptc": INTRINSIC,
+    "email-header": INTRINSIC,
     "document-metadata": INTRINSIC,
 }
 

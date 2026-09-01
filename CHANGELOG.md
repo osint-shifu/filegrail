@@ -23,6 +23,33 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Saved messages, read for how they travelled. `Received:` headers are the only
+  part of an email not written by the sender: each mail server prepends its own
+  as the message passes through, so they read from the bottom up. Each hop
+  becomes an event of its own, the way a recorded XMP edit does, so the whole
+  chain lands on `--timeline` in order.
+
+  They are not ranked alike, because they are not worth the same. The topmost
+  was written by the recipient's own server and nobody else could have forged
+  it; it goes in at 78, below the attributes an operating system keeps outside
+  the file and above an archive's inheritance. Every hop under it was written by
+  a machine the sender may control, and those go in at 45. What the message says
+  about itself - who it is from, what the subject was, which client composed it
+  - is a self-description checked by nobody and goes in at 30, the weakest in
+  the table, because forging a `From` line takes nothing but typing it.
+
+  The address each server actually saw is kept beside the name the connecting
+  host claimed for itself, and both reach `--identify` along with the addresses
+  and domains in the headers. A message id does not: RFC 5322 builds one to the
+  same shape as a mailbox, so it matches every test for an address and nobody
+  can write to it. Its domain is still reported - that names the host that
+  minted it, which is a real fact about where the message was written.
+
+  `.eml` only. An mbox holds many messages and one record per file has no honest
+  way to describe them all; `.msg` keeps its headers as MAPI properties inside a
+  compound document, which is a different reader. Both are left for their own
+  design rather than half-answered here.
+
 - Vorbis comments, which FLAC, Ogg Vorbis and Opus all carry: one layout in
   three containers. FLAC keeps the block among the metadata blocks at the front
   of the file and those can be walked exactly; Ogg keeps it in the second packet
