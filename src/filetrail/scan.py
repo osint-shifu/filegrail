@@ -23,7 +23,7 @@ from .sources import (
     read_mail,
     read_xmp,
 )
-from .util import birth_time, iso, sha256_file
+from .util import basename, birth_time, iso, sha256_file
 
 SKIP_DIRECTORIES = {
     ".git",
@@ -101,10 +101,12 @@ def scan(
 
     downloads = collect_browser_downloads(home=home, stats=stats)
     # Browsers record the path at download time; index by name too so a file
-    # that was later moved into the case directory still resolves.
+    # that was later moved into the case directory still resolves. The record
+    # keeps the path as its own operating system spelled it, which is why the
+    # name is taken with `basename` and not with `Path`.
     downloads_by_name: dict[str, list] = {}
     for target, origins in downloads.items():
-        downloads_by_name.setdefault(Path(target).name, []).extend(origins)
+        downloads_by_name.setdefault(basename(target), []).extend(origins)
 
     history = (
         collect_shell_history({path.name for path in files}, home=home) if use_shell_history else {}

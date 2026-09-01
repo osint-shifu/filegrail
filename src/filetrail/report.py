@@ -96,12 +96,15 @@ def render_text(
     theme: Theme | None = None,
     filtered: str = "",
     identify: bool = False,
+    home: Path | None = None,
 ) -> str:
     theme = theme or detect()
     known = [record for record in records if record.origins]
     unknown = [record for record in records if not record.origins]
 
     lines = _masthead(theme, root, len(records), len(known))
+    if home:
+        lines.extend([*_whose_machine(theme, home, "evidence read from the profile at"), ""])
     lines.extend(_sections(theme, known, root, verbose=verbose, brief=brief))
 
     if unknown:
@@ -514,13 +517,15 @@ def _file_json(record: FileRecord) -> dict[str, object]:
     return data
 
 
-def render_doctor(found, theme: Theme | None = None) -> str:
-    """What could be searched on this machine, and how far back it reaches."""
+def render_doctor(found, theme: Theme | None = None, home: Path | None = None) -> str:
+    """What could be searched, and how far back it reaches."""
     theme = theme or detect()
     rule = f"  {theme.rule(theme.width - 2)}"
     width = max(len(check.name) for check in found.checks)
 
     lines = ["", f"  {theme.bold('filetrail')}  {theme.dim('evidence sources')}", rule, ""]
+    if home:
+        lines.extend([*_whose_machine(theme, home, "surveying the profile at"), ""])
 
     for check in found.checks:
         colour = {
@@ -553,7 +558,19 @@ def _note_line(theme: Theme, text: str) -> str:
     return f"  {theme.dim(theme.clip(text, theme.width - 4))}"
 
 
-def render_explain(record: FileRecord, theme: Theme | None = None) -> str:
+def _whose_machine(theme: Theme, home: Path | None, said: str) -> list[str]:
+    """Say whose traces these are, when they are not this machine's.
+
+    Wrapped rather than clipped. A reader who cannot see which profile was read
+    cannot check the finding, and half a mount path is worse than none - it
+    looks like a path.
+    """
+    if not home:
+        return []
+    return [f"  {theme.dim(part)}" for part in theme.wrap(f"{said} {home}", theme.width - 4)]
+
+
+def render_explain(record: FileRecord, theme: Theme | None = None, home: Path | None = None) -> str:
     """Every source for one file, grouped by the question it answers."""
     theme = theme or detect()
     rule = f"  {theme.rule(theme.width - 2)}"
@@ -561,8 +578,9 @@ def render_explain(record: FileRecord, theme: Theme | None = None) -> str:
 
     name = Path(record.path).name
     lines = ["", f"  {theme.bold('filetrail')}  {theme.dim('explain')}  {theme.bold(name)}", rule]
+    lines.extend(_whose_machine(theme, home, "evidence read from the profile at"))
 
-    for name_of_kind, question, claims in grouped(record):
+    for name_of_kind, question, claims in grouped(record, home):
         head = f"  {theme.label(name_of_kind)}"
         room = theme.width - len(name_of_kind) - 6
         if room >= 12:
@@ -588,7 +606,7 @@ def render_explain(record: FileRecord, theme: Theme | None = None) -> str:
         lines.append(f"    {theme.dim('nothing to reconcile')}")
 
     lines.extend(["", rule, "", f"  {theme.label('conclusion')}", ""])
-    for sentence in conclusion(record, verdict):
+    for sentence in conclusion(record, verdict, home):
         for part in theme.wrap(sentence, theme.width - 6):
             lines.append(f"    {theme.paint(part, 'body')}")
         lines.append("")
@@ -710,31 +728,45 @@ def document(shape: str, payload: dict[str, object]) -> str:
     return json.dumps(stamped, ensure_ascii=False, indent=2)
 
 
-def render_json_doctor(found) -> str:
-    return document("doctor", found.to_dict())
+def _whose(home: Path | None) -> dict[str, object]:
+    """Name the profile the evidence came from, when it is not this machine's.
+
+    Absent by default, because a key that is always there says nothing. Present
+    means these claims describe another machine, which a consumer has to know
+    before it files them against the one it is running on.
+    """
+    return {"home": str(home)} if home else {}
 
 
-def render_json_explain(record: FileRecord) -> str:
+def render_json_doctor(found, home: Path | None = None) -> str:
+    return document("doctor", {**_whose(home), **found.to_dict()})
+
+
+def render_json_explain(record: FileRecord, home: Path | None = None) -> str:
     verdict = reconcile(record)
     return document(
         "explain",
         {
+            **_whose(home),
             "file": record.to_dict(),
             "reconciliation": verdict.to_dict(),
-            "conclusion": conclusion(record, verdict),
+            "conclusion": conclusion(record, verdict, home),
         },
     )
 
 
-def render_json_compare(left: FileRecord, right: FileRecord) -> str:
+def render_json_compare(left: FileRecord, right: FileRecord, home: Path | None = None) -> str:
     from .compare import compare
 
-    return document("compare", compare(left, right).to_dict())
+    return document("compare", {**_whose(home), **compare(left, right).to_dict()})
 
 
-def render_json(records: list[FileRecord], root: Path, *, identify: bool = False) -> str:
+def render_json(
+    records: list[FileRecord], root: Path, *, identify: bool = False, home: Path | None = None
+) -> str:
     payload: dict[str, object] = {
         "root": str(root),
+        **_whose(home),
         "files": [_file_json(record) for record in records],
         "summary": {
             "total": len(records),
@@ -747,7 +779,9 @@ def render_json(records: list[FileRecord], root: Path, *, identify: bool = False
     return document("scan", payload)
 
 
-def render_timeline(records: list[FileRecord], root: Path, *, theme: Theme | None = None) -> str:
+def render_timeline(
+    records: list[FileRecord], root: Path, *, theme: Theme | None = None, home: Path | None = None
+) -> str:
     theme = theme or detect()
     events: list[tuple[str, str, str, str]] = []
 
@@ -767,7 +801,9 @@ def render_timeline(records: list[FileRecord], root: Path, *, theme: Theme | Non
 
     stamp_width = 21
     rail = theme.rail_glyph()
-    lines = []
+    # Only when there is one, so anything already reading a line per event from
+    # a scan of this machine sees exactly what it saw before.
+    lines = [*_whose_machine(theme, home, "evidence read from the profile at"), ""] if home else []
     for when, name, detail, source in sorted(events):
         colour = theme.evidence(source)
         moment = theme.dim(when[:19].replace("T", " "))

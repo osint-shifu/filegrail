@@ -13,6 +13,8 @@ nobody can argue with is a verdict nobody should trust.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from .models import ACQUISITION, INTERACTION, INTRINSIC, SOURCE_LABELS, FileRecord, kind
 from .reconcile import (
     AGREEMENT,
@@ -24,20 +26,33 @@ from .reconcile import (
     Verdict,
 )
 
-#: The three questions, in the order a reader asks them.
-KINDS = (
-    (ACQUISITION, "how the file reached this machine"),
-    (INTRINSIC, "what the file records about its own earlier life"),
-    (INTERACTION, "what handled it here afterwards"),
-)
+
+def questions(home: Path | None = None) -> tuple[tuple[str, str], ...]:
+    """The three questions, in the order a reader asks them.
+
+    Two of them name a machine, and which machine that is depends on whose
+    traces were read. Under `--home` the answers come from a mounted image or a
+    copied profile, and calling that `this machine` is not a turn of phrase -
+    it is a false statement about where the evidence lives.
+    """
+    machine = "that machine" if home else "this machine"
+    return (
+        (ACQUISITION, f"how the file reached {machine}"),
+        (INTRINSIC, "what the file records about its own earlier life"),
+        (INTERACTION, f"what handled it {'there' if home else 'here'} afterwards"),
+    )
+
+
+#: The questions as asked about this machine, which is the ordinary case.
+KINDS = questions()
 
 _COUNTS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
 
 
-def grouped(record: FileRecord) -> list[tuple[str, str, list]]:
+def grouped(record: FileRecord, home: Path | None = None) -> list[tuple[str, str, list]]:
     """Every claim, under the question it answers. Empty kinds are dropped."""
     out = []
-    for name, question in KINDS:
+    for name, question in questions(home):
         claims = [origin for origin in record.origins if kind(origin) == name]
         if claims:
             claims.sort(key=lambda origin: -origin.confidence)
@@ -45,14 +60,14 @@ def grouped(record: FileRecord) -> list[tuple[str, str, list]]:
     return out
 
 
-def conclusion(record: FileRecord, verdict: Verdict) -> list[str]:
+def conclusion(record: FileRecord, verdict: Verdict, home: Path | None = None) -> list[str]:
     """The reading of the evidence, in sentences, one idea each."""
     said: list[str] = []
     acquisition = [o for o in record.origins if kind(o) == ACQUISITION]
     intrinsic = [o for o in record.origins if kind(o) == INTRINSIC]
     interaction = [o for o in record.origins if kind(o) == INTERACTION]
 
-    said.append(_arrival(verdict, acquisition))
+    said.append(_arrival(verdict, acquisition, home))
 
     contested = [f for f in verdict.findings if f.kind == ATTRIBUTION_CONFLICT]
     if intrinsic and not contested:
@@ -70,10 +85,12 @@ def conclusion(record: FileRecord, verdict: Verdict) -> list[str]:
         )
 
     if interaction and not acquisition:
-        who = ", ".join(sorted({o.tool for o in interaction if o.tool})) or "something here"
+        where = "there" if home else "here"
+        who = ", ".join(sorted({o.tool for o in interaction if o.tool})) or f"something {where}"
         said.append(
-            f"It was handled here by {who}, which proves contact and not arrival: the file "
-            "may have reached this machine by any route at all before that."
+            f"It was handled {where} by {who}, which proves contact and not arrival: the file "
+            f"may have reached {'that' if home else 'this'} machine by any route at all "
+            "before that."
         )
 
     if any(finding.kind == TIMELINE_CONFLICT for finding in verdict.findings):
@@ -120,13 +137,19 @@ def _which_is_stale(contested: list) -> str:
     )
 
 
-def _arrival(verdict: Verdict, acquisition: list) -> str:
+def _arrival(verdict: Verdict, acquisition: list, home: Path | None = None) -> str:
     count = _COUNTS.get(len(acquisition), str(len(acquisition)))
 
     if verdict.state == NONE:
+        # The advice has to name the same machine the evidence would be on.
+        # Sending a reader to survey their own laptop about somebody else's
+        # profile wastes the one step that would have told them the truth.
+        where = f"in the profile at {home}" if home else "on this machine"
+        survey = f"filetrail doctor --home {home}" if home else "filetrail doctor"
         return (
-            "Nothing on this machine recorded how the file arrived. Run `filetrail doctor` "
-            "to see whether that evidence exists here at all before reading it as absence."
+            f"Nothing {where} recorded how the file arrived. Run `{survey}` to see whether "
+            f"that evidence exists {'there' if home else 'here'} at all before reading it "
+            "as absence."
         )
     if verdict.state == SINGLE:
         return (

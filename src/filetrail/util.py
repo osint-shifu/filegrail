@@ -4,10 +4,31 @@ import ctypes
 import ctypes.util
 import hashlib
 import os
+import re
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 _EPOCH_1601_OFFSET = 11_644_473_600  # seconds between 1601-01-01 and 1970-01-01
+
+#: A drive letter or a UNC prefix: the two ways a path says it is a Windows one.
+_WINDOWS_PATH = re.compile(r"^(?:[A-Za-z]:[\\/]|\\\\)")
+
+
+def basename(recorded: str) -> str:
+    """The file name out of a path that another machine may have written.
+
+    `Path` knows only the separator of the machine reading it, so a Windows
+    download record split with `PosixPath` has no directory at all and its
+    whole spelling comes back as the name. Under `--home` that is the ordinary
+    case rather than a curiosity, and it makes every name match silently fail.
+
+    A backslash counts as a separator only where the path announces itself as a
+    Windows one, because a backslash is a legal character in a POSIX file name
+    and mangling those would trade one silent failure for another.
+    """
+    if _WINDOWS_PATH.match(recorded):
+        return PureWindowsPath(recorded).name
+    return PurePosixPath(recorded).name
 
 
 def iso(ts: float | None) -> str | None:

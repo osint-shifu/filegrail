@@ -418,10 +418,25 @@ Vendor-specific camera maker notes are the main exception. They need manufacture
 | `filetrail PATH` | Scan a file or directory and reconstruct available provenance |
 | `filetrail explain FILE` | Show every evidence source behind the result |
 | `filetrail compare FILE_A FILE_B` | Compare metadata, provenance and timing |
-| `filetrail doctor` | Show which evidence sources are available on this machine |
+| `filetrail doctor` | Show which evidence sources are available, and how far back they reach |
 | `filetrail menu` | Open the interactive terminal front end |
 
-Useful options: `--verbose`, `--brief`, `--json`, `--hash`, `--redact`, `--identify`, `--timeline`, `--unknown-only`, `--type`, `--ext`, `--limit`, `--no-recurse`, `--no-shell-history`, `--no-archives`, `--no-color`.
+Useful options: `--verbose`, `--brief`, `--json`, `--hash`, `--redact`, `--identify`, `--timeline`, `--unknown-only`, `--type`, `--ext`, `--limit`, `--home`, `--no-recurse`, `--no-shell-history`, `--no-archives`, `--no-color`.
+
+### Reading a machine that is not this one
+
+By default every source is read from the current user's home directory, which answers *what does my machine remember about my files*. `--home` points the same readers at another profile, which answers *here is a mounted image, reconstruct what its machine remembered*.
+
+```bash
+filetrail /mnt/case/files --home /mnt/case/Users/Alice
+filetrail doctor --home /mnt/case/Users/Alice
+```
+
+It works across platforms: a Windows Chrome profile can be read from Linux, because the profile locations for all three systems are searched under whatever `--home` is given. `scan`, `explain`, `compare` and `doctor` all take it.
+
+Two things change when it is used. Download records keep the path the other machine wrote, so they usually match on file name and size rather than on path - the report says which. And the report stops saying `this machine`, because it is not; it names the profile it read instead.
+
+A `--home` that does not exist is an error rather than an empty result. A run that found nothing because it looked in the wrong place should not look like a run that found nothing because there was nothing to find.
 
 <p align="right"><a href="#table-of-contents">Back to contents ↑</a></p>
 

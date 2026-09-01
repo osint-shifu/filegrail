@@ -61,11 +61,30 @@ def _common() -> argparse.ArgumentParser:
     return shared
 
 
+def _profile() -> argparse.ArgumentParser:
+    """The option for reading a machine that is not this one.
+
+    Every source that answers *how did this arrive* lives under a home
+    directory, and the readers have always taken one as an argument. Offering
+    it here is what turns `what does my machine remember about my files` into
+    `here is a mounted profile, reconstruct what its machine remembered`.
+    """
+    shared = argparse.ArgumentParser(add_help=False)
+    shared.add_argument(
+        "--home",
+        type=Path,
+        metavar="DIR",
+        help="Read browser, shell and desktop history from this user profile "
+        "instead of the current one, e.g. a mounted image.",
+    )
+    return shared
+
+
 def build_parser() -> argparse.ArgumentParser:
     """The scan parser, which is also what a bare path is parsed with."""
     parser = argparse.ArgumentParser(
         prog="filetrail scan",
-        parents=[_common()],
+        parents=[_common(), _profile()],
         description="Analyze a file or directory and report where its files came from.",
     )
     parser.add_argument(
@@ -142,7 +161,7 @@ def build_parser() -> argparse.ArgumentParser:
 def _explain_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="filetrail explain",
-        parents=[_common()],
+        parents=[_common(), _profile()],
         description="Explain why filetrail reached a conclusion about one file.",
     )
     parser.add_argument("path", type=Path, help="The file to explain.")
@@ -152,7 +171,7 @@ def _explain_parser() -> argparse.ArgumentParser:
 def _compare_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="filetrail compare",
-        parents=[_common()],
+        parents=[_common(), _profile()],
         description="Compare what two files record about themselves and how each arrived.",
     )
     parser.add_argument("left", type=Path, help="The first file.")
@@ -163,7 +182,7 @@ def _compare_parser() -> argparse.ArgumentParser:
 def _doctor_parser() -> argparse.ArgumentParser:
     return argparse.ArgumentParser(
         prog="filetrail doctor",
-        parents=[_common()],
+        parents=[_common(), _profile()],
         description="Report which evidence sources this machine has, and how far back they reach.",
     )
 
@@ -240,11 +259,31 @@ def _missing(path: Path) -> int:
     return 2
 
 
+def _home(args) -> Path | None | int:
+    """Resolve `--home`, refusing a profile that is not there.
+
+    A mistyped path would otherwise read as an answer: every source comes back
+    empty, and a run that found nothing because it looked in the wrong place is
+    indistinguishable from one that found nothing because there was nothing to
+    find. That confusion is the exact thing `doctor` exists to prevent, so it
+    is not one to introduce here.
+    """
+    if args.home is None:
+        return None
+    if not args.home.is_dir():
+        return _missing(args.home)
+    return args.home.resolve()
+
+
 def _scan(rest: list[str]) -> int:
     args = build_parser().parse_args(rest)
     root = args.path.resolve()
     if not root.exists():
         return _missing(args.path)
+
+    home = _home(args)
+    if isinstance(home, int):
+        return home
 
     try:
         suffixes = selection(args.families, args.extensions)
@@ -260,6 +299,7 @@ def _scan(rest: list[str]) -> int:
         use_shell_history=not args.no_shell_history,
         follow_archives=not args.no_archives,
         suffixes=suffixes,
+        home=home,
         stats=stats,
     )
 
@@ -272,9 +312,9 @@ def _scan(rest: list[str]) -> int:
     theme = detect(colour=args.colour)
 
     if args.json:
-        print(render_json(records, base, identify=args.identify))
+        print(render_json(records, base, identify=args.identify, home=home))
     elif args.timeline:
-        print(render_timeline(records, base, theme=theme))
+        print(render_timeline(records, base, theme=theme, home=home))
     else:
         print(
             render_text(
@@ -287,45 +327,54 @@ def _scan(rest: list[str]) -> int:
                 theme=theme,
                 filtered=describe(args.families, args.extensions),
                 identify=args.identify,
+                home=home,
             )
         )
     return 0
 
 
-def _one(path: Path):
+def _one(path: Path, home: Path | None = None):
     """Scan exactly one file, for the commands that take one."""
     resolved = path.resolve()
     if not resolved.is_file():
         return None
-    found = scan(resolved)
+    found = scan(resolved, home=home)
     return found[0] if found else None
 
 
 def _explain(rest: list[str]) -> int:
     args = _explain_parser().parse_args(rest)
-    record = _one(args.path)
+    home = _home(args)
+    if isinstance(home, int):
+        return home
+
+    record = _one(args.path, home)
     if record is None:
         print(f"filetrail: explain takes one file: {args.path}", file=sys.stderr)
         return 2
 
     if args.json:
-        print(render_json_explain(record))
+        print(render_json_explain(record, home))
         return 0
 
-    print(render_explain(record, theme=detect(colour=args.colour)))
+    print(render_explain(record, theme=detect(colour=args.colour), home=home))
     return 0
 
 
 def _compare(rest: list[str]) -> int:
     args = _compare_parser().parse_args(rest)
-    left, right = _one(args.left), _one(args.right)
+    home = _home(args)
+    if isinstance(home, int):
+        return home
+
+    left, right = _one(args.left, home), _one(args.right, home)
     for path, record in ((args.left, left), (args.right, right)):
         if record is None:
             print(f"filetrail: compare takes two files: {path}", file=sys.stderr)
             return 2
 
     if args.json:
-        print(render_json_compare(left, right))
+        print(render_json_compare(left, right, home))
         return 0
 
     from .compare import compare
@@ -338,11 +387,15 @@ def _doctor(rest: list[str]) -> int:
     args = _doctor_parser().parse_args(rest)
     from .doctor import survey
 
-    found = survey()
+    home = _home(args)
+    if isinstance(home, int):
+        return home
+
+    found = survey(home)
     if args.json:
-        print(render_json_doctor(found))
+        print(render_json_doctor(found, home))
         return 0
-    print(render_doctor(found, detect(colour=args.colour)))
+    print(render_doctor(found, detect(colour=args.colour), home=home))
     return 0
 
 

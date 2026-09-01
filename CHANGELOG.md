@@ -68,6 +68,30 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `--home DIR` reads the browser, shell and desktop history of another user
+  profile instead of the current one, on `scan`, `explain`, `compare` and
+  `doctor`. `scan()` and `survey()` had taken a home directory as an argument
+  since they were written; nothing offered it on the command line, so the
+  answer was always about the machine doing the asking - which is the wrong
+  machine whenever the interesting one is a mounted image or a copied profile.
+
+  It works across platforms without porting, because the profile locations for
+  Linux, macOS and Windows were already in one list and searched under whatever
+  home is given. A Windows Chrome profile read from Linux resolves.
+
+  Two things change when the traces are not this machine's, and both are things
+  the report would otherwise have got wrong. `this machine` becomes `that
+  machine` and the report names the profile it read - on paper a foreign-profile
+  report was previously indistinguishable from a local one. And when there is no
+  acquisition record, the advice to run `doctor` now carries the same `--home`,
+  because sending a reader to survey their own laptop about somebody else's
+  profile wastes the one step that would have told them the truth.
+
+  A `--home` that does not exist is refused rather than searched. Every source
+  would come back empty, and a run that found nothing because it looked in the
+  wrong place is indistinguishable from one that found nothing because there was
+  nothing to find - which is the exact confusion `doctor` exists to prevent.
+
 - Every `--json` document now begins with what it is: a `schema` naming the
   shape, and a `filetrail_version` naming the build that wrote it. The four
   shapes are `filetrail.scan/1`, `filetrail.explain/1`, `filetrail.compare/1`
@@ -340,6 +364,22 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   is how a caption longer than 32767 bytes is carried. Reading that as an
   ordinary length does not skip one field, it loses the reader's place in the
   stream and every dataset after it.
+
+### Fixed
+
+- A download record written by another operating system never matched by name.
+  `Path` knows only the separator of the machine reading it, so
+  `C:\Users\Alice\Downloads\evidence.zip` split with `PosixPath` has no
+  directory at all and its whole spelling comes back as the file name. Every
+  Windows record read from Linux or macOS therefore failed to match silently.
+
+  Names are now taken with `util.basename`, which treats a backslash as a
+  separator only where the path announces itself as a Windows one - a drive
+  letter or a UNC prefix - because a backslash is a legal character in a POSIX
+  file name and mangling those would trade one silent failure for another.
+
+  The bug was invisible before `--home` because a record and the file it
+  described came from the same machine, so both were spelled the same way.
 
 ### Changed
 
