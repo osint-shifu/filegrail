@@ -31,7 +31,7 @@
 
 ## What filetrail does
 
-You have a file. You want to know **where it came from, what it reveals, and what happened to it**.
+You have a folder full of files - a case directory, a download folder, an unpacked archive. You want to know **where they came from, what they reveal, and what happened to them**. All of them, in one pass.
 
 `filetrail` combines two things that are usually analyzed separately:
 
