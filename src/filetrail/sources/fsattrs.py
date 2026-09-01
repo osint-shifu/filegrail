@@ -20,6 +20,7 @@ import plistlib
 from pathlib import Path
 
 from ..models import Origin
+from ..util import read_xattr
 
 _LINUX_ORIGIN = "user.xdg.origin.url"
 _LINUX_REFERRER = "user.xdg.referrer.url"
@@ -74,12 +75,13 @@ def _read_zone_identifier(path: Path) -> Origin | None:
 
 
 def _read_macos_wherefroms(path: Path) -> Origin | None:
-    """Read the macOS 'where from' metadata attribute."""
-    if not hasattr(os, "getxattr"):
-        return None
-    try:
-        raw = os.getxattr(str(path), _MACOS_WHEREFROMS)
-    except OSError:
+    """Read the macOS 'where from' metadata attribute.
+
+    Under its own name on macOS, and under the `user.` namespace where a copy
+    carries it onto a system that has no other namespace to put it in.
+    """
+    raw = read_xattr(path, _MACOS_WHEREFROMS) or read_xattr(path, f"user.{_MACOS_WHEREFROMS}")
+    if raw is None:
         return None
 
     values = plistlib.loads(raw)
@@ -93,14 +95,10 @@ def _read_macos_wherefroms(path: Path) -> Origin | None:
 
 def _read_xdg_xattrs(path: Path) -> Origin | None:
     """Read the freedesktop.org origin extended attributes."""
-    if not hasattr(os, "getxattr"):
-        return None
 
     def get(name: str) -> str | None:
-        try:
-            return os.getxattr(str(path), name).decode("utf-8", "replace") or None
-        except OSError:
-            return None
+        raw = read_xattr(path, name)
+        return raw.decode("utf-8", "replace") or None if raw is not None else None
 
     url = get(_LINUX_ORIGIN)
     referrer = get(_LINUX_REFERRER)

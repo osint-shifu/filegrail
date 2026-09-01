@@ -457,6 +457,23 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The macOS where-from attribute could never be read on macOS. `os.getxattr`
+  is a Linux interface - the standard library does not expose the call on macOS
+  at all - and every reader here guarded on `hasattr(os, "getxattr")`, so on
+  the one platform `kMDItemWhereFroms` exists, the reader that exists for it
+  did nothing. `doctor` said so, which is why this survived: it reported the
+  source as unavailable there and was believed.
+
+  Attributes now go through `util.read_xattr`, which calls libc on macOS the
+  same way creation timestamps already do. macOS takes two arguments the Linux
+  call does not, a position and a flags word, which is why one interface does
+  not cover both. The tests write an attribute the same way, so the macOS path
+  is exercised on a macOS runner rather than reasoned about.
+
+  The macOS attribute is also read under the `user.` namespace, which is where
+  a copy carries it onto a system with no other namespace to put it in - the
+  same reason the quarantine attribute is read under both names.
+
 - `doctor` counts in the singular where there is one of something. Four checks
   wrote `1 records`, `1 files`, `1 downloads` and `1 shortcuts`, which is the
   kind of seam that makes a report look assembled rather than written.

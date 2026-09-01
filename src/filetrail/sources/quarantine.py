@@ -25,7 +25,6 @@ examined from somewhere else.
 
 from __future__ import annotations
 
-import os
 import sqlite3
 import tempfile
 from dataclasses import dataclass, field
@@ -34,7 +33,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from ..models import Origin
-from ..util import iso
+from ..util import iso, read_xattr
 
 QUARANTINE_DB = "Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2"
 
@@ -155,12 +154,9 @@ def _attribute(path: Path) -> tuple[str, str, str] | None:
     Four fields or nothing. Half a record read as a whole one would put the
     flag word where the application's name belongs.
     """
-    if not hasattr(os, "getxattr"):
-        return None
     for name in _ATTRIBUTES:
-        try:
-            raw = os.getxattr(str(path), name)
-        except OSError:
+        raw = read_xattr(path, name)
+        if raw is None:
             continue
         parts = raw.decode("utf-8", "replace").split(";")
         if len(parts) < 4:

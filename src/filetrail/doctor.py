@@ -32,7 +32,7 @@ from .sources.quarantine import QUARANTINE_DB, collect_quarantine_events
 from .sources.recent import RECENT_FILES, collect_recent_files
 from .sources.shell import HISTORY_FILES, _parse_history
 from .sources.shortcut import RECENT_LINKS, collect_windows_recent
-from .util import birth_time, iso
+from .util import birth_time, iso, xattrs_readable
 
 
 def counted(number: int, noun: str) -> str:
@@ -153,9 +153,9 @@ def _os_origin() -> Check:
     if system == "Windows":
         return Check("Windows Zone.Identifier", AVAILABLE, "alternate data streams")
     if system == "Darwin":
-        state = AVAILABLE if hasattr(os, "getxattr") else UNAVAILABLE
+        state = AVAILABLE if xattrs_readable() else UNAVAILABLE
         return Check("macOS where-from", state, "kMDItemWhereFroms")
-    if not hasattr(os, "getxattr"):
+    if not xattrs_readable():
         return Check("XDG origin attribute", UNSUPPORTED, "no extended attributes")
 
     # Reading the attribute needs the filesystem to carry it, which varies per

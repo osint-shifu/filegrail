@@ -5,6 +5,7 @@ import ctypes.util
 import hashlib
 import os
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
@@ -12,6 +13,73 @@ _EPOCH_1601_OFFSET = 11_644_473_600  # seconds between 1601-01-01 and 1970-01-01
 
 #: A drive letter or a UNC prefix: the two ways a path says it is a Windows one.
 _WINDOWS_PATH = re.compile(r"^(?:[A-Za-z]:[\\/]|\\\\)")
+
+
+#: macOS takes two arguments the Linux call does not - a position for resource
+#: forks and a flags word - which is why the standard library offers one
+#: interface and not the other.
+_DARWIN_GETXATTR = (
+    ctypes.c_char_p,
+    ctypes.c_char_p,
+    ctypes.c_void_p,
+    ctypes.c_size_t,
+    ctypes.c_uint32,
+    ctypes.c_int,
+)
+
+
+def xattrs_readable() -> bool:
+    """Whether an extended attribute can be read on this platform at all."""
+    return hasattr(os, "getxattr") or _darwin_libc() is not None
+
+
+def read_xattr(path: Path | str, name: str) -> bytes | None:
+    """One extended attribute, or None where there is none to read.
+
+    `os.getxattr` is a Linux interface. The standard library does not expose
+    the call on macOS, so every reader here that guarded on `hasattr` did
+    nothing on macOS - including the one for `kMDItemWhereFroms`, which is a
+    macOS attribute and the reason the guard existed. Reading it means calling
+    libc, the same way creation timestamps already do.
+    """
+    if hasattr(os, "getxattr"):
+        try:
+            return os.getxattr(str(path), name)
+        except OSError:
+            return None
+    libc = _darwin_libc()
+    if libc is None:
+        return None
+    return _darwin_read(libc, str(path), name)
+
+
+def _darwin_libc() -> ctypes.CDLL | None:
+    if sys.platform != "darwin":
+        return None
+    library = ctypes.util.find_library("c")
+    if library is None:  # pragma: no cover - only on a broken macOS
+        return None
+    try:
+        return ctypes.CDLL(library, use_errno=True)
+    except OSError:  # pragma: no cover - only on a broken macOS
+        return None
+
+
+def _darwin_read(libc: ctypes.CDLL, path: str, name: str) -> bytes | None:
+    """Ask for the size first, then for the value: the attribute can change."""
+    libc.getxattr.argtypes = list(_DARWIN_GETXATTR)
+    libc.getxattr.restype = ctypes.c_ssize_t
+    encoded_path = os.fsencode(path)
+    encoded_name = name.encode("utf-8")
+
+    size = libc.getxattr(encoded_path, encoded_name, None, 0, 0, 0)
+    if size <= 0:
+        return None
+    buffer = ctypes.create_string_buffer(size)
+    read = libc.getxattr(encoded_path, encoded_name, buffer, size, 0, 0)
+    if read < 0:
+        return None
+    return buffer.raw[:read]
 
 
 def basename(recorded: str) -> str:
