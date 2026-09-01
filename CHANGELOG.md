@@ -23,6 +23,23 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The broadcast extension, `bext`, which is what a field recorder writes into
+  a WAV: the machine that made the recording, the moment it started, a slate
+  line for the take, and the coding history - one line per processing step, so
+  a take that went through an analogue deck before it was digitised says so on
+  its first line. The lines are kept apart, because the chain is the evidence
+  and folding it into one sentence loses where each step began.
+
+  Where a file has both, the recorder is named first and the editor after it -
+  "Sound Devices MixPre-6 (edited with Adobe Audition 3.0)" - for the reason
+  the EXIF reader already names a camera before the software that processed
+  its picture. Naming only the last writer hands back the studio and loses the
+  field. The recording moment likewise outranks the date the editor wrote.
+
+  It stays at `document-metadata` rather than being promoted to
+  `device-metadata`. `Originator` is free text and is a recorder about as often
+  as it is a company, and a reader cannot tell which from the file.
+
 - RIFF `LIST/INFO`, which is where a WAV or an AVI records who edited it.
   `ISFT` names the software, `ICRD` the date, `IART` and `IENG` the people
   credited; the twenty-odd remaining codes are kept under their published

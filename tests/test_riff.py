@@ -117,6 +117,111 @@ def test_a_field_nobody_summarises_still_reaches_the_record(tmp_path: Path):
     assert fields["Medium"] == "DAT"
 
 
+# --- the broadcast extension -------------------------------------------------
+
+
+def bext(
+    *,
+    description: bytes = b"",
+    originator: bytes = b"",
+    reference: bytes = b"",
+    date: bytes = b"",
+    time: bytes = b"",
+    history: bytes = b"",
+) -> bytes:
+    """A BWF `bext` chunk, laid out as EBU Tech 3285 fixes it."""
+    return chunk(
+        b"bext",
+        description.ljust(256, b"\x00")
+        + originator.ljust(32, b"\x00")
+        + reference.ljust(32, b"\x00")
+        + date.ljust(10, b"\x00")
+        + time.ljust(8, b"\x00")
+        + struct.pack("<QH", 0, 1)  # time reference, version
+        + b"\x00" * 254  # UMID, loudness, reserved
+        + history,
+    )
+
+
+def test_a_broadcast_wave_names_the_machine_that_recorded_it(tmp_path: Path):
+    audio = wav(tmp_path, [bext(originator=b"Sound Devices MixPre-6")])
+
+    assert read_embedded_metadata(audio).tool == "Sound Devices MixPre-6"
+
+
+def test_the_origination_date_and_time_become_one_moment(tmp_path: Path):
+    """BWF splits the two across neighbouring fields, and either alone is a
+    worse answer than the pair."""
+    audio = wav(tmp_path, [bext(originator=b"Zoom F8n", date=b"2019-03-04", time=b"10:22:31")])
+
+    assert read_embedded_metadata(audio).at == "2019-03-04T10:22:31Z"
+
+
+def test_an_empty_origination_date_is_not_invented(tmp_path: Path):
+    """ffmpeg writes the chunk with the date left as nulls unless it is told
+    one. Nulls are an absence, not a moment at the start of the epoch."""
+    audio = wav(tmp_path, [bext(originator=b"Zoom F8n")])
+
+    assert read_embedded_metadata(audio).at is None
+
+
+def test_the_recorder_is_named_alongside_the_editor(tmp_path: Path):
+    """One machine captured the sound and another wrote the file out. Reporting
+    only the second would hand back the studio and lose the field."""
+    audio = wav(
+        tmp_path,
+        [bext(originator=b"Sound Devices MixPre-6"), info([(b"ISFT", b"Adobe Audition 3.0")])],
+    )
+
+    assert read_embedded_metadata(audio).tool == (
+        "Sound Devices MixPre-6 (edited with Adobe Audition 3.0)"
+    )
+
+
+def test_the_recording_date_outranks_the_date_the_editor_wrote(tmp_path: Path):
+    audio = wav(
+        tmp_path,
+        [
+            bext(originator=b"Zoom F8n", date=b"2019-03-04", time=b"10:22:31"),
+            info([(b"ICRD", b"2021-11-02")]),
+        ],
+    )
+
+    assert read_embedded_metadata(audio).at == "2019-03-04T10:22:31Z"
+
+
+def test_the_coding_history_is_kept_whole(tmp_path: Path):
+    """It is the chain of everything done to the sound, written one line per
+    step, and the last line is not a summary of the ones above it."""
+    history = b"A=ANALOGUE,M=stereo,T=Nagra IV-S\r\nA=PCM,F=48000,W=24,M=stereo,T=Zoom F8n"
+    audio = wav(tmp_path, [bext(originator=b"Zoom F8n", history=history)])
+
+    kept = read_embedded_metadata(audio).fields["bext:CodingHistory"]
+
+    assert "Nagra IV-S" in kept
+    assert "Zoom F8n" in kept
+
+
+def test_the_slate_reaches_the_note(tmp_path: Path):
+    audio = wav(
+        tmp_path,
+        [bext(originator=b"Zoom F8n", description=b"Interview, take 3", reference=b"SD0012345")],
+    )
+
+    origin = read_embedded_metadata(audio)
+
+    assert "Interview, take 3" in origin.note
+    assert origin.fields["bext:OriginatorReference"] == "SD0012345"
+
+
+def test_a_chunk_too_short_to_be_bext_is_not_read_as_one(tmp_path: Path):
+    """The layout is fixed and unlabelled: every field is found by counting
+    bytes, so a short chunk would have its neighbours read as its contents."""
+    audio = wav(tmp_path, [chunk(b"bext", b"Interview, take 3".ljust(400, b"\x00"))])
+
+    assert read_riff(audio) is None
+
+
 # --- walking the container ---------------------------------------------------
 
 

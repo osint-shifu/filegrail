@@ -266,8 +266,17 @@ def _from_riff(path: Path, suffix: str) -> Origin | None:
     if not found:
         return None
 
+    # One machine captured the sound and another wrote the file out. Naming
+    # only the second hands back the studio and loses the field.
+    recorder = found.broadcast.get("Originator")
+    editor = found.info.get("Software") or found.frames.get("encoder")
+    tool = recorder or editor
+    if recorder and editor and editor.lower() not in recorder.lower():
+        tool = f"{recorder} (edited with {editor})"
+
     notes = []
     for label, value in (
+        ("description", found.broadcast.get("Description")),
         ("artist", found.info.get("Artist") or found.frames.get("artist")),
         ("title", found.info.get("Title") or found.frames.get("title")),
         ("engineer", found.info.get("Engineer")),
@@ -278,12 +287,16 @@ def _from_riff(path: Path, suffix: str) -> Origin | None:
 
     return _origin(
         "document-metadata",
-        tool=found.info.get("Software") or found.frames.get("encoder"),
-        at=_normalise(found.info.get("DateCreated") or found.frames.get("date")),
+        tool=tool,
+        # When the recording started beats when the file was written out.
+        at=_normalise(found.originated)
+        or _normalise(found.info.get("DateCreated") or found.frames.get("date")),
         note="; ".join(notes) or None,
-        # The tag's frames are named apart from the INFO fields: the two can
-        # disagree, and a merged dictionary would silently hide one of them.
-        fields=dict(found.info) | {f"id3:{k}": v for k, v in found.frames.items()},
+        # Each standard keeps its own names. The three can disagree, and one
+        # merged dictionary would silently hide whichever was written last.
+        fields=dict(found.info)
+        | {f"bext:{name}": value for name, value in found.broadcast.items()}
+        | {f"id3:{name}": value for name, value in found.frames.items()},
     )
 
 

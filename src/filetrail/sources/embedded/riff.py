@@ -4,6 +4,8 @@ A RIFF file is a list of chunks, and two of them say where the file came from:
 
     LIST/INFO   ``ISFT`` names the software, ``ICRD`` the date, ``IART``
                 whoever is credited - the fields an editor fills in on save
+    bext        the broadcast extension: what machine made the recording, when
+                it started, and every processing step since
     id3         the tag MP3 made familiar, carried here in a chunk rather than
                 at the start of the file, which is why the ID3 reader alone
                 could never find one in a WAV
@@ -14,6 +16,7 @@ the same handful of reads as a one-second sample.
 
 from __future__ import annotations
 
+import re
 import struct
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -42,6 +45,16 @@ _MAX_DEPTH = 3
 _MAX_TEXT = 4096
 
 _ID3_CHUNKS = (b"id3 ", b"ID3 ")
+
+#: The fixed part of a BWF `bext` chunk, ahead of the coding history. Every
+#: field in it is found by counting bytes - the layout carries no names - so a
+#: chunk shorter than this is not one, whatever it calls itself.
+_BEXT_FIXED = 602
+
+#: EBU Tech 3285 writes the date as yyyy-mm-dd and the time as hh:mm:ss, and
+#: then leaves the separator to the writer, so it is read as anything at all.
+_DATE = re.compile(r"(\d{4}).(\d{2}).(\d{2})")
+_TIME = re.compile(r"(\d{2}).(\d{2}).(\d{2})")
 
 #: Lists holding sample data rather than description. Anything at all can turn
 #: up inside a frame, chunk headers included, so this is where the walk stops
@@ -94,8 +107,16 @@ class Riff:
     #: returns them.
     frames: dict[str, str] = field(default_factory=dict)
 
+    #: The BWF `bext` fields, under the names EBU Tech 3285 gives them.
+    broadcast: dict[str, str] = field(default_factory=dict)
+
+    #: When the recording started, from the broadcast date and time fields read
+    #: together. Kept apart from `broadcast` because it is this tool's reading
+    #: of two fields rather than a third field anybody wrote.
+    originated: str | None = None
+
     def __bool__(self) -> bool:
-        return bool(self.info or self.frames)
+        return bool(self.info or self.frames or self.broadcast)
 
 
 def read_riff(path: Path) -> Riff | None:
@@ -151,12 +172,71 @@ def _leaf(handle, name: bytes, body: int, size: int, found: Riff, inside: bytes)
         handle.seek(body)
         found.frames.update(id3.read_tag(handle.read(size)))
         return
+    if name == b"bext":
+        handle.seek(body)
+        found.broadcast.update(_broadcast(handle.read(size)))
+        found.originated = _originated(found.broadcast)
+        return
     if inside != b"INFO":
         return
     handle.seek(body)
     text = _text(handle.read(min(size, _MAX_TEXT)))
     if text:
         found.info.setdefault(INFO_NAMES.get(name, _code(name)), text)
+
+
+def _broadcast(raw: bytes) -> dict[str, str]:
+    """Decode a BWF `bext` chunk, whose fields sit at fixed offsets."""
+    if len(raw) < _BEXT_FIXED:
+        return {}
+
+    found = {}
+    for name, start, stop in (
+        ("Description", 0, 256),
+        ("Originator", 256, 288),
+        ("OriginatorReference", 288, 320),
+        ("OriginationDate", 320, 330),
+        ("OriginationTime", 330, 338),
+    ):
+        if value := _text(raw[start:stop]):
+            found[name] = value
+
+    reference, version = struct.unpack_from("<QH", raw, 338)
+    if reference:
+        # Samples since midnight: where in the day's timeline this take sits.
+        found["TimeReference"] = str(reference)
+    found["Version"] = str(version)
+
+    umid = raw[348:412]
+    if any(umid):
+        found["UMID"] = umid.hex()
+    if history := _history(raw[_BEXT_FIXED:]):
+        found["CodingHistory"] = history
+    return found
+
+
+def _originated(broadcast: dict[str, str]) -> str | None:
+    """When the recording started, from the two fields that say so together.
+
+    Neither is worth much alone, and a writer that leaves them as nulls has
+    said nothing - which is not the same as midnight at the start of 1970.
+    """
+    date = _DATE.match(broadcast.get("OriginationDate", ""))
+    if not date:
+        return None
+    clock = _TIME.match(broadcast.get("OriginationTime", ""))
+    return "-".join(date.groups()) + "T" + ":".join(clock.groups() if clock else ("00",) * 3)
+
+
+def _history(raw: bytes) -> str | None:
+    """The coding history, one line per processing step.
+
+    The steps are kept apart. The chain is the evidence - a take that went
+    through an analogue deck before it was digitised says so on its first line,
+    and folding the lines into one sentence loses where each step began.
+    """
+    steps = [" ".join(line.split()) for line in _decode(raw).splitlines()]
+    return " | ".join(step for step in steps if step) or None
 
 
 def _text(raw: bytes) -> str | None:
@@ -167,12 +247,15 @@ def _text(raw: bytes) -> str | None:
     one of the two that can fail: bytes that decode as UTF-8 were almost
     certainly written as UTF-8, and Latin-1 then accepts whatever is left.
     """
+    return " ".join(_decode(raw).split()) or None
+
+
+def _decode(raw: bytes) -> str:
     trimmed = raw.split(b"\x00", 1)[0]
     try:
-        text = trimmed.decode("utf-8")
+        return trimmed.decode("utf-8")
     except UnicodeDecodeError:
-        text = trimmed.decode("latin-1")
-    return " ".join(text.split()) or None
+        return trimmed.decode("latin-1")
 
 
 def _code(name: bytes) -> str:
