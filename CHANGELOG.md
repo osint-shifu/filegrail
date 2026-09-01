@@ -68,6 +68,25 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Every `--json` document now begins with what it is: a `schema` naming the
+  shape, and a `filetrail_version` naming the build that wrote it. The four
+  shapes are `filetrail.scan/1`, `filetrail.explain/1`, `filetrail.compare/1`
+  and `filetrail.doctor/1`.
+
+  `--json` is a contract with software, not a convenience for reading, and it
+  had no way to say which contract. Something switching on the keys it found
+  would break silently the first time a field was renamed, in a program nobody
+  here can see. The stamp is also the kind of thing that can only be added for
+  free once: adding a key is itself a change for anyone who enumerates them, so
+  the cheapest moment to do it is before there are consumers. The schema number
+  moves only when a field changes meaning or leaves - a new field is not a
+  break, and neither is a release, which is why the two live in separate keys.
+
+  `explain` and `compare` built their JSON inline in the command layer, so
+  there were four documents defined in two files. All four are now rendered in
+  `report.py` through one function, which is what makes the stamp a single
+  decision rather than four.
+
 - Reconciliation now compares a PDF's `Info` dictionary against its XMP, and a
   PNG's text chunks against theirs. Both pairings are published in Part 3 of the
   XMP specification, alongside the IIM and EXIF ones already checked: the Info

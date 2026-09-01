@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from . import __version__
 from .explain import conclusion, grouped
 from .identify import Identifier, extract
 from .models import ACQUISITION, INTRINSIC, FileRecord, Origin, kind, label
@@ -31,6 +32,11 @@ from .theme import (
     Theme,
     detect,
 )
+
+#: The version of the machine-readable documents. It is a promise to whatever
+#: consumes them, so it changes only when a field changes meaning or leaves -
+#: adding one is not a break, and neither is a release.
+SCHEMA = 1
 
 #: Sources describing what a file says about itself, rather than where it came from.
 SELF_REPORTED = frozenset(
@@ -684,8 +690,46 @@ def _pair(theme: Theme, name: str, value: str, width: int, colour: str) -> list[
     return lines
 
 
+def document(shape: str, payload: dict[str, object]) -> str:
+    """Render one machine-readable document, stamped with what it is.
+
+    The stamp goes first so that reading the head of a piped document is enough
+    to identify it, and it is two fields because they answer two questions. The
+    schema says how to read what follows; the version says which build wrote
+    it, which is what a bug report needs.
+
+    The schema number is a contract rather than a build number, so it moves
+    only when a field changes meaning or leaves - never merely because the
+    release did.
+    """
+    stamped: dict[str, object] = {
+        "schema": f"filetrail.{shape}/{SCHEMA}",
+        "filetrail_version": __version__,
+    }
+    stamped.update(payload)
+    return json.dumps(stamped, ensure_ascii=False, indent=2)
+
+
 def render_json_doctor(found) -> str:
-    return json.dumps(found.to_dict(), ensure_ascii=False, indent=2)
+    return document("doctor", found.to_dict())
+
+
+def render_json_explain(record: FileRecord) -> str:
+    verdict = reconcile(record)
+    return document(
+        "explain",
+        {
+            "file": record.to_dict(),
+            "reconciliation": verdict.to_dict(),
+            "conclusion": conclusion(record, verdict),
+        },
+    )
+
+
+def render_json_compare(left: FileRecord, right: FileRecord) -> str:
+    from .compare import compare
+
+    return document("compare", compare(left, right).to_dict())
 
 
 def render_json(records: list[FileRecord], root: Path, *, identify: bool = False) -> str:
@@ -700,11 +744,7 @@ def render_json(records: list[FileRecord], root: Path, *, identify: bool = False
     if identify:
         payload["identifiers"] = [entry.to_dict() for entry in extract(records)]
 
-    return json.dumps(
-        payload,
-        ensure_ascii=False,
-        indent=2,
-    )
+    return document("scan", payload)
 
 
 def render_timeline(records: list[FileRecord], root: Path, *, theme: Theme | None = None) -> str:

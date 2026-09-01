@@ -1,0 +1,112 @@
+"""Every machine-readable document says what it is and what wrote it.
+
+`--json` is a contract with software, not a convenience for reading. Something
+piping filetrail into jq, a case tool or a log pipeline has to know which shape
+it received and which release produced it. Without that, the first time a field
+is renamed the breakage is silent and it happens in somebody else's program.
+
+The stamp is cheapest now and gets more expensive every week: adding a key is
+itself a change for anyone who enumerates them, so a tool with no consumers yet
+is the only tool that can add one for free.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from filetrail import __version__
+from filetrail.cli import PARSERS, main
+
+#: `menu` inherits `--json` from the shared options but is interactive: it
+#: refuses to run without a terminal, so it has no document to stamp.
+INTERACTIVE = {"menu"}
+
+
+@pytest.fixture(autouse=True)
+def elsewhere(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Point every source that reads a home directory at an empty one.
+
+    These tests are about the envelope, not the evidence, and a run that reads
+    the developer's own browser history is both slow and different on every
+    machine it runs on.
+    """
+    empty = tmp_path / "home"
+    empty.mkdir()
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: empty))
+    return empty
+
+
+@pytest.fixture
+def case(tmp_path: Path) -> Path:
+    for name in ("a.txt", "b.txt"):
+        (tmp_path / name).write_text(name, encoding="utf-8")
+    return tmp_path
+
+
+def _arguments(name: str, case: Path) -> list[str]:
+    return {
+        "scan": [name, str(case)],
+        "explain": [name, str(case / "a.txt")],
+        "compare": [name, str(case / "a.txt"), str(case / "b.txt")],
+        "doctor": [name],
+    }[name]
+
+
+#: Every command that can be asked for JSON, and how to ask it for some.
+DOCUMENTS = ("scan", "explain", "compare", "doctor")
+
+
+def _run(capsys, name: str, case: Path) -> dict:
+    assert main([*_arguments(name, case), "--json"]) == 0
+    return json.loads(capsys.readouterr().out)
+
+
+def test_a_scan_says_which_shape_it_is(case: Path, capsys):
+    assert _run(capsys, "scan", case)["schema"] == "filetrail.scan/1"
+
+
+def test_an_explanation_says_which_shape_it_is(case: Path, capsys):
+    assert _run(capsys, "explain", case)["schema"] == "filetrail.explain/1"
+
+
+def test_a_comparison_says_which_shape_it_is(case: Path, capsys):
+    assert _run(capsys, "compare", case)["schema"] == "filetrail.compare/1"
+
+
+def test_a_survey_says_which_shape_it_is(case: Path, capsys):
+    assert _run(capsys, "doctor", case)["schema"] == "filetrail.doctor/1"
+
+
+def test_every_document_names_the_release_that_wrote_it(case: Path, capsys):
+    """Two fields, because they answer two questions.
+
+    The schema says how to read the document; the version says which build
+    produced it, which is what a bug report needs and what a changelog entry
+    can be matched against.
+    """
+    for name in DOCUMENTS:
+        assert _run(capsys, name, case)["filetrail_version"] == __version__, name
+
+
+def test_the_stamp_comes_before_the_content(case: Path, capsys):
+    """`head` on a piped document should be enough to identify it."""
+    for name in DOCUMENTS:
+        assert list(_run(capsys, name, case))[:2] == ["schema", "filetrail_version"], name
+
+
+def test_stamping_left_the_documents_otherwise_alone(case: Path, capsys):
+    """The envelope is added around what was already there, not instead of it."""
+    assert {"root", "files", "summary"} <= set(_run(capsys, "scan", case))
+    assert {"file", "reconciliation", "conclusion"} <= set(_run(capsys, "explain", case))
+    assert {"assessment", "acquisition"} <= set(_run(capsys, "compare", case))
+    assert {"sources", "horizon"} <= set(_run(capsys, "doctor", case))
+
+
+def test_every_command_that_can_emit_json_is_covered_here():
+    """A sixth command must be stamped too, and this is what says so."""
+    assert set(DOCUMENTS) | INTERACTIVE == set(PARSERS), sorted(
+        set(PARSERS) - set(DOCUMENTS) - INTERACTIVE
+    )

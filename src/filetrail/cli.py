@@ -23,7 +23,9 @@ from .report import (
     render_doctor,
     render_explain,
     render_json,
+    render_json_compare,
     render_json_doctor,
+    render_json_explain,
     render_text,
     render_timeline,
 )
@@ -307,23 +309,7 @@ def _explain(rest: list[str]) -> int:
         return 2
 
     if args.json:
-        import json as _json
-
-        from .explain import conclusion
-        from .reconcile import reconcile
-
-        verdict = reconcile(record)
-        print(
-            _json.dumps(
-                {
-                    "file": record.to_dict(),
-                    "reconciliation": verdict.to_dict(),
-                    "conclusion": conclusion(record, verdict),
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
+        print(render_json_explain(record))
         return 0
 
     print(render_explain(record, theme=detect(colour=args.colour)))
@@ -338,16 +324,13 @@ def _compare(rest: list[str]) -> int:
             print(f"filetrail: compare takes two files: {path}", file=sys.stderr)
             return 2
 
-    from .compare import compare
-
-    found = compare(left, right)
     if args.json:
-        import json as _json
-
-        print(_json.dumps(found.to_dict(), ensure_ascii=False, indent=2))
+        print(render_json_compare(left, right))
         return 0
 
-    print(render_compare(left, right, found, theme=detect(colour=args.colour)))
+    from .compare import compare
+
+    print(render_compare(left, right, compare(left, right), theme=detect(colour=args.colour)))
     return 0
 
 

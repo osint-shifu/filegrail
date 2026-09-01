@@ -6,6 +6,7 @@ build/
 .pytest_cache/
 .ruff_cache/
 .venv/
+.venv*/
 venv/
 .vscode/
 .idea/

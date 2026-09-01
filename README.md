@@ -460,6 +460,22 @@ filetrail /mnt/evidence --hash --json > filetrail.json
 
 JSON keeps file records, origin claims, decoded fields and confidence values, so you can feed the result into scripts, case tooling or another analysis workflow without scraping terminal text.
 
+Every document begins by saying what it is:
+
+```json
+{
+  "schema": "filetrail.scan/1",
+  "filetrail_version": "0.1.0",
+  "root": "/mnt/evidence"
+}
+```
+
+Four commands emit JSON and each has its own shape: `filetrail.scan/1`,
+`filetrail.explain/1`, `filetrail.compare/1`, `filetrail.doctor/1`. Switch on
+`schema` rather than guessing from the keys. The number changes only when a
+field changes meaning or leaves - a new field is not a break, and neither is a
+release, which is why the version sits in its own key beside it.
+
 Each claim carries two names for where it came from. `source` says what the
 reader found - `device-metadata` where a file named a camera, `document-metadata`
 where it did not - and is what `confidence` ranks. `block` says which metadata
