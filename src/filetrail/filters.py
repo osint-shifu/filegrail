@@ -68,7 +68,9 @@ FAMILIES: dict[str, frozenset[str]] = {
     "archive": frozenset(ARCHIVE_SUFFIXES),
     # `.msg` is in `document` as well: it is a compound document that happens
     # to hold a message, and an analyst asking for either should get it.
-    "mail": frozenset(mail.SUFFIXES | {".mbox", ".msg"}),
+    # `.mbox` is listed but not read: a mailbox is many messages and a record
+    # is one file, so asking for it selects nothing this can answer yet.
+    "mail": frozenset(mail.SUFFIXES | mail.OUTLOOK_SUFFIXES | {".mbox"}),
     "text": frozenset(_EXTRA_TEXT),
 }
 

@@ -390,7 +390,7 @@ Supported classes include URLs, domains, email addresses, IP addresses, hashes a
 | OpenDocument | ODT, ODS, ODP, ODG, OTT, OTP | Generator, author, creation and editing metadata |
 | Books / markup | EPUB, RTF, SVG | Package metadata, generator information |
 | Notebooks | IPYNB | Kernel and language runtime |
-| Mail | EML | Every `Received:` hop as its own event, the connecting address each server saw, and the sender's own headers kept apart from them |
+| Mail | EML, MSG | Every `Received:` hop as its own event, the connecting address each server saw, and the sender's own headers kept apart from them. A `.msg` keeps the same header block in a MAPI stream; where an Exchange delivery left none, its own properties are reported and no delivery record is invented |
 | Archives | ZIP, TAR and compressed TAR variants | Member names and uncompressed sizes used for origin inheritance |
 
 Other files are still scanned. If `filetrail` does not understand metadata in a format, it says so instead of making something up.
@@ -545,6 +545,16 @@ That is why `filetrail doctor` exists: it tells you what sources are available a
 - **not a collector** - it reads existing traces instead of running a monitoring layer.
 
 C2PA manifests are parsed, but signatures are not cryptographically verified.
+
+Two readers are written from the specification and have never been run against
+a file the originating software produced, because nothing available here writes
+one: Outlook `.msg` messages, and the `id3 ` chunk a WAV file may carry. The
+container walk under the `.msg` reader is not in that position - it is the same
+one real `.doc` files exercise.
+
+`--home` reads another user profile, which is not the same as reading a disk
+image. It expects a mounted or copied home directory, and it reads the same
+sources it would read here; nothing about it parses a filesystem.
 
 <p align="right"><a href="#table-of-contents">Back to contents ↑</a></p>
 

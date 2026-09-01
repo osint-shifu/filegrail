@@ -365,6 +365,29 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   ordinary length does not skip one field, it loses the reader's place in the
   stream and every dataset after it.
 
+- A saved Outlook message is read for how it travelled. `.msg` was already
+  opened as a compound document, because its Office-style summary properties
+  sit where a `.doc`'s do; what was never read is
+  `PR_TRANSPORT_MESSAGE_HEADERS`, the stream holding the internet headers. That
+  block is the same RFC 5322 text an `.eml` starts with, so it goes through the
+  same parser and yields the same `Received:` chain - the one part of a message
+  the sender did not write. Both spellings of the property are asked for, UTF-16
+  and 8-bit, because which one a message carries depends on the sender's Outlook
+  and not on anything in the message.
+
+  A message delivered inside one Exchange organisation never crosses the
+  internet and has no such headers. No delivery record is invented for it; what
+  it says about itself - subject, sender, message id - is reported as exactly
+  that, from the MAPI properties, and only where the headers are absent, since
+  a header block already carries its own.
+
+  Spec-only. Nothing on the developer's machine writes a `.msg`, so every
+  fixture is assembled from [MS-OXMSG] and the reader has never been run
+  against a file Outlook produced. The container walk underneath it is not:
+  that is the same one the corpus exercises through real `.doc` files, now
+  exposed as `read_streams` so a reader of a compound document that is not an
+  Office one does not have to walk a FAT of its own.
+
 - `doctor` reports the desktop's list of recently opened files, and how far
   back the shell history and that list reach. It surveyed browsers, the
   operating system's origin attribute, the shell, creation timestamps and C2PA

@@ -25,6 +25,28 @@ from ..models import Origin
 
 SUFFIXES = {".eml"}
 
+#: A saved Outlook message is a compound document rather than a file of
+#: headers, but it keeps the same RFC 5322 block in a stream of its own - and
+#: with it the same `Received:` chain, reached by a different door.
+OUTLOOK_SUFFIXES = {".msg"}
+
+#: [MS-OXMSG] names a property stream `__substg1.0_` then the property tag then
+#: its type, `001F` for UTF-16 text and `001E` for 8-bit. Both spellings of a
+#: tag are asked for, because which one a message carries depends on the
+#: sender's Outlook and not on anything in the message.
+_TRANSPORT_HEADERS = ("__substg1.0_007D001F", "__substg1.0_007D001E")
+
+#: What a message says about itself when it never crossed the internet and so
+#: has no headers to say it with. An Exchange delivery between two mailboxes on
+#: one server is the ordinary case, not an edge one.
+_MAPI_HEADERS = {
+    "Subject": ("__substg1.0_0037001F", "__substg1.0_0037001E"),
+    "From": ("__substg1.0_0C1F001F", "__substg1.0_0C1F001E"),
+    "Sender": ("__substg1.0_0C1A001F", "__substg1.0_0C1A001E"),
+    "To": ("__substg1.0_0E04001F", "__substg1.0_0E04001E"),
+    "Message-ID": ("__substg1.0_1035001F", "__substg1.0_1035001E"),
+}
+
 #: Headers sit at the front. A message with more than this before its body is
 #: not a message anybody sent.
 _WINDOW = 512 * 1024
@@ -71,14 +93,20 @@ _ADDRESS = re.compile(r"\[(?:IPv6:)?([0-9A-Fa-f:.]{3,45})\]")
 
 def read_mail(path: Path) -> list[Origin]:
     """Return the delivery record and the message's own headers."""
-    if path.suffix.lower() not in SUFFIXES:
-        return []
-    try:
-        with path.open("rb") as handle:
-            message = BytesHeaderParser().parsebytes(handle.read(_WINDOW))
-    except (OSError, ValueError):
-        return []
+    suffix = path.suffix.lower()
+    if suffix in SUFFIXES:
+        try:
+            with path.open("rb") as handle:
+                return _claims(BytesHeaderParser().parsebytes(handle.read(_WINDOW)))
+        except (OSError, ValueError):
+            return []
+    if suffix in OUTLOOK_SUFFIXES:
+        return _outlook(path)
+    return []
 
+
+def _claims(message) -> list[Origin]:
+    """The hops, then what the message says about itself."""
     hops = message.get_all("Received") or []
     found = [
         _hop(value, "email-delivery" if position == 0 else "email-relay")
@@ -87,6 +115,59 @@ def read_mail(path: Path) -> list[Origin]:
     if header := _self_description(message):
         found.append(header)
     return [origin for origin in found if origin is not None]
+
+
+def _outlook(path: Path) -> list[Origin]:
+    """Read a compound document as the message it is.
+
+    Spec-only: assembled from [MS-OXMSG], and never run against a file Outlook
+    wrote, because nothing on the developer's machine produces one.
+    """
+    from .embedded.ole import read_streams
+
+    wanted = [*_TRANSPORT_HEADERS, *(name for pair in _MAPI_HEADERS.values() for name in pair)]
+    streams = read_streams(path, wanted)
+    if not streams:
+        return []
+
+    for name in _TRANSPORT_HEADERS:
+        if (raw := streams.get(name)) is not None and (text := _text(name, raw)):
+            return _claims(BytesHeaderParser().parsebytes(text.encode("utf-8", "replace")))
+
+    # No headers means the message never crossed the internet, so there is no
+    # delivery record to be had and none is invented. What it says about itself
+    # is still worth reporting, as exactly that.
+    fields = {}
+    for label, names in _MAPI_HEADERS.items():
+        for name in names:
+            if (raw := streams.get(name)) is not None and (text := _text(name, raw)):
+                fields[label] = " ".join(text.split())[:_MAX_VALUE]
+                break
+    if not fields:
+        return []
+
+    subject = fields.get("Subject")
+    return [
+        Origin(
+            source="email-header",
+            note=f"subject {subject}" if subject else None,
+            fields=fields,
+        )
+    ]
+
+
+def _text(name: str, raw: bytes) -> str | None:
+    """Decode a property stream by the type its name declares.
+
+    An odd byte count cannot be UTF-16. Decoding it anyway would drop the last
+    byte and hand back a name a character short, which is worse than nothing
+    because it looks like a name.
+    """
+    if name.endswith("001F"):
+        if len(raw) % 2:
+            return None
+        return raw.decode("utf-16-le", "replace").rstrip("\x00") or None
+    return raw.decode("utf-8", "replace").rstrip("\x00") or None
 
 
 def _hop(value: str, source: str) -> Origin | None:

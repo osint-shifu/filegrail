@@ -285,3 +285,23 @@ def test_the_same_advice_on_this_machine_names_no_profile(carved: Path):
 
     assert "`filetrail doctor`" in said[0]
     assert "--home" not in said[0]
+
+
+def test_the_explanation_names_the_profile_it_read(carved: Path, mounted: Path, capsys):
+    """Same reason as the scan report: on paper it looks like a local finding."""
+    argv = ["explain", str(carved / "evidence.zip"), "--home", str(mounted), "--no-color"]
+    assert main(argv) == 0
+
+    assert "evidence read from the profile at" in capsys.readouterr().out
+
+
+def test_the_survey_names_the_profile_it_read(mounted: Path, capsys):
+    assert main(["doctor", "--home", str(mounted), "--no-color"]) == 0
+
+    assert "surveying the profile at" in capsys.readouterr().out
+
+
+def test_a_survey_of_this_machine_announces_no_profile(capsys):
+    assert main(["doctor", "--no-color"]) == 0
+
+    assert "surveying the profile at" not in capsys.readouterr().out

@@ -18,6 +18,7 @@ the modern equivalent, because nobody has thought to strip it.
 from __future__ import annotations
 
 import struct
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -99,6 +100,33 @@ def read_ole(path: Path) -> Document | None:
     except (struct.error, ValueError, IndexError):
         return None
     return found if found else None
+
+
+def read_streams(path: Path, names: Iterable[str]) -> dict[str, bytes]:
+    """Return whichever of the named streams a compound document holds.
+
+    Exposed because not every compound document is an Office one. An Outlook
+    `.msg` is this same container carrying a message instead of a spreadsheet,
+    and its reader has no business walking a FAT of its own.
+    """
+    try:
+        with path.open("rb") as handle:
+            data = handle.read()
+    except OSError:
+        return {}
+    if not data.startswith(_SIGNATURE):
+        return {}
+
+    try:
+        container = _Container(data)
+        found = {}
+        for name in names:
+            raw = container.stream(name)
+            if raw is not None:
+                found[name] = raw
+    except (struct.error, ValueError, IndexError):
+        return {}
+    return found
 
 
 # --- the container -----------------------------------------------------------
