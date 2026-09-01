@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from filetrail.lineage import Link
 from filetrail.models import FileRecord, Origin
 from filetrail.report import render_text
 from filetrail.theme import Theme
@@ -100,6 +101,27 @@ def test_wrapping_still_respects_the_width(width: int):
     output = render_text([record], Path("/case"), theme=_plain(width))
 
     assert not [line for line in output.splitlines() if len(line) > width]
+
+
+@pytest.mark.parametrize("width", WIDTHS)
+def test_a_long_list_of_related_files_wraps_rather_than_overflows(width: int):
+    """Every path in a lineage link is a file the reader may have to go and
+    open. None of them may be cut, and none may push the entry past the edge."""
+    record = _record(source="device-metadata", tool="Canon")
+    record.links = [
+        Link(
+            kind="derived from",
+            others=tuple(f"/case/a-rather-long-export-name-{n}.jpg" for n in range(4)),
+            count=4,
+        )
+    ]
+
+    output = render_text([record], Path("/case"), theme=_plain(width))
+
+    assert "…" not in output
+    assert not [line for line in output.splitlines() if len(line) > width]
+    for n in range(4):
+        assert f"a-rather-long-export-name-{n}.jpg" in _flat(output)
 
 
 def test_a_long_file_name_is_not_cut():

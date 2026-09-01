@@ -157,7 +157,7 @@ def _note(properties: dict[str, str], dropped: int, total: int) -> str | None:
         ),
     )
     if derived:
-        notes.append(f"derived from {derived}")
+        notes.append(f"derived from document {derived}")
     if dropped:
         notes.append(f"{dropped} of {total} recorded edits not shown separately")
     return "; ".join(notes) or None

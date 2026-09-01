@@ -249,7 +249,26 @@ def _entry(
 
     if verdict.notable:
         lines.extend(_verdict(theme, verdict))
+    lines.extend(_links(theme, record, root))
     lines.append("")
+    return lines
+
+
+def _links(theme: Theme, record: FileRecord, root: Path) -> list[str]:
+    """How this file relates to the others that were scanned with it.
+
+    Last in the entry because it is the one part that points outward: everything
+    above is about this file, and this says where else to look.
+    """
+    lines = []
+    for link in record.links:
+        named = ", ".join(_relative(path, root) for path in link.others)
+        said = named or f"{link.count} other files in this scan"
+        room = theme.width - _gutter(theme) - len(link.kind) - 4
+        wrapped = theme.wrap(said, room)
+        lines.append(f"  {_mark(theme, BRANCH)} {theme.dim(link.kind)}  {wrapped[0]}")
+        for part in wrapped[1:]:
+            lines.append(f"  {_mark(theme, RAIL)}   {' ' * len(link.kind)}{part}")
     return lines
 
 

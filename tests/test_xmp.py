@@ -223,7 +223,11 @@ def test_the_packet_names_its_author_and_what_it_was_derived_from(tmp_path: Path
 
     packet = read_xmp(photo)[0]
 
-    assert packet.note == "author Maria Wolf; derived from xmp.did:4b77"
+    # "document" rather than a bare identifier: the report also prints a
+    # `derived from` line naming an actual file when one is in the same scan,
+    # and two lines with one wording meaning two things is a report that reads
+    # as though it said something twice.
+    assert packet.note == "author Maria Wolf; derived from document xmp.did:4b77"
 
 
 def _png(*chunks: tuple[bytes, bytes]) -> bytes:

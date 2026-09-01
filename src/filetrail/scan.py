@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from dataclasses import replace
 from pathlib import Path
 
+from .lineage import attach_lineage
 from .models import FileRecord, Origin
 from .sources import (
     collect_browser_downloads,
@@ -142,6 +143,7 @@ def scan(
 
     if follow_archives:
         _attach_archive_origins(records, downloads, downloads_by_name)
+    attach_lineage(records)
 
     return records
 

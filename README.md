@@ -187,6 +187,12 @@ It can flag:
   compared as moments and exposure settings not at all, because a zone or a
   comma decimal is two tools spelling one fact, not two facts.
 
+It also links the scanned files to each other where XMP says how they were made:
+a master, the export derived from it and the rendition derived from that are
+reported as a chain, in both directions. A shared *original* document is only
+ever reported as a common ancestor - a template carries its XMP block into every
+file made from it, and those files share an ancestor and nothing else.
+
 > [!IMPORTANT]
 > A conflict is useful evidence too. `filetrail` shows it and lets you decide what it means.
 

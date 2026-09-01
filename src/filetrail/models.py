@@ -183,6 +183,12 @@ class FileRecord:
     sha256: str | None = None
     origins: list[Origin] = field(default_factory=list)
 
+    #: How this file relates to the others in the same scan, from the
+    #: identifiers XMP carries for it. Not an origin: an origin is one source's
+    #: claim about where this file came from, and a link is a relation between
+    #: two records that only exists because both were scanned together.
+    links: list = field(default_factory=list)
+
     @property
     def best(self) -> Origin | None:
         """The single strongest claim, whatever kind it is.
@@ -231,4 +237,5 @@ class FileRecord:
             "btime": self.btime,
             "sha256": self.sha256,
             "origins": [o.to_dict() for o in self.origins],
+            "links": [link.to_dict() for link in self.links],
         }

@@ -23,6 +23,38 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Files in one scan are linked to each other by the identifiers XMP carries for
+  exactly that purpose. A master, the export made from it and the web rendition
+  made from that now say so in the report, in both directions - `derived from`,
+  `source of`, `descends from`, `original of`, `same document`.
+
+  A shared original document is reported as a common ancestor and never as a
+  derivation. The corpus explains why: `osint360-klienci-zastosowania.pdf`
+  carries an `xmp:CreateDate` of 2013 inside a document made in 2026, because a
+  LibreOffice template dragged its whole XMP block along. Everything ever made
+  from that template shares an original and shares nothing else. For the same
+  reason an identifier shared by more than eight files is counted rather than
+  paired off - that is a template sitting under a directory, not a lineage, and
+  pairing it would be a square number of links saying nothing.
+
+  Two guards worth naming. Half of a `DerivedFrom` reference is looked up only
+  in its own index, because PowerPoint writes one uuid as both the document and
+  the instance and matching across the two would make each of its exports an
+  instance of the rest. And a null uuid identifies nothing, so it joins nothing:
+  it is what a writer emits when it has nothing to say.
+
+  A link is not an origin. An origin is one source's claim about where a file
+  came from; a link is a relation between two records that exists only because
+  both were scanned together, so it lives on the record rather than among the
+  claims. An ancestor's download record is deliberately *not* inherited down a
+  derivation edge - an archive inherits because the bytes were literally inside
+  it, and an edited export is a different file. `docs/specs/` has the reasoning.
+
+  The developer's corpus produces no links at all: 105 files, twenty identifiers
+  and not one of them shared. That is the honest result for a collection of
+  unrelated downloads, and the feature was verified instead against a chain
+  written by `exiftool`.
+
 - Reconciliation now compares a camera's own tags against their XMP mirror, the
   way it already compared IIM against XMP. The pairing is the XMP
   specification's own - the `tiff:` and `exif:` properties are defined as the

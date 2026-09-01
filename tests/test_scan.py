@@ -1,4 +1,5 @@
 import sqlite3
+import struct
 from pathlib import Path
 
 from filetrail.scan import scan
@@ -97,3 +98,37 @@ def test_xdg_xattr_is_read_when_supported(tmp_path: Path):
 
     assert any(o.source == "xdg-xattr" for o in origins)
     assert origins[0].url == "https://example.org/downloaded.bin"
+
+
+def test_a_scan_links_a_file_to_the_one_it_was_made_from(tmp_path: Path):
+    """The identifiers are per file and the relation is not. Working it out
+    needs the whole scan, which is why it happens beside the pass that gives an
+    extracted file the origin of the archive it came out of."""
+
+    def photograph(name: str, properties: str) -> None:
+        packet = (
+            '<x:xmpmeta xmlns:x="adobe:ns:meta/">'
+            '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
+            '<rdf:Description rdf:about=""'
+            ' xmlns:xmpMM="http://ns.adobe.com/xap/1.0/mm/"'
+            ' xmlns:stRef="http://ns.adobe.com/xap/1.0/sType/ResourceRef#">'
+            f"{properties}"
+            "</rdf:Description></rdf:RDF></x:xmpmeta>"
+        )
+        payload = b"http://ns.adobe.com/xap/1.0/\x00" + packet.encode("utf-8")
+        (tmp_path / name).write_bytes(
+            b"\xff\xd8\xff\xe1" + struct.pack(">H", len(payload) + 2) + payload + b"\xff\xd9"
+        )
+
+    photograph("master.jpg", "<xmpMM:DocumentID>xmp.did:1111AAAA</xmpMM:DocumentID>")
+    photograph(
+        "export.jpg",
+        "<xmpMM:DocumentID>xmp.did:2222BBBB</xmpMM:DocumentID>"
+        '<xmpMM:DerivedFrom stRef:documentID="xmp.did:1111AAAA"/>',
+    )
+
+    records = {Path(r.path).name: r for r in scan(tmp_path, use_shell_history=False)}
+
+    assert [link.others for link in records["export.jpg"].links] == [
+        (str(tmp_path / "master.jpg"),)
+    ]
