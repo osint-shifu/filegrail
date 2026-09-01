@@ -365,6 +365,24 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   ordinary length does not skip one field, it loses the reader's place in the
   stream and every dataset after it.
 
+- `doctor` reports the desktop's list of recently opened files, and how far
+  back the shell history and that list reach. It surveyed browsers, the
+  operating system's origin attribute, the shell, creation timestamps and C2PA
+  - but not `recently-used.xbel`, which a scan reads on every run. The file
+  opens by promising to say up front what could be searched, and a reader could
+  be handed a finding from a source the survey had never mentioned. An
+  incomplete promise of that kind is worse than none, because nothing tells the
+  reader where the gap is.
+
+  `HOME_SOURCES` now names every source that reads a home directory beside the
+  checks that report it, and a test holds it against `sources` itself, so the
+  next collector added without a check fails rather than going unreported.
+
+  The note under the horizon said a file older than it cannot be resolved from
+  browser history. With a shell and a desktop list beside them it was
+  describing one row of three, and reading as though the other two carried no
+  limit at all.
+
 ### Fixed
 
 - A download record written by another operating system never matched by name.

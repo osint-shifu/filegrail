@@ -158,3 +158,143 @@ def test_the_survey_stays_inside_the_width(tmp_path: Path):
     for width in (48, 64, 88, 110):
         output = render_doctor(found, Theme(colour=False, unicode=False, width=width))
         assert not [line for line in output.splitlines() if len(line) > width]
+
+
+# --- the sources a scan actually consults -------------------------------------
+
+
+XBEL = """<?xml version="1.0" encoding="UTF-8"?>
+<xbel version="1.0"
+  xmlns:bookmark="http://www.freedesktop.org/standards/desktop-bookmarks">
+  <bookmark href="file:///case/a.pdf" added="{first}">
+    <info><metadata owner="http://freedesktop.org">
+      <bookmark:applications>
+        <bookmark:application name="LibreOffice Writer"/>
+      </bookmark:applications>
+    </metadata></info>
+  </bookmark>
+  <bookmark href="file:///case/b.pdf" added="{second}">
+    <info><metadata owner="http://freedesktop.org">
+      <bookmark:applications>
+        <bookmark:application name="Okular"/>
+      </bookmark:applications>
+    </metadata></info>
+  </bookmark>
+</xbel>
+"""
+
+
+def _recent(home: Path, first: str, second: str) -> None:
+    share = home / ".local" / "share"
+    share.mkdir(parents=True)
+    (share / "recently-used.xbel").write_text(
+        XBEL.format(first=first, second=second), encoding="utf-8"
+    )
+
+
+def test_a_desktop_that_records_openings_is_reported(tmp_path: Path):
+    """`scan` reads this on every run; the survey never mentioned it.
+
+    A reader told which sources could be searched, and then handed a finding
+    from one that was not on the list, has been given an incomplete promise -
+    which is worse than none, because they cannot tell where the gap is.
+    """
+    _recent(tmp_path, "2026-04-17T09:00:00Z", "2026-08-30T11:00:00Z")
+
+    found = survey(home=tmp_path)
+
+    assert _state(found, "Recent documents") == AVAILABLE
+    assert "2 files" in _detail(found, "Recent documents")
+
+
+def test_a_desktop_with_no_record_of_openings_says_so(tmp_path: Path):
+    found = survey(home=tmp_path)
+
+    assert _state(found, "Recent documents") == UNAVAILABLE
+    assert "no list found" in _detail(found, "Recent documents")
+
+
+def test_the_recent_list_reports_how_far_back_it_reaches(tmp_path: Path):
+    """The oldest entry is the honest limit, exactly as it is for a browser."""
+    _recent(tmp_path, "2026-04-17T09:00:00Z", "2026-08-30T11:00:00Z")
+
+    found = survey(home=tmp_path)
+
+    horizon = {check.name: check.detail for check in found.horizon}
+    assert horizon["Recent documents oldest entry"] == "2026-04-17"
+
+
+def test_a_timestamped_shell_history_reports_how_far_back_it_reaches(tmp_path: Path):
+    (tmp_path / ".zsh_history").write_text(
+        ": 1713340800:0;curl -o a.pdf https://x.org/\n: 1756598400:0;ls\n"
+    )
+
+    found = survey(home=tmp_path)
+
+    horizon = {check.name: check.detail for check in found.horizon}
+    assert horizon["Shell history oldest command"] == "2024-04-17"
+
+
+def test_a_shell_history_without_times_claims_no_horizon(tmp_path: Path):
+    """Ordering survives; dates do not, and a horizon would be invented."""
+    (tmp_path / ".bash_history").write_text("ls -la\n")
+
+    found = survey(home=tmp_path)
+
+    assert not [check for check in found.horizon if check.name.startswith("Shell")]
+
+
+def test_every_source_that_reads_a_home_directory_is_surveyed():
+    """The invariant that would have caught the missing one.
+
+    Anything under `sources` that takes a home directory is evidence a scan
+    will use, so `doctor` has to account for it or stop claiming to say what
+    could be searched.
+    """
+    import inspect
+
+    from filetrail import sources
+    from filetrail.doctor import HOME_SOURCES
+
+    reads_a_home = {
+        name
+        for name in sources.__all__
+        if "home" in inspect.signature(getattr(sources, name)).parameters
+    }
+
+    assert reads_a_home == set(HOME_SOURCES), sorted(reads_a_home ^ set(HOME_SOURCES))
+
+
+def test_every_surveyed_source_is_named_in_the_report(tmp_path: Path):
+    """The registry is only worth having if the survey actually emits it."""
+    from filetrail.doctor import HOME_SOURCES
+
+    found = survey(home=tmp_path)
+
+    names = {check.name for check in found.checks}
+    for expected in (name for group in HOME_SOURCES.values() for name in group):
+        assert expected in names, expected
+
+
+def test_a_bash_history_with_times_also_reports_a_horizon(tmp_path: Path):
+    """Two shells, two spellings of the same fact, one horizon."""
+    (tmp_path / ".bash_history").write_text("#1713340800\ncurl -o a.pdf https://x.org/\n")
+
+    found = survey(home=tmp_path)
+
+    horizon = {check.name: check.detail for check in found.horizon}
+    assert horizon["Shell history oldest command"] == "2024-04-17"
+
+
+def test_the_horizon_note_covers_every_source_it_lists(tmp_path: Path):
+    """The note named browser history back when browsers were the only horizon.
+
+    With a shell and a desktop list beside them it describes one row of three
+    and reads as though the other two carried no limit at all.
+    """
+    _recent(tmp_path, "2026-04-17T09:00:00Z", "2026-08-30T11:00:00Z")
+
+    out = render_doctor(survey(home=tmp_path), PLAIN)
+
+    assert "Recent documents oldest entry" in out
+    assert "browser history" not in out

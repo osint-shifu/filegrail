@@ -547,7 +547,9 @@ def render_doctor(found, theme: Theme | None = None, home: Path | None = None) -
             )
         lines.append("")
         lines.append(
-            _note_line(theme, "A file older than this cannot be resolved from browser history.")
+            _note_line(
+                theme, "A file older than a source's oldest record cannot be resolved from it."
+            )
         )
 
     lines.append("")

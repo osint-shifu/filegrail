@@ -28,13 +28,25 @@ from .sources.browser import (
     _firefox_downloads,
     _profiles,
 )
-from .sources.shell import HISTORY_FILES
-from .util import birth_time
+from .sources.recent import RECENT_FILES, collect_recent_files
+from .sources.shell import HISTORY_FILES, _parse_history
+from .util import birth_time, iso
 
 AVAILABLE = "available"
 UNAVAILABLE = "unavailable"
 UNSUPPORTED = "not supported here"
 PARTIAL = "partial"
+
+#: Every source that reads a user's home directory, and the checks that report
+#: it. Kept as a mapping rather than left implicit, because this file promises
+#: to say what could be searched: a source a scan consults and the survey never
+#: mentions makes that promise one it keeps only sometimes, which is worse than
+#: not making it. A test holds this against `sources` itself.
+HOME_SOURCES = {
+    "collect_browser_downloads": ("Chromium family downloads", "Firefox downloads"),
+    "collect_shell_history": ("Shell history",),
+    "collect_recent_files": ("Recent documents",),
+}
 
 
 @dataclass(slots=True)
@@ -63,7 +75,8 @@ def survey(home: Path | None = None) -> Survey:
     found = Survey()
     found.checks.extend(_browsers(home, found))
     found.checks.append(_os_origin())
-    found.checks.append(_shell(home))
+    found.checks.append(_shell(home, found))
+    found.checks.append(_recent(home, found))
     found.checks.append(_birth_times())
     found.checks.append(_c2pa())
     return found
@@ -146,13 +159,14 @@ def _os_origin() -> Check:
     )
 
 
-def _shell(home: Path) -> Check:
+def _shell(home: Path, found: Survey) -> Check:
     """Which history files exist, and whether any of them kept timestamps."""
     present = [name for name in HISTORY_FILES if (home / name).is_file()]
     if not present:
         return Check("Shell history", UNAVAILABLE, "no history file found")
 
     timed = False
+    oldest: float | None = None
     for name in present:
         try:
             head = (home / name).read_text(encoding="utf-8", errors="replace")[:20000]
@@ -160,11 +174,52 @@ def _shell(home: Path) -> Check:
             continue
         if head.lstrip().startswith((": 1", "#1")):
             timed = True
+        for when, _command in _parse_history(home / name):
+            if when is not None and (oldest is None or when < oldest):
+                oldest = when
+
+    # Only where the shell was configured to keep times. Ordering survives
+    # without them, but a date does not, and one would have to be invented.
+    if oldest is not None:
+        stamp = iso(oldest)
+        if stamp:
+            found.horizon.append(Check("Shell history oldest command", AVAILABLE, stamp[:10]))
 
     names = ", ".join(Path(name).name for name in present)
     if timed:
         return Check("Shell history", AVAILABLE, f"{names}, with timestamps")
     return Check("Shell history", PARTIAL, f"{names}, without timestamps")
+
+
+def _recent(home: Path, found: Survey) -> Check:
+    """The desktop's record of which application opened which file.
+
+    A scan reads this every time, so a survey that leaves it out understates
+    what could be found. It answers a different question from the rest - what
+    handled the file here, not how it arrived - and it is the only source of
+    that kind, which is why its absence is worth stating rather than implying.
+    """
+    where = [name for name in RECENT_FILES if (home / name).is_file()]
+    if not where:
+        return Check("Recent documents", UNAVAILABLE, "no list found")
+
+    opened = collect_recent_files(home)
+    if not opened:
+        return Check("Recent documents", PARTIAL, "a list is present but nothing could be read")
+
+    oldest: str | None = None
+    for origins in opened.values():
+        for origin in origins:
+            if origin.at and (oldest is None or origin.at < oldest):
+                oldest = origin.at
+    if oldest:
+        found.horizon.append(Check("Recent documents oldest entry", AVAILABLE, oldest[:10]))
+
+    return Check(
+        "Recent documents",
+        AVAILABLE,
+        f"{len(opened)} files in {', '.join(Path(name).name for name in where)}",
+    )
 
 
 def _birth_times() -> Check:
