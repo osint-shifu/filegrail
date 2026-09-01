@@ -365,6 +365,18 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   ordinary length does not skip one field, it loses the reader's place in the
   stream and every dataset after it.
 
+- The README says what it can read before it says how it ranks it. The metadata
+  half was one item in a list of seven in the opening paragraph, which is a
+  strange way to describe the substance of the tool - `CONTRIBUTING.md` calls it
+  exactly that. It now has its own sentence, with the count and a link, and the
+  `Supported metadata` section opens with the scale rather than with a note
+  about output formatting. macOS quarantine was missing from the list of traces
+  entirely.
+
+  The JSON section said nine readers answer to `document-metadata`. That was
+  true before three more were added; fifteen blocks can carry it now, which is
+  every block there is.
+
 - [`FORMATS.md`](FORMATS.md): the complete list of what can be read out of a
   file, with the metadata block each format produces, what is deliberately not
   read, and which three readers are written from a specification rather than

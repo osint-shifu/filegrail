@@ -5,6 +5,7 @@
   <p>Retroactive file provenance from traces your machine already has.</p>
   <p>
     <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square">
+    <img alt="68 file extensions" src="https://img.shields.io/badge/formats-68-8250df?style=flat-square">
     <img alt="Zero runtime dependencies" src="https://img.shields.io/badge/runtime_dependencies-0-1f883d?style=flat-square">
     <img alt="Local and read-only" src="https://img.shields.io/badge/local_%26_read--only-yes-1f883d?style=flat-square">
     <img alt="Network requests" src="https://img.shields.io/badge/network_requests-none-1f883d?style=flat-square">
@@ -22,7 +23,11 @@
 
 You have a file. You want to know **where it came from**.
 
-`filetrail` checks the traces already left on the machine: browser history, OS origin metadata, archives, shell history, C2PA Content Credentials, EXIF, document metadata and recent-file records.
+`filetrail` reads two things and keeps them apart.
+
+It decodes metadata out of **68 file extensions** - EXIF, XMP, IPTC, C2PA, PDF, Office, OpenDocument, EPUB, MP4, Matroska, FLAC, WAV, email and more ([full list](FORMATS.md)).
+
+And it checks the traces already left on the machine: browser history, OS origin metadata, macOS quarantine records, archives, shell history and recent-file records.
 
 Then it puts those pieces into one report and keeps three questions separate:
 
@@ -374,6 +379,8 @@ Supported classes include URLs, domains, email addresses, IP addresses, hashes a
 
 ## Supported metadata
 
+**68 file extensions** have a reader. Fifteen named metadata blocks, plus XMP, IPTC and C2PA, which turn up in any container that will carry them.
+
 `filetrail` keeps the fields its readers can actually decode. Normal output shows them as a tree, `--brief` folds them down, and `--json` keeps them for scripts and other tooling.
 
 The table below is the summary. [`FORMATS.md`](FORMATS.md) has the complete list — every extension, the metadata block each one produces, what is deliberately not read, and which readers are written from a specification rather than tested against real files. It is checked against the code by a test, so it cannot go stale.
@@ -497,10 +504,10 @@ Each claim carries two names for where it came from. `source` says what the
 reader found - `device-metadata` where a file named a camera, `document-metadata`
 where it did not - and is what `confidence` ranks. `block` says which metadata
 block was decoded: `pdf-info`, `png-text`, `exif`, `ole-summary`, `iptc`, `xmp`.
-Nine readers answer to `document-metadata`, so `block` is the field to filter on
-when you want the PDFs rather than everything a file said about itself. A record
-that decoded no metadata block - a browser download, a shell command - has no
-`block` at all.
+Fifteen different blocks can all come back as `document-metadata`, so `block` is
+the field to filter on when you want the PDFs rather than everything a file said
+about itself. A record that decoded no metadata block - a browser download, a
+shell command - has no `block` at all.
 
 <p align="right"><a href="#table-of-contents">Back to contents ↑</a></p>
 
