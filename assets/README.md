@@ -7,7 +7,7 @@ Banner (works on both GitHub themes):
 
 ```markdown
 <p align="center">
-  <img src="assets/filetrail-banner.svg" alt="filetrail — trace where files came from" width="820">
+  <img src="assets/filetrail-banner.svg" alt="filetrail — trace origins, extract metadata" width="820">
 </p>
 ```
 

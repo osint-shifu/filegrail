@@ -365,6 +365,29 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   ordinary length does not skip one field, it loses the reader's place in the
   stream and every dataset after it.
 
+- The tagline says both halves of what the tool does: `trace origins, extract
+  metadata`. It said only the first, and the landing screen it sits on had ten
+  examples without one that mentioned metadata - including `filetrail
+  suspicious.pdf`, the command that prints the whole field tree, described as
+  `one file`. The capability now sits in the examples, where a reader looks for
+  capabilities, rather than in a second slogan under the first.
+
+  Four characters longer than the line it replaces, because `where files came
+  from` spent five words on one idea and the wordmark says `filetrail` directly
+  above it. The banner, both READMEs and the `aria-label` say the same thing.
+
+  `--home` and `--timeline` are in the options list. `--home` is the newest
+  thing the tool can do and was on the screen nowhere.
+
+- Timestamps print to the second. GTK writes microseconds into
+  `recently-used.xbel` and a shortcut carries the filesystem's own precision, so
+  a claim from either sat beside a dozen stamps that stop at the second and read
+  as an inconsistency rather than as precision. `--json` still carries every
+  digit, and `--timeline` already did this.
+
+- `explain` puts a blank line under the rule before naming the profile it read,
+  the way the scan report does.
+
 - The README is rewritten around what the tool does rather than around how its
   evidence model works. `What filetrail does` opens with metadata extraction and
   provenance reconstruction as two named capabilities; `Metadata analysis` is a

@@ -43,6 +43,21 @@ SELF_REPORTED = frozenset(
     {"document-metadata", "device-metadata", "c2pa", "xmp", "xmp-history", "iptc"}
 )
 
+
+def shown(moment: str | None) -> str | None:
+    """A timestamp as the report prints it: to the second, and no further.
+
+    A source is free to record more. GTK writes microseconds into
+    `recently-used.xbel` and a shortcut carries the filesystem's own precision,
+    and `--json` keeps every digit of it. On screen those seven characters buy
+    nothing, sit beside a dozen stamps that stop at the second, and read as an
+    inconsistency rather than as precision.
+    """
+    if not moment:
+        return None
+    return f"{moment[:19]}Z" if moment.endswith("Z") else moment[:19]
+
+
 #: Width of the label column inside an entry, so values line up across labels.
 _LABEL = 10
 
@@ -321,7 +336,7 @@ def _origin(theme: Theme, origin: Origin, record: FileRecord, *, brief: bool = F
     facts = [label(origin)]
     if origin.tool and origin.tool not in claim:
         facts.append(origin.tool)
-    stamp = origin.at if origin.source in SELF_REPORTED else (origin.at or record.btime)
+    stamp = shown(origin.at if origin.source in SELF_REPORTED else (origin.at or record.btime))
     if stamp:
         facts.append(stamp)
     detail = theme.glyph(MIDDOT).join(f" {fact} " for fact in facts).strip()
@@ -580,7 +595,8 @@ def render_explain(record: FileRecord, theme: Theme | None = None, home: Path | 
 
     name = Path(record.path).name
     lines = ["", f"  {theme.bold('filetrail')}  {theme.dim('explain')}  {theme.bold(name)}", rule]
-    lines.extend(_whose_machine(theme, home, "evidence read from the profile at"))
+    if home:
+        lines.extend(["", *_whose_machine(theme, home, "evidence read from the profile at")])
 
     for name_of_kind, question, claims in grouped(record, home):
         head = f"  {theme.label(name_of_kind)}"
@@ -643,7 +659,7 @@ def _explained(theme: Theme, origin: Origin) -> list[str]:
     # Whatever became the headline must not be repeated underneath it.
     detail = [
         value
-        for value in (origin.tool, origin.at, origin.geo, origin.location)
+        for value in (origin.tool, shown(origin.at), origin.geo, origin.location)
         if value and value != said
     ]
     if origin.note and origin.note != said:

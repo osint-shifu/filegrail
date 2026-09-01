@@ -45,7 +45,7 @@ USAGE = (
 #: they can skip one they skip the rest.
 EXAMPLES = (
     ("filetrail ~/Downloads", "everything in a folder"),
-    ("filetrail suspicious.pdf", "one file"),
+    ("filetrail suspicious.pdf", "one file, every field it carries"),
     ("filetrail . --unknown-only", "what nothing accounts for"),
     ("filetrail photos/ --type image", "cameras and phones only"),
     ("filetrail explain suspicious.pdf", "why it concluded that"),
@@ -54,6 +54,7 @@ EXAMPLES = (
     ("filetrail . --timeline", "in the order things happened"),
     ("filetrail . --redact --json", "safe to hand to someone else"),
     ("filetrail doctor", "what this machine can answer at all"),
+    ("filetrail case/ --home /mnt/case", "somebody else's machine"),
 )
 
 COMMANDS = (
@@ -72,7 +73,9 @@ OPTIONS = (
     ("    --identify", "emails, domains, addresses, coordinates"),
     ("    --type image", "only these kinds of file"),
     ("    --unknown-only", "only files nothing accounts for"),
+    ("    --timeline", "one line per event, in order"),
     ("    --redact", "redact credentials before printing"),
+    ("    --home DIR", "read another profile, not this machine's"),
     ("    --no-recurse", "this directory only"),
     ("    --no-color", "disable ANSI colors"),
     ("    --version", "show version"),

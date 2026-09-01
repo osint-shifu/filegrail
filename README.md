@@ -1,8 +1,8 @@
 <a id="top"></a>
 
 <div align="center">
-  <img src="assets/filetrail-banner.svg" alt="filetrail - trace where files came from" width="820">
-  <p><strong>Trace where files came from. Extract what they reveal.</strong></p>
+  <img src="assets/filetrail-banner.svg" alt="filetrail - trace origins, extract metadata" width="820">
+  <p><strong>Trace origins, extract metadata.</strong></p>
   <p>
     Fast, local file provenance and metadata analysis from traces your machine
     and the files themselves already contain.
@@ -512,5 +512,5 @@ See [`LICENSE`](LICENSE).
 ---
 
 <div align="center">
-  <strong>Trace where files came from. Extract what they reveal.</strong>
+  <strong>Trace origins, extract metadata.</strong>
 </div>
