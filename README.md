@@ -446,6 +446,8 @@ It reconstructs what it can from surviving local evidence and file metadata.
 
 C2PA manifests are parsed, but their cryptographic signatures are currently **not verified**.
 
+Three readers are written from the specification and have never been run against a file the originating software produced: Outlook `.msg` messages, Windows `.lnk` shortcuts, and the `id3 ` chunk a WAV file may carry. [`FORMATS.md`](FORMATS.md) names them and says why.
+
 Use `filetrail doctor` to understand what evidence sources are actually available before drawing conclusions from missing data.
 
 ---
