@@ -158,7 +158,7 @@ BLOCKS = [
     ("chart.png", _image, "png-text"),
     ("clip.mp4", _movie, "isobmff"),
     ("track.mp3", _audio, "id3"),
-    ("take.wav", _wav, "riff-info"),
+    ("take.wav", _wav, "riff"),
 ]
 
 

@@ -541,7 +541,7 @@ def test_a_riff_software_field_is_not_read_as_a_tiff_tag():
     record = _record(
         Origin(
             source="document-metadata",
-            block="riff-info",
+            block="riff",
             fields={"Software": "Audacity 3.4.2"},
         ),
         Origin(source="xmp", block="xmp", fields={"tiff:Software": "Adobe Audition 24.0"}),

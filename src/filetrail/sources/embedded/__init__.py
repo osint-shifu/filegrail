@@ -300,7 +300,7 @@ def _from_riff(path: Path, suffix: str) -> Origin | None:
 
     return _origin(
         "document-metadata",
-        block="riff-info",
+        block="riff",
         tool=tool,
         # When the recording started beats when the file was written out.
         at=_normalise(found.originated)

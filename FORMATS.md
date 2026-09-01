@@ -33,7 +33,7 @@ on when you want the PDFs rather than everything a file said about itself.
 | `png-text` | `.png` `.apng` | `tEXt` / `zTXt` / `iTXt` keywords: software, creation time, author, and whatever a generator wrote there |
 | `isobmff` | `.mp4` `.m4v` `.mov` `.qt` `.3gp` `.m4a` `.heic` `.heif` `.avif` | Encoder and recording device, creation time, ISO 6709 location |
 | `matroska` | `.mkv` `.mk3d` `.webm` `.mka` | Writing application and library, segment date, tag entries |
-| `riff-info` | `.wav` `.wave` `.rmi` `.avi` | `LIST`/`INFO` fields, BWF `bext` recorder and coding history, an `id3 ` chunk where one is present |
+| `riff` | `.wav` `.wave` `.rmi` `.avi` | `LIST`/`INFO` fields, BWF `bext` recorder and coding history, an `id3 ` chunk where one is present |
 | `vorbis-comment` | `.flac` `.ogg` `.oga` `.opus` `.spx` | Vendor string and every `NAME=value` comment |
 | `id3` | `.mp3` `.aac` `.tta` | ID3v2 frames: encoding software, artist, title, date |
 | `pdf-info` | `.pdf` | The `Info` dictionary, through compressed object streams and hex strings |

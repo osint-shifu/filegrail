@@ -45,6 +45,14 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   make and a model, which is why it outranks a bare document property, and
   `EXIF` would throw that away.
 
+- The WAV and AVI block is `riff` rather than `riff-info`. That reader decodes
+  three chunk families and already names every field for the standard it came
+  from - `bext:Originator` beside `id3:encoder` beside a plain INFO field - so
+  the block only had to name where they were all found. It named one of the
+  three instead, and a broadcast recording carrying no INFO list at all was
+  reported under the label of the chunk it did not have. `matroska` and
+  `isobmff` are named for their containers for the same reason.
+
 - Two timestamps are compared as instants where both writers said what zone they
   were in, and as readings where either did not. The zone used to be dropped
   outright, which EXIF requires - it writes no zone at all while its XMP mirror

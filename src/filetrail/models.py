@@ -89,7 +89,7 @@ BLOCK_LABELS = {
     "isobmff": "movie metadata",
     "png-text": "PNG text",
     "ole-summary": "OLE summary",
-    "riff-info": "RIFF INFO",
+    "riff": "RIFF",
     "id3": "ID3",
     "matroska": "Matroska",
     "vorbis-comment": "Vorbis comment",
