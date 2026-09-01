@@ -120,6 +120,17 @@ class Origin:
     """One claim about where a file came from, made by one source."""
 
     source: str
+
+    #: The metadata block these values were decoded from: `pdf-info`, `exif`,
+    #: `png-text`. `source` names what the reader *found* - a camera, a bare
+    #: document - which is the axis confidence and colour turn on, and one
+    #: reader answers it two ways depending on what the file happened to hold.
+    #: This names what it *read*, which is the axis a mirrored self-description
+    #: turns on: whether IIM or a PDF Info dictionary applies is a question
+    #: about the standard. A record that decoded no metadata block leaves it
+    #: unset rather than naming one nobody read.
+    block: str | None = None
+
     url: str | None = None
     referrer: str | None = None
     tool: str | None = None

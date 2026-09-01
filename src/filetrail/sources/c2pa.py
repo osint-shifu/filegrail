@@ -182,7 +182,7 @@ def _summarise(claims: list[dict]) -> Origin | None:
         return None
 
     notes = [note for note in (source_type, "signature not verified") if note]
-    return Origin(source="c2pa", tool=tool, at=when, note="; ".join(notes))
+    return Origin(source="c2pa", block="c2pa", tool=tool, at=when, note="; ".join(notes))
 
 
 def _generator_name(claim: dict) -> str | None:

@@ -65,6 +65,7 @@ def read_ooxml(path: Path) -> Origin | None:
 
 
 def _origin(
+    block: str,
     tool: str | None,
     at: str | None,
     note: str | None,
@@ -72,7 +73,14 @@ def _origin(
 ) -> Origin | None:
     if not tool and not at and not note:
         return None
-    return Origin(source="document-metadata", tool=tool, at=at, note=note, fields=fields or {})
+    return Origin(
+        source="document-metadata",
+        block=block,
+        tool=tool,
+        at=at,
+        note=note,
+        fields=fields or {},
+    )
 
 
 def _read_pdf(path: Path) -> Origin | None:
@@ -99,6 +107,7 @@ def _read_pdf(path: Path) -> Origin | None:
 
     notes = [f"author {found['Author']}"] if found.get("Author") else []
     return _origin(
+        "pdf-info",
         tool,
         _parse_pdf_date(found.get("CreationDate")),
         "; ".join(notes) or None,
@@ -198,7 +207,9 @@ def _read_ooxml(path: Path) -> Origin | None:
     if company:
         notes.append(f"company {company}")
 
-    return _origin(tool, _normalise_timestamp(created), "; ".join(notes) or None, fields)
+    return _origin(
+        "ooxml-properties", tool, _normalise_timestamp(created), "; ".join(notes) or None, fields
+    )
 
 
 def _ooxml_properties(

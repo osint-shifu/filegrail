@@ -101,6 +101,7 @@ def read_iptc(path: Path) -> Origin | None:
 
     return Origin(
         source="iptc",
+        block="iptc",
         tool=_tool(fields),
         at=_moment(fields.get("DateCreated"), fields.get("TimeCreated")),
         location=_place(fields),

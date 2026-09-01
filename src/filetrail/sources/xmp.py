@@ -133,6 +133,7 @@ def read_xmp(path: Path) -> list[Origin]:
     return [
         Origin(
             source="xmp",
+            block="xmp",
             tool=_first(properties, ("xmp:CreatorTool",)),
             at=_timestamp(_first(properties, ("xmp:CreateDate",))),
             note=_note(properties, len(dated) - len(shown), len(dated)),
@@ -260,6 +261,7 @@ def _history(root: ElementTree.Element) -> list[dict[str, str]]:
 def _edit(step: dict[str, str]) -> Origin:
     return Origin(
         source="xmp-history",
+        block="xmp-history",
         tool=_first(step, ("stEvt:softwareAgent",)),
         at=_timestamp(_first(step, ("stEvt:when",))),
         note=_summary(step) or None,
