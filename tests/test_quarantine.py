@@ -13,7 +13,6 @@ single subsystem twice.
 
 from __future__ import annotations
 
-import os
 import sqlite3
 from pathlib import Path
 
@@ -25,11 +24,13 @@ from filetrail.sources.quarantine import (
     collect_quarantine_events,
     read_quarantine,
 )
+from tests.xattrs import supported, write
 
-#: The attribute is `com.apple.quarantine` on macOS itself. Nothing outside
-#: that namespace can be written on Linux, so a copy carries it under `user.`,
-#: which is also the only spelling these tests can create.
-ATTRIBUTE = "user.com.apple.quarantine"
+#: The attribute is `com.apple.quarantine` on macOS itself. Nothing outside the
+#: `user.` namespace can be written on Linux, so a copy carries it there - and
+#: both are tried, so a macOS runner exercises the native spelling and a Linux
+#: one exercises the spelling a copy arrives under.
+ATTRIBUTES = ("com.apple.quarantine", "user.com.apple.quarantine")
 
 EVENT = "1A2B3C4D-5E6F-4071-8293-A4B5C6D7E8F9"
 
@@ -39,18 +40,13 @@ STAMP = "68b4bd35"
 
 
 def _tag(path: Path, value: str) -> None:
-    """Write the attribute, or skip where the test cannot write one.
-
-    `os.setxattr` is a Linux interface: the standard library does not expose
-    the call on macOS or Windows at all, which is a fact about the test rig and
-    not about the format.
-    """
-    if not hasattr(os, "setxattr"):  # pragma: no cover - depends on the platform
-        pytest.skip("the standard library exposes extended attributes on Linux only")
-    try:
-        os.setxattr(str(path), ATTRIBUTE, value.encode("ascii"))
-    except OSError as unsupported:  # pragma: no cover - depends on the mount
-        pytest.skip(f"extended attributes unavailable here: {unsupported}")
+    """Write the attribute under whichever name this platform will take."""
+    if not supported():  # pragma: no cover - depends on the platform
+        pytest.skip("no interface for extended attributes on this platform")
+    for name in ATTRIBUTES:
+        if write(path, name, value.encode("ascii")):
+            return
+    pytest.skip("this filesystem refuses extended attributes")  # pragma: no cover
 
 
 def _database(home: Path, rows: list[tuple]) -> None:
