@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .explain import conclusion, grouped
 from .identify import Identifier, extract
-from .models import ACQUISITION, INTRINSIC, SOURCE_LABELS, FileRecord, Origin, kind
+from .models import ACQUISITION, INTRINSIC, FileRecord, Origin, kind, label
 from .reconcile import ATTRIBUTION_CONFLICT, CONFLICT, KINDS, PARTIAL, Verdict, reconcile
 from .theme import (
     ARROW,
@@ -289,9 +289,9 @@ def _verdict(theme: Theme, verdict: Verdict) -> list[str]:
     """The reconciliation, in the gutter, so it reads as part of the entry."""
     colour = "warning" if verdict.contested else "recorded"
     indent = _gutter(theme)
-    label = theme.paint(verdict.headline, colour)
+    headline = theme.paint(verdict.headline, colour)
 
-    lines = [f"  {_mark(theme, FLAG, colour)} {label}"]
+    lines = [f"  {_mark(theme, FLAG, colour)} {headline}"]
     for reason in verdict.reasons:
         for part in theme.wrap(reason, theme.width - indent - 2):
             lines.append(f"  {_mark(theme, RAIL)}   {theme.dim(part)}")
@@ -309,7 +309,7 @@ def _origin(theme: Theme, origin: Origin, record: FileRecord, *, brief: bool = F
     lines = [f"  {arrow} {theme.paint(wrapped[0], colour)}"]
     lines.extend(f"  {rail} {theme.paint(part, colour)}" for part in wrapped[1:])
 
-    facts = [SOURCE_LABELS.get(origin.source, origin.source)]
+    facts = [label(origin)]
     if origin.tool and origin.tool not in claim:
         facts.append(origin.tool)
     stamp = origin.at if origin.source in SELF_REPORTED else (origin.at or record.btime)
@@ -327,9 +327,9 @@ def _origin(theme: Theme, origin: Origin, record: FileRecord, *, brief: bool = F
         else:
             lines.append(f"  {rail} {theme.label(part)}")
 
-    for label, value, paint in _facts(origin):
+    for name, value, paint in _facts(origin):
         for index, part in enumerate(theme.wrap(value, theme.width - indent - _LABEL)):
-            head = theme.dim(label.ljust(_LABEL)) if index == 0 else " " * _LABEL
+            head = theme.dim(name.ljust(_LABEL)) if index == 0 else " " * _LABEL
             painted = theme.paint(part, paint) if paint else theme.dim(part)
             lines.append(f"  {rail} {head}{painted}")
 
@@ -357,12 +357,12 @@ def _fields_block(theme: Theme, fields: dict[str, str], indent: int) -> list[str
     for index, (name, value) in enumerate(items):
         last = index == len(items) - 1
         branch = _mark(theme, LAST if last else BRANCH)
-        label = theme.dim(theme.clip(name, width).ljust(width))
+        painted = theme.dim(theme.clip(name, width).ljust(width))
         spacer = " " * len(theme.glyph(ARROW)) if last else _mark(theme, RAIL)
 
         for line, part in enumerate(theme.wrap(str(value), room)):
             gutter = branch if line == 0 else spacer
-            head = label if line == 0 else " " * width
+            head = painted if line == 0 else " " * width
             out.append(f"  {gutter} {head}  {theme.paint(part, 'body')}")
     return out
 
@@ -430,24 +430,29 @@ def _summary(
     stats: dict[str, int] | None,
     filtered: str = "",
 ) -> list[str]:
+    # Tallied by the name the entries above were printed under, not by the
+    # source behind it: one report calling the same claim `PDF Info` in the body
+    # and `document metadata` in the summary reads as two kinds of evidence.
     counts: dict[str, int] = {}
-    confidence: dict[str, int] = {}
+    behind: dict[str, tuple[str, int]] = {}
     for record in known:
         if record.best:
-            counts[record.best.source] = counts.get(record.best.source, 0) + 1
-            confidence[record.best.source] = record.best.confidence
+            name = label(record.best)
+            counts[name] = counts.get(name, 0) + 1
+            behind[name] = (record.best.source, record.best.confidence)
 
     lines = [f"  {theme.rule(theme.width - 2)}"]
 
     if counts:
         ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
-        widest = max(len(SOURCE_LABELS.get(source, source)) for source, _ in ordered)
+        widest = max(len(name) for name, _ in ordered)
         digits = max(len(str(count)) for _, count in ordered)
-        for source, count in ordered:
+        for name, count in ordered:
+            source, confidence = behind[name]
             colour = theme.evidence(source)
-            label = theme.paint(SOURCE_LABELS.get(source, source).ljust(widest), colour)
-            meter = theme.meter(confidence[source], colour)
-            lines.append(f"    {label}  {meter}  {theme.dim(str(count).rjust(digits))}")
+            painted = theme.paint(name.ljust(widest), colour)
+            meter = theme.meter(confidence, colour)
+            lines.append(f"    {painted}  {meter}  {theme.dim(str(count).rjust(digits))}")
         lines.append("")
 
     total = theme.bold(f"{len(known)} of {len(records)}")
@@ -516,9 +521,9 @@ def render_doctor(found, theme: Theme | None = None) -> str:
             "available": "recorded",
             "partial": "circumstantial",
         }.get(check.state, "warning")
-        label = theme.paint(check.name.ljust(width), "body")
+        painted = theme.paint(check.name.ljust(width), "body")
         state = theme.paint(check.state, colour)
-        lines.append(f"  {label}  {state}")
+        lines.append(f"  {painted}  {state}")
         for part in theme.wrap(check.detail, theme.width - width - 8):
             lines.append(f"  {' ' * width}    {theme.dim(part)}")
 
@@ -591,7 +596,7 @@ def _explained(theme: Theme, origin: Origin) -> list[str]:
     that order, because what the record actually says is the part worth keeping.
     """
     colour = theme.evidence(origin.source)
-    label = SOURCE_LABELS.get(origin.source, origin.source)
+    name = label(origin)
     word = STRENGTH.get(colour, colour)
     said = origin.url or origin.command or origin.tool or origin.note or "(no detail)"
 
@@ -603,7 +608,7 @@ def _explained(theme: Theme, origin: Origin) -> list[str]:
 
     lines = []
     for index, part in enumerate(theme.wrap(said, room)):
-        head = theme.paint(theme.clip(label, column).ljust(column), colour)
+        head = theme.paint(theme.clip(name, column).ljust(column), colour)
         if index:
             head = " " * column
         tail = f"  {theme.dim(word)}" if index == 0 and show_strength else ""

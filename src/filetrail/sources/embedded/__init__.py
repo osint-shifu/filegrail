@@ -111,6 +111,7 @@ def _from_exif(path: Path, suffix: str) -> Origin | None:
 
     return _origin(
         "device-metadata" if device else "document-metadata",
+        block="exif",
         tool=tool,
         at=taken,
         geo=_coordinates(exif.coordinates(tags)),
@@ -159,6 +160,7 @@ def _from_movie(path: Path, suffix: str) -> Origin | None:
 
     return _origin(
         "device-metadata" if device else "document-metadata",
+        block="isobmff",
         tool=tool,
         at=movie.created,
         geo=_coordinates(movie.coordinates),
@@ -200,7 +202,12 @@ def _from_png(path: Path, suffix: str) -> Origin | None:
     fields = {name: value for name, value in text.items() if name != png.XMP_KEYWORD}
 
     return _origin(
-        "document-metadata", tool=tool, at=created, note="; ".join(notes) or None, fields=fields
+        "document-metadata",
+        block="png-text",
+        tool=tool,
+        at=created,
+        note="; ".join(notes) or None,
+        fields=fields,
     )
 
 
@@ -219,6 +226,7 @@ def _from_container(path: Path, suffix: str) -> Origin | None:
 
     return _origin(
         "document-metadata",
+        block=found.block,
         tool=found.tool,
         at=_normalise(found.created),
         note="; ".join(notes) or None,
@@ -245,6 +253,7 @@ def _from_compound(path: Path, suffix: str) -> Origin | None:
 
     return _origin(
         "document-metadata",
+        block="ole-summary",
         tool=found.tool,
         at=_normalise(found.created),
         note="; ".join(notes) or None,
@@ -291,6 +300,7 @@ def _from_riff(path: Path, suffix: str) -> Origin | None:
 
     return _origin(
         "document-metadata",
+        block="riff-info",
         tool=tool,
         # When the recording started beats when the file was written out.
         at=_normalise(found.originated)
@@ -323,6 +333,7 @@ def _from_matroska(path: Path, suffix: str) -> Origin | None:
     title = found.fields.get("Title")
     return _origin(
         "document-metadata",
+        block="matroska",
         tool=tool,
         at=found.at,
         note=f"title {_clip(title, 80)}" if title else None,
@@ -347,6 +358,7 @@ def _from_vorbis(path: Path, suffix: str) -> Origin | None:
 
     return _origin(
         "document-metadata",
+        block="vorbis-comment",
         # The vendor string is written by whatever produced the file, so it is
         # the weaker answer of the two and never the wrong one.
         tool=_first(found, ("ENCODER", "Vendor")),
@@ -370,6 +382,7 @@ def _from_audio(path: Path, suffix: str) -> Origin | None:
 
     return _origin(
         "document-metadata",
+        block="id3",
         tool=frames.get("encoder"),
         at=_normalise(frames.get("date")),
         note="; ".join(notes) or None,
@@ -382,6 +395,7 @@ def _from_audio(path: Path, suffix: str) -> Origin | None:
 def _origin(
     source: str,
     *,
+    block: str,
     tool: str | None = None,
     at: str | None = None,
     geo: str | None = None,
@@ -396,7 +410,9 @@ def _origin(
     """
     if not any((tool, at, geo, note)):
         return None
-    return Origin(source=source, tool=tool, at=at, geo=geo, note=note, fields=fields or {})
+    return Origin(
+        source=source, block=block, tool=tool, at=at, geo=geo, note=note, fields=fields or {}
+    )
 
 
 def _coordinates(value: tuple[float, float] | None) -> str | None:

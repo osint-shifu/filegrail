@@ -90,17 +90,32 @@ def _which_is_stale(contested: list) -> str:
     Whichever block an editor understands is the one it rewrites; the other it
     copies through untouched. Naming them is the point - a conclusion about the
     IPTC block of a file that has none is describing evidence that is not there.
+
+    Not every pairing works that way, and the ones that do not are not made to.
+    A PDF's two blocks are written by one producer, and an exporter stamps a
+    fresh Info dictionary while carrying the XMP through from the source
+    document, so the Info is as often the newer of the two as the older.
     """
-    pairs = list(dict.fromkeys(finding.sources for finding in contested if finding.sources))
+    pairs = list(
+        dict.fromkeys(
+            (finding.sources, finding.maintained) for finding in contested if finding.sources
+        )
+    )
     if len(pairs) != 1:
         return (
             "An editor maintains the block it understands and copies the others through as "
             "it found them, so the ones it did not touch are the likelier to describe an "
             "earlier state"
         )
-    older, newer = pairs[0]
+    (first, second), maintained = pairs[0]
+    if maintained is None:
+        return (
+            f"One tool writes both the {first} and the {second}, and either can be the block "
+            f"carried through from an earlier document, so neither is reliably the older"
+        )
+    older = first if maintained == second else second
     return (
-        f"An editor maintains the {newer} and leaves the {older} as it found it, so the "
+        f"An editor maintains the {maintained} and leaves the {older} as it found it, so the "
         f"{older} is the likelier of the two to describe an earlier state"
     )
 

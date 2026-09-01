@@ -180,10 +180,13 @@ It can flag:
 - filename-only matches;
 - recorded-size mismatches;
 - timelines that do not line up;
-- a file whose own two accounts of itself disagree - IPTC and XMP hold the same
-  facts under different names, and so do a camera's EXIF tags and their XMP
-  mirror. An editor maintains one block while leaving the other as it found it,
-  so a difference is the trace of an attribution being changed. Timestamps are
+- a file whose own two accounts of itself disagree. Four pairings are checked,
+  each of them published rather than guessed: IPTC IIM against XMP, a camera's
+  EXIF tags against their XMP mirror, a PDF's `Info` dictionary against its XMP,
+  and a PNG's text chunks against its XMP. An editor maintains one block while
+  leaving the other as it found it, so a difference is the trace of an
+  attribution being changed - a PDF whose `Info` names InDesign while its XMP
+  still names the Illustrator document it was exported from, say. Timestamps are
   compared as moments and exposure settings not at all, because a zone or a
   comma decimal is two tools spelling one fact, not two facts.
 
@@ -456,6 +459,15 @@ filetrail /mnt/evidence --hash --json > filetrail.json
 ```
 
 JSON keeps file records, origin claims, decoded fields and confidence values, so you can feed the result into scripts, case tooling or another analysis workflow without scraping terminal text.
+
+Each claim carries two names for where it came from. `source` says what the
+reader found - `device-metadata` where a file named a camera, `document-metadata`
+where it did not - and is what `confidence` ranks. `block` says which metadata
+block was decoded: `pdf-info`, `png-text`, `exif`, `ole-summary`, `iptc`, `xmp`.
+Nine readers answer to `document-metadata`, so `block` is the field to filter on
+when you want the PDFs rather than everything a file said about itself. A record
+that decoded no metadata block - a browser download, a shell command - has no
+`block` at all.
 
 <p align="right"><a href="#table-of-contents">Back to contents ↑</a></p>
 

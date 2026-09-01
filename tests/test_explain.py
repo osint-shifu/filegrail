@@ -149,8 +149,10 @@ def test_the_conclusion_says_when_the_two_self_descriptions_contradict():
     silent about the thing that is actually contested here: the file's own two
     accounts of who made it."""
     record = FileRecord(path="/case/contested.jpg", size=494, mtime="2026-08-24T19:00:00Z")
-    record.origins.append(Origin(source="iptc", fields={"By-line": "Francisco Gonzalez"}))
-    record.origins.append(Origin(source="xmp", fields={"dc:creator": "Marta Nowak"}))
+    record.origins.append(
+        Origin(source="iptc", block="iptc", fields={"By-line": "Francisco Gonzalez"})
+    )
+    record.origins.append(Origin(source="xmp", block="xmp", fields={"dc:creator": "Marta Nowak"}))
 
     output = render_explain(record, theme=Theme(colour=False, unicode=False, width=88))
 
@@ -161,14 +163,44 @@ def test_the_conclusion_says_when_the_two_self_descriptions_contradict():
     assert "IPTC" in output
 
 
+def test_the_conclusion_does_not_rank_a_pdf_info_block_against_its_xmp():
+    """IIM and EXIF go stale because an editor rewrites the XMP and copies them
+    through untouched. A PDF is the other way about as often as not: an exporter
+    stamps a fresh Info dictionary at export while carrying the XMP through from
+    the source document, which is what the corpus file shows - XMP from February,
+    Info from May. Naming the Info as the likelier to be stale would state the
+    opposite of what happened."""
+    record = FileRecord(path="/case/export.pdf", size=494, mtime="2026-08-24T19:00:00Z")
+    record.origins.append(
+        Origin(
+            source="document-metadata",
+            block="pdf-info",
+            fields={"Creator": "Adobe InDesign CC 13.1"},
+        )
+    )
+    record.origins.append(
+        Origin(source="xmp", block="xmp", fields={"xmp:CreatorTool": "Adobe Illustrator CC 22.0"})
+    )
+
+    said = " ".join(
+        render_explain(record, theme=Theme(colour=False, unicode=False, width=88)).split()
+    )
+
+    assert "disagree about Creator" in said
+    assert "PDF Info is the likelier" not in said
+    assert "neither is reliably the older" in said
+
+
 def test_the_conclusion_names_the_blocks_that_actually_disagree():
     """A camera's tags and their XMP mirror contradict each other in the same
     way IIM and XMP do, and the reasoning is the same - but a conclusion that
     talks about the IPTC block of a file that has none is telling the reader
     about a piece of evidence that is not there."""
     record = FileRecord(path="/case/tampered.jpg", size=494, mtime="2026-08-24T19:00:00Z")
-    record.origins.append(Origin(source="device-metadata", fields={"Model": "Canon PowerShot G9"}))
-    record.origins.append(Origin(source="xmp", fields={"tiff:Model": "NIKON D700"}))
+    record.origins.append(
+        Origin(source="device-metadata", block="exif", fields={"Model": "Canon PowerShot G9"})
+    )
+    record.origins.append(Origin(source="xmp", block="xmp", fields={"tiff:Model": "NIKON D700"}))
 
     output = render_explain(record, theme=Theme(colour=False, unicode=False, width=88))
 

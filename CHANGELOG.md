@@ -9,6 +9,51 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Every claim records which metadata block it was decoded from, beside the
+  source it already carried. The two answer different questions. `source` names
+  what the reader *found* - `device-metadata` where a file named a camera,
+  `document-metadata` where it did not - and is what confidence, colour and
+  kind turn on. `block` names what it *read*: `pdf-info`, `png-text`, `exif`,
+  `ole-summary`, `iptc`, `xmp`. It appears in `--json` as `block`, and a record
+  that decoded no metadata block does not have one.
+
+  Nine readers answer to `document-metadata`, which is why the distinction had
+  to exist before a PDF pairing could. Keyed on the source, the EXIF mirror
+  reached all nine: a WAV's `INFO` list has a field spelled Software, and beside
+  an XMP packet the tool reported `Software: RIFF INFO says Audacity 3.4.2, XMP
+  says Adobe Audition 24.0` - a contested attribution between a RIFF field and a
+  TIFF tag, invented out of two standards sharing a word. `Mirror.left` and
+  `Mirror.right` now name blocks, and `left` is a plain string rather than a
+  tuple of source names.
+
+- The conclusion no longer ranks two blocks it has no basis to rank. IIM and a
+  camera's EXIF tags go stale because an editor rewrites the XMP and copies them
+  through untouched, and the sentence said so. A PDF has no such direction: one
+  producer writes both blocks, and an exporter stamps a fresh Info dictionary
+  while carrying the XMP through from the source document - the corpus file has
+  XMP from February beside an Info dictionary from May, so naming the Info as
+  the likelier to be stale would have stated the opposite of what happened.
+  A pairing now carries which of its two sides an editor keeps current, or that
+  it has no answer, and the conclusion follows it. `--json` carries it too, as
+  `maintained` on a finding that has one.
+
+- A claim is named by its block where the source would only say `document
+  metadata`. That label names a category rather than a thing, and the summary
+  collapsed a whole corpus into one line reading `document metadata 39` when it
+  could say which nineteen were OOXML properties and which six were PDF Info.
+  Every other source keeps its own name: `device metadata` says the block held a
+  make and a model, which is why it outranks a bare document property, and
+  `EXIF` would throw that away.
+
+- Two timestamps are compared as instants where both writers said what zone they
+  were in, and as readings where either did not. The zone used to be dropped
+  outright, which EXIF requires - it writes no zone at all while its XMP mirror
+  writes the same reading with one attached - but a PDF carries an offset in
+  both of its blocks, and one machine varies it across the year. The corpus has
+  an export whose Info dictionary says `-04'00'` where its XMP says `-05:00`,
+  the same laptop either side of a daylight change; comparing the readings would
+  have reported a single moment as a contested attribution.
+
 - Modes are commands now, not flags: `filetrail explain FILE`,
   `filetrail compare A B`, `filetrail doctor`, `filetrail menu`,
   `filetrail help <command>`. `--doctor` and `--explain` were modes wearing an
@@ -23,6 +68,39 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Reconciliation now compares a PDF's `Info` dictionary against its XMP, and a
+  PNG's text chunks against theirs. Both pairings are published in Part 3 of the
+  XMP specification, alongside the IIM and EXIF ones already checked: the Info
+  entries are the legacy form of `dc:title`, `dc:creator`, `dc:description`,
+  `pdf:Keywords` and `xmp:CreatorTool`, and the standard PNG keywords map the
+  same way.
+
+  One producer writes both of a PDF's blocks at one save, so agreement is the
+  ordinary case and worth no line. A difference is the trace of an export that
+  stamped a fresh Info dictionary over XMP carried through from the source
+  document. On the developer's corpus this finds an InDesign export whose Info
+  names InDesign where its XMP still names the Illustrator document behind it,
+  three months earlier - and a Writer export whose title and creation date
+  belong to a thirteen-year-old file.
+
+  `/Producer` is left out. It names the library that wrote both blocks, so it
+  disagrees with itself rather than with anything: Adobe PDF Library 15 puts
+  `Adobe PDF Library 15.0` in the Info dictionary and `Adobe PDF library 15.00`
+  in the XMP. `/Trapped` is left out because it is a PDF name object rather than
+  a string, and the reader takes only string values.
+
+  The PNG pairing is spec-only. No file in the corpus carries both a text chunk
+  and an XMP packet, so it has been read against synthetic files alone. Its
+  `Creation Time` is compared where it can be read; the specification asks for
+  RFC 1123, which nothing here parses, and an unreadable stamp is skipped rather
+  than reported.
+
+  Reading a PDF's dates needed the moment comparison taught the form a PDF
+  writes. `D:20180511143720-04'00'` opens with two letters the day pattern would
+  not match past and runs the clock straight into the day with none of the
+  separators the clock pattern looked for, so every PDF timestamp came back
+  unreadable - and an unreadable stamp is never compared. They were being
+  skipped in silence.
 - Saved messages, read for how they travelled. `Received:` headers are the only
   part of an email not written by the sender: each mail server prepends its own
   as the message passes through, so they read from the bottom up. Each hop

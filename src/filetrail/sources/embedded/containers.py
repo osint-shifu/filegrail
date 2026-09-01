@@ -47,6 +47,11 @@ class Document:
     created: str | None = None
     title: str | None = None
 
+    #: Which of the five standards this came from. One reader serves all of
+    #: them, and a caller comparing a self-description against its mirror has
+    #: to know whether it is holding an ODF `meta.xml` or an OPF package.
+    block: str | None = None
+
     #: Everything else the container declared. ODF records how many times a
     #: document was edited and for how long; an OPF package records identifiers,
     #: publisher and language. None of it fits a four-field summary.
@@ -58,22 +63,24 @@ class Document:
 
 def read_container(path: Path) -> Document | None:
     suffix = path.suffix.lower()
-    try:
-        if suffix in ODF_SUFFIXES:
-            found = _read_odf(path)
-        elif suffix in EPUB_SUFFIXES:
-            found = _read_epub(path)
-        elif suffix in RTF_SUFFIXES:
-            found = _read_rtf(path)
-        elif suffix in SVG_SUFFIXES:
-            found = _read_svg(path)
-        elif suffix in NOTEBOOK_SUFFIXES:
-            found = _read_notebook(path)
-        else:
+    for suffixes, read, block in (
+        (ODF_SUFFIXES, _read_odf, "odf-meta"),
+        (EPUB_SUFFIXES, _read_epub, "epub-package"),
+        (RTF_SUFFIXES, _read_rtf, "rtf-generator"),
+        (SVG_SUFFIXES, _read_svg, "svg-metadata"),
+        (NOTEBOOK_SUFFIXES, _read_notebook, "notebook-kernel"),
+    ):
+        if suffix not in suffixes:
+            continue
+        try:
+            found = read(path)
+        except (OSError, ValueError, zipfile.BadZipFile, ElementTree.ParseError, KeyError):
             return None
-    except (OSError, ValueError, zipfile.BadZipFile, ElementTree.ParseError, KeyError):
-        return None
-    return found if found else None
+        if not found:
+            return None
+        found.block = block
+        return found
+    return None
 
 
 def _read_odf(path: Path) -> Document:

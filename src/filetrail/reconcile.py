@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import NamedTuple
 
 from .identify import normalize_url
-from .models import ACQUISITION, INTRINSIC, SOURCE_LABELS, FileRecord, Origin, kind
+from .models import ACQUISITION, INTRINSIC, FileRecord, Origin, kind, label
 
 #: No acquisition record at all: nothing said how the file got here.
 NONE = "no acquisition record"
@@ -120,6 +122,51 @@ _EXIF_IN_XMP = (
     ("BodySerialNumber", "aux:SerialNumber"),
 )
 
+#: And for a PDF's Info dictionary and its XMP, where the pairing is again the
+#: XMP specification's own - Part 3 defines the Info entries as the legacy form
+#: of these properties, and PDF/A requires the two to agree.
+#:
+#: `/Creator` is the application that made the document; XMP keeps it under
+#: `xmp:CreatorTool`. An exporter that stamps a fresh Info dictionary over XMP
+#: carried through from the source document leaves the two naming different
+#: applications, which is the trace worth reporting.
+#:
+#: `/Producer` is left out. It names the library that wrote the PDF, and that
+#: library writes both blocks at one save - so it disagrees with itself rather
+#: than with anything: Adobe PDF Library 15 puts `Adobe PDF Library 15.0` in the
+#: Info dictionary and `Adobe PDF library 15.00` in the XMP. Case and spacing
+#: are already forgiven, the trailing zero is not, and the pair would put a line
+#: on Adobe exports at large while catching a rewrite the other pairs also see.
+#:
+#: `/Trapped` is left out for a duller reason: it is a PDF name object, `/False`
+#: rather than `(False)`, and the reader takes only string values - so the pair
+#: could never fire.
+_PDF_IN_XMP = (
+    ("Title", "dc:title"),
+    ("Author", "dc:creator"),
+    ("Subject", "dc:description"),
+    ("Keywords", "pdf:Keywords"),
+    ("Creator", "xmp:CreatorTool"),
+)
+
+#: And for a PNG's text chunks and its XMP, published in the same part of the
+#: specification. `Software` is the pair worth naming: in a PNG it is the
+#: application that made the image, which is what `xmp:CreatorTool` holds. The
+#: EXIF tag of the same spelling is not that fact - it is whatever processed the
+#: file last, and its mirror is `tiff:Software` - so the two blocks take the
+#: word in opposite directions and only a pairing keyed on the block can tell
+#: them apart.
+#:
+#: This one is spec-only. The local corpus has no PNG carrying both a text chunk
+#: and an XMP packet, so nothing here has been read against a real file.
+_PNG_IN_XMP = (
+    ("Title", "dc:title"),
+    ("Author", "dc:creator"),
+    ("Description", "dc:description"),
+    ("Copyright", "dc:rights"),
+    ("Software", "xmp:CreatorTool"),
+)
+
 #: Pairs holding a timestamp, compared as moments rather than as text. IIM
 #: writes a bare eight-digit day, EXIF writes a zoneless local reading, XMP
 #: writes the same reading with an offset attached - three spellings of one
@@ -131,37 +178,77 @@ _EXIF_MOMENTS = (
     ("DateTimeDigitized", "exif:DateTimeDigitized"),
 )
 
+#: A PDF's two dates. `ModDate` is here where EXIF's `DateTime` is not: an XMP
+#: writer maintains `xmp:ModifyDate` while leaving the EXIF tag as it found it,
+#: so the two drift apart in ordinary use, but a PDF producer writes both of its
+#: blocks at the same save and a gap between them is one of them being stale.
+_PDF_MOMENTS = (
+    ("CreationDate", "xmp:CreateDate"),
+    ("ModDate", "xmp:ModifyDate"),
+)
+
+#: And a PNG's. The specification asks for RFC 1123 here - `Sun, 30 Jul 2023
+#: 14:22:01 +0000` - which nothing in this module can read, though the writers
+#: that fill the chunk in mostly write ISO. An unreadable stamp is skipped
+#: rather than reported, so the pair is silent on the spelling it cannot take
+#: and useful on the one it meets.
+_PNG_MOMENTS = (("Creation Time", "xmp:CreateDate"),)
+
 #: A day, however the writer punctuated it, and a clock reading if one is there.
 _DAY = re.compile(r"(\d{4})\D?(\d{2})\D?(\d{2})")
 _CLOCK = re.compile(r"[T ](\d{2}):?(\d{2}):?(\d{2})")
+
+#: A PDF date, which is neither: `D:20180511143720-04'00'` opens with two
+#: letters `_DAY` will not match past and runs the clock straight into the day
+#: with none of the separators `_CLOCK` looks for. Read by the general pattern
+#: it comes back unreadable, and an unreadable stamp is never compared - so
+#: every PDF timestamp would be skipped in silence rather than checked.
+_PDF_STAMP = re.compile(r"D:(\d{4})(\d{2})(\d{2})(?:(\d{2})(\d{2})(\d{2}))?")
+
+#: What a writer said about its own zone, in either punctuation: ISO writes
+#: `+02:00` or `Z`, a PDF writes `+02'00'`. Anchored at the end, where a zone
+#: is, so the hyphens inside a date cannot be read as one.
+_ZONE = re.compile(r"(?:(Z)|([+-])(\d{2})'?:?(\d{2}))'?\s*$")
 
 
 @dataclass(frozen=True, slots=True)
 class Mirror:
     """Two self-descriptions a file is supposed to keep saying the same thing.
 
-    `left` lists the sources that can supply the first of them, because a
-    reader that decodes EXIF names its claim after what it found - a camera or
-    a bare document - rather than after the standard it read.
+    Both sides name a metadata block rather than a source, because the pairing
+    is between two standards. The source says what a reader found - a camera or
+    a bare document - and one block arrives under either name, while nine
+    different blocks arrive under `document-metadata` alone. Keyed on that, a
+    mirror would read a WAV's INFO list with the field names of a TIFF tag.
     """
 
-    left: tuple[str, ...]
+    left: str
     right: str
     text: tuple[tuple[str, str], ...]
     moments: tuple[tuple[str, str], ...]
+
+    #: Which of the two an editor ordinarily keeps current, where the pairing
+    #: has a direction at all. Modern tools maintain XMP and copy the IIM block
+    #: and a camera's EXIF tags through as they found them, so for those the
+    #: other side is the likelier to describe an earlier state.
+    #:
+    #: A PDF has no such direction. One producer writes both blocks, and an
+    #: exporter stamps a fresh Info dictionary at export while carrying the XMP
+    #: through from the source document - which is what the corpus shows, XMP
+    #: from February beside an Info dictionary from May. Naming the Info as the
+    #: stale one would state the opposite of what happened. None says so, so a
+    #: conclusion does not rank two blocks it has no basis to rank.
+    maintained: str | None
 
 
 #: Every pairing there is, so a consumer can enumerate them and a test can
 #: check the comparison against a corpus without restating which fields mirror
 #: which.
 MIRRORS = (
-    Mirror(left=("iptc",), right="xmp", text=_IIM_IN_XMP, moments=_IIM_MOMENTS),
-    Mirror(
-        left=("device-metadata", "document-metadata"),
-        right="xmp",
-        text=_EXIF_IN_XMP,
-        moments=_EXIF_MOMENTS,
-    ),
+    Mirror("iptc", "xmp", _IIM_IN_XMP, _IIM_MOMENTS, maintained="xmp"),
+    Mirror("exif", "xmp", _EXIF_IN_XMP, _EXIF_MOMENTS, maintained="xmp"),
+    Mirror("pdf-info", "xmp", _PDF_IN_XMP, _PDF_MOMENTS, maintained=None),
+    Mirror("png-text", "xmp", _PNG_IN_XMP, _PNG_MOMENTS, maintained=None),
 )
 
 
@@ -176,10 +263,16 @@ class Finding:
     #: parse English to learn which two pieces of evidence disagree.
     sources: tuple[str, str] | None = None
 
+    #: Which of `sources` an editor ordinarily keeps current, where the pairing
+    #: has a direction. None where it does not, and the two are then not ranked.
+    maintained: str | None = None
+
     def to_dict(self) -> dict[str, object]:
         found: dict[str, object] = {"kind": self.kind, "text": self.text}
         if self.sources:
             found["sources"] = list(self.sources)
+        if self.maintained:
+            found["maintained"] = self.maintained
         return found
 
 
@@ -347,12 +440,13 @@ def _attribution_findings(record: FileRecord) -> list[Finding]:
 
 def _disagreements(record: FileRecord, mirror: Mirror) -> list[Finding]:
     left = _describing(record, mirror.left)
-    right = _describing(record, (mirror.right,))
+    right = _describing(record, mirror.right)
     if left is None or right is None:
         return []
 
     theirs = _named(left)
     ours = _named(right)
+    kept = {mirror.left: left, mirror.right: right}.get(mirror.maintained or "")
     found = []
     for name, other, agree in (
         *((a, b, _same_text) for a, b in mirror.text),
@@ -367,14 +461,15 @@ def _disagreements(record: FileRecord, mirror: Mirror) -> list[Finding]:
                     ATTRIBUTION_CONFLICT,
                     f"{name}: {_label(left)} says {said}, {_label(right)} says {also}",
                     sources=(_label(left), _label(right)),
+                    maintained=_label(kept) if kept else None,
                 )
             )
     return found
 
 
-def _describing(record: FileRecord, sources: tuple[str, ...]) -> Origin | None:
+def _describing(record: FileRecord, block: str) -> Origin | None:
     for origin in record.origins:
-        if origin.source in sources:
+        if origin.block == block:
             return origin
     return None
 
@@ -391,27 +486,81 @@ def _same_text(left: str, right: str) -> bool:
 def _same_moment(left: str, right: str) -> bool | None:
     """Whether two timestamps say the same thing, or None if one cannot be read.
 
-    The zone is dropped. EXIF writes none at all and its XMP mirror writes the
-    same clock reading with one attached, so reading the tag as UTC and the
-    mirror as an instant would make every photograph taken outside Greenwich
-    contradict itself. The clock is optional because IIM records a bare day, and
-    a day that agrees is no conflict merely because the other writer also wrote
-    down a time.
+    Where both writers said what zone they were in, the two are compared as
+    instants. A PDF's Info dictionary and its XMP both carry an offset, and one
+    machine varies it across the year - the same export can write -04'00' into
+    one block and -05:00 into the other - so comparing the readings would call a
+    single moment a contested attribution.
+
+    Where either did not, the reading is compared instead. EXIF writes no zone
+    at all and its XMP mirror writes the same clock with one attached, so
+    reading the tag as UTC and the mirror as an instant would make every
+    photograph taken outside Greenwich contradict itself. The clock is optional
+    for the same reason: IIM records a bare day, and a day that agrees is no
+    conflict merely because the other writer also wrote down a time.
     """
     first, second = _instant(left), _instant(right)
     if first is None or second is None:
         return None
-    if first[0] != second[0]:
+
+    here, there = _utc(first), _utc(second)
+    if here is not None and there is not None:
+        return here == there
+
+    if first.day != second.day:
         return False
-    return not (first[1] and second[1]) or first[1] == second[1]
+    return not (first.clock and second.clock) or first.clock == second.clock
 
 
-def _instant(value: str) -> tuple[str, str | None] | None:
-    day = _DAY.match(value.strip())
+class _Stamp(NamedTuple):
+    """A timestamp as its writer spelled it: a day, a reading, and a zone."""
+
+    day: str
+    clock: str | None
+
+    #: Minutes east of UTC, or None where the writer said nothing about it.
+    offset: int | None
+
+
+def _utc(stamp: _Stamp) -> datetime | None:
+    """The moment this stamp names, or None if it does not name one.
+
+    A stamp without a clock or without a zone is a reading rather than an
+    instant, and an impossible date - month 13, day 32 - is neither.
+    """
+    if stamp.clock is None or stamp.offset is None:
+        return None
+    try:
+        moment = datetime.strptime(stamp.day + stamp.clock, "%Y%m%d%H%M%S")
+    except ValueError:
+        return None
+    return moment - timedelta(minutes=stamp.offset)
+
+
+def _instant(value: str) -> _Stamp | None:
+    text = value.strip()
+    offset = _offset(text)
+
+    stamp = _PDF_STAMP.match(text)
+    if stamp:
+        clock = stamp.group(4, 5, 6)
+        return _Stamp("".join(stamp.group(1, 2, 3)), "".join(clock) if all(clock) else None, offset)
+
+    day = _DAY.match(text)
     if not day:
         return None
-    clock = _CLOCK.search(value)
-    return "".join(day.groups()), "".join(clock.groups()) if clock else None
+    clock = _CLOCK.search(text)
+    return _Stamp("".join(day.groups()), "".join(clock.groups()) if clock else None, offset)
+
+
+def _offset(text: str) -> int | None:
+    zone = _ZONE.search(text)
+    if not zone:
+        return None
+    if zone.group(1):
+        return 0
+    sign = -1 if zone.group(2) == "-" else 1
+    return sign * (int(zone.group(3)) * 60 + int(zone.group(4)))
 
 
 def _plain(value: str) -> str:
@@ -419,4 +568,4 @@ def _plain(value: str) -> str:
 
 
 def _label(origin: Origin) -> str:
-    return SOURCE_LABELS.get(origin.source, origin.source)
+    return label(origin)

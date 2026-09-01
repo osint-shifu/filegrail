@@ -12,8 +12,12 @@ timeline conflict.
 
 from __future__ import annotations
 
+import ast
+from pathlib import Path
+
 from filetrail.models import (
     ACQUISITION,
+    BLOCK_LABELS,
     CONFIDENCE,
     INTERACTION,
     INTRINSIC,
@@ -29,6 +33,7 @@ from filetrail.reconcile import (
     WEAK_MATCH,
     reconcile,
 )
+from filetrail.sources import embedded
 
 
 def _record(*origins: Origin) -> FileRecord:
@@ -167,3 +172,20 @@ def test_json_carries_the_kind_and_the_sentence():
     payload = verdict.to_dict()
     assert payload["state"]
     assert all({"kind", "text"} <= set(finding) for finding in payload["findings"])
+
+
+def test_every_block_a_reader_declares_has_a_label():
+    """A block with no label reads as `document metadata`, which is the very
+    thing naming the block was for. The dispatcher is read rather than a list
+    kept beside it, because a list beside it is the thing that goes stale."""
+    source = Path(embedded.__file__).read_text(encoding="utf-8")
+    declared = {
+        keyword.value.value
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call)
+        for keyword in node.keywords
+        if keyword.arg == "block" and isinstance(keyword.value, ast.Constant)
+    }
+
+    assert declared, "no reader declares a block; the walk found nothing to check"
+    assert declared <= set(BLOCK_LABELS), sorted(declared - set(BLOCK_LABELS))
