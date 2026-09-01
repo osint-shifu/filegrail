@@ -149,6 +149,24 @@ _PDF_IN_XMP = (
     ("Creator", "xmp:CreatorTool"),
 )
 
+#: And for a PNG's text chunks and its XMP, published in the same part of the
+#: specification. `Software` is the pair worth naming: in a PNG it is the
+#: application that made the image, which is what `xmp:CreatorTool` holds. The
+#: EXIF tag of the same spelling is not that fact - it is whatever processed the
+#: file last, and its mirror is `tiff:Software` - so the two blocks take the
+#: word in opposite directions and only a pairing keyed on the block can tell
+#: them apart.
+#:
+#: This one is spec-only. The local corpus has no PNG carrying both a text chunk
+#: and an XMP packet, so nothing here has been read against a real file.
+_PNG_IN_XMP = (
+    ("Title", "dc:title"),
+    ("Author", "dc:creator"),
+    ("Description", "dc:description"),
+    ("Copyright", "dc:rights"),
+    ("Software", "xmp:CreatorTool"),
+)
+
 #: Pairs holding a timestamp, compared as moments rather than as text. IIM
 #: writes a bare eight-digit day, EXIF writes a zoneless local reading, XMP
 #: writes the same reading with an offset attached - three spellings of one
@@ -168,6 +186,13 @@ _PDF_MOMENTS = (
     ("CreationDate", "xmp:CreateDate"),
     ("ModDate", "xmp:ModifyDate"),
 )
+
+#: And a PNG's. The specification asks for RFC 1123 here - `Sun, 30 Jul 2023
+#: 14:22:01 +0000` - which nothing in this module can read, though the writers
+#: that fill the chunk in mostly write ISO. An unreadable stamp is skipped
+#: rather than reported, so the pair is silent on the spelling it cannot take
+#: and useful on the one it meets.
+_PNG_MOMENTS = (("Creation Time", "xmp:CreateDate"),)
 
 #: A day, however the writer punctuated it, and a clock reading if one is there.
 _DAY = re.compile(r"(\d{4})\D?(\d{2})\D?(\d{2})")
@@ -210,6 +235,7 @@ MIRRORS = (
     Mirror(left="iptc", right="xmp", text=_IIM_IN_XMP, moments=_IIM_MOMENTS),
     Mirror(left="exif", right="xmp", text=_EXIF_IN_XMP, moments=_EXIF_MOMENTS),
     Mirror(left="pdf-info", right="xmp", text=_PDF_IN_XMP, moments=_PDF_MOMENTS),
+    Mirror(left="png-text", right="xmp", text=_PNG_IN_XMP, moments=_PNG_MOMENTS),
 )
 
 

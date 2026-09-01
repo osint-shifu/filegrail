@@ -450,6 +450,73 @@ def test_the_producer_string_is_left_out_of_the_comparison():
     assert reconcile(record).findings == []
 
 
+def _text_chunks(**fields: str) -> Origin:
+    return Origin(
+        source="document-metadata",
+        block="png-text",
+        fields={name.replace("_", " "): value for name, value in fields.items()},
+    )
+
+
+def test_png_text_chunks_naming_a_different_application_than_the_xmp_is_a_finding():
+    """XMP Part 3 maps the standard PNG keywords onto XMP properties, and `Software`
+    is one of them - in a PNG it names the application that made the image, which
+    is what `xmp:CreatorTool` holds."""
+    record = _record(
+        _text_chunks(Software="matplotlib 3.9.0"),
+        _xmp(xmp_CreatorTool="Adobe Photoshop 25.0"),
+    )
+
+    findings = reconcile(record).findings
+
+    assert [f.kind for f in findings] == [ATTRIBUTION_CONFLICT]
+    assert "Software: PNG text says matplotlib 3.9.0" in findings[0].text
+
+
+def test_png_text_chunks_agreeing_with_the_xmp_say_nothing():
+    record = _record(
+        _text_chunks(
+            Title="Q3 revenue",
+            Author="Jan Kowalski",
+            Description="quarterly figures",
+            Copyright="(c) 2026 Acme",
+            Software="matplotlib 3.9.0",
+        ),
+        _xmp(
+            dc_title="Q3 revenue",
+            dc_creator="Jan Kowalski",
+            dc_description="quarterly figures",
+            dc_rights="(c) 2026 Acme",
+            xmp_CreatorTool="matplotlib 3.9.0",
+        ),
+    )
+
+    assert reconcile(record).findings == []
+
+
+def test_a_png_creation_time_is_compared_against_the_xmp():
+    record = _record(
+        _text_chunks(Creation_Time="2023-07-30T14:22:01+00:00"),
+        _xmp(xmp_CreateDate="2019-01-15T09:00:00Z"),
+    )
+
+    assert [f.kind for f in reconcile(record).findings] == [ATTRIBUTION_CONFLICT]
+
+
+def test_a_png_creation_time_in_the_format_the_specification_asks_for_is_skipped():
+    """PNG says `Creation Time` should be RFC 1123 - `Sun, 30 Jul 2023 14:22:01
+    +0000` - which nothing here can read, though the writers that put a date
+    there mostly write ISO. Unreadable is not disagreement, so the pair is
+    skipped rather than reported, and the comparison stays silent instead of
+    inventing a conflict on every PNG that follows the specification."""
+    record = _record(
+        _text_chunks(Creation_Time="Sun, 30 Jul 2023 14:22:01 +0000"),
+        _xmp(xmp_CreateDate="2019-01-15T09:00:00Z"),
+    )
+
+    assert reconcile(record).findings == []
+
+
 def test_a_camera_software_tag_is_not_paired_with_the_creating_application():
     """EXIF `Software` is the last thing that processed the file and
     `xmp:CreatorTool` is the application that made it. They are different facts
