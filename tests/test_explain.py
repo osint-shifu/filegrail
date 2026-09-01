@@ -158,3 +158,20 @@ def test_the_conclusion_says_when_the_two_self_descriptions_contradict():
     assert "attribution_conflict" in output  # the kind, whole, not clipped
     assert "does not contest" not in output
     assert "disagree about" in output
+    assert "IPTC" in output
+
+
+def test_the_conclusion_names_the_blocks_that_actually_disagree():
+    """A camera's tags and their XMP mirror contradict each other in the same
+    way IIM and XMP do, and the reasoning is the same - but a conclusion that
+    talks about the IPTC block of a file that has none is telling the reader
+    about a piece of evidence that is not there."""
+    record = FileRecord(path="/case/tampered.jpg", size=494, mtime="2026-08-24T19:00:00Z")
+    record.origins.append(Origin(source="device-metadata", fields={"Model": "Canon PowerShot G9"}))
+    record.origins.append(Origin(source="xmp", fields={"tiff:Model": "NIKON D700"}))
+
+    output = render_explain(record, theme=Theme(colour=False, unicode=False, width=88))
+
+    assert "disagree about Model" in output
+    assert "device metadata" in output
+    assert "IPTC" not in output

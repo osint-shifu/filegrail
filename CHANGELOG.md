@@ -23,6 +23,37 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Reconciliation now compares a camera's own tags against their XMP mirror, the
+  way it already compared IIM against XMP. The pairing is the XMP
+  specification's own - the `tiff:` and `exif:` properties are defined as the
+  serialisation of those tags - so a difference is one of the two blocks having
+  been rewritten rather than two tools writing one fact differently.
+
+  What is compared is what the camera said about taking the picture: the make,
+  the model, the software, the artist, the lens, the body serial number, the
+  description, and the two capture timestamps. Exposure settings are left out on
+  purpose. XMP writers put units, rationals and comma decimals in them - `f/5,6`
+  against 5.6, `1/500 sec.` against 0.002, `105,0 mm` against 105 - and a
+  comparison that cannot read those would report a contested attribution on
+  almost every photograph ever taken. `xmp:ModifyDate` against EXIF `DateTime`
+  is left out for the opposite reason: tools maintain one and not the other, so
+  the two drift apart in ordinary use and a finding there would say nothing
+  while diluting the ones that do.
+
+  Timestamps are compared as moments rather than as characters. EXIF writes a
+  local reading with no zone, XMP writes the same reading with an offset
+  attached, and IIM writes a bare eight-digit day - three spellings of one fact.
+  Comparing their characters would have found conflicts in three of the
+  twenty-two files in the developer's corpus that carry two self-descriptions,
+  and every one of them would have been invented. That also fixes a conflict the
+  IIM comparison could already have reported and nobody had a file to trigger:
+  `DateCreated` as `20190304` against `2019-03-04T10:22:31+01:00`.
+
+  A finding now carries the two blocks it is between, so the conclusion names
+  them instead of talking about the IPTC block of a file that has none, and a
+  consumer reading the JSON does not have to parse the sentence to learn which
+  two pieces of evidence disagree.
+
 - The broadcast extension, `bext`, which is what a field recorder writes into
   a WAV: the machine that made the recording, the moment it started, a slate
   line for the take, and the coding history - one line per processing step, so

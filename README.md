@@ -181,8 +181,11 @@ It can flag:
 - recorded-size mismatches;
 - timelines that do not line up;
 - a file whose own two accounts of itself disagree - IPTC and XMP hold the same
-  facts under different names, and an editor maintains one while leaving the other
-  as it found it, so a difference is the trace of an attribution being changed.
+  facts under different names, and so do a camera's EXIF tags and their XMP
+  mirror. An editor maintains one block while leaving the other as it found it,
+  so a difference is the trace of an attribution being changed. Timestamps are
+  compared as moments and exposure settings not at all, because a zone or a
+  comma decimal is two tools spelling one fact, not two facts.
 
 > [!IMPORTANT]
 > A conflict is useful evidence too. `filetrail` shows it and lets you decide what it means.

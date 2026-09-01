@@ -182,6 +182,80 @@ def _xmp(**fields: str) -> Origin:
     return Origin(source="xmp", fields={name.replace("_", ":"): v for name, v in fields.items()})
 
 
+def _exif(**fields: str) -> Origin:
+    return Origin(source="device-metadata", fields=dict(fields))
+
+
+def test_a_camera_and_its_xmp_mirror_naming_different_models_is_a_finding():
+    """The `tiff:` properties are the XMP serialisation of the EXIF tags - the
+    specification says so - which is what makes them comparable at all. Two
+    different cameras in one file is one of them having been rewritten."""
+    record = _record(
+        _exif(Make="Canon", Model="Canon PowerShot G9"),
+        _xmp(tiff_Make="NIKON CORPORATION", tiff_Model="NIKON D700"),
+    )
+
+    findings = reconcile(record).findings
+
+    assert [f.kind for f in findings] == [ATTRIBUTION_CONFLICT, ATTRIBUTION_CONFLICT]
+    assert "device metadata says Canon" in findings[0].text
+    assert "XMP says NIKON CORPORATION" in findings[0].text
+
+
+def test_a_camera_agreeing_with_its_mirror_says_nothing():
+    record = _record(
+        _exif(Make="Canon", Model="Canon PowerShot G9"),
+        _xmp(tiff_Make="Canon", tiff_Model="Canon PowerShot G9"),
+    )
+
+    assert reconcile(record).findings == []
+
+
+def test_a_zoneless_tag_agrees_with_its_zoned_mirror():
+    """EXIF writes no zone and the XMP mirror writes the same clock reading with
+    one attached. Reading the tag as UTC and the mirror as an instant would make
+    every photograph taken outside Greenwich contradict itself."""
+    record = _record(
+        _exif(DateTimeOriginal="2004:08:27 13:52:55"),
+        _xmp(exif_DateTimeOriginal="2004-08-27T13:52:55+02:00"),
+    )
+
+    assert reconcile(record).findings == []
+
+
+def test_a_capture_time_moved_to_another_day_is_a_finding():
+    record = _record(
+        _exif(DateTimeOriginal="2004:08:27 13:52:55"),
+        _xmp(exif_DateTimeOriginal="2004-08-28T13:52:55+02:00"),
+    )
+
+    assert [f.kind for f in reconcile(record).findings] == [ATTRIBUTION_CONFLICT]
+
+
+def test_a_bare_iim_day_agrees_with_a_full_xmp_stamp():
+    """IIM records the day in one dataset and the clock in another, so its date
+    field is eight digits. A day that agrees is not a conflict merely because
+    the other writer also wrote down a time."""
+    record = _record(
+        _iptc(DateCreated="20190304"),
+        _xmp(photoshop_DateCreated="2019-03-04T10:22:31+01:00"),
+    )
+
+    assert reconcile(record).findings == []
+
+
+def test_exposure_settings_are_left_out_of_the_comparison():
+    """XMP writers put units, rationals and comma decimals in these - "f/5,6"
+    against 5.6, "1/500 sec." against 0.002 - and a comparison that cannot read
+    them would report a conflict on almost every photograph ever taken."""
+    record = _record(
+        _exif(FNumber="5.6", ExposureTime="0.002", FocalLength="105"),
+        _xmp(exif_FNumber="f/5,6", exif_ExposureTime="1/500 sec.", exif_FocalLength="105,0 mm"),
+    )
+
+    assert reconcile(record).findings == []
+
+
 def test_two_self_descriptions_disagreeing_about_the_byline_is_a_finding():
     """IIM and XMP hold the same facts, and tools maintain the XMP while leaving
     the IIM block as they found it. Two different photographers in one file is

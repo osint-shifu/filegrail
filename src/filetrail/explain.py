@@ -65,9 +65,8 @@ def conclusion(record: FileRecord, verdict: Verdict) -> list[str]:
         fields = ", ".join(finding.text.split(":")[0] for finding in contested)
         said.append(
             f"The file gives two accounts of itself and they disagree about {fields}. "
-            "An editor maintains the XMP and leaves the IPTC block as it found it, so the "
-            "IPTC side is the likelier of the two to describe an earlier state - but which "
-            "was rewritten is a question this cannot answer, only raise."
+            f"{_which_is_stale(contested)} - but which was rewritten is a question this "
+            "cannot answer, only raise."
         )
 
     if interaction and not acquisition:
@@ -83,6 +82,27 @@ def conclusion(record: FileRecord, verdict: Verdict) -> list[str]:
             "Either a clock was wrong, or the metadata was written after the fact."
         )
     return said
+
+
+def _which_is_stale(contested: list) -> str:
+    """Why one of the two blocks is the likelier to be out of date.
+
+    Whichever block an editor understands is the one it rewrites; the other it
+    copies through untouched. Naming them is the point - a conclusion about the
+    IPTC block of a file that has none is describing evidence that is not there.
+    """
+    pairs = list(dict.fromkeys(finding.sources for finding in contested if finding.sources))
+    if len(pairs) != 1:
+        return (
+            "An editor maintains the block it understands and copies the others through as "
+            "it found them, so the ones it did not touch are the likelier to describe an "
+            "earlier state"
+        )
+    older, newer = pairs[0]
+    return (
+        f"An editor maintains the {newer} and leaves the {older} as it found it, so the "
+        f"{older} is the likelier of the two to describe an earlier state"
+    )
 
 
 def _arrival(verdict: Verdict, acquisition: list) -> str:

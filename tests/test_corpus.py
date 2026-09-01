@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pytest
 
+from filetrail.models import FileRecord
+from filetrail.reconcile import ATTRIBUTION_CONFLICT, MIRRORS, reconcile
 from filetrail.sources import iptc as iptc_reader
 from filetrail.sources import xmp as xmp_reader
 from filetrail.sources.embedded import exif as exif_reader
@@ -215,3 +217,57 @@ def test_a_present_iptc_block_is_never_missed(path: Path):
     assert iptc_reader.read_iptc(path) is not None, (
         f"{path.name} holds an IIM datastream the reader did not decode"
     )
+
+
+#: Files that could carry two accounts of themselves at once.
+MIRROR_CANDIDATES = _corpus_files(exif_reader.SUFFIXES | {".pdf", ".png", ".psd", ".heic", ".avif"})
+
+
+def _self_descriptions(path: Path) -> FileRecord:
+    record = FileRecord(path=str(path), size=path.stat().st_size, mtime="")
+    for reader in (read_embedded_metadata, iptc_reader.read_iptc):
+        if (claim := reader(path)) is not None:
+            record.origins.append(claim)
+    record.origins.extend(xmp_reader.read_xmp(path))
+    return record
+
+
+def _one_fact(value: str) -> str:
+    """Reduce a value the way a reader would, without asking the code under test.
+
+    Anything date-shaped keeps its digits and loses its zone, which is how EXIF,
+    IIM and XMP each spell one moment differently; anything else loses only case
+    and spacing.
+    """
+    digits = re.sub(r"\D", "", value)
+    if re.match(r"\d{4}\D?\d{2}\D?\d{2}", value.strip()):
+        return digits[:14]
+    return "".join(value.split()).casefold()
+
+
+@pytest.mark.skipif(not CORPUS.is_dir(), reason="no test-data corpus present")
+@pytest.mark.parametrize("path", MIRROR_CANDIDATES, ids=lambda path: path.name)
+def test_two_spellings_of_one_fact_are_not_reported_as_a_conflict(path: Path):
+    """A camera writes `2004:08:27 13:52:55` and its XMP mirror writes the same
+    reading with a zone attached; IIM writes a bare day where XMP writes a full
+    stamp. A comparison reading characters would find a contested attribution in
+    almost every photograph ever taken, and every one of them would be invented.
+    """
+    record = _self_descriptions(path)
+    reported = {
+        finding.text.split(":", 1)[0]
+        for finding in reconcile(record).findings
+        if finding.kind == ATTRIBUTION_CONFLICT
+    }
+
+    for mirror in MIRRORS:
+        left = next((o for o in record.origins if o.source in mirror.left), None)
+        right = next((o for o in record.origins if o.source == mirror.right), None)
+        if left is None or right is None:
+            continue
+        theirs = {name.lower(): value for name, value in left.fields.items()}
+        ours = {name.lower(): value for name, value in right.fields.items()}
+        for name, other in mirror.text + mirror.moments:
+            said, also = theirs.get(name.lower()), ours.get(other.lower())
+            if said and also and _one_fact(said) == _one_fact(also):
+                assert name not in reported, f"{name}: {said!r} and {also!r} are one fact"

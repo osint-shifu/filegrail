@@ -12,6 +12,7 @@ leaves the reading of it to whoever is reading the report.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from .identify import normalize_url
@@ -71,10 +72,11 @@ CONFLICTS = frozenset(
     {SOURCE_CONFLICT, PATH_DISAGREEMENT, TIMELINE_CONFLICT, SIZE_MISMATCH, ATTRIBUTION_CONFLICT}
 )
 
-#: The same fact under two names. Adobe published this pairing when it moved IIM
-#: into XMP, which is what makes the two standards comparable at all: the
-#: correspondence is documented, not inferred from whatever the values look like.
-_SAME_FACT = (
+#: The same fact under two names, for IIM and XMP. Adobe published this pairing
+#: when it moved IIM into XMP, which is what makes the two standards comparable
+#: at all: the correspondence is documented, not inferred from whatever the
+#: values happen to look like.
+_IIM_IN_XMP = (
     ("By-line", "dc:creator"),
     ("By-lineTitle", "photoshop:AuthorsPosition"),
     ("Credit", "photoshop:Credit"),
@@ -87,12 +89,79 @@ _SAME_FACT = (
     ("City", "photoshop:City"),
     ("Province-State", "photoshop:State"),
     ("Country-PrimaryLocationName", "photoshop:Country"),
-    ("DateCreated", "photoshop:DateCreated"),
     ("SpecialInstructions", "photoshop:Instructions"),
     ("OriginalTransmissionReference", "photoshop:TransmissionReference"),
     ("Writer-Editor", "photoshop:CaptionWriter"),
     ("Urgency", "photoshop:Urgency"),
     ("Category", "photoshop:Category"),
+)
+
+#: And for EXIF and XMP, where the pairing is the XMP specification's own: the
+#: `tiff:` and `exif:` properties are defined as the serialisation of those
+#: tags, so a difference is one of the two blocks having been rewritten.
+#:
+#: Only what the camera said about the act of taking the picture is here.
+#: Exposure settings are left out on purpose: XMP writers put units, rationals
+#: and comma decimals in them - "f/5,6" against 5.6, "1/500 sec." against 0.002
+#: - and a comparison that cannot read those would report a conflict on almost
+#: every photograph ever taken. The file's later handling is left out for the
+#: opposite reason: `xmp:ModifyDate` is maintained by tools that leave EXIF
+#: `DateTime` alone, so the two drift apart in ordinary use and a finding there
+#: would say nothing while diluting the ones that do.
+_EXIF_IN_XMP = (
+    ("Make", "tiff:Make"),
+    ("Model", "tiff:Model"),
+    ("Software", "tiff:Software"),
+    ("Artist", "tiff:Artist"),
+    ("Artist", "dc:creator"),
+    ("Copyright", "tiff:Copyright"),
+    ("ImageDescription", "dc:description"),
+    ("LensModel", "aux:Lens"),
+    ("BodySerialNumber", "aux:SerialNumber"),
+)
+
+#: Pairs holding a timestamp, compared as moments rather than as text. IIM
+#: writes a bare eight-digit day, EXIF writes a zoneless local reading, XMP
+#: writes the same reading with an offset attached - three spellings of one
+#: fact, and comparing their characters would find three conflicts in a file
+#: that has none.
+_IIM_MOMENTS = (("DateCreated", "photoshop:DateCreated"),)
+_EXIF_MOMENTS = (
+    ("DateTimeOriginal", "exif:DateTimeOriginal"),
+    ("DateTimeDigitized", "exif:DateTimeDigitized"),
+)
+
+#: A day, however the writer punctuated it, and a clock reading if one is there.
+_DAY = re.compile(r"(\d{4})\D?(\d{2})\D?(\d{2})")
+_CLOCK = re.compile(r"[T ](\d{2}):?(\d{2}):?(\d{2})")
+
+
+@dataclass(frozen=True, slots=True)
+class Mirror:
+    """Two self-descriptions a file is supposed to keep saying the same thing.
+
+    `left` lists the sources that can supply the first of them, because a
+    reader that decodes EXIF names its claim after what it found - a camera or
+    a bare document - rather than after the standard it read.
+    """
+
+    left: tuple[str, ...]
+    right: str
+    text: tuple[tuple[str, str], ...]
+    moments: tuple[tuple[str, str], ...]
+
+
+#: Every pairing there is, so a consumer can enumerate them and a test can
+#: check the comparison against a corpus without restating which fields mirror
+#: which.
+MIRRORS = (
+    Mirror(left=("iptc",), right="xmp", text=_IIM_IN_XMP, moments=_IIM_MOMENTS),
+    Mirror(
+        left=("device-metadata", "document-metadata"),
+        right="xmp",
+        text=_EXIF_IN_XMP,
+        moments=_EXIF_MOMENTS,
+    ),
 )
 
 
@@ -101,8 +170,17 @@ class Finding:
     kind: str
     text: str
 
-    def to_dict(self) -> dict[str, str]:
-        return {"kind": self.kind, "text": self.text}
+    #: The two blocks a contested attribution is between, already in the words
+    #: the report uses for them. Carried rather than left to be read back out of
+    #: the sentence, for the reason `kind` is: a consumer should not have to
+    #: parse English to learn which two pieces of evidence disagree.
+    sources: tuple[str, str] | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        found: dict[str, object] = {"kind": self.kind, "text": self.text}
+        if self.sources:
+            found["sources"] = list(self.sources)
+        return found
 
 
 @dataclass(slots=True)
@@ -252,42 +330,91 @@ def _match_findings(acquisition: list[Origin]) -> list[Finding]:
 
 
 def _attribution_findings(record: FileRecord) -> list[Finding]:
-    """Say when the file's two self-descriptions contradict each other.
+    """Say when the file's own accounts of itself contradict each other.
 
-    IIM and XMP carry the same facts under different names. An editor maintains
-    the XMP and leaves the IIM block as it found it, so agreement is the ordinary
-    case and worth no line at all - while a difference is the trace of one of
-    them having been changed, and which of the two is stale is exactly the
-    question the reader has to answer.
+    A file can describe itself more than once - IIM beside XMP, a camera's tags
+    beside their XMP mirror - and each pairing is documented, so the two are
+    meant to say the same thing. An editor maintains one and leaves the other as
+    it found it, so agreement is the ordinary case and worth no line at all,
+    while a difference is the trace of one of them having been changed. Which of
+    the two is stale is exactly the question the reader has to answer.
     """
-    iptc = _self_description(record, "iptc")
-    xmp = _self_description(record, "xmp")
-    if not iptc or not xmp:
+    found = []
+    for mirror in MIRRORS:
+        found.extend(_disagreements(record, mirror))
+    return found
+
+
+def _disagreements(record: FileRecord, mirror: Mirror) -> list[Finding]:
+    left = _describing(record, mirror.left)
+    right = _describing(record, (mirror.right,))
+    if left is None or right is None:
         return []
 
+    theirs = _named(left)
+    ours = _named(right)
     found = []
-    for iim_name, xmp_name in _SAME_FACT:
-        said, also = iptc.get(iim_name.lower()), xmp.get(xmp_name.lower())
-        if said and also and _plain(said) != _plain(also):
+    for name, other, agree in (
+        *((a, b, _same_text) for a, b in mirror.text),
+        *((a, b, _same_moment) for a, b in mirror.moments),
+    ):
+        said, also = theirs.get(name.lower()), ours.get(other.lower())
+        # `agree` returns None when it cannot read one of the two. Unreadable is
+        # not disagreement, and reporting it as such would be a fabrication.
+        if said and also and agree(said, also) is False:
             found.append(
                 Finding(
                     ATTRIBUTION_CONFLICT,
-                    f"{iim_name}: {SOURCE_LABELS['iptc']} says {said}, "
-                    f"{SOURCE_LABELS['xmp']} says {also}",
+                    f"{name}: {_label(left)} says {said}, {_label(right)} says {also}",
+                    sources=(_label(left), _label(right)),
                 )
             )
     return found
 
 
-def _self_description(record: FileRecord, source: str) -> dict[str, str]:
+def _describing(record: FileRecord, sources: tuple[str, ...]) -> Origin | None:
     for origin in record.origins:
-        if origin.source == source:
-            return {name.lower(): value for name, value in origin.fields.items()}
-    return {}
+        if origin.source in sources:
+            return origin
+    return None
+
+
+def _named(origin: Origin) -> dict[str, str]:
+    return {name.lower(): value for name, value in origin.fields.items()}
+
+
+def _same_text(left: str, right: str) -> bool:
+    """Case and spacing are how two tools write one name, not two facts."""
+    return _plain(left) == _plain(right)
+
+
+def _same_moment(left: str, right: str) -> bool | None:
+    """Whether two timestamps say the same thing, or None if one cannot be read.
+
+    The zone is dropped. EXIF writes none at all and its XMP mirror writes the
+    same clock reading with one attached, so reading the tag as UTC and the
+    mirror as an instant would make every photograph taken outside Greenwich
+    contradict itself. The clock is optional because IIM records a bare day, and
+    a day that agrees is no conflict merely because the other writer also wrote
+    down a time.
+    """
+    first, second = _instant(left), _instant(right)
+    if first is None or second is None:
+        return None
+    if first[0] != second[0]:
+        return False
+    return not (first[1] and second[1]) or first[1] == second[1]
+
+
+def _instant(value: str) -> tuple[str, str | None] | None:
+    day = _DAY.match(value.strip())
+    if not day:
+        return None
+    clock = _CLOCK.search(value)
+    return "".join(day.groups()), "".join(clock.groups()) if clock else None
 
 
 def _plain(value: str) -> str:
-    """Case and spacing are how two tools write one name, not two facts."""
     return " ".join(value.split()).casefold()
 
 
