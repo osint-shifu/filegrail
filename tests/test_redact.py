@@ -96,6 +96,26 @@ def test_origin_redacts_url_referrer_and_command():
     assert safe.source == origin.source
 
 
+def test_origin_redacts_note_and_location_too():
+    """A mail subject or a typed place name is free text like any other.
+
+    Both fields reach the report word for word, so a token in a forwarded
+    subject line or a URL pasted where a place name belongs would ride
+    through `--redact` untouched.
+    """
+    origin = Origin(
+        source="email-delivery",
+        note="Fwd: your key sk-abcdefghijklmnopqrstuvwx",
+        location="see https://vault.example.org/f?token=abcdef123456",
+    )
+
+    safe = origin.redacted()
+
+    assert "sk-abcdefghijklmnopqrstuvwx" not in safe.note
+    assert "abcdef123456" not in safe.location
+    assert safe.note.startswith("Fwd: your key ")  # the subject itself survives
+
+
 def test_file_record_redacts_every_origin():
     record = FileRecord(path="/case/a", size=1, mtime="2026-08-24T19:00:00Z")
     record.origins.append(Origin(source="shell-history", command="tool --token=abcdef123456"))

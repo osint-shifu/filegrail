@@ -233,6 +233,8 @@ class Origin:
             url=clean(self.url) if self.url else None,
             referrer=clean(self.referrer) if self.referrer else None,
             command=redact_text(self.command) if self.command else None,
+            location=clean(self.location) if self.location else None,
+            note=clean(self.note) if self.note else None,
             fields={name: clean(value) for name, value in self.fields.items()},
         )
 
