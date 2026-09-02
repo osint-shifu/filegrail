@@ -7,6 +7,7 @@ introduces itself and says how to point it somewhere instead.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -27,6 +28,18 @@ WIDTHS = [48, 56, 64, 80, 88, 110]
 
 def _screen(theme: Theme | None = None) -> str:
     return about.render(theme=theme or PLAIN)
+
+
+def test_the_version_shown_is_the_pyproject_version():
+    """One number stated twice: importers read `__version__`, installers read
+    pyproject. A release where the two drift apart answers "which filetrail is
+    this" differently depending on who is asked, and nothing else holds the
+    pair together."""
+    pyproject = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text("utf-8")
+    declared = re.search(r'(?m)^version = "([^"]+)"$', pyproject)
+
+    assert declared is not None, "pyproject.toml no longer declares its version on one line"
+    assert declared.group(1) == __version__
 
 
 def test_it_says_what_it_is():
