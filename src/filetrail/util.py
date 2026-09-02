@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import ctypes
 import ctypes.util
+import functools
 import hashlib
 import os
 import re
 import sys
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
@@ -56,6 +58,17 @@ def read_xattr(path: Path | str, name: str) -> bytes | None:
 def _darwin_libc() -> ctypes.CDLL | None:
     if sys.platform != "darwin":
         return None
+    return _darwin_handle()
+
+
+@functools.cache
+def _darwin_handle() -> ctypes.CDLL | None:
+    """libc, found once and kept: `read_xattr` runs per file.
+
+    Only the expensive part is remembered. The platform check above stays
+    live because tests steer it through `sys.platform`, and a frozen first
+    answer would pin every later call to whatever ran first.
+    """
     library = ctypes.util.find_library("c")
     if library is None:  # pragma: no cover - only on a broken macOS
         return None
@@ -186,12 +199,26 @@ _STATX_BTIME = 0x800
 _AT_FDCWD = -100
 
 
-def _statx_btime(path: Path) -> float | None:
-    """Read stx_btime via statx(2). Returns None when unsupported."""
+@functools.cache
+def _statx_func() -> Callable[..., int] | None:
+    """statx(2) out of libc, or None where there is nothing to call.
+
+    Locating libc goes through ldconfig and costs more than the call it
+    enables; done per file it was most of a scan's runtime. Neither the
+    handle nor its absence changes within a process, so one answer serves
+    every file - the refusal included.
+    """
     try:
         libc = ctypes.CDLL(ctypes.util.find_library("c") or "libc.so.6", use_errno=True)
-        statx = libc.statx
+        return libc.statx
     except (OSError, AttributeError):
+        return None
+
+
+def _statx_btime(path: Path) -> float | None:
+    """Read stx_btime via statx(2). Returns None when unsupported."""
+    statx = _statx_func()
+    if statx is None:
         return None
 
     buffer = _Statx()
