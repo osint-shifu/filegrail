@@ -70,11 +70,11 @@ def iter_files(
         return
 
     for directory, subdirectories, filenames in os.walk(root, followlinks=follow_symlinks):
-        subdirectories[:] = [
+        subdirectories[:] = sorted(
             name
             for name in subdirectories
             if name not in SKIP_DIRECTORIES and not name.endswith(".repro")
-        ]
+        )
         for name in sorted(filenames):
             path = Path(directory) / name
             if path.is_file() and wanted(path) and (follow_symlinks or not path.is_symlink()):

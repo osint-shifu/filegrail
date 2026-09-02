@@ -1,8 +1,11 @@
+import os
 import sqlite3
 import struct
 from pathlib import Path
 
-from filetrail.scan import scan
+import pytest
+
+from filetrail.scan import iter_files, scan
 from filetrail.sources.fsattrs import read_file_attributes
 
 from .test_browser import CHROMIUM_SCHEMA, START_TIME
@@ -98,6 +101,55 @@ def test_xdg_xattr_is_read_when_supported(tmp_path: Path):
 
     assert any(o.source == "xdg-xattr" for o in origins)
     assert origins[0].url == "https://example.org/downloaded.bin"
+
+
+class _ContraryOrder:
+    """What `os.scandir` hands back, in the one order it never promises."""
+
+    def __init__(self, entries):
+        self._entries = iter(entries)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc: object) -> bool:
+        return False
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return next(self._entries)
+
+    def close(self) -> None:
+        return None
+
+
+def test_directories_are_visited_in_name_order_whatever_the_disk_says(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Two scans of one tree must tell the same story in the same order.
+
+    The filesystem hands directories back in whatever order suits it, and
+    that order is what a report printed on another machine would differ by.
+    File names are already sorted; the directories they sit in have to be.
+    """
+    case = tmp_path / "case"
+    for name in ("beta", "alpha", "gamma"):
+        (case / name).mkdir(parents=True)
+        (case / name / "note.txt").write_text("x", encoding="utf-8")
+
+    real = os.scandir
+
+    def contrary(path):
+        with real(path) as entries:
+            return _ContraryOrder(sorted(entries, key=lambda entry: entry.name, reverse=True))
+
+    monkeypatch.setattr(os, "scandir", contrary)
+
+    visited = [Path(found).parent.name for found in iter_files(case)]
+
+    assert visited == ["alpha", "beta", "gamma"]
 
 
 def test_a_scan_links_a_file_to_the_one_it_was_made_from(tmp_path: Path):
