@@ -271,6 +271,23 @@ filegrail compare original.jpg edited.jpg
 
 Exposes shared device metadata, creation context and timing, and differences in how each file arrived.
 
+### Strip metadata before publishing
+
+```bash
+filegrail clean ./photos --out ./cleaned --type image
+```
+
+Writes copies without their metadata and leaves the originals alone. `--out` is required and must be outside the directory being read.
+
+```text
+  ● holiday.jpg                                              exif, xmp
+  ● chart.png                                                 png-text
+
+    2 files · 2 cleaned · 0 left alone
+```
+
+Anything the readers can still see in a copy is listed under `still readable in the copies` — do not publish those.
+
 ### Another profile, JSON, redaction
 
 ```bash
@@ -331,12 +348,12 @@ A format FileGrail does not understand is reported as not understood — and sti
 
 ## JSON and automation
 
-`--json` is available on every command — `filegrail.scan/1`, `filegrail.explain/1`, `filegrail.compare/1` and `filegrail.doctor/1` — and each document names its schema and the version that produced it:
+`--json` is available on every command — `filegrail.scan/1`, `filegrail.explain/1`, `filegrail.compare/1`, `filegrail.doctor/1` and `filegrail.clean/1` — and each document names its schema and the version that produced it:
 
 ```json
 {
   "schema": "filegrail.scan/1",
-  "filegrail_version": "0.2.0",
+  "filegrail_version": "0.3.0",
   "root": "/mnt/evidence"
 }
 ```
