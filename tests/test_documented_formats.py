@@ -1,4 +1,4 @@
-"""`FORMATS.md` is held against the readers, so it cannot quietly go stale.
+"""`docs/FORMATS.md` is held against the readers, so it cannot quietly go stale.
 
 A list of formats in prose is the one kind of documentation guaranteed to rot:
 `CONTRIBUTING.md` asks for new readers, every new reader is a line somebody has
@@ -26,7 +26,7 @@ from filegrail.sources.archives import ARCHIVE_SUFFIXES
 from filegrail.sources.c2pa import SUPPORTED_SUFFIXES as C2PA_SUFFIXES
 from filegrail.sources.embedded import SUFFIXES as EMBEDDED_SUFFIXES
 
-FORMATS = Path(__file__).resolve().parent.parent / "FORMATS.md"
+FORMATS = Path(__file__).resolve().parent.parent / "docs" / "FORMATS.md"
 
 #: The header rows that mark the two tables this test reads. Anything else in
 #: the file is prose and is left alone.

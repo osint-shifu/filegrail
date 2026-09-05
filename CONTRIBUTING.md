@@ -49,7 +49,7 @@ Do not compute byte lengths by hand in a test. Encode the structure with a small
 helper instead, so a miscounted length cannot silently produce a passing test on
 malformed input.
 
-Add the format to the table in [`FORMATS.md`](FORMATS.md) in the same change.
+Add the format to the table in [`FORMATS.md`](docs/FORMATS.md) in the same change.
 That file is parsed by `tests/test_documented_formats.py` and held against the
 readers, so a format you can read and did not document is a failing test rather
 than a document that quietly stops being true.

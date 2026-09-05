@@ -5,7 +5,7 @@ runtime dependencies. Styling is applied only when the output is actually a
 terminal that wants it: piping to a file, `NO_COLOR`, `TERM=dumb` and an
 explicit `--no-color` all fall back to plain text with the same layout.
 
-The palette is documented in `DESIGN.md`. Its one rule: **colour encodes how the
+The palette is documented in `docs/DESIGN.md`. Its one rule: **colour encodes how the
 tool knows, never what it found.** Every colour here names a class of evidence,
 so a reader learns five of them once and can then triage a folder by eye.
 """

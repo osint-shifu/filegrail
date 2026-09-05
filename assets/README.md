@@ -1,6 +1,6 @@
 # Brand assets
 
-Construction rules and the colour meanings live in [`DESIGN.md`](../DESIGN.md).
+Construction rules and the colour meanings live in [`DESIGN.md`](../docs/DESIGN.md).
 This file is how to use them.
 
 Banner (works on both GitHub themes):

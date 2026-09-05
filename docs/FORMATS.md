@@ -2,7 +2,7 @@
 
 What `filegrail` can read out of a file you point it at.
 
-This is the reference list. The [README](README.md) has the short version; this
+This is the reference list. The [README](../README.md) has the short version; this
 one is complete, and it is checked against the code by
 `tests/test_documented_formats.py` — a reader whose formats are missing here
 fails a test, and so does a format listed here that nothing reads. It cannot
@@ -79,7 +79,7 @@ export and a rendition of that export be reported as a chain. A shared
 *original* is only ever reported as a common ancestor — a template carries its
 XMP into everything made from it, and those files share an ancestor and nothing
 else. The reasoning is in
-[`docs/specs/2026-09-01-derivation-lineage.md`](docs/specs/2026-09-01-derivation-lineage.md).
+[`docs/specs/2026-09-01-derivation-lineage.md`](specs/2026-09-01-derivation-lineage.md).
 
 ---
 
@@ -166,7 +166,7 @@ too.
 
 ## Adding one
 
-[`CONTRIBUTING.md`](CONTRIBUTING.md) has the bar for a new reader. The short
+[`CONTRIBUTING.md`](../CONTRIBUTING.md) has the bar for a new reader. The short
 version: one module per container family under `src/filegrail/sources/embedded/`,
 a test that builds a minimal valid file rather than committing a sample, and no
 byte length counted by hand.

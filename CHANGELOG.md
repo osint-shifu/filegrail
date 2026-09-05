@@ -504,7 +504,7 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
   Some reference material moved out rather than being reworded: the confidence
   table, the four reconciliation pairings, the `source` and `block` fields in
-  `--json`, and the spec-only readers. [`FORMATS.md`](FORMATS.md) carries the
+  `--json`, and the spec-only readers. [`FORMATS.md`](docs/FORMATS.md) carries the
   format and block detail; the rest is in `CHANGELOG.md` and `DESIGN.md`.
 
 - The README says what it can read before it says how it ranks it. The metadata
@@ -519,7 +519,7 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   true before three more were added; fifteen blocks can carry it now, which is
   every block there is.
 
-- [`FORMATS.md`](FORMATS.md): the complete list of what can be read out of a
+- [`FORMATS.md`](docs/FORMATS.md): the complete list of what can be read out of a
   file, with the metadata block each format produces, what is deliberately not
   read, and which three readers are written from a specification rather than
   tested against files the originating software wrote.
@@ -867,7 +867,7 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Redesigned the terminal report, and wrote the system down in
-  [`DESIGN.md`](DESIGN.md) so it can be argued with. Entries are bound together
+  [`DESIGN.md`](docs/DESIGN.md) so it can be argued with. Entries are bound together
   by a one-character gutter (`●` a file, `←` its origin, `│` a continuation)
   instead of drifting indentation; colour now encodes only *which class of
   source* made a claim, so five colours learned once let a folder be triaged by

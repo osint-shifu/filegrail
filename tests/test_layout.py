@@ -1,4 +1,4 @@
-"""The layout rules `DESIGN.md` states, enforced.
+"""The layout rules `docs/DESIGN.md` states, enforced.
 
 A terminal layout breaks quietly: one long file name, one narrow window, and a
 line wraps into the next entry's gutter. Nothing raises, the tests stay green,
@@ -199,7 +199,7 @@ def test_the_inventory_drops_a_column_before_it_drops_anything_else():
 @pytest.mark.parametrize("width", WIDTHS)
 @pytest.mark.parametrize("unicode_ok", [True, False])
 def test_nothing_in_the_report_ends_in_an_ellipsis(width: int, unicode_ok: bool):
-    """`DESIGN.md` says nothing is truncated, and the field names used to be."""
+    """`docs/DESIGN.md` says nothing is truncated, and the field names used to be."""
     theme = Theme(colour=False, unicode=unicode_ok, width=width)
 
     output = render_text(_corpus(), ROOT, theme=theme, limit=0, identify=True)

@@ -23,7 +23,7 @@
     <a href="#metadata-analysis">Metadata</a> ·
     <a href="#provenance-and-evidence">Evidence</a> ·
     <a href="#investigation-workflows">Workflows</a> ·
-    <a href="FORMATS.md">Formats</a>
+    <a href="docs/FORMATS.md">Formats</a>
   </p>
 </div>
 
@@ -178,7 +178,7 @@ Supported pivot classes include:
 
 A camera serial, domain, author name, GPS position or embedded URL can be more valuable than the file name itself.
 
-For the complete format and metadata matrix, see [`FORMATS.md`](FORMATS.md).
+For the complete format and metadata matrix, see [`FORMATS.md`](docs/FORMATS.md).
 
 ---
 
@@ -319,7 +319,7 @@ Metadata layers include **EXIF, XMP, IPTC IIM and C2PA** where supported by the 
 
 Files in unsupported formats are still scanned for available provenance evidence.
 
-See [`FORMATS.md`](FORMATS.md) for the complete matrix.
+See [`FORMATS.md`](docs/FORMATS.md) for the complete matrix.
 
 ---
 
@@ -373,7 +373,7 @@ Output supports:
 * ASCII fallback
 * JSON
 
-The terminal and evidence design are documented in [`DESIGN.md`](DESIGN.md).
+The terminal and evidence design are documented in [`DESIGN.md`](docs/DESIGN.md).
 
 ---
 
@@ -446,7 +446,7 @@ It reconstructs what it can from surviving local evidence and file metadata.
 
 C2PA manifests are parsed, but their cryptographic signatures are currently **not verified**.
 
-Three readers are written from the specification and have never been run against a file the originating software produced: Outlook `.msg` messages, Windows `.lnk` shortcuts, and the `id3 ` chunk a WAV file may carry. [`FORMATS.md`](FORMATS.md) names them and says why.
+Three readers are written from the specification and have never been run against a file the originating software produced: Outlook `.msg` messages, Windows `.lnk` shortcuts, and the `id3 ` chunk a WAV file may carry. [`FORMATS.md`](docs/FORMATS.md) names them and says why.
 
 Use `filegrail doctor` to understand what evidence sources are actually available before drawing conclusions from missing data.
 
