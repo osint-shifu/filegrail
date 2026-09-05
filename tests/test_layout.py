@@ -332,3 +332,18 @@ def test_one_class_needs_no_heading_to_tell_it_from_another():
     output = render_text([record], ROOT, theme=theme)
 
     assert "INTRINSIC" not in output.split("FILES IN DETAIL")[1]
+
+
+def test_the_timeline_does_not_break_a_url_inside_itself():
+    """The third renderer with the same fault: a value squeezed into a column
+    narrower than it needs, and hard-broken mid-token when it does not fit. An
+    address the report cuts in half is one nothing can open, copy or grep for."""
+    theme = Theme(colour=False, unicode=True, width=72)
+    long_url = "https://portal.example.org/press/2026/holiday-master.jpg"
+    record = _record(
+        "holiday.jpg", Origin(source="browser-download", url=long_url, at="2026-08-31T10:49:33Z")
+    )
+
+    output = render_timeline([record], ROOT, theme=theme)
+
+    assert long_url in output

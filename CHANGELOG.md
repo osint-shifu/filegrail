@@ -9,11 +9,21 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Five example views in the readme, each folded: one file, a directory's index,
-  `explain`, identifiers over document content, and the check before
+- Eleven example views in the readme, each folded: one file, a whole directory
+  top to bottom, the index alone, two records that disagree, `explain`, a
+  timeline, identifiers over document content, files sharing a camera, two
+  files compared, what the machine can answer at all, and the check before
   publishing. Real output from real runs rather than written out, and folded so
   the page stays a reference that answers *does it read this* in one look, with
   the output a click away for anyone who wants to see the shape of it.
+
+### Fixed
+
+- The timeline broke a URL inside itself. The claim was aligned under the file
+  name, which looked tidier and left it a column too narrow for an address, so
+  anything longer was hard-broken mid-token - the third renderer with the same
+  fault, after `explain` and the identifier table. Every claim gets the page
+  now, in the gutter rather than under the name.
 
 ## 0.6.0 - 2026-09-05
 

@@ -1404,8 +1404,13 @@ def render_timeline(
         for index, part in enumerate(theme.wrap(name, theme.width - stamp_width - 4)):
             head = f"  {moment}  " if index == 0 else f"  {under}  "
             lines.append(f"{head}{theme.bold(part)}")
-        for part in theme.wrap(detail, theme.width - stamp_width - 6):
-            lines.append(f"  {under}{rail} {theme.paint(part, colour)}")
+        # The claim sits in the gutter rather than under the file name. Aligning
+        # it with the name looked tidier and left it a column too narrow for a
+        # URL, which was then hard-broken inside itself - and half an address is
+        # one nothing can open, copy or grep for. Every claim gets the page.
+        for index, part in enumerate(theme.wrap(detail, theme.width - 4)):
+            head = f"  {rail} " if index == 0 else "    "
+            lines.append(f"{head}{theme.paint(part, colour)}")
     return "\n".join(lines)
 
 

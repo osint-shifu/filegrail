@@ -403,7 +403,7 @@ filegrail ./case --redact --json > report.json
 
 ## Example views
 
-Real output, from real runs. A redirected report is laid out to 72 columns so it stays readable wherever it is opened later.
+Real output from real runs, folded so the reference above stays readable. A redirected report is laid out to 72 columns, so it survives being quoted, pasted into a ticket, diffed or read in a side pane.
 
 <details>
 <summary><strong>One file</strong> &nbsp;·&nbsp; <code>filegrail holiday.jpg</code></summary>
@@ -434,12 +434,128 @@ Real output, from real runs. A redirected report is laid out to 72 columns so it
   └ GPSLongitude      11, 53, 6.46
 ```
 
-Two claims about the same file, under the question each one answers. The meter says how directly a source knows what it claims — it is not a probability.
+Two claims about one file, each under the question it answers. The meter says how directly a source knows what it claims — it is not a probability.
 
 </details>
 
 <details>
-<summary><strong>A directory, index only</strong> &nbsp;·&nbsp; <code>filegrail ./case --brief</code></summary>
+<summary><strong>A whole directory, top to bottom</strong> &nbsp;·&nbsp; <code>filegrail ./case</code></summary>
+
+```text
+    __ _ _                   _ _
+   / _(_) |___ __ _ _ _ __ _(_) |
+  |  _| | / -_) _` | '_/ _` | | |   filegrail 0.6.1
+  |_| |_|_\___\__, |_| \__,_|_|_|
+              |___/
+
+  Trace where files came from. Extract what they reveal.
+
+  target    ~/case
+  profile   ~/home · another machine
+  scanned   4 files · 4 types · 3.4 MB
+  findings  3 files · 1 without findings
+
+  ──────────────────────────────────────────────────────────────────────
+
+  INVENTORY                                                      4 types
+  ──────────────────────────────────────────────────────────────────────
+
+    type  files    size
+    JPEG      1  3.4 MB
+    DOCX      1   498 B
+    PNG       1    88 B
+    MD        1    81 B
+
+    family    files
+    image         2
+    document      1
+    text          1
+
+  FINDINGS
+  ──────────────────────────────────────────────────────────────────────
+
+    metadata              3 files
+    acquisition evidence  2 files
+    authors / creators    1 file
+    creating software     2 files
+    device information    1 file
+    coordinates           1 file
+    timestamps            1 file
+
+  NOTABLE FINDINGS
+  ──────────────────────────────────────────────────────────────────────
+
+    1 file contains coordinates
+    6 unique identifiers extracted (--identify to list them)
+
+  FILES                                                          4 files
+  ──────────────────────────────────────────────────────────────────────
+
+  ● chart.png               88 B                        png-text
+  ● invoice.docx           498 B  XDG attribute         ooxml-properties
+  ● press/holiday.jpg     3.4 MB  browser download      exif
+  · notes.md                81 B  2026-09-05T20:19:29Z
+
+  FILES IN DETAIL                                                3 files
+  ──────────────────────────────────────────────────────────────────────
+
+  ● invoice.docx                                                   498 B
+
+  ACQUISITION  how the file reached this machine
+  ← https://acme-legal.example/portal/invoice.docx
+  │ XDG attribute · 2026-09-05T20:19:29Z                    ▰▰▰▰▱ direct
+
+  INTRINSIC  what the file records about its own earlier life
+  ← self-reported metadata
+  │ OOXML properties                                 ▰▰▱▱▱ self-reported
+  │ note      author Ann Shaw
+  │
+  └ creator  Ann Shaw
+
+  ● press/holiday.jpg                                             3.4 MB
+
+  ACQUISITION  how the file reached this machine
+  ← https://portal.example.org/press/2026/holiday-master.jpg
+  │ browser download · chromium · 2026-08-31T10:49:33Z      ▰▰▰▰▱ direct
+  │ referrer  https://portal.example.org/press/
+
+  INTRINSIC  what the file records about its own earlier life
+  ← made by NIKON COOLPIX P6000
+  │ device metadata · 2008-10-22T16:28:39Z           ▰▰▰▱▱ self-reported
+  │ geo       43.467447, 11.885128
+  │
+  ├ Make              NIKON
+  ├ Model             COOLPIX P6000
+  ├ DateTimeOriginal  2008:10:22 16:28:39
+  ├ BodySerialNumber  3001234
+  ├ GPSLatitudeRef    N
+  ├ GPSLatitude       43, 28, 2.81
+  ├ GPSLongitudeRef   E
+  └ GPSLongitude      11, 53, 6.46
+
+  ● chart.png                                                       88 B
+  ← made by GIMP 2.10
+  │ PNG text                                         ▰▰▱▱▱ self-reported
+  │
+  └ Software  GIMP 2.10
+
+  METADATA SOURCES                                             3 sources
+  ──────────────────────────────────────────────────────────────────────
+
+    PNG text          ▰▰▱▱▱  1
+    XDG attribute     ▰▰▰▰▱  1
+    browser download  ▰▰▰▰▱  1
+
+  ──────────────────────────────────────────────────────────────────────
+    4 files analyzed · 3 with findings · 1 with no findings
+```
+
+Banner, inventory, findings, what needs a second look, the index, then each file in full, then which readers actually returned something.
+
+</details>
+
+<details>
+<summary><strong>Index only, for a large directory</strong> &nbsp;·&nbsp; <code>filegrail ./case --brief</code></summary>
 
 ```text
   FILES                                                          4 files
@@ -451,7 +567,39 @@ Two claims about the same file, under the question each one answers. The meter s
   · notes.md                81 B  2026-09-05T20:15:16Z
 ```
 
-A row a file: whatever needs a second look first, then the rest. A file nothing was found for carries its filesystem date instead of the columns it has nothing to put in them.
+A row a file. A file nothing was found for carries its filesystem date instead of the columns it has nothing to put in them.
+
+</details>
+
+<details>
+<summary><strong>Two records that disagree</strong> &nbsp;·&nbsp; <code>filegrail ./contested</code></summary>
+
+```text
+  FILES IN DETAIL                                                 1 file
+  ──────────────────────────────────────────────────────────────────────
+
+  ● statement.pdf                                                   83 B
+
+  ACQUISITION  how the file reached this machine
+  ← https://documents.example.org/releases/statement.pdf
+  │ browser download · chromium · 2026-08-31T10:49:33Z      ▰▰▰▰▱ direct
+  │ referrer  https://documents.example.org/releases/
+  │
+  ← https://mail.example.net/attach/statement.pdf
+  │ XDG attribute · 2026-09-05T20:19:51Z                    ▰▰▰▰▱ direct
+
+  INTRINSIC  what the file records about its own earlier life
+  ← made by LibreOffice 24.2
+  │ PDF Info                                         ▰▰▱▱▱ self-reported
+  │
+  └ Producer  LibreOffice 24.2
+  ! conflict
+  │   browser download says
+  │   https://documents.example.org/releases/statement.pdf
+  │   XDG attribute says https://mail.example.net/attach/statement.pdf
+```
+
+Neither claim is discarded and neither is promoted. The disagreement is the finding.
 
 </details>
 
@@ -506,6 +654,28 @@ The answer first, then what it rests on. A class with nothing in it says so rath
 </details>
 
 <details>
+<summary><strong>Chronological events</strong> &nbsp;·&nbsp; <code>filegrail ./case --timeline</code></summary>
+
+```text
+  2008-10-22 16:28:39  press/holiday.jpg
+  │ made by NIKON COOLPIX P6000
+  2026-08-31 10:49:33  press/holiday.jpg
+  │ https://portal.example.org/press/2026/holiday-master.jpg
+  2026-09-05 20:19:29  invoice.docx
+  │ https://acme-legal.example/portal/invoice.docx
+  2026-09-05 20:19:29  invoice.docx
+  │ self-reported metadata
+  2026-09-05 20:19:29  notes.md
+  │ (nothing found)
+  2026-09-05 20:19:29  chart.png
+  │ made by GIMP 2.10
+```
+
+Acquisition, creation, editing and interaction on one axis.
+
+</details>
+
+<details>
 <summary><strong>Identifiers, including document content</strong> &nbsp;·&nbsp; <code>filegrail ./case --content</code></summary>
 
 ```text
@@ -525,6 +695,93 @@ The answer first, then what it rests on. A class with nothing in it says so rath
 ```
 
 `both` means the value is in the document *and* in what the file records about itself. `recorded` is only the latter, `text` only the former.
+
+</details>
+
+<details>
+<summary><strong>Files sharing a camera or an author</strong> &nbsp;·&nbsp; <code>filegrail ./shots --cluster</code></summary>
+
+```text
+  SHARED SOURCES                                               2 sources
+  ──────────────────────────────────────────────────────────────────────
+
+    camera body   3001234                                        3 files
+    camera model  NIKON COOLPIX P6000                            3 files
+```
+
+A camera body is one physical device, by serial. A camera model is a product thousands of people own — not the same claim.
+
+</details>
+
+<details>
+<summary><strong>Two files against each other</strong> &nbsp;·&nbsp; <code>filegrail compare beach.jpg beach-edited.jpg</code></summary>
+
+```text
+  filegrail  compare  beach.jpg · beach-edited.jpg
+  ──────────────────────────────────────────────────────────────────────
+
+  IDENTICAL
+
+    Make              NIKON
+    Model             COOLPIX P6000
+    BodySerialNumber  3001234
+
+  DIFFERING
+
+    Software          NIKON COOLPIX P6000 vs Adobe Photoshop 26.1
+
+  ARRIVED BY
+
+    beach.jpg         no acquisition record
+    beach-edited.jpg  no acquisition record
+
+  CREATED
+
+    apart             0 seconds
+
+  ──────────────────────────────────────────────────────────────────────
+
+  ASSESSMENT
+
+    Both files agree on Make, Model, BodySerialNumber. How each one
+    arrived is not established here.
+```
+
+</details>
+
+<details>
+<summary><strong>What this machine can answer at all</strong> &nbsp;·&nbsp; <code>filegrail doctor</code></summary>
+
+```text
+  filegrail  evidence sources
+  ──────────────────────────────────────────────────────────────────────
+
+  profile   ~/home · another machine
+
+  Chromium family downloads  available
+                               2 records across 1 of 1 profile
+  Firefox downloads          unavailable
+                               no profile found
+  XDG origin attribute       available
+                               written by KDE tools and wget --xattr,
+                               but not by Firefox
+  Mounted Zone.Identifier    available
+                               user.Zone.Identifier on an NTFS mount
+  Shell history              unavailable
+                               no history file found
+  Recent documents           unavailable
+                               no list found
+  macOS quarantine database  unavailable
+                               no database in this profile
+  Deleted files              unavailable
+                               no trash directory
+  Windows Recent shortcuts   unavailable
+                               no Recent folder in this profile
+  Torrent client stores      unavailable
+                               no client store found
+```
+
+*The evidence was searched and the file was not in it* is a finding. *The evidence was never there to search* is not one, and only this can tell you which you are looking at.
 
 </details>
 
