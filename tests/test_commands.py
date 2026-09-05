@@ -192,3 +192,30 @@ def test_clean_does_not_overwrite_what_is_already_in_the_output(tmp_path: Path, 
 
     assert standing.read_bytes() == b"someone else's file"
     assert json.loads(capsys.readouterr().out)["summary"]["cleaned"] == 0
+
+
+def test_the_scan_document_carries_what_was_not_searched(tmp_path: Path, capsys):
+    case = tmp_path / "case"
+    (case / "node_modules").mkdir(parents=True)
+    (case / "node_modules" / "index.js").write_text("x", encoding="utf-8")
+    (case / "real.txt").write_text("x", encoding="utf-8")
+
+    assert main([str(case), "--json", "--no-shell-history"]) == 0
+
+    document = json.loads(capsys.readouterr().out)
+    assert [Path(p).name for p in document["unsearched"]["skipped_by_name"]] == ["node_modules"]
+    assert document["unsearched"]["unreadable"] == []
+
+
+def test_no_skip_descends_into_the_names_a_scan_normally_leaves(tmp_path: Path, capsys):
+    case = tmp_path / "case"
+    (case / "build").mkdir(parents=True)
+    (case / "build" / "shipped.txt").write_text("x", encoding="utf-8")
+
+    assert main([str(case), "--json", "--no-shell-history"]) == 0
+    assert json.loads(capsys.readouterr().out)["summary"]["total"] == 0
+
+    assert main([str(case), "--json", "--no-shell-history", "--no-skip"]) == 0
+    document = json.loads(capsys.readouterr().out)
+    assert document["summary"]["total"] == 1
+    assert document["unsearched"]["skipped_by_name"] == []

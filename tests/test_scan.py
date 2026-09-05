@@ -1,11 +1,13 @@
 import os
 import sqlite3
 import struct
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
 
-from filegrail.scan import iter_files, scan
+from filegrail.scan import Unsearched, iter_files, scan
 from filegrail.sources.fsattrs import read_file_attributes
 
 from .test_browser import CHROMIUM_SCHEMA, START_TIME
@@ -184,3 +186,74 @@ def test_a_scan_links_a_file_to_the_one_it_was_made_from(tmp_path: Path):
     assert [link.others for link in records["export.jpg"].links] == [
         (str(tmp_path / "master.jpg"),)
     ]
+
+
+# --- what the walk did not look inside ---------------------------------------
+#
+# `no findings` is a claim about a file the tool looked at. A directory it never
+# entered produces no files at all, so nothing in the report is about them and
+# nothing in the report says so. The two reasons a directory goes unvisited are
+# different in kind and are kept apart: one is a choice the tool made and can be
+# told not to make, the other is a hole in the evidence.
+
+
+@contextmanager
+def unreadable(path: Path) -> Iterator[None]:
+    """Make a directory impossible to walk into, or skip where that cannot be done."""
+    path.chmod(0o000)
+    if os.access(path, os.R_OK):
+        path.chmod(0o755)
+        pytest.skip("this user or platform can read a directory with no permissions")
+    try:
+        yield
+    finally:
+        path.chmod(0o755)
+
+
+def test_a_directory_that_could_not_be_read_is_named(tmp_path: Path):
+    case = tmp_path / "case"
+    (case / "locked").mkdir(parents=True)
+    (case / "locked" / "secret.txt").write_text("x", encoding="utf-8")
+    (case / "open.txt").write_text("x", encoding="utf-8")
+
+    missed = Unsearched()
+    with unreadable(case / "locked"):
+        records = scan(case, home=tmp_path, use_shell_history=False, unsearched=missed)
+
+    assert [Path(record.path).name for record in records] == ["open.txt"]
+    assert [Path(p).name for p in missed.unreadable] == ["locked"]
+    assert missed.by_name == []
+
+
+def test_a_directory_skipped_for_its_name_is_named_too(tmp_path: Path):
+    case = tmp_path / "case"
+    (case / "node_modules").mkdir(parents=True)
+    (case / "node_modules" / "index.js").write_text("x", encoding="utf-8")
+    (case / "real.txt").write_text("x", encoding="utf-8")
+
+    missed = Unsearched()
+    scan(case, home=tmp_path, use_shell_history=False, unsearched=missed)
+
+    assert [Path(p).name for p in missed.by_name] == ["node_modules"]
+    assert missed.unreadable == []
+
+
+def test_the_skipped_names_can_be_visited_when_asked(tmp_path: Path):
+    """The list is a default, not a rule about what evidence is."""
+    case = tmp_path / "case"
+    (case / "build").mkdir(parents=True)
+    (case / "build" / "shipped.txt").write_text("x", encoding="utf-8")
+
+    assert [p.name for p in iter_files(case)] == []
+    assert [p.name for p in iter_files(case, skip_names=False)] == ["shipped.txt"]
+
+
+def test_nothing_is_recorded_when_nothing_was_missed(tmp_path: Path):
+    case = tmp_path / "case"
+    case.mkdir()
+    (case / "real.txt").write_text("x", encoding="utf-8")
+
+    missed = Unsearched()
+    scan(case, home=tmp_path, use_shell_history=False, unsearched=missed)
+
+    assert not missed

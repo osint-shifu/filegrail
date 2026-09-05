@@ -5,6 +5,7 @@ import pytest
 from filegrail import TAGLINE, __version__
 from filegrail.models import FileRecord, Origin
 from filegrail.report import render_text, render_timeline
+from filegrail.scan import Unsearched
 from filegrail.theme import Theme
 
 #: Deterministic rendering for assertions: no colour, no box drawing.
@@ -430,3 +431,49 @@ def test_brief_is_where_the_list_gets_shortened():
     output = render_text(_unexplained(40), Path("/case"), theme=PLAIN, brief=True, limit=25)
 
     assert "... and 15 more" in output
+
+
+# --- what was not searched ---------------------------------------------------
+
+
+def test_the_report_says_which_directories_were_not_read():
+    """A directory the walk could not enter is a hole, and holes are findings.
+
+    The report's own premise is that "searched and not found" and "never
+    searched" are different sentences. A directory that could not be opened
+    produces no files, so without this line nothing in the report is about it
+    and nothing in the report says so.
+    """
+    missed = Unsearched(unreadable=["/case/locked", "/case/sealed"])
+
+    output = render_text([_record("a.jpg")], Path("/case"), theme=PLAIN, unsearched=missed)
+
+    assert "2 directories could not be read" in output
+    assert "locked" in output and "sealed" in output
+
+
+def test_the_report_says_which_directories_it_skipped_by_name():
+    missed = Unsearched(by_name=["/case/node_modules"])
+
+    output = render_text([_record("a.jpg")], Path("/case"), theme=PLAIN, unsearched=missed)
+
+    assert "1 directory skipped by name" in output
+    assert "--no-skip" in output
+
+
+def test_the_two_reasons_are_not_merged():
+    """One is a choice this tool made; the other is evidence that was not there."""
+    missed = Unsearched(unreadable=["/case/locked"], by_name=["/case/build"])
+
+    output = render_text([_record("a.jpg")], Path("/case"), theme=PLAIN, unsearched=missed)
+
+    assert "could not be read" in output
+    assert "skipped by name" in output
+    assert output.index("could not be read") < output.index("skipped by name")
+
+
+def test_a_report_with_nothing_missed_says_nothing_about_it():
+    output = render_text([_record("a.jpg")], Path("/case"), theme=PLAIN, unsearched=Unsearched())
+
+    assert "could not be read" not in output
+    assert "skipped by name" not in output

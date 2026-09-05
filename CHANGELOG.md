@@ -9,6 +9,13 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `--no-skip` reads the directories a scan normally leaves alone. The skip list
+  holds build output, caches and vendored copies - `dist`, `build`, `target`,
+  `node_modules` and a dozen more - which bury a report and say nothing about
+  how anything arrived. It is a sensible default and it was never a claim about
+  what evidence is: an evidence directory may perfectly well be called `build`,
+  and until now one would have vanished from the scan without a word.
+
 - `Zone.Identifier` is read on machines that are not Windows. It is the richest
   thing Windows writes down about a download - the address, the referrer and
   the zone the bytes came from - and it was reachable only from Windows, which
@@ -28,6 +35,20 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   never mentioned.
 
 ### Fixed
+
+- A scan says which directories it did not look inside. `os.walk` swallows
+  access errors by default, so a directory that could not be opened produced no
+  files, nothing in the report was about it, and nothing in the report said so
+  - on exit code zero. That is precisely the confusion the tool exists to
+  prevent: `no findings` is a claim about a file that was looked at, and this
+  one never was. It matters most in the case `--home` was built for, since a
+  profile mounted from an image routinely carries directories this user cannot
+  read.
+
+  The closing lines of a report now name them, and keep the two reasons apart
+  rather than merging them into one count. A directory that could not be read
+  is a hole in the evidence; a directory skipped by name is a choice this tool
+  made and can be told not to make. Both are in `--json` under `unsearched`.
 
 - `LICENSE` is the Apache License 2.0. It had been reflowed and cut by about a
   third: the APPENDIX was gone and so were normative sentences from section 1,

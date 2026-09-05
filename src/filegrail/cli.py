@@ -29,7 +29,7 @@ from .report import (
     render_text,
     render_timeline,
 )
-from .scan import scan
+from .scan import Unsearched, scan
 from .theme import detect
 
 COMMANDS = ("scan", "explain", "compare", "doctor", "menu", "clean", "help")
@@ -166,6 +166,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--no-recurse", action="store_true", help="Do not descend into subdirectories."
+    )
+    parser.add_argument(
+        "--no-skip",
+        action="store_true",
+        help="Read the directories a scan normally leaves alone, such as "
+        "build output, caches and vendored copies.",
     )
     parser.add_argument(
         "--no-shell-history", action="store_true", help="Skip shell history correlation."
@@ -376,6 +382,7 @@ def _scan(rest: list[str]) -> int:
         return 2
 
     stats: dict[str, int] = {}
+    missed = Unsearched()
     records = scan(
         root,
         recursive=not args.no_recurse,
@@ -385,6 +392,8 @@ def _scan(rest: list[str]) -> int:
         suffixes=suffixes,
         home=home,
         stats=stats,
+        skip_names=not args.no_skip,
+        unsearched=missed,
     )
 
     if args.unknown_only:
@@ -396,7 +405,16 @@ def _scan(rest: list[str]) -> int:
     theme = detect(colour=args.colour)
 
     if args.json:
-        print(render_json(records, base, identify=args.identify, cluster=args.cluster, home=home))
+        print(
+            render_json(
+                records,
+                base,
+                identify=args.identify,
+                cluster=args.cluster,
+                home=home,
+                unsearched=missed,
+            )
+        )
     elif args.timeline:
         print(render_timeline(records, base, theme=theme, home=home))
     else:
@@ -413,6 +431,7 @@ def _scan(rest: list[str]) -> int:
                 identify=args.identify,
                 cluster=args.cluster,
                 home=home,
+                unsearched=missed,
             )
         )
     return 0

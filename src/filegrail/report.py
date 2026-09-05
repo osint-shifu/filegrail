@@ -23,6 +23,7 @@ from .identify import PLACE, Identifier, extract
 from .models import ACQUISITION, INTRINSIC, FileRecord, Origin, kind, label
 from .overview import Alert, Inventory, Tally, attention, findings, inventory
 from .reconcile import ATTRIBUTION_CONFLICT, CONFLICT, KINDS, PARTIAL, Verdict, reconcile
+from .scan import Unsearched
 from .theme import (
     ARROW,
     BRANCH,
@@ -122,6 +123,7 @@ def render_text(
     identify: bool = False,
     cluster: bool = False,
     home: Path | None = None,
+    unsearched: Unsearched | None = None,
 ) -> str:
     theme = theme or detect()
     known = [record for record in records if record.origins]
@@ -153,7 +155,7 @@ def render_text(
     if cluster:
         lines.extend(_shared(theme, records))
 
-    lines.extend(_summary(theme, records, known, unknown, stats, filtered))
+    lines.extend(_summary(theme, records, known, unknown, stats, filtered, root, unsearched))
     return "\n".join(lines)
 
 
@@ -234,8 +236,11 @@ def _identifiers(theme: Theme, found: list[Identifier]) -> list[str]:
     return lines
 
 
-def _plural(count: int, noun: str) -> str:
-    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
+def _plural(count: int, noun: str, plural: str | None = None) -> str:
+    """`3 files`, and `2 directories` for the nouns an -s does not pluralise."""
+    if count == 1:
+        return f"{count} {noun}"
+    return f"{count} {plural or noun + 's'}"
 
 
 def _facts_line(theme: Theme, facts: list[str]) -> str:
@@ -783,6 +788,8 @@ def _summary(
     unknown: list[FileRecord],
     stats: dict[str, int] | None,
     filtered: str = "",
+    root: Path | None = None,
+    unsearched: Unsearched | None = None,
 ) -> list[str]:
     """Which readers produced results, and the one line that closes the report.
 
@@ -828,6 +835,9 @@ def _summary(
     )
     lines.extend(_wrapped(theme, closing, " " * _INDENT, theme.bold))
 
+    if unsearched:
+        lines.extend(_unsearched(theme, unsearched, root))
+
     if filtered:
         # An empty report after a filter has to name the filter. Otherwise it
         # reads as "this folder holds nothing", which is a different finding.
@@ -837,6 +847,47 @@ def _summary(
     elif not known and records:
         lines.extend(explain_empty_result(stats, theme))
     lines.append("")
+    return lines
+
+
+#: How many directories are named before the rest become a count. A tree of
+#: source repositories can hold hundreds of skipped names, and a report that
+#: spends a page on them buries what it found.
+_NAMED_DIRECTORIES = 8
+
+
+def _unsearched(theme: Theme, missed: Unsearched, root: Path | None) -> list[str]:
+    """The directories nothing in this report is about.
+
+    Kept in two groups because they answer differently. One could not be read,
+    which is a hole in the evidence and the thing this tool exists to be honest
+    about; the other was skipped on purpose, which is a default the reader can
+    turn off. Reported in that order: the hole first.
+    """
+    lines: list[str] = []
+    for paths, sentence in (
+        (
+            missed.unreadable,
+            "{count} could not be read. Nothing in this report is about {them}.",
+        ),
+        (missed.by_name, "{count} skipped by name; --no-skip reads {them} too."),
+    ):
+        if not paths:
+            continue
+        said = sentence.format(
+            count=_plural(len(paths), "directory", "directories"),
+            them="it" if len(paths) == 1 else "them",
+        )
+        lines.append("")
+        lines.extend(_wrapped(theme, said, " " * _INDENT, theme.dim))
+        for path in paths[:_NAMED_DIRECTORIES]:
+            shown = _relative(path, root) if root else path
+            lines.append(f"{' ' * (_INDENT + 2)}{theme.dim(shown)}")
+        hidden = len(paths) - _NAMED_DIRECTORIES
+        if hidden > 0:
+            lines.append(
+                f"{' ' * (_INDENT + 2)}{theme.dim(f'... and {hidden} more (--json for each)')}"
+            )
     return lines
 
 
@@ -1132,6 +1183,7 @@ def render_json(
     identify: bool = False,
     cluster: bool = False,
     home: Path | None = None,
+    unsearched: Unsearched | None = None,
 ) -> str:
     payload: dict[str, object] = {
         "root": str(root),
@@ -1142,6 +1194,7 @@ def render_json(
             "with_origin": sum(1 for record in records if record.origins),
         },
     }
+    payload["unsearched"] = (unsearched or Unsearched()).to_dict()
     if identify:
         payload["identifiers"] = [entry.to_dict() for entry in extract(records)]
     if cluster:

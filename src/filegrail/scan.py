@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .lineage import attach_lineage
@@ -37,6 +37,13 @@ from .sources import (
 )
 from .util import basename, birth_time, iso, sha256_file
 
+#: Directory names a scan does not descend into. They hold build output, caches
+#: and vendored copies - thousands of files that say nothing about how anything
+#: reached this machine, and whose presence would bury the report.
+#:
+#: It is a default and not a claim about what evidence is. An evidence directory
+#: may perfectly well be called `build`, so every skip is named in the report
+#: rather than made silently, and `--no-skip` turns the list off.
 SKIP_DIRECTORIES = {
     ".git",
     ".hg",
@@ -56,12 +63,34 @@ SKIP_DIRECTORIES = {
 }
 
 
+@dataclass(slots=True)
+class Unsearched:
+    """The directories the walk did not look inside, and which kind of not.
+
+    Two answers a report must not merge. A directory skipped for its name is a
+    choice this tool made and can be told not to make; a directory that could
+    not be read is a hole in the evidence. `no findings` is a claim about files
+    that were looked at, and neither of these produced any.
+    """
+
+    unreadable: list[str] = field(default_factory=list)
+    by_name: list[str] = field(default_factory=list)
+
+    def __bool__(self) -> bool:
+        return bool(self.unreadable or self.by_name)
+
+    def to_dict(self) -> dict[str, list[str]]:
+        return {"unreadable": self.unreadable, "skipped_by_name": self.by_name}
+
+
 def iter_files(
     root: Path,
     *,
     recursive: bool = True,
     follow_symlinks: bool = False,
     suffixes: set[str] | None = None,
+    skip_names: bool = True,
+    unsearched: Unsearched | None = None,
 ) -> Iterator[Path]:
     """Yield the files a scan should consider.
 
@@ -72,17 +101,27 @@ def iter_files(
     def wanted(path: Path) -> bool:
         return suffixes is None or path.suffix.lower() in suffixes
 
+    def note_unreadable(error: OSError) -> None:
+        """`os.walk` swallows these by default, and a swallowed one is a hole."""
+        if unsearched is not None and error.filename:
+            unsearched.unreadable.append(str(error.filename))
+
     if root.is_file():
         if wanted(root):
             yield root
         return
 
-    for directory, subdirectories, filenames in os.walk(root, followlinks=follow_symlinks):
-        subdirectories[:] = sorted(
-            name
-            for name in subdirectories
-            if name not in SKIP_DIRECTORIES and not name.endswith(".repro")
-        )
+    for directory, subdirectories, filenames in os.walk(
+        root, followlinks=follow_symlinks, onerror=note_unreadable
+    ):
+        keep = []
+        for name in sorted(subdirectories):
+            if skip_names and (name in SKIP_DIRECTORIES or name.endswith(".repro")):
+                if unsearched is not None:
+                    unsearched.by_name.append(str(Path(directory) / name))
+                continue
+            keep.append(name)
+        subdirectories[:] = keep
         for name in sorted(filenames):
             path = Path(directory) / name
             if path.is_file() and wanted(path) and (follow_symlinks or not path.is_symlink()):
@@ -101,6 +140,8 @@ def scan(
     suffixes: set[str] | None = None,
     home: Path | None = None,
     stats: dict[str, int] | None = None,
+    skip_names: bool = True,
+    unsearched: Unsearched | None = None,
 ) -> list[FileRecord]:
     """Build a FileRecord for every file under root.
 
@@ -109,7 +150,15 @@ def scan(
     guessing whether the tool failed.
     """
     root = root.resolve()
-    files = list(iter_files(root, recursive=recursive, suffixes=suffixes))
+    files = list(
+        iter_files(
+            root,
+            recursive=recursive,
+            suffixes=suffixes,
+            skip_names=skip_names,
+            unsearched=unsearched,
+        )
+    )
 
     downloads = collect_browser_downloads(home=home, stats=stats)
     # Browsers record the path at download time; index by name too so a file

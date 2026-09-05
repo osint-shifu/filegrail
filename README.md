@@ -124,6 +124,8 @@ Removing the fields is removing the fields: pixels still carry sensor noise, an 
 > [!NOTE]
 > *The evidence was searched and the file was not in it* is a finding. *The evidence was never there to search* is not a finding about the file at all. A report cannot tell those apart on its own, so `doctor` says up front which one you are looking at.
 
+The same rule applies to the directory being scanned. A scan closes by naming every directory it did not look inside, and keeps the two reasons apart: one it **could not read**, and one it **skipped by name** — build output, caches and vendored copies, which bury a report and say nothing about how anything arrived. An evidence directory may perfectly well be called `build`, so the skip is a default rather than a rule about what evidence is, and `--no-skip` turns it off.
+
 ---
 
 ## Installation
@@ -194,6 +196,7 @@ filegrail ./evidence
 | `--limit N` | Cap the list of files with no findings; `0` for all |
 | `--home DIR` | Read local evidence from another user profile |
 | `--no-recurse` | Do not descend into subdirectories |
+| `--no-skip` | Read the directories a scan normally leaves alone |
 | `--no-shell-history` | Skip shell-history correlation |
 | `--no-archives` | Do not read archives or inherit their origins |
 | `--no-color` | Disable ANSI colour |
