@@ -5,7 +5,17 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.1.0 - 2026-09-05
+
+### Fixed
+
+- The wheel can be built. `packages` already carried everything under the
+  package directory, including the IANA TLD list, and the `force-include` entry
+  added the same file at the same path a second time - which hatchling refuses,
+  so **no wheel had ever been produced**. The entry rested on an assumption
+  that turned out to be wrong, and nothing tested it because nothing had built
+  the project. CI now builds it, checks the data file is inside, installs what
+  it built and runs it.
 
 ### Added
 
