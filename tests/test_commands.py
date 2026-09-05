@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from filegrail.cli import COMMANDS, main
+from filegrail.cli import COMMANDS, build_parser, main
 
 
 @pytest.fixture
@@ -137,3 +137,18 @@ def test_compare_ignores_what_merely_opened_a_file(tmp_path: Path, capsys):
 
     assert not found.differing
     assert ("Software", "Canon EOS R5") in found.shared
+
+
+def test_the_type_option_lists_every_family_it_accepts():
+    """The help text was written by hand and `mail` had been added to the
+    families without it, so `--type mail` worked and nothing said so."""
+    from filegrail.filters import FAMILIES
+
+    parser = build_parser()
+    text = next(
+        action.help
+        for action in parser._actions
+        if "--type" in getattr(action, "option_strings", [])
+    )
+
+    assert sorted(FAMILIES) == sorted(name for name in FAMILIES if name in text)

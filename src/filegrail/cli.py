@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .filters import UnknownType, describe, selection
+from .filters import FAMILIES, UnknownType, describe, selection
 from .report import (
     render_compare,
     render_doctor,
@@ -133,7 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         metavar="NAME",
-        help="Only these kinds of file: image, video, audio, document, archive, text.",
+        help=f"Only these kinds of file: {', '.join(sorted(FAMILIES))}.",
     )
     parser.add_argument(
         "--ext",
