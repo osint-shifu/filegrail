@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import TAGLINE, __version__
 from .about import WORDMARK
+from .cluster import cluster as group_sources
 from .explain import conclusion, grouped
 from .identify import PLACE, Identifier, extract
 from .models import ACQUISITION, INTRINSIC, FileRecord, Origin, kind, label
@@ -118,6 +119,7 @@ def render_text(
     theme: Theme | None = None,
     filtered: str = "",
     identify: bool = False,
+    cluster: bool = False,
     home: Path | None = None,
 ) -> str:
     theme = theme or detect()
@@ -147,8 +149,42 @@ def render_text(
     if identify:
         lines.extend(_identifiers(theme, found))
 
+    if cluster:
+        lines.extend(_shared(theme, records))
+
     lines.extend(_summary(theme, records, known, unknown, stats, filtered))
     return "\n".join(lines)
+
+
+#: What each axis is called where the section names it. The word says what the
+#: shared value identifies, because the three do not identify equally well and
+#: one label for all of them would flatten that away.
+_AXIS_LABELS = {"device": "camera body", "model": "camera model", "author": "author"}
+
+
+def _shared(theme: Theme, records: list[FileRecord]) -> list[str]:
+    """The sources more than one scanned file names.
+
+    A group of one is left out: it says a file has an author, which the file
+    already said. What this section is for is the second file, and the picture
+    of a directory that appears once the repeats are counted.
+    """
+    groups = [group for group in group_sources(records) if len(group.paths) > 1]
+    lines = _heading(theme, "shared sources", len(groups), "source")
+
+    if not groups:
+        return [*lines, f"    {theme.dim('no source is shared by more than one file')}", ""]
+
+    # Wide enough for the longest label there is, whichever axes turned up, so
+    # the column does not move between one scan and the next. Padding goes in
+    # the prefix because `_row` collapses whitespace inside the body.
+    width = max(len(name) for name in _AXIS_LABELS.values())
+    for group in groups:
+        label = _AXIS_LABELS.get(group.axis, group.axis)
+        tag = theme.dim(theme.clip(label, width).ljust(width))
+        count = theme.dim(_plural(len(group.paths), "file"))
+        lines.append(_row(theme, f"    {tag}  ", group.name, count))
+    return [*lines, ""]
 
 
 #: Which evidence class each identifier type is drawn in. A coordinate is the
@@ -1089,7 +1125,12 @@ def render_json_compare(left: FileRecord, right: FileRecord, home: Path | None =
 
 
 def render_json(
-    records: list[FileRecord], root: Path, *, identify: bool = False, home: Path | None = None
+    records: list[FileRecord],
+    root: Path,
+    *,
+    identify: bool = False,
+    cluster: bool = False,
+    home: Path | None = None,
 ) -> str:
     payload: dict[str, object] = {
         "root": str(root),
@@ -1102,6 +1143,8 @@ def render_json(
     }
     if identify:
         payload["identifiers"] = [entry.to_dict() for entry in extract(records)]
+    if cluster:
+        payload["shared_sources"] = [group.to_dict() for group in group_sources(records)]
 
     return document("scan", payload)
 

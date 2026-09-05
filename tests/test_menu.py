@@ -60,23 +60,26 @@ def test_end_of_input_leaves_quietly(tmp_path: Path):
     assert session.ran == []
 
 
-@pytest.mark.parametrize(
-    ("key", "flags"),
-    [
-        ("1", []),
-        ("2", ["--unknown-only"]),
-        ("3", ["--timeline"]),
-        ("4", ["--verbose"]),
-        ("5", ["--brief"]),
-        ("6", ["--hash"]),
-        ("7", ["--identify"]),
-        ("8", ["--redact", "--json"]),
-        ("i", ["--type", "image"]),
-        ("d", ["--type", "document"]),
-        ("s", ["doctor"]),
-        ("e", ["explain"]),
-    ],
-)
+#: Every menu key and the command line it must build. Kept as a constant so
+#: the invariant below can hold it against the menu itself.
+COMMANDS = [
+    ("1", []),
+    ("2", ["--unknown-only"]),
+    ("3", ["--timeline"]),
+    ("4", ["--verbose"]),
+    ("5", ["--brief"]),
+    ("6", ["--hash"]),
+    ("7", ["--identify"]),
+    ("8", ["--redact", "--json"]),
+    ("9", ["--cluster"]),
+    ("i", ["--type", "image"]),
+    ("d", ["--type", "document"]),
+    ("s", ["doctor"]),
+    ("e", ["explain"]),
+]
+
+
+@pytest.mark.parametrize(("key", "flags"), COMMANDS)
 def test_each_action_builds_its_command_line(tmp_path: Path, key: str, flags: list[str]):
     session = Session(key, "", "q")
 
@@ -196,3 +199,9 @@ def test_a_redirected_stream_has_no_menu():
             return False
 
     assert menu.available(NotATerminal()) is False
+
+
+def test_every_action_on_the_menu_has_a_case_above():
+    """The table above is written by hand, so an action added to the menu and
+    not to it would ship untested. This is what notices."""
+    assert {action.key for action in menu.ACTIONS} == {key for key, _ in COMMANDS}

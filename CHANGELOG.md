@@ -9,6 +9,31 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `--cluster` groups the scan by the sources more than one file names. A
+  directory is a list of files; a case is the smaller number of authors and
+  cameras that produced them, and the section exists to turn the first reading
+  into the second.
+
+  Three axes, kept apart because they do not identify equally well. A body
+  serial is assigned per unit and names one physical camera. A make and model
+  names a product thousands of people own, which is a different claim and is
+  never merged with the first - a reader told that two photographs "came from
+  the same camera" on the strength of a model name has been told something the
+  metadata does not support. An author field holds a name somebody typed, and
+  two people can type one name.
+
+  A field naming several authors is read as several. These formats separate
+  them with a semicolon, and reading the value whole invented a person nobody
+  is while hiding every real author in it - in the local corpus it split one
+  author across three near-identical groups. A comma is deliberately not a
+  separator: `Smith, John` is one person written surname first.
+
+  The author fields are the ones the overview already counts rather than a
+  second list beside it, so a block that learns to report an author becomes
+  clusterable in the same change.
+
+  It is on `--json` as `shared_sources`, with every path, and on the menu.
+
 - A block whose own two timestamps run backwards is reported. Where a document
   records both when it was made and when it was last changed - a PDF `Info`
   dictionary, OOXML core properties, an XMP packet - and the change comes

@@ -118,6 +118,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="List the emails, domains, addresses, hashes and coordinates found.",
     )
+    parser.add_argument(
+        "--cluster",
+        action="store_true",
+        help="Group the files by the authors and cameras more than one of them names.",
+    )
     parser.add_argument("--redact", action="store_true", help="Redact credentials before printing.")
     parser.add_argument(
         "--hash", action="store_true", dest="hash_files", help="Compute SHA-256 for each file."
@@ -332,7 +337,7 @@ def _scan(rest: list[str]) -> int:
     theme = detect(colour=args.colour)
 
     if args.json:
-        print(render_json(records, base, identify=args.identify, home=home))
+        print(render_json(records, base, identify=args.identify, cluster=args.cluster, home=home))
     elif args.timeline:
         print(render_timeline(records, base, theme=theme, home=home))
     else:
@@ -347,6 +352,7 @@ def _scan(rest: list[str]) -> int:
                 theme=theme,
                 filtered=describe(args.families, args.extensions),
                 identify=args.identify,
+                cluster=args.cluster,
                 home=home,
             )
         )

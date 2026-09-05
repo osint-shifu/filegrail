@@ -108,6 +108,7 @@ filegrail . --unknown-only
 filegrail explain statement.pdf
 filegrail compare a.jpg b.jpg
 filegrail . --identify
+filegrail . --cluster
 filegrail . --timeline
 filegrail doctor
 filegrail menu
@@ -177,6 +178,32 @@ Supported pivot classes include:
 * coordinates
 
 A camera serial, domain, author name, GPS position or embedded URL can be more valuable than the file name itself.
+
+### Who and what made these files
+
+A directory is a list of files. A case is the smaller number of sources that produced them.
+
+```bash
+filegrail ./case-files --cluster
+```
+
+```text
+  shared sources                                                    3 sources
+
+    camera model  NIKON COOLPIX P6000                                6 files
+    author        Stephen Richard                                   28 files
+    author        iSamples Team                                      3 files
+```
+
+The three axes are kept apart because they do not identify equally well:
+
+| Axis | What a shared value means |
+| :--- | :--- |
+| **camera body** | One physical camera. A body serial is assigned per unit |
+| **camera model** | The same product, which thousands of people own. Not the same camera |
+| **author** | The same name, as somebody typed it. Two people can type one name, and one person can be typed two ways |
+
+A field naming several authors is read as several authors. Nothing here says two files came from one person or one camera - it says they name the same thing, and on which axis.
 
 For the complete format and metadata matrix, see [`FORMATS.md`](docs/FORMATS.md).
 
@@ -336,7 +363,7 @@ See [`FORMATS.md`](docs/FORMATS.md) for the complete matrix.
 
 Useful scan options include:
 
-`--verbose`, `--brief`, `--json`, `--hash`, `--redact`, `--identify`, `--timeline`, `--unknown-only`, `--type`, `--ext`, `--limit`, `--home`, `--no-recurse`, `--no-shell-history`, `--no-archives`, `--no-color`.
+`--verbose`, `--brief`, `--json`, `--hash`, `--redact`, `--identify`, `--cluster`, `--timeline`, `--unknown-only`, `--type`, `--ext`, `--limit`, `--home`, `--no-recurse`, `--no-shell-history`, `--no-archives`, `--no-color`.
 
 ---
 
