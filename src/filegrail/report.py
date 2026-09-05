@@ -244,7 +244,13 @@ def _identifiers(theme: Theme, found: list[Identifier], *, content: bool = False
 
     lines = _heading(theme, "identifiers", len(found), noun="value")
     tag = max(len(_corpus(entry)) for entry in found) if content else 0
-    width = min(max(len(entry.normalized) for entry in found), theme.width - 30 - tag)
+    # The reserve is measured rather than assumed. It used to be a flat thirty
+    # columns, which on a narrow terminal spent width the value needed on a
+    # count that was six characters long - and a URL a few characters over the
+    # column breaks inside itself, which is the one thing a pivot must not do.
+    counted = max(len(f"{entry.count} in {entry.files}") for entry in found)
+    room = theme.width - 4 - 8 - 2 - counted - (tag + 2 if tag else 0)
+    width = min(max(len(entry.normalized) for entry in found), room)
 
     for entry in found:
         colour = _IDENTIFIER_COLOURS.get(entry.type, "self-reported")

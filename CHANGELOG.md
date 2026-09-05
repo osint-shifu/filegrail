@@ -5,6 +5,76 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.5.0 - 2026-09-05
+
+The report was reorganised. Nothing about what filegrail reads or claims has
+changed; what changed is the order it says things in, and how much of the page
+it says them on.
+
+### Added
+
+- **An index.** A scan went from the overview straight into a block per file,
+  so a reader learned which files were worth opening by scrolling the whole
+  report - on a case directory, hundreds of lines, and no answer to the first
+  question anybody asks. There is a `FILES` section now: one line a file,
+  whatever needs a second look at the top, then the rest in the order they were
+  walked, and `FILES IN DETAIL` below it.
+
+  It abbreviates, and it is allowed to precisely because it is an index: every
+  file in it is written out in full underneath. Nothing is truncated even so -
+  a name too long for its column takes the width it needs and the columns
+  follow it, which is what the list it replaces already did.
+
+- **`EVIDENCE STATE` in `explain`**: one line per class of evidence, whether or
+  not the file has any. An absent class is a fact about the file rather than a
+  gap in the report - a photograph nothing recorded the arrival of is a
+  different thing from one whose arrival record disagrees with itself, and a
+  section that simply does not appear cannot tell those apart.
+
+- **The class of each claim is named** inside an entry, where there is more
+  than one to tell apart. The order was already acquisition, then intrinsic,
+  then interaction, and a reader had to know that to read it.
+
+### Changed
+
+- **A report that is not going to a terminal is laid out to 72 columns.** It
+  used to take the width of whatever terminal produced it and bake that into
+  the file. Open it anywhere narrower and every rule wraps, leaving a stray
+  line of dashes outside the gutter that reads as damage rather than as a
+  divider: measured, a report made at 110 and read at 72 wraps twelve lines,
+  five of them rules, and that was a scan of three empty text files. Seventy-two
+  is what a file survives being quoted, pasted, diffed and read in a side pane
+  at - the width git uses for a commit body, for the same reason. `COLUMNS`
+  still overrides it, and a terminal is still asked how wide it is.
+
+- **`explain` answers first.** The conclusion was printed under everything it
+  rests on, in the one command whose entire purpose is to be asked *why*.
+
+- **A claim's value gets the page.** It used to share a line with the source
+  name and the strength, which left it about a third of the width, and anything
+  longer broke inside a token - so the URL in an `explain` report was an address
+  nobody could open, copy or grep for. A field to a line fixes it, and the claim
+  carries the same meter the scan prints rather than a second way of saying
+  strength. The identifier table sizes its columns from what they hold instead
+  of reserving a flat thirty, for the same reason.
+
+- **Headings are upper case.** `theme.bold` and `theme.paint` both hand the text
+  back untouched when colour is off, and colour is off in exactly the case that
+  matters most - a file read months later by somebody who was not there. Case
+  and position are the only emphasis left.
+
+- **`--brief` stops at the index.** It used to be the same report with the
+  decoded fields taken out, which is not a shorter answer to the question a
+  large directory asks - it is the same length minus the detail.
+
+### Removed
+
+- The separate list of files with no findings, and the heading over each group
+  of entries. Both were substitutes for an index. The files are index rows now,
+  carrying the filesystem date that was the only thing that list added over a
+  bare name, and `--limit` caps them with the wording it had. The ordering the
+  group headings sat on - strongest class of evidence first - is unchanged.
+
 ## 0.4.1 - 2026-09-05
 
 ### Fixed

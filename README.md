@@ -114,9 +114,12 @@ filegrail /mnt/image/home/ann/.local/share/Trash/files
 ```
 
 ```text
-  ● report.pdf                                                          19 B
+  FILES IN DETAIL                                                 1 file
+  ──────────────────────────────────────────────────────────────────────
+
+  ● report.pdf                                                      19 B
   ← (no detail)
-  │ trash record · 2026-08-14T09:41:07Z              ▰▰▱▱▱ circumstantial
+  │ trash record · 2026-08-14T09:41:07Z             ▰▰▱▱▱ circumstantial
   │ note      deleted from /home/ann/Cases/2026-08/report.pdf
   │
   ├ Path          /home/ann/Cases/2026-08/report.pdf
@@ -199,6 +202,9 @@ filegrail suspicious.pdf
 filegrail ./evidence
 ```
 
+> [!NOTE]
+> **A report redirected to a file is laid out for whoever opens it later.** On a terminal filegrail uses the terminal's width; anywhere else it uses 72 columns — what a file survives being quoted in mail, pasted into a ticket, read in a side pane and diffed at. Baking the generating terminal's width into an archived report makes every rule wrap the moment it is opened somewhere narrower. `COLUMNS=110 filegrail ./case > report.txt` overrides it.
+
 ### Commands
 
 | Command | What it does |
@@ -217,7 +223,7 @@ filegrail ./evidence
 | Option | Purpose |
 | :--- | :--- |
 | `-v`, `--verbose` | Every evidence record, not the strongest of each kind |
-| `--brief` | Summarise each file instead of listing every field |
+| `--brief` | Stop at the index: one line a file, no per-file detail |
 | `--timeline` | One chronological line per event |
 | `--identify` | Extract investigation pivots from metadata |
 | `--content` | Also read what the documents say, not only what they record (implies `--identify`) |
@@ -228,7 +234,7 @@ filegrail ./evidence
 | `--redact` | Redact credentials before printing (also on `explain` and `compare`) |
 | `--type NAME` | One family: `archive`, `audio`, `document`, `image`, `mail`, `text`, `video` |
 | `--ext LIST` | Only these extensions, e.g. `--ext jpg,pdf` |
-| `--limit N` | Cap the list of files with no findings; `0` for all |
+| `--limit N` | Cap how many files with no findings the index lists; `0` for all |
 | `--home DIR` | Read local evidence from another user profile |
 | `--no-recurse` | Do not descend into subdirectories |
 | `--no-skip` | Read the directories a scan normally leaves alone |
@@ -264,11 +270,17 @@ filegrail holiday.jpg
 ```
 
 ```text
+  FILES IN DETAIL                                                 1 file
+  ──────────────────────────────────────────────────────────────────────
+
   ● holiday.jpg                                                   3.4 MB
-  ← https://portal.example.org/press/holiday.jpg
+
+  ACQUISITION  how the file reached this machine
+  ← https://portal.example.org/press/2026/holiday-master.jpg
   │ browser download · chromium · 2026-08-31T10:49:33Z      ▰▰▰▰▱ direct
   │ referrer  https://portal.example.org/press/
-  │
+
+  INTRINSIC  what the file records about its own earlier life
   ← made by NIKON COOLPIX P6000
   │ device metadata · 2008-10-22T16:28:39Z           ▰▰▰▱▱ self-reported
   │ geo       43.467447, 11.885128
@@ -293,7 +305,137 @@ The browser record says **how the bytes reached the machine**. The EXIF block de
 filegrail ./case-files
 ```
 
-Scans recursively and leads with an overview before the per-file results.
+A report is read from the top down: what is in the directory, what was found in it, what wants a second look, **one line per file**, and only then each file in full. The index is what a long report is missing without: it answers *which of these do I open* before anything else does.
+
+<details>
+<summary><strong>A whole report, exactly as filegrail prints it</strong></summary>
+
+```text
+    __ _ _                   _ _
+   / _(_) |___ __ _ _ _ __ _(_) |
+  |  _| | / -_) _` | '_/ _` | | |   filegrail 0.4.1
+  |_| |_|_\___\__, |_| \__,_|_|_|
+              |___/
+
+  Trace where files came from. Extract what they reveal.
+
+  target    ~/Cases/acme
+  scanned   4 files · 4 types · 3.4 MB
+  findings  3 files · 1 without findings
+
+  ──────────────────────────────────────────────────────────────────────
+
+  evidence read from the profile at
+  /mnt/image/home/ann
+
+  INVENTORY                                                      4 types
+  ──────────────────────────────────────────────────────────────────────
+
+    JPEG  1  3.4 MB    DOCX  1   498 B    PNG   1    88 B
+    MD    1    81 B
+
+    image     2    document  1    text      1
+
+  FINDINGS
+  ──────────────────────────────────────────────────────────────────────
+
+    metadata              3 files
+    acquisition evidence  2 files
+    authors / creators    1 file
+    creating software     2 files
+    device information    1 file
+    coordinates           1 file
+    timestamps            1 file
+
+  NOTABLE FINDINGS
+  ──────────────────────────────────────────────────────────────────────
+
+    1 file contains coordinates
+    6 unique identifiers extracted (--identify to list them)
+
+  FILES                                                          4 files
+  ──────────────────────────────────────────────────────────────────────
+
+  ● chart.png               88 B                        png-text
+  ● invoice.docx           498 B  XDG attribute         ooxml-properties
+  ● press/holiday.jpg     3.4 MB  browser download      exif
+  · notes.md                81 B  2026-09-05T19:21:14Z
+
+  FILES IN DETAIL                                                3 files
+  ──────────────────────────────────────────────────────────────────────
+
+  ● invoice.docx                                                   498 B
+
+  ACQUISITION  how the file reached this machine
+  ← https://acme-legal.example/portal/invoice.docx
+  │ XDG attribute · 2026-09-05T19:21:14Z                    ▰▰▰▰▱ direct
+
+  INTRINSIC  what the file records about its own earlier life
+  ← self-reported metadata
+  │ OOXML properties                                 ▰▰▱▱▱ self-reported
+  │ note      author Ann Shaw
+  │
+  └ creator  Ann Shaw
+
+  ● press/holiday.jpg                                             3.4 MB
+
+  ACQUISITION  how the file reached this machine
+  ← https://portal.example.org/press/2026/holiday-master.jpg
+  │ browser download · chromium · 2026-08-31T10:49:33Z      ▰▰▰▰▱ direct
+  │ referrer  https://portal.example.org/press/
+
+  INTRINSIC  what the file records about its own earlier life
+  ← made by NIKON COOLPIX P6000
+  │ device metadata · 2008-10-22T16:28:39Z           ▰▰▰▱▱ self-reported
+  │ geo       43.467447, 11.885128
+  │
+  ├ Make              NIKON
+  ├ Model             COOLPIX P6000
+  ├ DateTimeOriginal  2008:10:22 16:28:39
+  ├ BodySerialNumber  3001234
+  ├ GPSLatitudeRef    N
+  ├ GPSLatitude       43, 28, 2.81
+  ├ GPSLongitudeRef   E
+  └ GPSLongitude      11, 53, 6.46
+
+  ● chart.png                                                       88 B
+  ← made by GIMP 2.10
+  │ PNG text                                         ▰▰▱▱▱ self-reported
+  │
+  └ Software  GIMP 2.10
+
+  METADATA SOURCES                                             3 sources
+  ──────────────────────────────────────────────────────────────────────
+
+    PNG text          ▰▰▱▱▱  1
+    XDG attribute     ▰▰▰▰▱  1
+    browser download  ▰▰▰▰▱  1
+
+  ──────────────────────────────────────────────────────────────────────
+    4 files analyzed · 3 with findings · 1 with no findings
+```
+
+</details>
+
+### Triage a large directory
+
+```bash
+filegrail ./case-files --brief
+```
+
+`--brief` stops at the index. Everything above it — the inventory, the findings, what needs a second look — and then one line per file, with nothing written out in full:
+
+```text
+  FILES                                                          4 files
+  ──────────────────────────────────────────────────────────────────────
+
+  ● chart.png               88 B                        png-text
+  ● invoice.docx           498 B  XDG attribute         ooxml-properties
+  ● press/holiday.jpg     3.4 MB  browser download      exif
+  · notes.md                81 B  2026-09-05T19:21:14Z
+```
+
+A file nothing was found for carries its filesystem date instead of the columns it has nothing to put in them, and `--limit` caps how many of those are listed.
 
 ### Files nothing explains
 
@@ -315,19 +457,20 @@ filegrail ./case-files --timeline
 With `--content`, each value says which side of the file it came from, and a value on both sides that also appears in how the file arrived is raised where a long report cannot bury it:
 
 ```text
-  notable findings
+  IDENTIFIERS                                                  11 values
+  ──────────────────────────────────────────────────────────────────────
 
-    1 identifier is named in a document and in how it arrived
-    8 unique identifiers extracted
-
-    domain  acme-legal.example                       both      3 in 1
+    domain  acme-legal.example                          both      2 in 1
             invoice.docx · url
-    email   ann.shaw@acme-legal.example              text      1 in 1
-            invoice.docx · body
-    md5     8f14e45fceea167a5a36dedd4bea2543         text      1 in 1
+    domain  portal.example.org                          recorded  2 in 1
+            holiday.jpg · url
+    domain  innafirma.example                           text      1 in 1
             notes.md · line 1
-    url     https://acme-legal.example/portal        recorded  1 in 1
-            invoice.docx · referrer
+    email   ann.shaw@acme-legal.example                 text      1 in 1
+            invoice.docx · body
+    email   kontakt@innafirma.example                   text      1 in 1
+            notes.md · line 1
+    geo     43.46745,11.88513                           recorded  1 in 1
 ```
 
 ### Explain one result
@@ -336,7 +479,52 @@ With `--content`, each value says which side of the file it came from, and a val
 filegrail explain statement.pdf
 ```
 
-Use it when the summary is not enough and you want every source, including the ones that disagree.
+Use it when the summary is not enough and you want every source, including the ones that disagree. **The answer comes first** — the command exists to be asked *why does filegrail say this*, and an answer printed under everything it rests on is one the reader has to go looking for:
+
+```text
+  CONCLUSION
+
+    One record explains how the file arrived, and nothing corroborates
+    it. That is the ordinary case, not a weakness, but it rests on
+    browser download.
+
+    The file describes an earlier life of its own - NIKON COOLPIX
+    P6000 - which says nothing about how it arrived and does not
+    contest the record above.
+
+  EVIDENCE STATE
+
+    acquisition  1 record · single source
+    intrinsic    1 record
+    interaction  none
+
+  ──────────────────────────────────────────────────────────────────────
+
+  ACQUISITION  how the file reached that machine
+
+  ← browser download                                        ▰▰▰▰▱ direct
+  │ url       https://portal.example.org/press/2026/holiday-master.jpg
+  │ referrer  https://portal.example.org/press/
+  │ tool      chromium
+  │ at        2026-08-31T10:49:33Z
+
+  ──────────────────────────────────────────────────────────────────────
+
+  INTRINSIC  what the file records about its own earlier life
+
+  ← device metadata                                  ▰▰▰▱▱ self-reported
+  │ tool  NIKON COOLPIX P6000
+  │ at    2008-10-22T16:28:39Z
+  │ geo   43.467447, 11.885128
+
+  ──────────────────────────────────────────────────────────────────────
+
+  RECONCILIATION  single source
+
+    nothing to reconcile
+```
+
+Between the conclusion and the material is where the evidence stands, one line per class **whether or not the file has any**. An absent class is a fact about the file, not a gap in the report: a photograph nothing recorded the arrival of is a different thing from one whose arrival record disagrees with itself, and a section that simply does not appear cannot tell those apart.
 
 ### Compare two files
 
@@ -374,10 +562,13 @@ filegrail clean ./ready-to-publish --check
 ```text
   nothing written
 
-  ● chart.png                                                 png-text
-  ● holiday.jpg                                                   exif
+  ● chart.png                                                   png-text
+  ● invoice.docx                                     document properties
+  ● notes.md                                 no stripper for this format
+  ● press/holiday.jpg                                               exif
 
-    2 files · 2 would be cleaned · 0 left alone
+  ──────────────────────────────────────────────────────────────────────
+    4 files · 3 would be cleaned · 1 left alone
 ```
 
 `0` means every copy would come out clean, `1` means at least one would not. `--out` is optional under it; given one, the check still reports a name already taken there. Whether or not `--check` was used, the same exit code says whether the copies that were made carry anything a reader can still see.
@@ -449,7 +640,7 @@ A format filegrail does not understand is reported as not understood — and sti
 ```json
 {
   "schema": "filegrail.scan/1",
-  "filegrail_version": "0.4.1",
+  "filegrail_version": "0.5.0",
   "root": "/mnt/evidence"
 }
 ```
