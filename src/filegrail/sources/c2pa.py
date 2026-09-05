@@ -17,6 +17,7 @@ recorded as evidence, not as proof, and the reported confidence says so.
 
 from __future__ import annotations
 
+import hashlib
 import struct
 from pathlib import Path
 
@@ -34,6 +35,22 @@ _JPEG_APP11 = 0xEB
 _JUMBF_SUPERBOX = b"jumb"
 _JUMBF_DESCRIPTION = b"jumd"
 _JUMBF_CBOR = b"cbor"
+
+#: The hard binding: a hash over the asset with the manifest's own bytes cut
+#: out of it. Checking it needs no key and no trust list - only the file - and
+#: it answers a different question from the signature: not "who says so" but
+#: "is this manifest even about these bytes".
+_DATA_HASH = "c2pa.hash.data"
+
+#: Claim boxes are labelled by version - `c2pa.claim`, `c2pa.claim.v2` - and
+#: the claim is where the assertion's hash algorithm is inherited from when the
+#: assertion itself leaves it out, which real manifests routinely do.
+_CLAIM_PREFIX = "c2pa.claim"
+
+_HASHES = {"sha256": hashlib.sha256, "sha384": hashlib.sha384, "sha512": hashlib.sha512}
+
+#: A megabyte at a time, so a large asset is never held in memory to hash it.
+_CHUNK = 1 << 20
 
 _MAX_BOXES = 4096
 _MAX_DEPTH = 12
@@ -60,13 +77,25 @@ def read_c2pa_manifest(path: Path) -> Origin | None:
     if not jumbf:
         return None
 
-    claims: list[dict] = []
+    payloads: list[tuple[str | None, dict]] = []
     try:
-        _walk(jumbf, 0, len(jumbf), 0, claims)
+        _walk(jumbf, 0, len(jumbf), 0, payloads)
     except (CborError, struct.error, ValueError):
         return None
 
-    return _summarise(claims)
+    inherited = None
+    for label, payload in payloads:
+        if label and label.startswith(_CLAIM_PREFIX):
+            inherited = payload.get("alg")
+            break
+
+    binding = None
+    for label, payload in payloads:
+        if label == _DATA_HASH:
+            binding = _binding(path, payload, inherited)
+            break
+
+    return _summarise([payload for _, payload in payloads], binding)
 
 
 # --- container extraction ----------------------------------------------------
@@ -121,8 +150,22 @@ def _jpeg_app11(handle) -> bytes:
 # --- JUMBF ------------------------------------------------------------------
 
 
-def _walk(data: bytes, offset: int, end: int, depth: int, found: list[dict]) -> None:
-    """Collect every decodable CBOR payload in the box tree."""
+def _walk(
+    data: bytes,
+    offset: int,
+    end: int,
+    depth: int,
+    found: list[tuple[str | None, dict]],
+    label: str | None = None,
+) -> None:
+    """Collect every decodable CBOR payload, under the label it was filed as.
+
+    A JUMBF superbox describes itself in a `jumd` box before its content, so a
+    payload's label is whatever the last description at this level said. That
+    is what tells an assertion apart from the claim, and one assertion apart
+    from another - which matters here, because only one of them is the hash
+    binding and reading it out by shape would be a guess.
+    """
     if depth > _MAX_DEPTH:
         return
 
@@ -146,23 +189,118 @@ def _walk(data: bytes, offset: int, end: int, depth: int, found: list[dict]) -> 
         box_end = offset + length
         if box_type == _JUMBF_SUPERBOX:
             _walk(data, body, box_end, depth + 1, found)
+        elif box_type == _JUMBF_DESCRIPTION:
+            label = _label(data, body, box_end) or label
         elif box_type == _JUMBF_CBOR:
             try:
                 value = loads(data[body:box_end])
             except CborError:
                 value = None
             if isinstance(value, dict):
-                found.append(value)
-        elif box_type != _JUMBF_DESCRIPTION:
+                found.append((label, value))
+        else:
             pass  # binary payloads: icons, thumbnails, signatures
 
         offset = box_end
 
 
+def _label(data: bytes, offset: int, end: int) -> str | None:
+    """The label out of a JUMBF description box, where it carries one.
+
+    Sixteen bytes of type UUID, then a byte of toggles whose second bit says
+    whether a null-terminated label follows.
+    """
+    if end - offset < 17 or not data[offset + 16] & 0x02:
+        return None
+    raw = data[offset + 17 : end]
+    stop = raw.find(b"\x00")
+    return raw[: stop if stop >= 0 else len(raw)].decode("utf-8", "replace") or None
+
+
+# --- the hard binding -------------------------------------------------------
+
+
+def _binding(path: Path, assertion: dict, inherited: object = None) -> str | None:
+    """Whether the manifest's own hash still describes the file it sits in.
+
+    This is not the signature. It says nothing about who produced the manifest
+    or whether to believe them; it says whether this manifest is about these
+    bytes at all. A manifest lifted onto a different image fails here, and so
+    does an asset edited after the manifest was written - and both are worth
+    knowing without a certificate in sight.
+    """
+    recorded = assertion.get("hash")
+    named = assertion.get("alg") or inherited
+    hasher = _HASHES.get(named if isinstance(named, str) else "")
+    if not isinstance(recorded, bytes) or not recorded or hasher is None:
+        return None  # nothing to compare, or an algorithm this cannot compute
+
+    exclusions = assertion.get("exclusions")
+    spans = _spans(exclusions) if exclusions is not None else []
+    if spans is None:
+        return None
+
+    try:
+        computed = _hash_excluding(path, spans, hasher)
+    except OSError:
+        return None
+    if computed is None:
+        return None
+    return "hash binding matches" if computed == recorded else "hash binding does not match"
+
+
+def _spans(exclusions: object) -> list[tuple[int, int]] | None:
+    """The excluded byte ranges, or None where they cannot be trusted."""
+    if not isinstance(exclusions, list):
+        return None
+    spans: list[tuple[int, int]] = []
+    for item in exclusions:
+        if not isinstance(item, dict):
+            return None
+        start, length = item.get("start"), item.get("length")
+        if not isinstance(start, int) or not isinstance(length, int):
+            return None
+        if isinstance(start, bool) or isinstance(length, bool):
+            return None
+        if start < 0 or length < 0:
+            return None
+        spans.append((start, start + length))
+    spans.sort()
+    for (_, first_end), (second_start, _) in zip(spans, spans[1:], strict=False):
+        if second_start < first_end:
+            return None  # overlapping ranges: the intended coverage is unclear
+    return spans
+
+
+def _hash_excluding(path: Path, spans: list[tuple[int, int]], hasher) -> bytes | None:
+    """Hash the file with those byte ranges left out of it."""
+    digest = hasher()
+    position = 0
+    with path.open("rb") as handle:
+        for start, stop in spans:
+            if start < position:
+                return None
+            _feed(handle, digest, start - position)
+            handle.seek(stop)
+            position = stop
+        while chunk := handle.read(_CHUNK):
+            digest.update(chunk)
+    return digest.digest()
+
+
+def _feed(handle, digest, count: int) -> None:
+    while count > 0:
+        chunk = handle.read(min(count, _CHUNK))
+        if not chunk:
+            return
+        digest.update(chunk)
+        count -= len(chunk)
+
+
 # --- interpretation ----------------------------------------------------------
 
 
-def _summarise(claims: list[dict]) -> Origin | None:
+def _summarise(claims: list[dict], binding: str | None = None) -> Origin | None:
     generator = None
     software = None
     when = None
@@ -181,7 +319,7 @@ def _summarise(claims: list[dict]) -> Origin | None:
     if not tool and not when and not source_type:
         return None
 
-    notes = [note for note in (source_type, "signature not verified") if note]
+    notes = [note for note in (source_type, binding, "signature not verified") if note]
     return Origin(source="c2pa", block="c2pa", tool=tool, at=when, note="; ".join(notes))
 
 

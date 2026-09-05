@@ -1,3 +1,4 @@
+import hashlib
 import struct
 import zlib
 from pathlib import Path
@@ -14,9 +15,16 @@ def _description(content_type: bytes, label: str) -> bytes:
     return _box(b"jumd", uuid + b"\x03" + label.encode() + b"\x00")
 
 
-def _manifest(cbor_payload: bytes) -> bytes:
+def _manifest(cbor_payload: bytes, assertions: tuple = ()) -> bytes:
     claim = _box(b"jumb", _description(b"c2cl", "c2pa.claim.v2") + _box(b"cbor", cbor_payload))
-    return _box(b"jumb", _description(b"c2pa", "c2pa") + claim)
+    body = _description(b"c2pa", "c2pa")
+    if assertions:
+        store = b"".join(
+            _box(b"jumb", _description(b"c2as", label) + _box(b"cbor", payload))
+            for label, payload in assertions
+        )
+        body += _box(b"jumb", _description(b"c2as", "c2pa.assertions") + store)
+    return _box(b"jumb", body + claim)
 
 
 def _cbor(value) -> bytes:
@@ -37,6 +45,11 @@ def _cbor(value) -> bytes:
 
     if isinstance(value, Tagged):
         return head(6, value.tag) + _cbor(value.value)
+    if isinstance(value, Fixed):
+        # Always four bytes, so patching the value cannot resize the manifest.
+        return bytes([26]) + struct.pack(">I", value.value)
+    if isinstance(value, bytes):
+        return head(2, len(value)) + value
     if isinstance(value, str):
         raw = value.encode("utf-8")
         return head(3, len(raw)) + raw
@@ -49,6 +62,13 @@ def _cbor(value) -> bytes:
             _cbor(key) + _cbor(item) for key, item in value.items()
         )
     raise TypeError(value)
+
+
+class Fixed:
+    """A CBOR integer pinned to one width, so a later patch cannot resize it."""
+
+    def __init__(self, value: int) -> None:
+        self.value = value
 
 
 class Tagged:
@@ -74,7 +94,7 @@ GENERATED_CLAIM = _cbor(
 )
 
 
-def _png_with(path: Path, jumbf: bytes) -> None:
+def _png_with(path: Path, jumbf: bytes) -> tuple[int, int]:
     def chunk(kind: bytes, payload: bytes) -> bytes:
         return (
             struct.pack(">I", len(payload))
@@ -83,13 +103,10 @@ def _png_with(path: Path, jumbf: bytes) -> None:
             + struct.pack(">I", zlib.crc32(kind + payload))
         )
 
-    path.write_bytes(
-        b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0))
-        + chunk(b"caBX", jumbf)
-        + chunk(b"IDAT", b"\x00")
-        + chunk(b"IEND", b"")
-    )
+    header = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0))
+    manifest_chunk = chunk(b"caBX", jumbf)
+    path.write_bytes(header + manifest_chunk + chunk(b"IDAT", b"\x00") + chunk(b"IEND", b""))
+    return len(header), len(manifest_chunk)
 
 
 def test_reads_an_ai_generated_png(tmp_path: Path):
@@ -150,3 +167,85 @@ def test_truncated_box_length_does_not_hang(tmp_path: Path):
     _png_with(image, struct.pack(">I", 0xFFFFFF) + b"jumb" + b"\x00" * 4)
 
     assert read_c2pa_manifest(image) is None
+
+
+#: A value that will not occur by accident in the rest of the fixture, so the
+#: real digest can be patched in exactly where the placeholder sat.
+_PLACEHOLDER = b"\xab" * 32
+
+
+def _png_with_binding(path: Path, claim: bytes, *, alg: str | None = "sha256") -> None:
+    """Write a PNG whose data hash assertion really does cover its own bytes.
+
+    The assertion has to name the range it excludes, and that range is only
+    known once the file has been laid out - so the manifest is written twice.
+    The exclusion values are pinned to a fixed width and the digest is written
+    over a placeholder of its own length, which is what keeps the second pass
+    from moving anything the first pass measured.
+    """
+
+    def build(start: int, length: int) -> bytes:
+        fields = {"exclusions": [{"start": Fixed(start), "length": Fixed(length)}]}
+        if alg is not None:
+            fields["alg"] = alg
+        fields["hash"] = _PLACEHOLDER
+        assertion = _cbor(fields)
+        return _manifest(claim, (("c2pa.hash.data", assertion),))
+
+    start, length = _png_with(path, build(0, 0))
+    _png_with(path, build(start, length))
+
+    raw = bytearray(path.read_bytes())
+    digest = hashlib.sha256(bytes(raw[:start]) + bytes(raw[start + length :])).digest()
+    at = raw.index(_PLACEHOLDER)
+    raw[at : at + len(_PLACEHOLDER)] = digest
+    path.write_bytes(bytes(raw))
+
+
+def test_a_hash_binding_that_matches_the_file_is_reported(tmp_path: Path):
+    image = tmp_path / "bound.png"
+    _png_with_binding(image, GENERATED_CLAIM)
+
+    assert "hash binding matches" in read_c2pa_manifest(image).note
+
+
+def test_a_hash_binding_that_does_not_match_the_file_is_reported(tmp_path: Path):
+    """The point of the check: a manifest that is not about these bytes."""
+    image = tmp_path / "transplanted.png"
+    _png_with_binding(image, GENERATED_CLAIM)
+
+    raw = bytearray(image.read_bytes())
+    raw[-1] ^= 0xFF  # a byte outside the excluded manifest chunk
+    image.write_bytes(bytes(raw))
+
+    assert "hash binding does not match" in read_c2pa_manifest(image).note
+
+
+def test_a_manifest_without_a_hash_assertion_claims_nothing_about_binding(tmp_path: Path):
+    image = tmp_path / "unbound.png"
+    _png_with(image, _manifest(GENERATED_CLAIM))
+
+    assert "hash binding" not in read_c2pa_manifest(image).note
+
+
+def test_a_hash_algorithm_this_cannot_compute_is_not_guessed_at(tmp_path: Path):
+    image = tmp_path / "exotic.png"
+    _png_with_binding(image, GENERATED_CLAIM, alg="whirlpool")
+
+    assert "hash binding" not in read_c2pa_manifest(image).note
+
+
+def test_the_hash_algorithm_may_be_inherited_from_the_claim(tmp_path: Path):
+    """The specification makes `alg` optional in the assertion when the claim
+    already states one, and real manifests leave it out."""
+    claim = _cbor(
+        {
+            "alg": "sha256",
+            "claim_generator_info": {"name": "Quiet Tool"},
+            "actions": [{"action": "c2pa.created"}],
+        }
+    )
+    image = tmp_path / "inherited.png"
+    _png_with_binding(image, claim, alg=None)
+
+    assert "hash binding matches" in read_c2pa_manifest(image).note

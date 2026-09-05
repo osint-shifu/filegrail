@@ -116,6 +116,14 @@ def test_a_history_with_timestamps_is_available(tmp_path: Path):
     assert "with timestamps" in _detail(found, "Shell history")
 
 
+def test_c2pa_says_the_binding_is_checked_even_though_the_signature_is_not():
+    """Half of it is available now, and a row that says only "unavailable"
+    reads as though nothing about a manifest is checked at all."""
+    found = survey()
+
+    assert "hash binding" in _detail(found, "C2PA")
+
+
 def test_c2pa_is_always_reported_as_unverified():
     """The one claim the tool must never let a reader over-read."""
     found = survey()

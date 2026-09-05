@@ -44,7 +44,7 @@ on when you want the PDFs rather than everything a file said about itself.
 | `rtf-generator` | `.rtf` | The `\generator` and `\info` groups |
 | `svg-metadata` | `.svg` | Generator, plus an embedded RDF block where an editor left one |
 | `notebook-kernel` | `.ipynb` | Kernel name and language runtime version |
-| `c2pa` | `.jpg` `.jpeg` `.png` | JUMBF manifest: producing application, creation data, digital source type |
+| `c2pa` | `.jpg` `.jpeg` `.png` | JUMBF manifest: producing application, creation data, digital source type, and whether the manifest's own hash still covers the file |
 
 Mail is not in this table because a message's metadata is its delivery record
 rather than a block inside a container; it has a section of its own further
@@ -139,7 +139,7 @@ That is worth knowing before you rely on one of them in something that matters.
 | What | Why |
 |:---|:---|
 | Vendor maker notes | Every manufacturer encodes them differently and each needs its own parser. The rest of EXIF is decoded |
-| C2PA signatures | Manifests are parsed; the certificate chain is **not** verified. A manifest says what it says, and this does not tell you whether to believe it |
+| C2PA signatures | The certificate chain is **not** verified; that needs a crypto library and a trust list that changes over time. The *hard binding* is checked, which is a different question - whether the manifest describes these bytes, not whether its signer is anyone you should trust |
 | `.mbox` | Many messages, one record per file. There is no honest single claim to make about a mailbox |
 | Jump Lists (`.automaticDestinations-ms`) | In the Recent folder beside the shortcuts, and a different format. Shortcuts first |
 | Fixed-length MAPI properties | Delivery and submit times live in `__properties_version1.0`, not a `__substg1.0_` stream. Left unread rather than guessed at, with no real `.msg` to check the layout against |

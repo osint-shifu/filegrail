@@ -290,5 +290,6 @@ def _c2pa() -> Check:
     return Check(
         "C2PA signature check",
         UNAVAILABLE,
-        "manifests are read; validating the certificate chain needs a crypto library",
+        "manifests are read and their hash binding recomputed; "
+        "validating the certificate chain needs a crypto library",
     )

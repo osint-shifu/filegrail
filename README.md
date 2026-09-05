@@ -444,7 +444,15 @@ Browser history can be cleared. Extended attributes disappear during copies. She
 
 It reconstructs what it can from surviving local evidence and file metadata.
 
-C2PA manifests are parsed, but their cryptographic signatures are currently **not verified**.
+C2PA manifests are parsed and their **hard binding is checked**: the hash the
+manifest carries is recomputed over the file, leaving out exactly the bytes the
+assertion says to leave out. A manifest lifted onto a different image, or an
+asset edited after the manifest was written, is reported as not matching.
+
+The cryptographic **signature is still not verified**. The two answer different
+questions, and only one of them is answered here: a binding that matches says
+the manifest is about *these bytes*. It does not say who wrote it, or whether
+to believe them.
 
 Three readers are written from the specification and have never been run against a file the originating software produced: Outlook `.msg` messages, Windows `.lnk` shortcuts, and the `id3 ` chunk a WAV file may carry. [`FORMATS.md`](docs/FORMATS.md) names them and says why.
 

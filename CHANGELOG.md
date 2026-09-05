@@ -7,6 +7,26 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- The C2PA hard binding is checked. A manifest carries a hash of the asset it
+  describes, with its own bytes cut out of the range so it is not hashing
+  itself, and recomputing that hash needs no key, no certificate and no trust
+  list - only the file. So a manifest lifted onto a different image, and an
+  asset edited after its manifest was written, are both reported now, where
+  before the tool could only repeat what the manifest said about itself.
+
+  This is deliberately not signature verification and the report does not let
+  the two be confused: a claim now reads `hash binding matches; signature not
+  verified`. The first says the manifest is about these bytes. The second is
+  still the open question of whether anyone should be believed about it.
+
+  Finding the assertion meant reading JUMBF labels rather than guessing at
+  payloads by their shape, so every box is now filed under the label its
+  description box gives it. `c2pa.hash.data` is found by name, and an
+  assertion that omits its algorithm inherits it from the claim, the way the
+  specification says to.
+
 ### Changed
 
 - The report carries the wordmark. It is redirected to a file more often than
