@@ -5,7 +5,7 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.2.0 - 2026-09-05
 
 ### Added
 
@@ -45,15 +45,6 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   thing is in there, and an archive of ten thousand photographs is not read ten
   thousand times to say it.
 
-### Fixed
-
-- An archive is no longer swept for XMP and IPTC blocks in its own raw bytes.
-  Those readers look for a block wherever it turns up, and inside a container
-  what they find is a member's - which is how a zip came to be reported as
-  "made by Adobe Photoshop Elements" because a photograph inside it was. Now
-  that the members are read under their own names, the sweep is both redundant
-  and wrong.
-
 - A `.torrent` is read for the files it distributes. It lists its members by
   name and exact size, which is the pairing the archive reader already makes,
   so a file matching both is given the torrent as an origin: the trackers it
@@ -82,6 +73,20 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   about it: an info hash is taken over the `info` value exactly as written, so
   bytes no honest encoder produced would hash to something that identifies
   nothing.
+
+### Fixed
+
+- `--type` lists every family it accepts. The help text was written by hand and
+  `mail` had been added to the families without it, so `--type mail` worked and
+  nothing said so. It is generated from the families now, and a test holds it
+  there.
+
+- An archive is no longer swept for XMP and IPTC blocks in its own raw bytes.
+  Those readers look for a block wherever it turns up, and inside a container
+  what they find is a member's - which is how a zip came to be reported as
+  "made by Adobe Photoshop Elements" because a photograph inside it was. Now
+  that the members are read under their own names, the sweep is both redundant
+  and wrong.
 
 ## 0.1.0 - 2026-09-05
 
