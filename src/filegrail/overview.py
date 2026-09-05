@@ -13,6 +13,7 @@ entry it refers to cannot disagree.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -259,7 +260,7 @@ def _authored(record: FileRecord) -> bool:
 #: here: the masthead already counts both, and a row repeating one of them under
 #: a slightly different name is a second number to keep in agreement with the
 #: first.
-TALLIES: tuple[tuple[str, object], ...] = (
+TALLIES: tuple[tuple[str, Callable[[FileRecord], bool]], ...] = (
     ("metadata", _described),
     ("acquisition evidence", _acquired),
     ("interaction records", _handled),

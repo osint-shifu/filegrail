@@ -19,10 +19,15 @@ from __future__ import annotations
 
 import hashlib
 import struct
+from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING, BinaryIO
 
 from ..cbor import CborError, loads
 from ..models import Origin
+
+if TYPE_CHECKING:  # `hashlib._Hash` exists in the type stubs, not at runtime.
+    from hashlib import _Hash
 
 PNG_SUFFIXES = {".png"}
 JPEG_SUFFIXES = {".jpg", ".jpeg"}
@@ -112,7 +117,7 @@ def _extract_jumbf(path: Path) -> bytes:
     return b""
 
 
-def _png_chunk(handle) -> bytes:
+def _png_chunk(handle: BinaryIO) -> bytes:
     handle.seek(len(_PNG_MAGIC))
     while True:
         header = handle.read(8)
@@ -126,7 +131,7 @@ def _png_chunk(handle) -> bytes:
         handle.seek(length + 4, 1)  # payload plus CRC
 
 
-def _jpeg_app11(handle) -> bytes:
+def _jpeg_app11(handle: BinaryIO) -> bytes:
     """Collect APP11 segments, which carry the manifest split across markers."""
     handle.seek(2)
     parts: list[bytes] = []
@@ -272,7 +277,9 @@ def _spans(exclusions: object) -> list[tuple[int, int]] | None:
     return spans
 
 
-def _hash_excluding(path: Path, spans: list[tuple[int, int]], hasher) -> bytes | None:
+def _hash_excluding(
+    path: Path, spans: list[tuple[int, int]], hasher: Callable[[], _Hash]
+) -> bytes | None:
     """Hash the file with those byte ranges left out of it."""
     digest = hasher()
     position = 0
@@ -288,7 +295,7 @@ def _hash_excluding(path: Path, spans: list[tuple[int, int]], hasher) -> bytes |
     return digest.digest()
 
 
-def _feed(handle, digest, count: int) -> None:
+def _feed(handle: BinaryIO, digest: _Hash, count: int) -> None:
     while count > 0:
         chunk = handle.read(min(count, _CHUNK))
         if not chunk:

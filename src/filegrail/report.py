@@ -545,7 +545,7 @@ def _entry(
     verdict = reconcile(record)
 
     if verbose:
-        claims = list(record.origins)
+        claims: list[Origin | None] = list(record.origins)
     elif verdict.state in (PARTIAL, CONFLICT):
         # A verdict that refers to evidence the report hid is not a verdict, so
         # a disagreement brings every acquisition record on screen with it.
@@ -698,7 +698,7 @@ def _fields_block(theme: Theme, fields: dict[str, str], indent: int) -> list[str
 
 def _facts(origin: Origin) -> list[tuple[str, str, str | None]]:
     """The labelled lines under a claim, in a fixed order."""
-    found = []
+    found: list[tuple[str, str, str | None]] = []
     if origin.geo:
         found.append(("geo", origin.geo, "circumstantial"))
     if origin.location:

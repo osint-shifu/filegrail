@@ -22,6 +22,7 @@ import zipfile
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import replace
+from functools import partial
 from pathlib import Path
 
 from ..models import Origin
@@ -57,12 +58,12 @@ def list_members(path: Path) -> dict[str, set[int]]:
             return members
 
         if tarfile.is_tarfile(path):
-            with tarfile.open(path) as archive:
-                for count, info in enumerate(archive):
+            with tarfile.open(path) as bundle:
+                for count, entry in enumerate(bundle):
                     if count >= _MAX_MEMBERS:
                         break
-                    if info.isfile():
-                        record(info.name, info.size)
+                    if entry.isfile():
+                        record(entry.name, entry.size)
             return members
     except (OSError, zipfile.BadZipFile, tarfile.TarError, EOFError, ValueError):
         return {}
@@ -111,34 +112,34 @@ def _opened(path: Path) -> Iterator[Iterator[tuple[str, Callable[[], bytes]]] | 
     if zipfile.is_zipfile(path):
         with zipfile.ZipFile(path) as archive:
 
-            def entries() -> Iterator[tuple[str, Callable[[], bytes]]]:
+            def from_zip() -> Iterator[tuple[str, Callable[[], bytes]]]:
                 for info in archive.infolist()[:_MAX_MEMBERS]:
                     if not info.is_dir() and info.file_size <= _MAX_MEMBER_BYTES:
-                        yield info.filename, lambda i=info: archive.read(i)
+                        yield info.filename, partial(archive.read, info)
 
-            yield entries()
+            yield from_zip()
         return
 
     if tarfile.is_tarfile(path):
-        with tarfile.open(path) as archive:
+        with tarfile.open(path) as bundle:
 
-            def entries() -> Iterator[tuple[str, Callable[[], bytes]]]:
-                for count, info in enumerate(archive):
+            def from_tar() -> Iterator[tuple[str, Callable[[], bytes]]]:
+                for count, entry in enumerate(bundle):
                     if count >= _MAX_MEMBERS:
                         break
-                    if info.isfile() and info.size <= _MAX_MEMBER_BYTES:
-                        yield info.name, lambda i=info: (archive.extractfile(i) or _EMPTY).read()
+                    if entry.isfile() and entry.size <= _MAX_MEMBER_BYTES:
+                        yield entry.name, partial(_tar_bytes, bundle, entry)
 
-            yield entries()
+            yield from_tar()
         return
 
     yield None
 
 
-class _EMPTY:
-    @staticmethod
-    def read() -> bytes:
-        return b""
+def _tar_bytes(bundle: tarfile.TarFile, entry: tarfile.TarInfo) -> bytes:
+    """One member's bytes, or none where the tar declines to open it."""
+    handle = bundle.extractfile(entry)
+    return handle.read() if handle is not None else b""
 
 
 def _read_member(name: str, extract: Callable[[], bytes]) -> list[Origin]:

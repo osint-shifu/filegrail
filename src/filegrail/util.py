@@ -152,12 +152,12 @@ def birth_time(path: Path) -> float | None:
     except OSError:
         return None
 
-    for attribute in ("st_birthtime", "st_ctime"):
-        if attribute == "st_birthtime" and hasattr(stat, "st_birthtime"):
-            return float(stat.st_birthtime)
-        if attribute == "st_ctime" and os.name == "nt":
-            return float(stat.st_ctime)
-
+    # macOS and the BSDs carry it on the stat result; the type stubs describe
+    # Linux, where it is absent, which is exactly what the guard is for.
+    if hasattr(stat, "st_birthtime"):
+        return float(stat.st_birthtime)  # type: ignore[attr-defined]
+    if os.name == "nt":
+        return float(stat.st_ctime)
     return _statx_btime(path)
 
 
@@ -231,4 +231,4 @@ def _statx_btime(path: Path) -> float | None:
     )
     if result != 0 or not (buffer.stx_mask & _STATX_BTIME):
         return None
-    return buffer.stx_btime.tv_sec + buffer.stx_btime.tv_nsec / 1e9
+    return float(buffer.stx_btime.tv_sec) + float(buffer.stx_btime.tv_nsec) / 1e9

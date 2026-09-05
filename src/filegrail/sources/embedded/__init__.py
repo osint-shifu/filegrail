@@ -395,7 +395,7 @@ def _from_audio(path: Path, suffix: str) -> Origin | None:
 def _origin(
     source: str,
     *,
-    block: str,
+    block: str | None,
     tool: str | None = None,
     at: str | None = None,
     geo: str | None = None,

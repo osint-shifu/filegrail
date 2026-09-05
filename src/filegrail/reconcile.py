@@ -655,8 +655,8 @@ def _instant(value: str) -> _Stamp | None:
 
     stamp = _PDF_STAMP.match(text)
     if stamp:
-        clock = stamp.group(4, 5, 6)
-        return _Stamp("".join(stamp.group(1, 2, 3)), "".join(clock) if all(clock) else None, offset)
+        parts = stamp.group(4, 5, 6)
+        return _Stamp("".join(stamp.group(1, 2, 3)), "".join(parts) if all(parts) else None, offset)
 
     day = _DAY.match(text)
     if not day:

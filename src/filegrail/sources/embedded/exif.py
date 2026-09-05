@@ -15,7 +15,9 @@ the single most consequential fact a file carries.
 from __future__ import annotations
 
 import struct
+from collections.abc import Iterator
 from pathlib import Path
+from typing import BinaryIO
 
 JPEG_SUFFIXES = {".jpg", ".jpeg", ".jpe"}
 TIFF_SUFFIXES = {".tif", ".tiff", ".dng", ".nef", ".cr2", ".arw", ".orf", ".rw2"}
@@ -156,7 +158,7 @@ def _jpeg_exif(path: Path) -> bytes:
     return b""
 
 
-def _jpeg_segments(handle):
+def _jpeg_segments(handle: BinaryIO) -> Iterator[tuple[int, bytes]]:
     """Yield (marker, payload) for each JPEG segment before the scan starts."""
     while True:
         marker = handle.read(2)

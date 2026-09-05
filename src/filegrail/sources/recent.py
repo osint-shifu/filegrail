@@ -69,9 +69,9 @@ def _path(href: str | None) -> str | None:
 
 def _origin(bookmark: ElementTree.Element) -> Origin | None:
     applications = [
-        element.get("name")
+        name
         for element in bookmark.iter(f"{{{_BOOKMARK_NS}}}application")
-        if element.get("name")
+        if (name := element.get("name"))
     ]
     added = _timestamp(bookmark.get("added") or bookmark.get("visited"))
 

@@ -5,6 +5,26 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- The type annotations are checked. There were 362 of them and nothing verified
+  any of them, which in a project that holds its format documentation against
+  the readers with a test was the one large body of claims with no invariant
+  behind it. `mypy` runs in CI now, against the oldest supported interpreter so
+  that a construct newer than the floor fails here rather than on somebody's
+  3.10.
+
+  It found no defect a user would have met. What it found were annotations that
+  were not true: `_origin` declared a required `block` for a value that is
+  optional, one name stood for a tuple and a regex match inside a single
+  function, and the tally table was typed loosely enough that calling its
+  predicates was checked by nothing. Those are fixed rather than silenced.
+
+  Only settings that already pass are enabled, because a flag nothing satisfies
+  is a comment rather than a check.
+
 ## 0.2.0 - 2026-09-05
 
 ### Added

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .models import ACQUISITION, INTERACTION, INTRINSIC, SOURCE_LABELS, FileRecord, kind
+from .models import ACQUISITION, INTERACTION, INTRINSIC, SOURCE_LABELS, FileRecord, Origin, kind
 from .reconcile import (
     AGREEMENT,
     ATTRIBUTION_CONFLICT,
@@ -173,7 +173,7 @@ def _arrival(verdict: Verdict, acquisition: list, home: Path | None = None) -> s
     )
 
 
-def _only(acquisition: list) -> str:
+def _only(acquisition: list[Origin]) -> str:
     if not acquisition:
         return "nothing"
     return SOURCE_LABELS.get(acquisition[0].source, acquisition[0].source)

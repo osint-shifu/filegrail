@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
 # How much a source is trusted when several disagree. Higher wins.
-CONFIDENCE = {
+CONFIDENCE: dict[str, int] = {
     "browser-download": 90,
     # A mail server on the recipient's side wrote this down as the message
     # arrived. Independent of the sender, like a download record - and unlike
@@ -75,7 +75,7 @@ CONFIDENCE = {
 #: How each source reads in prose. Data about sources, so it lives beside the
 #: confidence table rather than in the renderer - reconciliation needs to name a
 #: source too, and importing the renderer to do it would be a cycle.
-SOURCE_LABELS = {
+SOURCE_LABELS: dict[str, str] = {
     "browser-download": "browser download",
     "email-delivery": "mail delivery",
     "email-relay": "mail relay",
@@ -108,7 +108,7 @@ SOURCE_LABELS = {
 #: only that has been told the claim is self-reported and nothing else. Every
 #: other source already names something specific, and a camera naming its own
 #: model is `device metadata`, which says more than `EXIF`.
-BLOCK_LABELS = {
+BLOCK_LABELS: dict[str, str] = {
     "pdf-info": "PDF Info",
     "ooxml-properties": "OOXML properties",
     "odf-meta": "ODF meta",

@@ -68,7 +68,7 @@ def read_sidecar(path: Path) -> Origin | None:
     if not url:
         return None  # without an address it says nothing about where this came from
 
-    fields = {name: _text(document[name]) for name in _KEPT if _text(document.get(name))}
+    fields = {name: value for name in _KEPT if (value := _text(document.get(name)))}
     site = _text(document.get("extractor"))
     return Origin(
         source="ytdlp-sidecar",

@@ -275,7 +275,7 @@ def _limit(args) -> int:
     by default.
     """
     if args.limit is not None:
-        return args.limit
+        return int(args.limit)
     return BRIEF_LIMIT if args.brief else 0
 
 
@@ -297,7 +297,7 @@ def _home(args) -> Path | None | int:
         return None
     if not args.home.is_dir():
         return _missing(args.home)
-    return args.home.resolve()
+    return Path(args.home).resolve()
 
 
 def _scan(rest: list[str]) -> int:
