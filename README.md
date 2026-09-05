@@ -226,6 +226,7 @@ Conflicts are reported rather than silently resolved.
 * filename-only matches
 * size mismatches
 * timeline inconsistencies
+* a file whose own dates run backwards
 * disagreements between metadata blocks
 * derivation relationships between related files
 

@@ -41,6 +41,12 @@ CONFLICT = "conflict"
 #: acquisition records is worth headlining instead.
 CONTESTED = "contested attribution"
 
+#: Not an acquisition state either: the file's own account of itself puts a
+#: change before the making of the thing changed. It headlines for the same
+#: reason `contested attribution` does - the acquisition state describes
+#: records this finding never consulted.
+SELF_CONTRADICTORY = "contradicts itself"
+
 #: What a single finding is about. Typed, so a consumer reading the JSON does
 #: not have to pattern-match English to tell one problem from another - and so
 #: the two conflicts, which are genuinely different classes of problem, stay
@@ -54,6 +60,12 @@ SIZE_MISMATCH = "size_mismatch"
 SIZE_CORROBORATION = "size_corroboration"
 ATTRIBUTION_CONFLICT = "attribution_conflict"
 
+#: One block's own two timestamps in an order that cannot have happened. Kept
+#: apart from `timeline_conflict`, which is a disagreement between the file and
+#: the machine it arrived on; this one needs no second source to be wrong, and
+#: a reader chasing tampering wants to tell the two apart.
+IMPOSSIBLE_ORDER = "impossible_order"
+
 #: Every kind there is, so a consumer can enumerate them and the report can size
 #: its column to the longest of them rather than guess at a width.
 KINDS = (
@@ -65,14 +77,32 @@ KINDS = (
     SIZE_MISMATCH,
     SIZE_CORROBORATION,
     ATTRIBUTION_CONFLICT,
+    IMPOSSIBLE_ORDER,
 )
 
 #: Findings that say something is wrong, as against something corroborated. The
 #: report colours by this rather than by the state, because a finding can now
 #: arrive from somewhere the state knows nothing about.
 CONFLICTS = frozenset(
-    {SOURCE_CONFLICT, PATH_DISAGREEMENT, TIMELINE_CONFLICT, SIZE_MISMATCH, ATTRIBUTION_CONFLICT}
+    {
+        SOURCE_CONFLICT,
+        PATH_DISAGREEMENT,
+        TIMELINE_CONFLICT,
+        SIZE_MISMATCH,
+        ATTRIBUTION_CONFLICT,
+        IMPOSSIBLE_ORDER,
+    }
 )
+
+#: Where one block records both when a thing was made and when it was last
+#: changed, under the names its own standard fixes. Only pairs a reader
+#: actually emits are here: a pair invented for a block that writes neither
+#: field would be a rule that can never fire, and so never be found wrong.
+_MADE_AND_CHANGED = {
+    "pdf-info": ("CreationDate", "ModDate"),
+    "ooxml-properties": ("created", "modified"),
+    "xmp": ("xmp:CreateDate", "xmp:ModifyDate"),
+}
 
 #: The same fact under two names, for IIM and XMP. Adobe published this pairing
 #: when it moved IIM into XMP, which is what makes the two standards comparable
@@ -297,6 +327,8 @@ class Verdict:
             return self.state
         if any(finding.kind == ATTRIBUTION_CONFLICT for finding in self.findings):
             return CONTESTED
+        if any(finding.kind == IMPOSSIBLE_ORDER for finding in self.findings):
+            return SELF_CONTRADICTORY
         return self.state
 
     @property
@@ -331,6 +363,7 @@ def reconcile(record: FileRecord) -> Verdict:
     verdict = Verdict(state=_state(addressed))
     verdict.findings.extend(_address_findings(addressed, verdict.state))
     verdict.findings.extend(_time_findings(record))
+    verdict.findings.extend(_order_findings(record))
     verdict.findings.extend(_match_findings(acquisition))
     verdict.findings.extend(_attribution_findings(record))
     return verdict
@@ -390,6 +423,59 @@ def _time_findings(record: FileRecord) -> list[Finding]:
             )
         ]
     return []
+
+
+def _order_findings(record: FileRecord) -> list[Finding]:
+    """Flag a block whose own two timestamps put the change before the making.
+
+    Nothing can be modified before it exists, so this needs no second source to
+    contradict: the block disagrees with itself. It is worth more than either
+    timestamp alone, because a document whose own dates run backwards has been
+    through something - a clock set wrong, a template reused, or a field edited
+    by hand - and which of those it was is a question the report cannot answer
+    but the reader can now ask.
+    """
+    found: list[Finding] = []
+    for origin in record.origins:
+        pair = _MADE_AND_CHANGED.get(origin.block or "")
+        if pair is None:
+            continue
+        made, changed = origin.fields.get(pair[0]), origin.fields.get(pair[1])
+        if not made or not changed:
+            continue
+        if _after(made, changed):
+            found.append(
+                Finding(
+                    IMPOSSIBLE_ORDER,
+                    f"{label(origin)} says it was modified at {changed}, "
+                    f"before it was created at {made}",
+                )
+            )
+    return found
+
+
+def _after(left: str, right: str) -> bool | None:
+    """Whether `left` names a later moment than `right`, or None if unrankable.
+
+    Ranking is refused rather than guessed at wherever the two were not written
+    to the same standard of precision: one writer naming its zone and the other
+    staying silent about it can differ by most of a day, and calling that an
+    impossible order would be inventing the half nobody wrote down.
+    """
+    first, second = _instant(left), _instant(right)
+    if first is None or second is None:
+        return None
+
+    here, there = _utc(first), _utc(second)
+    if here is not None and there is not None:
+        return here > there
+    if first.offset != second.offset:
+        return None
+    if first.day != second.day:
+        return first.day > second.day
+    if first.clock and second.clock:
+        return first.clock > second.clock
+    return None
 
 
 def _match_findings(acquisition: list[Origin]) -> list[Finding]:

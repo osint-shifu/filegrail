@@ -17,6 +17,7 @@ from filegrail.reconcile import (
     CONFLICT,
     NONE,
     PARTIAL,
+    SELF_CONTRADICTORY,
     SINGLE,
     reconcile,
 )
@@ -582,3 +583,90 @@ def test_a_contested_attribution_brings_both_self_descriptions_on_screen():
     # so seeing both is seeing both claims rather than one claim and a quotation.
     assert "Adobe Photoshop 7.0" in output
     assert "darktable 4.6.1" in output
+
+
+# --- the file contradicting itself -------------------------------------------
+
+
+def test_a_pdf_modified_before_it_was_created_is_a_contradiction():
+    """Not a surprising order of events. An impossible one."""
+    record = _record(
+        Origin(
+            source="document-metadata",
+            block="pdf-info",
+            fields={"CreationDate": "D:20260824190000Z", "ModDate": "D:20260101120000Z"},
+        )
+    )
+
+    verdict = reconcile(record)
+
+    assert [f for f in verdict.findings if "before it was created" in f.text]
+
+
+def test_an_office_document_modified_before_it_was_created():
+    record = _record(
+        Origin(
+            source="document-metadata",
+            block="ooxml-properties",
+            fields={"created": "2026-08-24T19:00:00Z", "modified": "2026-01-01T12:00:00Z"},
+        )
+    )
+
+    assert [f for f in reconcile(record).findings if "before it was created" in f.text]
+
+
+def test_xmp_modified_before_it_was_created():
+    record = _record(
+        Origin(
+            source="xmp",
+            block="xmp",
+            fields={
+                "xmp:CreateDate": "2026-08-24T19:00:00Z",
+                "xmp:ModifyDate": "2026-01-01T12:00:00Z",
+            },
+        )
+    )
+
+    assert [f for f in reconcile(record).findings if "before it was created" in f.text]
+
+
+def test_the_ordinary_order_is_not_a_finding():
+    """Created, then modified later. The normal life of a document."""
+    record = _record(
+        Origin(
+            source="document-metadata",
+            block="pdf-info",
+            fields={"CreationDate": "D:20260101120000Z", "ModDate": "D:20260824190000Z"},
+        )
+    )
+
+    assert not reconcile(record).findings
+
+
+def test_two_stamps_that_cannot_be_ranked_are_left_alone():
+    """One writer said which zone it was in and the other did not, on the same
+    day. Ranking them would be inventing the missing half."""
+    record = _record(
+        Origin(
+            source="document-metadata",
+            block="pdf-info",
+            fields={"CreationDate": "D:20260824190000Z", "ModDate": "D:20260824120000"},
+        )
+    )
+
+    assert not reconcile(record).findings
+
+
+def test_a_self_contradiction_is_not_headlined_as_an_acquisition_state():
+    """`state` describes the acquisition records. A file whose own dates run
+    backwards has said nothing about acquisition, and heading that finding
+    "no acquisition record" labels one thing with the name of another."""
+    record = _record(
+        Origin(
+            source="document-metadata",
+            block="pdf-info",
+            fields={"CreationDate": "D:20260824190000Z", "ModDate": "D:20260101120000Z"},
+        )
+    )
+
+    assert reconcile(record).headline == SELF_CONTRADICTORY

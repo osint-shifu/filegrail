@@ -9,6 +9,30 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A block whose own two timestamps run backwards is reported. Where a document
+  records both when it was made and when it was last changed - a PDF `Info`
+  dictionary, OOXML core properties, an XMP packet - and the change comes
+  first, the block is contradicting itself. That needs no second source to be
+  wrong, which is what makes it different from the timeline conflict already
+  reported: that one is the file disagreeing with the machine it arrived on,
+  this one is the file disagreeing with itself. It arrives as its own finding
+  kind, `impossible_order`, so a consumer can tell the two apart without
+  reading the sentence.
+
+  Only pairs a reader actually emits are compared. A rule written for a block
+  that records neither field could never fire, and so could never be found
+  wrong.
+
+  Two stamps are ranked only where they were written to the same standard of
+  precision. One writer naming its zone while the other stays silent can differ
+  by most of a day, and calling that an impossible order would be inventing the
+  half nobody wrote down - so it is left alone instead.
+
+  The verdict no longer heads such a finding with the acquisition state. A file
+  whose dates run backwards has said nothing about how it arrived, and printing
+  `no acquisition record` above the contradiction labelled one thing with the
+  name of another; it now reads `contradicts itself`.
+
 - The C2PA hard binding is checked. A manifest carries a hash of the asset it
   describes, with its own bytes cut out of the range so it is not hashing
   itself, and recomputing that hash needs no key, no certificate and no trust
