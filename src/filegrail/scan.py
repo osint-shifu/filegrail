@@ -23,6 +23,7 @@ from .sources import (
     read_file_attributes,
     read_iptc,
     read_mail,
+    read_messenger_name,
     read_quarantine,
     read_shortcuts,
     read_sidecar,
@@ -145,6 +146,8 @@ def scan(
         record.origins.extend(read_quarantine(path, quarantined))
         if sidecar := read_sidecar(path):
             record.origins.append(sidecar)
+        if named := read_messenger_name(path):
+            record.origins.append(named)
         for reader in (read_c2pa_manifest, read_embedded_metadata, read_iptc):
             claim = reader(path)
             if claim is not None:

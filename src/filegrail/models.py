@@ -41,6 +41,12 @@ CONFIDENCE = {
     # something, but not by anything the recipient has reason to trust.
     "email-relay": 45,
     "shell-history": 40,
+    # A file name, and nothing else. Both clients write a fixed pattern and a
+    # file carrying one usually did come through that client - but a name is
+    # typed as easily as it is written, survives no scrutiny on its own, and is
+    # lost the moment somebody renames the file. Below an application having
+    # opened it, which at least happened.
+    "messenger-name": 25,
     # An application opening a file proves contact, not acquisition.
     # A Windows shortcut says the same thing and records the size of what it
     # pointed at, which is one check more than the desktop list offers.
@@ -73,6 +79,7 @@ SOURCE_LABELS = {
     "iptc": "IPTC",
     "document-metadata": "document metadata",
     "shell-history": "shell history",
+    "messenger-name": "messenger file name",
     "recent-documents": "recent documents",
     "windows-recent": "recent shortcut",
     "filesystem": "filesystem",
@@ -156,6 +163,7 @@ _KINDS = {
     "email-delivery": ACQUISITION,
     "email-relay": ACQUISITION,
     "archive-member": ACQUISITION,
+    "messenger-name": ACQUISITION,
     "filesystem": ACQUISITION,
     "recent-documents": INTERACTION,
     "windows-recent": INTERACTION,

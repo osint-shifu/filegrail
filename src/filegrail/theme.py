@@ -67,6 +67,7 @@ EVIDENCE = {
     "iptc": "self-reported",
     "email-header": "self-reported",
     "document-metadata": "self-reported",
+    "messenger-name": "circumstantial",
     "shell-history": "circumstantial",
     "recent-documents": "circumstantial",
     "windows-recent": "circumstantial",

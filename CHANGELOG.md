@@ -9,6 +9,30 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The file names messaging clients give to what they save are recognised.
+  WhatsApp writes `IMG-20240115-WA0001.jpg` and its siblings for video, audio,
+  voice messages, documents and stickers; Telegram Desktop writes
+  `photo_2024-01-15_12-30-45.jpg`. A file carrying one came through that client
+  far more often than not.
+
+  It is worth being exact about what this is not. It names no sender and no
+  conversation, because those stores cannot be read: Telegram Desktop encrypts
+  `tdata` and keeps no chat history in it, Signal Desktop's database is
+  SQLCipher behind an operating-system-wrapped key, and Discord and Slack keep
+  no local message database at all. Reading any of them would mean a crypto
+  dependency, which this project does not have. `FORMATS.md` says so where the
+  rest of what is deliberately not read is listed.
+
+  So this is a name and nothing else, and it is ranked below an application
+  having opened the file - which at least happened. A name is typed as easily
+  as it is written and is lost the moment somebody renames the file.
+
+  The claim is left undated on purpose. The name carries a day, and for
+  Telegram a clock with no zone on it, and putting either on the timeline would
+  place the file at a moment nothing recorded. A pattern matching the shape but
+  not the calendar - `IMG-20241315-WA0001.jpg` - is read as the coincidence it
+  is and reported as nothing.
+
 - The record `yt-dlp` writes beside what it fetched is read. `--write-info-json`
   leaves `<name>.info.json` next to the media, and that document names the page
   the bytes came from, the uploader and channel, the publication date, and the

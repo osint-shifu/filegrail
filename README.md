@@ -48,6 +48,7 @@ At the same time, it checks traces already left on the machine:
 * Linux XDG attributes
 * archive membership
 * download-tool sidecars
+* messaging-client file names
 * shell history
 * recent-document records
 
