@@ -57,6 +57,13 @@ CONFIDENCE: dict[str, int] = {
     # containment is a fact and the configuration is authoritative about it;
     # what it implies about origin is nothing, because sync runs both ways.
     "sync-folder": 38,
+    # The trash wrote this down as it moved the bytes, and it wrote it beside
+    # them: the record is the trash's own bookkeeping for this exact file
+    # rather than something matched to it by name afterwards. That pairing is
+    # what puts it above every other source of its kind - and it is still only
+    # a claim about a path this machine held, which is why it stays well below
+    # anything that knows how the file arrived.
+    "freedesktop-trash": 45,
     "shell-history": 40,
     # A file name, and nothing else. Both clients write a fixed pattern and a
     # file carrying one usually did come through that client - but a name is
@@ -101,6 +108,7 @@ SOURCE_LABELS: dict[str, str] = {
     "messenger-name": "messenger file name",
     "recent-documents": "recent documents",
     "sync-folder": "sync folder",
+    "freedesktop-trash": "trash record",
     "windows-recent": "recent shortcut",
     "filesystem": "filesystem",
 }
@@ -186,6 +194,7 @@ _KINDS = {
     "torrent": ACQUISITION,
     "messenger-name": ACQUISITION,
     "filesystem": ACQUISITION,
+    "freedesktop-trash": INTERACTION,
     "recent-documents": INTERACTION,
     "sync-folder": INTERACTION,
     "windows-recent": INTERACTION,

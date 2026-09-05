@@ -34,6 +34,7 @@ from .sources.shell import HISTORY_FILES, _parse_history
 from .sources.shortcut import RECENT_LINKS, collect_windows_recent
 from .sources.sync import collect_sync_roots
 from .sources.torrent import TORRENT_STORES, collect_torrents
+from .sources.trash import TRASH_DIRECTORY, collect_trash
 from .util import birth_time, iso, xattrs_readable
 
 
@@ -60,6 +61,7 @@ HOME_SOURCES = {
     "collect_windows_recent": ("Windows Recent shortcuts",),
     "collect_torrents": ("Torrent client stores",),
     "collect_sync_roots": ("Sync client folders",),
+    "collect_trash": ("Deleted files",),
 }
 
 
@@ -92,6 +94,7 @@ def survey(home: Path | None = None) -> Survey:
     found.checks.append(_shell(home, found))
     found.checks.append(_recent(home, found))
     found.checks.append(_quarantine(home, found))
+    found.checks.append(_trash(home, found))
     found.checks.append(_shortcuts(home))
     found.checks.append(_torrents(home))
     found.checks.append(_synced(home))
@@ -260,6 +263,36 @@ def _recent(home: Path, found: Survey) -> Check:
         "Recent documents",
         AVAILABLE,
         f"{counted(len(opened), 'file')} in {', '.join(Path(name).name for name in where)}",
+    )
+
+
+def _trash(home: Path, found: Survey) -> Check:
+    """What the desktop's trash still holds, and how far back it reaches.
+
+    Reported like the rest even though a scan does not consult it by profile:
+    the records are read from the deleted files themselves, so what this says
+    is how much there is to find if the trash is scanned - which is a thing an
+    examiner would otherwise have to go and look for by hand.
+    """
+    if not (home / TRASH_DIRECTORY).is_dir():
+        return Check("Deleted files", UNAVAILABLE, "no trash directory")
+
+    thrown = collect_trash(home)
+    if not thrown:
+        # Says what is there rather than why. A trash that was emptied and one
+        # whose records nothing here can read both answer the question a survey
+        # asks - nothing to be found - and this cannot tell them apart without
+        # claiming to know which.
+        return Check("Deleted files", UNAVAILABLE, "the trash holds no readable record")
+
+    oldest = min((origin.at for origin in thrown if origin.at), default=None)
+    if oldest:
+        found.horizon.append(Check("Deleted files oldest record", AVAILABLE, oldest[:10]))
+
+    return Check(
+        "Deleted files",
+        AVAILABLE,
+        f"{counted(len(thrown), 'file')} in the trash, with the path each came from",
     )
 
 

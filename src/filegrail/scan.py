@@ -33,6 +33,7 @@ from .sources import (
     read_sidecar,
     read_sync,
     read_torrent,
+    read_trash,
     read_xmp,
 )
 from .util import basename, birth_time, iso, sha256_file
@@ -202,6 +203,10 @@ def scan(
         record.origins.extend(read_quarantine(path, quarantined))
         if sidecar := read_sidecar(path):
             record.origins.append(sidecar)
+        # Found from the file rather than from a profile: the record sits beside
+        # it, so a mounted image's trash reads without `--home` being given.
+        if thrown_away := read_trash(path):
+            record.origins.append(thrown_away)
         if named := read_messenger_name(path):
             record.origins.append(named)
         if in_sync := read_sync(path, synced):

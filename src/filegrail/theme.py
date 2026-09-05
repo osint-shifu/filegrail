@@ -74,6 +74,10 @@ EVIDENCE = {
     "shell-history": "circumstantial",
     "recent-documents": "circumstantial",
     "sync-folder": "circumstantial",
+    # Directly recorded, like the two above, and what it implies about where
+    # the bytes came from is the same as theirs: nothing. Which of the three is
+    # worth more is what the rank says, not the colour.
+    "freedesktop-trash": "circumstantial",
     "windows-recent": "circumstantial",
     "filesystem": "faint",
 }

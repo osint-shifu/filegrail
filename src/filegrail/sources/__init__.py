@@ -16,6 +16,7 @@ from .shortcut import collect_windows_recent, read_shortcuts
 from .sidecar import read_sidecar
 from .sync import SyncRoot, collect_sync_roots, read_sync
 from .torrent import Torrent, collect_torrents, is_torrent, read_torrent
+from .trash import collect_trash, read_trash
 from .xmp import read_xmp
 
 __all__ = [
@@ -42,6 +43,8 @@ __all__ = [
     "is_torrent",
     "read_torrent",
     "read_sidecar",
+    "collect_trash",
+    "read_trash",
     "is_archive",
     "list_members",
     "read_contents",

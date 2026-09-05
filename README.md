@@ -68,6 +68,7 @@ Evidence the system and its applications already left behind:
 - shell history
 - sync client folders — Nextcloud, Dropbox, Syncthing, OneDrive
 - messaging-client filename patterns
+- the freedesktop trash — where a deleted file was and when it was thrown away
 
 ### Extract metadata
 
@@ -103,6 +104,28 @@ Every value says where in the document it was found, in whatever terms the forma
 The two corpora are kept apart on every value, because prose is an order of magnitude noisier than a property field. That separation is also what makes the interesting answer visible:
 
 > **A value a document names, that the record of the file's arrival also names.** Either alone is ordinary. The two together were put there by separate acts, and only something that already read the arrival record can see it.
+
+### Deleted files
+
+Nothing else on a Linux desktop writes down where a file *used to be*. The freedesktop trash does: the bytes go into `files/` and a record with the same name goes into `info/`, holding the path the file was deleted from and the moment it happened.
+
+```bash
+filegrail /mnt/image/home/ann/.local/share/Trash/files
+```
+
+```text
+  ● report.pdf                                                          19 B
+  ← (no detail)
+  │ trash record · 2026-08-14T09:41:07Z              ▰▰▱▱▱ circumstantial
+  │ note      deleted from /home/ann/Cases/2026-08/report.pdf
+  │
+  ├ Path          /home/ann/Cases/2026-08/report.pdf
+  └ DeletionDate  2026-08-14T09:41:07
+```
+
+The record is found from the file itself, so no `--home` is needed and a trash on a mounted volume reads the same as the desktop's own — including the two per-volume layouts, where the recorded path is relative to the top of that volume.
+
+Two things it is careful about. It is **interaction**, not acquisition: it proves this machine held the file at a path and removed it from there, and says nothing about where the bytes came from before that. And the deletion moment carries **no time zone** — the specification writes the deleting machine's local time and records its offset nowhere — so it is read as UTC and the record keeps the string as written.
 
 ### Shared sources
 
@@ -359,7 +382,7 @@ Every result is a claim from one source. A browser database, an EXIF block, a sh
 | :--- | :--- | :--- |
 | **Acquisition** | How did the file reach this machine? | Browser downloads, OS origin metadata, archives, torrents, download sidecars, fetch commands |
 | **Intrinsic** | What does the file reveal about its earlier life? | EXIF, XMP, IPTC, C2PA, document and media metadata, archive contents |
-| **Interaction** | What touched it after arrival? | Recent documents, shortcuts, sync folders, non-fetch shell commands |
+| **Interaction** | What touched it after arrival? | Recent documents, shortcuts, sync folders, trash records, non-fetch shell commands |
 
 Agreement between independent sources is reported as corroboration. Disagreement is reported as a conflict rather than resolved silently.
 

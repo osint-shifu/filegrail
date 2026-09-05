@@ -9,6 +9,29 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The freedesktop trash is read. Nothing else on a Linux desktop writes down
+  where a file *used to be*: the specification keeps a deleted file and the
+  record of its deletion side by side, the bytes in `files/` and a small text
+  record with the same name in `info/`, holding the path it was deleted from
+  and the moment it happened.
+
+  The record is found from the file rather than from a profile, so a mounted
+  image's trash reads without `--home` and all three layouts work from one
+  rule - the home trash, and both of the per-volume ones, where the recorded
+  path is relative to the top of that volume rather than absolute. That pairing
+  is also why it ranks above every other source of its kind: the record is the
+  trash's own bookkeeping for this exact file, not something matched to it by
+  name afterwards.
+
+  It is `interaction` and not acquisition. It proves this machine held the file
+  at a path and removed it from there, and says nothing at all about where the
+  bytes came from before that. The deletion moment carries no time zone - the
+  specification writes the deleting machine's local time and records its offset
+  nowhere - so it is read as UTC, the same choice this project makes for EXIF,
+  and the record keeps the string as written for anybody who knows the machine.
+  `doctor` reports what the trash holds and how far back it reaches, and does
+  not guess why an empty one is empty.
+
 - `--content` reads what documents say, not only what they record about
   themselves. `--identify` has always swept the metadata a scan decoded - an
   author line, a company, a producing URL, a GPS fix - which is where
