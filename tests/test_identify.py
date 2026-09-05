@@ -376,15 +376,22 @@ def test_the_report_says_which_side_of_the_file_a_value_came_from(tmp_path: Path
         ),
     ]
 
-    printed = " ".join(
-        render_text(records, tmp_path, identify=True, content=True, theme=PLAIN).split()
-    )
+    report = render_text(records, tmp_path, identify=True, content=True, theme=PLAIN)
 
-    assert "1 identifier is named in a document and in how it arrived" in printed
-    # One word per side of the file, and the three cases are distinguishable.
-    assert "acme-legal.example both" in printed
-    assert "other.example text" in printed
-    assert "third.example recorded" in printed
+    assert "1 identifier is named in a document and in how it arrived" in " ".join(report.split())
+    # The value's own line says which side of the file it came from, and the
+    # three cases are distinguishable. The separator between the type and the
+    # corpus is a glyph the theme chooses, so the line is searched rather than
+    # reconstructed.
+    for value, corpus in (
+        ("acme-legal.example", "both"),
+        ("other.example", "text"),
+        ("third.example", "recorded"),
+    ):
+        section = report[report.index("IDENTIFIERS") :]
+        line = next(row for row in section.splitlines() if value in row)
+        assert line.split()[-1] == corpus, line
+        assert "domain" in line
 
 
 def test_the_report_has_no_corpus_column_when_there_is_one_corpus(tmp_path: Path):
@@ -401,3 +408,41 @@ def test_the_report_has_no_corpus_column_when_there_is_one_corpus(tmp_path: Path
     assert "acme-legal.example" in printed
     assert "recorded" not in printed
     assert "named in a document" not in printed
+
+
+def test_a_value_too_long_to_sit_beside_its_type_keeps_the_line(tmp_path: Path):
+    """A URL is the thing this section exists to be pivoted on, and one broken
+    across two lines inside a path segment cannot be copied out of a terminal.
+    The type moves into the gutter with the rest of what is said about it."""
+    url = "https://portal.example.org/press/2026/q3/holiday-master-copy.jpg"
+    record = _document(tmp_path, "nothing here", source="browser-download", url=url)
+
+    printed = render_text(
+        [record], tmp_path, identify=True, theme=Theme(colour=False, unicode=False, width=72)
+    )
+    block = printed.split("IDENTIFIERS")[1]
+
+    assert any(line.strip().endswith(url) for line in block.splitlines()), block
+    said = next(line for line in block.splitlines() if "kind" in line)
+    assert said.split()[-1] == "url"
+
+
+def test_an_identifier_is_a_block_that_names_its_places(tmp_path: Path):
+    """A row with the type repeated down a column, a cryptic `2 in 1` and one
+    place under it was hard to read and did not answer *where*. An identifier is
+    a block now, in the language the rest of the report already uses."""
+    record = _document(
+        tmp_path,
+        "write to ann.shaw@acme-legal.example twice: ann.shaw@acme-legal.example",
+        name="notes.txt",
+        source="document-metadata",
+    )
+
+    printed = render_text([record], tmp_path, identify=True, content=True, theme=PLAIN)
+    block = printed.split("IDENTIFIERS")[1]
+
+    assert "ann.shaw@acme-legal.example" in block
+    assert "email" in block
+    assert "2 occurrences in 1 file" in block
+    assert "notes.txt" in block
+    assert "2 in 1" not in block

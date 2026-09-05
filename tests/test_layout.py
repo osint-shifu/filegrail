@@ -298,8 +298,69 @@ def test_brief_stops_at_the_index():
 
 
 def _index_rows(output: str) -> list[str]:
+    """The rows of the index: whatever follows the rules under its column names.
+
+    Found rather than counted from the heading, because what stands between the
+    two - the legend, the blank line - is layout the rows do not depend on.
+    """
     lines = output.splitlines()
-    start = next(i for i, line in enumerate(lines) if line.startswith("  FILES")) + 3
+    head = next(i for i, line in enumerate(lines) if line.startswith("  FILES"))
+    start = (
+        next(
+            i
+            for i, line in enumerate(lines[head + 2 :], head + 2)
+            if line.strip() and set(line.strip()) <= {"\u2500", " "}
+        )
+        + 1
+    )
+    end = next(i for i, line in enumerate(lines[start:], start) if not line.strip())
+    return lines[start:end]
+
+
+def test_the_index_names_its_columns_and_says_what_its_marks_mean():
+    """Everything the table needs to be read is printed above the rows.
+
+    A column of dates under no heading and a glyph nobody explained are both
+    things to be worked out, and an index exists to be read at a glance.
+    """
+    theme = Theme(colour=False, unicode=True, width=88)
+
+    output = render_text(_mixed(), ROOT, theme=theme)
+
+    lines = output.splitlines()
+    head = next(i for i, line in enumerate(lines) if line.startswith("  FILES"))
+    preamble = "\n".join(lines[head : head + 6])
+    for name in ("file", "size", "how it arrived", "what it says"):
+        assert name in preamble, name
+    for meaning in ("evidence found", "needs a second look", "nothing found"):
+        assert meaning in preamble, meaning
+
+
+def test_a_window_too_narrow_for_both_keeps_the_word_and_drops_the_meter():
+    """Five blocks are a shape and the word beside them is what the shape
+    means, so the shape is what a narrow terminal loses."""
+    wide = render_text(_corpus(), ROOT, theme=Theme(colour=False, unicode=True, width=110), limit=1)
+    narrow = render_text(
+        _corpus(), ROOT, theme=Theme(colour=False, unicode=True, width=48), limit=1
+    )
+
+    assert any("\u25b0" in row and "credentialed" in row for row in _reader_rows(wide))
+    assert any("credentialed" in row for row in _reader_rows(narrow))
+    assert not any("\u25b0" in row for row in _reader_rows(narrow))
+
+
+def _reader_rows(output: str) -> list[str]:
+    """The rows of the reader table, found the same way as the index's."""
+    lines = output.splitlines()
+    head = next(i for i, line in enumerate(lines) if line.startswith("  METADATA SOURCES"))
+    start = (
+        next(
+            i
+            for i, line in enumerate(lines[head + 2 :], head + 2)
+            if line.strip() and set(line.strip()) <= {"\u2500", " "}
+        )
+        + 1
+    )
     end = next(i for i, line in enumerate(lines[start:], start) if not line.strip())
     return lines[start:end]
 

@@ -210,9 +210,104 @@ def test_the_readme_lists_exactly_what_content_reads():
     """A count in prose can be checked; a list of extensions can be checked
     against the reader itself, which is the stronger claim and the one the
     readme actually makes."""
-    listed = _backticked(README, "## Content extraction", "## Analysis")
+    listed = _backticked(README, "### Document content", "## Analysis")
 
     assert listed == CONTENT_SUFFIXES, sorted(listed ^ CONTENT_SUFFIXES)
+
+
+def test_every_place_the_readme_promises_is_one_the_reader_writes():
+    """The table says where in a document a value will be reported from. A
+    place named there that nothing ever emits is a promise about output, which
+    is worse than a wrong extension: a reader will look for it and not find it.
+    """
+    import filegrail.sources.content as reader
+
+    # Every place the reader can write: the ones its table of package members
+    # names, and the ones it builds itself. Read out of the module rather than
+    # kept here, so a new place cannot be documented before it exists.
+    source = Path(reader.__file__).read_text(encoding="utf-8")
+    built = {
+        re.sub(r"\{[^}]*\}", "{}", place)
+        for place in re.findall(r'Passage\(\s*f?"([^"]+)"', source)
+    }
+    written = {name for _, name in reader._PARTS} | built
+    promised = set()
+    for row in _readme_rows(README, "### Document content"):
+        promised |= {re.sub(r"\d+", "{}", place) for place in _EXTENSION_FREE.findall(row[2])}
+
+    assert promised, "the table no longer says where a value is reported from"
+    assert promised <= written, sorted(promised - written)
+
+
+def _readme_rows(document: Path, heading: str) -> list[list[str]]:
+    """The cells of the table under one heading of a document."""
+    text = document.read_text(encoding="utf-8")
+    section = text[text.index(heading) :]
+    rows = []
+    for line in section.splitlines()[1:]:
+        if not line.startswith("|"):
+            if rows:
+                break
+            continue
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        if set("".join(cells)) <= set(":- "):
+            continue
+        rows.append(cells)
+    return rows
+
+
+#: A backticked value that is not a file extension - the place names.
+_EXTENSION_FREE = re.compile(r"`([^`.]+)`")
+
+
+def test_the_readme_metadata_table_names_the_extensions_its_readers_declare():
+    """The largest table on the page, and the one a reader arrives to check.
+
+    Held row by row against the reader each row names, both ways: an extension
+    listed under `EXIF` that the EXIF reader does not declare is a promise the
+    tool does not keep, and one it declares but the row omits is a capability
+    nobody can find.
+    """
+    from filegrail.sources.c2pa import SUPPORTED_SUFFIXES as C2PA
+    from filegrail.sources.embedded import (
+        containers,
+        documents,
+        exif,
+        id3,
+        isobmff,
+        matroska,
+        ole,
+        png,
+        riff,
+        vorbis,
+    )
+
+    owners = {
+        "EXIF": exif.SUFFIXES,
+        "PNG text": png.SUFFIXES,
+        "ISO BMFF": isobmff.SUFFIXES,
+        "Matroska": matroska.SUFFIXES,
+        "RIFF/BWF": riff.SUFFIXES,
+        "Vorbis comments": vorbis.SUFFIXES,
+        "ID3": id3.SUFFIXES,
+        "PDF Info": documents.PDF_SUFFIXES,
+        "OOXML properties": documents.OOXML_SUFFIXES,
+        "OLE properties": ole.SUFFIXES,
+        "OpenDocument metadata": containers.ODF_SUFFIXES,
+        "EPUB package": containers.EPUB_SUFFIXES,
+        "RTF metadata": containers.RTF_SUFFIXES,
+        "SVG metadata": containers.SVG_SUFFIXES,
+        "Jupyter notebook": containers.NOTEBOOK_SUFFIXES,
+        "C2PA": C2PA,
+    }
+
+    rows = {
+        row[0].strip("*"): set(_EXTENSION.findall(row[1]))
+        for row in _readme_rows(README, "### Embedded metadata")[1:]
+    }
+    assert set(rows) == set(owners), sorted(set(rows) ^ set(owners))
+    for block, listed in rows.items():
+        assert listed == set(owners[block]), (block, sorted(listed ^ set(owners[block])))
 
 
 def test_the_readme_lists_exactly_what_clean_can_strip():

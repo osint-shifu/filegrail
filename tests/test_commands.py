@@ -301,6 +301,25 @@ def test_the_check_report_says_that_nothing_was_written(tmp_path: Path, capsys, 
     assert "1 would be cleaned" in printed
 
 
+def test_the_clean_report_names_a_block_the_way_the_rest_of_the_report_does(
+    tmp_path: Path, capsys, monkeypatch
+):
+    """`png-text` is a value in the JSON, not a thing a person calls anything.
+    One report cannot name the same block two ways and expect to be read."""
+    monkeypatch.setenv("COLUMNS", "110")
+    from tests.photo import jpeg_with_exif
+
+    source = tmp_path / "case"
+    source.mkdir()
+    jpeg_with_exif(source / "photo.jpg", "NIKON", "MODEL", "2008:10:22 16:28:39")
+
+    assert main(["clean", str(source), "--check"]) == 0
+
+    printed = capsys.readouterr().out
+    assert "EXIF" in printed
+    assert "exif" not in printed
+
+
 def test_clean_check_does_not_even_make_the_directory_it_would_write_to(tmp_path: Path, capsys):
     """A mode that writes nothing does not leave a directory behind as the one
     trace that it ran. The name is still reported, because it was still asked

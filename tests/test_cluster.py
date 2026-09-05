@@ -167,3 +167,19 @@ def test_the_names_line_up_under_one_another():
 
     assert len(rows) == 2
     assert rows[0].index("NIKON") == rows[1].index("A. Person")
+
+
+def test_a_shared_source_names_the_files_that_share_it():
+    """`3 files` is a count, not an answer. The section exists to say which
+    files a camera or an author connects, and a reader who has to go and find
+    them has been handed the question back."""
+    records = [
+        _photo("/case/beach.jpg", Make="NIKON", Model="COOLPIX P6000"),
+        _photo("/case/market.jpg", Make="NIKON", Model="COOLPIX P6000"),
+    ]
+
+    out = render_text(records, Path("/case"), theme=PLAIN, cluster=True)
+    section = out.split("SHARED SOURCES")[1].split("METADATA SOURCES")[0]
+
+    assert "beach.jpg" in section
+    assert "market.jpg" in section

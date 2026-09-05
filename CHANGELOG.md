@@ -5,6 +5,86 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.7.0 - 2026-09-05
+
+### Changed
+
+- The report names things the way a person would, everywhere. A table now
+  carries the names of its columns and a thin rule under each one; the index
+  prints what its three marks mean above the rows rather than expecting them to
+  be worked out; and the strength meter never appears without the word beside
+  it, because five blocks are a shape and `direct` is what the shape means.
+
+- The reader table gives way in a narrow window instead of running off the
+  edge. The column's own name goes first - the rows still read under a shorter
+  heading - then the meter, so at forty-eight columns what is left standing is
+  the word that carries the meaning.
+
+- A long identifier keeps its line. A URL is the thing this section exists to
+  be pivoted on, and one broken inside a path segment to make room for the word
+  `url` beside it cannot be copied out of a terminal at all, so the type moves
+  down into the gutter with the rest of what is said about the value.
+
+- `clean` names a stripped block the way the rest of the report does - `PNG
+  text` rather than the `png-text` its JSON writes - and abbreviates the path it
+  was pointed at, as every other command does.
+
+### Fixed
+
+- A file carried one mark in the index and a different one over its own entry:
+  flagged as needing a second look in the table of contents, bulleted as
+  ordinary two screens later. Both now come from one rule in one place, which is
+  what the legend above the index promises.
+
+- The `profile` row printed a path in full while the `target` row directly above
+  it abbreviated one. Two paths in the same block, written two ways, read as two
+  different kinds of thing.
+
+- The sentence under `doctor`'s horizon - the one that says what a horizon is
+  for - was cut off at the edge of the terminal, so it stopped mid-clause and
+  explained nothing. It wraps.
+
+- `clean` reported `1 files`.
+
+- The paragraph that explains why nothing matched had its lines broken by hand,
+  so the sentence carrying the machine's own counts ran past the edge of the
+  window as soon as a profile held five or six figures of download history. It
+  is wrapped like every other paragraph now.
+
+- Two claims the readme made about reading mail were not what the reader does.
+  `--content` reads every *text* part of a message, an attached text file
+  included, and a message body reaches the report as `body` or `body (html)`;
+  the page said attachments were not read at all and named only `body`. Both
+  are now held against the reader by a test that takes the vocabulary out of
+  the module rather than keeping a copy of it.
+
+### Documentation
+
+- The readme had two places about reading document content: a section of its
+  own for the format table and another under Analysis for what is done with it.
+  The table has moved in beside the other format tables as **Document content**,
+  and what a reader most wanted from it - *which identifiers come out of that
+  text* - is now a table of its own: six types, what each one takes and, as
+  usefully, what it refuses.
+
+- Every table on the page is introduced by a sentence saying something the
+  table does not: that a torrent is matched by name *and* exact size, that
+  `clean` needs `--out` or `--check`, that a format missing from the cleanable
+  list gets no copy written at all.
+
+- The word printed beside every claim in a report - `direct`, `inherited`,
+  `credentialed`, `self-reported`, `circumstantial`, `weak` - was nowhere on
+  the page. It is a table now, saying what each word means and which sources
+  earn it, because a reader meeting `self-reported` in output has otherwise
+  been asked to work it out.
+
+- The largest table on the page, sixteen metadata blocks and their extensions,
+  is checked row by row against the reader each row names - in both directions,
+  like the content and cleanable-format tables already were.
+
+- Exit codes are written down: `1` from `clean` means metadata survived in a
+  copy, which is the whole point of running it in a pipeline.
+
 ## 0.6.1 - 2026-09-05
 
 ### Added

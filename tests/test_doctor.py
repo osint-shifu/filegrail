@@ -86,6 +86,17 @@ def test_the_oldest_record_sets_the_horizon(tmp_path: Path):
     assert horizon.detail.startswith("2022")
 
 
+def test_the_note_under_the_horizon_is_wrapped_rather_than_cut(tmp_path: Path):
+    """It is the sentence that says what a horizon is for. Cut off at the edge
+    of the terminal it stops mid-clause and explains nothing."""
+    _chromium(tmp_path, [("/x/a.pdf", 13300000000000000, "https://example.org/a.pdf")])
+
+    output = render_doctor(survey(home=tmp_path), Theme(colour=False, unicode=False, width=72))
+
+    assert "cannot be resolved from it." in " ".join(output.split())
+    assert "\u2026" not in output
+
+
 def test_an_unreadable_profile_does_not_crash_the_survey(tmp_path: Path):
     profile = tmp_path / ".config" / "google-chrome" / "Default"
     profile.mkdir(parents=True)

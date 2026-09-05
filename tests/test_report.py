@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -50,6 +51,18 @@ def test_zero_matches_explains_why():
     assert "0 with findings" in output
     assert "17 download records across 4 browser profiles" in output
     assert "prune download history" in output
+
+
+def test_the_explanation_for_zero_matches_fits_the_window():
+    """Its sentences were broken by hand, so the one carrying two counts grew
+    past the edge as soon as a real machine had more than a few records."""
+    stats = {"browser_profiles": 12, "browser_records": 148_392}
+
+    for width in (48, 72, 88):
+        theme = Theme(colour=False, unicode=False, width=width)
+        output = render_text([_record("a.txt")], Path("/case"), stats=stats, theme=theme)
+        over = [line for line in output.splitlines() if len(line) > width]
+        assert not over, (width, over)
 
 
 def test_zero_matches_with_no_readable_profile():
@@ -497,6 +510,35 @@ def test_the_profile_that_was_read_is_a_row_of_the_banner():
     assert str(profile) in row
     assert "another machine" in row
     assert "evidence read from the profile at" not in output
+
+
+def test_a_file_carries_the_same_mark_in_the_index_and_below_it():
+    """The index says `!` and the legend above it says what `!` means. A file
+    that then heads its own entry with `*` has changed its mind about itself
+    between two screens of the same report."""
+    output = render_text(_corpus(), Path("/case"), theme=PLAIN)
+
+    # The three marks the legend explains, and nothing else: a rail carrying a
+    # wrapped conflict line is not the file claiming anything about itself.
+    marks = re.findall(r"^\s*([!*.])\s+invoice\.pdf", output, flags=re.MULTILINE)
+    assert len(marks) == 2, marks
+    assert set(marks) == {"!"}, marks
+
+
+def test_the_profile_is_written_the_same_way_as_the_target(monkeypatch, tmp_path: Path):
+    """Two paths in the same block, one abbreviated and one not, reads as two
+    different kinds of thing. They are both just paths."""
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+
+    output = render_text(_corpus(), tmp_path / "case", theme=PLAIN, home=tmp_path / "image" / "ann")
+
+    rows = {
+        line.split()[0]: line.strip()
+        for line in output.splitlines()
+        if line.startswith("  target") or line.strip().startswith("profile")
+    }
+    assert rows["target"].endswith("~/case")
+    assert "~/image/ann" in rows["profile"]
 
 
 def test_the_inventory_is_a_table_with_a_row_for_each_type():
