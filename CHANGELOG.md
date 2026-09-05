@@ -9,6 +9,21 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The licence is declared as an SPDX expression, and the package says its
+  annotations are meant to be used. `license = { text = "Apache-2.0" }` with the
+  matching `License :: OSI Approved` classifier is the form PEP 639 replaced:
+  free text in one field, repeated in another, with nothing able to parse
+  either and both able to disagree. It is `license = "Apache-2.0"` plus
+  `license-files` now, which reaches the built metadata as `License-Expression`
+  and drops the deprecated classifier.
+
+  `py.typed` goes in beside it. `mypy` has run over this package in CI since
+  the beginning and none of that reached anyone installing it: without the
+  marker a package is treated as untyped however well it is annotated. The file
+  is empty; its presence is the whole statement. CI checks both it and the TLD
+  list are inside the wheel, since neither is imported and nothing else would
+  notice them going missing.
+
 - `--no-skip` reads the directories a scan normally leaves alone. The skip list
   holds build output, caches and vendored copies - `dist`, `build`, `target`,
   `node_modules` and a dozen more - which bury a report and say nothing about

@@ -57,12 +57,26 @@ jobs:
           python -m pip install build twine
           python -m build
           twine check dist/*
-      - name: The data file has to be inside the wheel
+      - name: What has to be inside the wheel, and what it has to say
         run: |
           python - <<'CHECK'
           import glob, zipfile
-          names = zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist()
-          assert "filegrail/data/tlds.txt" in names, names
+
+          wheel = zipfile.ZipFile(glob.glob("dist/*.whl")[0])
+          names = wheel.namelist()
+
+          # Neither of these is imported, so nothing else notices their absence:
+          # the TLD list is data the identifier reader needs, and the marker is
+          # what makes the annotations visible to anyone installing this.
+          for needed in ("filegrail/data/tlds.txt", "filegrail/py.typed"):
+              assert needed in names, (needed, names)
+
+          metadata = wheel.read(
+              next(n for n in names if n.endswith(".dist-info/METADATA"))
+          ).decode()
+          assert "License-Expression: Apache-2.0" in metadata, metadata
+          assert "License-File: LICENSE" in metadata, metadata
+          assert "Classifier: License ::" not in metadata, metadata
           CHECK
       - name: Install what was built and run it
         run: |

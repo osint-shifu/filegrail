@@ -14,6 +14,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+
+def _pyproject() -> str:
+    return (ROOT / "pyproject.toml").read_text("utf-8")
+
+
 #: sha256 of the Apache License, Version 2.0 exactly as apache.org publishes it
 #: at https://www.apache.org/licenses/LICENSE-2.0.txt. The text is frozen, so
 #: this is a constant and not a moving target.
@@ -41,8 +46,7 @@ def test_the_licence_file_is_the_licence_the_package_declares():
     with it. Section 4 of the licence also asks that recipients be given a copy
     of *the* Licence, which a copy with clauses missing from it is not.
     """
-    pyproject = (ROOT / "pyproject.toml").read_text("utf-8")
-    declared = re.search(r'(?m)^license = \{ text = "([^"]+)" \}$', pyproject)
+    declared = re.search(r'(?m)^license = "([^"]+)"$', _pyproject())
 
     assert declared is not None, "pyproject.toml no longer declares its licence on one line"
     assert declared.group(1) == "Apache-2.0"
@@ -80,3 +84,32 @@ def test_a_licence_that_is_not_the_apache_one_is_still_rejected(tmp_path: Path):
     other.write_text("MIT License\n\nPermission is hereby granted...\n", encoding="utf-8")
 
     assert _licence_digest(other) != APACHE_2_0
+
+
+# --- how the licence and the types are declared ------------------------------
+
+
+def test_the_licence_is_an_expression_and_not_a_classifier():
+    """PEP 639 replaced both halves of how a licence used to be stated.
+
+    The old form put free text in `license` and repeated it as a classifier,
+    which meant two fields to disagree with each other and a string nothing
+    could parse. The expression is machine-readable and the classifier is
+    deprecated, so tools that read one of them now read the same answer.
+    """
+    pyproject = _pyproject()
+
+    assert re.search(r"(?m)^license-files = ", pyproject), "the licence file has to be named"
+    assert "License :: OSI Approved" not in pyproject, (
+        "the licence classifier is deprecated under PEP 639; `license` carries it now"
+    )
+
+
+def test_the_package_offers_the_types_it_already_checks():
+    """`mypy` runs over this package in CI, and nobody outside can use the result.
+
+    A package without the marker is treated as untyped no matter how well it is
+    annotated, so every annotation here stops at the edge of the distribution.
+    The file is empty; its presence is the whole statement.
+    """
+    assert (ROOT / "src" / "filegrail" / "py.typed").is_file()
