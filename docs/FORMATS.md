@@ -70,7 +70,7 @@ read it wherever it turns up.
 | Block | Where it is found | What comes out |
 |:---|:---|:---|
 | `xmp` | Any file carrying an XMP packet — JPEG, TIFF and raw, PNG, PDF, MP4, HEIC, SVG, InDesign output, and containers nobody thought to list | Creating application, author, title, `xmpMM` derivation identifiers |
-| `xmp-history` | The same packet | Every recorded editing step. A step with a timestamp becomes its own dated claim and lands on `--timeline`; one without stays a field, because inventing a time for it would be worse than leaving it undated |
+| `xmp-history` | The same packet | Every recorded editing step. A step with a timestamp becomes its own dated claim and lands on `--timeline`; one without stays a field, because inventing a time for it would be worse than leaving it undated. The sequence is also held against itself: a step dated before the one it follows is reported |
 | `iptc` | Any Photoshop image-resource block — JPEG, TIFF, PSD — plus TIFF tag 33723 | By-line, credit, source, copyright, headline, caption, keywords, place and date of creation |
 
 XMP identifiers are also what links the scanned files to each other:

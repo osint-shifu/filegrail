@@ -364,6 +364,7 @@ def reconcile(record: FileRecord) -> Verdict:
     verdict.findings.extend(_address_findings(addressed, verdict.state))
     verdict.findings.extend(_time_findings(record))
     verdict.findings.extend(_order_findings(record))
+    verdict.findings.extend(_history_findings(record))
     verdict.findings.extend(_match_findings(acquisition))
     verdict.findings.extend(_attribution_findings(record))
     return verdict
@@ -452,6 +453,31 @@ def _order_findings(record: FileRecord) -> list[Finding]:
                 )
             )
     return found
+
+
+def _history_findings(record: FileRecord) -> list[Finding]:
+    """Flag an editing history whose steps are not in the order it lists them.
+
+    `xmpMM:History` is a sequence, and the reader keeps the order the encoder
+    wrote. A step dated before the one it follows therefore contradicts the
+    list it is in - a clock moved, a zone was got wrong, or the history was
+    written by something other than the sequence of events it describes.
+
+    Only the first inversion is reported. One is enough to say the account is
+    unreliable, and a history that goes backwards usually does so repeatedly,
+    which would bury every other finding about the file.
+    """
+    steps = [origin.at for origin in record.origins if origin.source == "xmp-history" and origin.at]
+    for earlier, later in zip(steps, steps[1:], strict=False):
+        if _after(earlier, later):
+            return [
+                Finding(
+                    IMPOSSIBLE_ORDER,
+                    f"the recorded editing history runs backwards: a step dated {later} "
+                    f"follows one dated {earlier}",
+                )
+            ]
+    return []
 
 
 def _after(left: str, right: str) -> bool | None:

@@ -670,3 +670,38 @@ def test_a_self_contradiction_is_not_headlined_as_an_acquisition_state():
     )
 
     assert reconcile(record).headline == SELF_CONTRADICTORY
+
+
+def _edit(when: str | None, said: str = "saved") -> Origin:
+    return Origin(source="xmp-history", block="xmp-history", at=when, note=said)
+
+
+def test_an_editing_history_that_runs_backwards_is_a_contradiction():
+    """`xmpMM:History` is an ordered sequence, so a step dated before the one
+    it follows is the file disagreeing with its own account of itself."""
+    record = _record(
+        _edit("2026-08-24T19:00:00Z", "created"),
+        _edit("2026-01-01T12:00:00Z", "exported"),
+    )
+
+    assert [f for f in reconcile(record).findings if "runs backwards" in f.text]
+
+
+def test_an_editing_history_in_order_is_not_a_finding():
+    record = _record(
+        _edit("2026-01-01T12:00:00Z", "created"),
+        _edit("2026-08-24T19:00:00Z", "exported"),
+    )
+
+    assert not reconcile(record).findings
+
+
+def test_two_steps_at_the_same_moment_are_not_backwards():
+    """An application that saves and exports in one action writes both at the
+    same second. Equal is not decreasing."""
+    record = _record(
+        _edit("2026-01-01T12:00:00Z", "saved"),
+        _edit("2026-01-01T12:00:00Z", "exported"),
+    )
+
+    assert not reconcile(record).findings

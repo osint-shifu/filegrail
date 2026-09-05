@@ -254,6 +254,7 @@ Conflicts are reported rather than silently resolved.
 * size mismatches
 * timeline inconsistencies
 * a file whose own dates run backwards
+* an editing history recorded out of the order it lists
 * disagreements between metadata blocks
 * derivation relationships between related files
 

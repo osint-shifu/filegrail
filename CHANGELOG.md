@@ -9,6 +9,23 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- An editing history recorded out of order is reported. `xmpMM:History` is a
+  sequence and the reader already keeps the order the encoder wrote, so a step
+  dated before the one it follows contradicts the list it sits in - a clock
+  moved, a zone was got wrong, or the history was written by something other
+  than the sequence of events it claims to describe.
+
+  It arrives as `impossible_order`, the same kind as a document modified before
+  it was created, because it is the same class of problem: the file's own
+  account of itself in an order that cannot have happened. Only the first
+  inversion is reported - one is enough to say the account is unreliable, and a
+  history that goes backwards usually does so repeatedly, which would bury
+  every other finding about the file.
+
+  Two steps at the same moment are not backwards. An application that saves and
+  exports in one action writes both at the same second, and equal is not
+  decreasing.
+
 - `--cluster` groups the scan by the sources more than one file names. A
   directory is a list of files; a case is the smaller number of authors and
   cameras that produced them, and the section exists to turn the first reading
