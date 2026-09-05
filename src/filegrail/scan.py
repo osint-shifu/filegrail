@@ -14,6 +14,7 @@ from .sources import (
     collect_quarantine_events,
     collect_recent_files,
     collect_shell_history,
+    collect_sync_roots,
     collect_torrents,
     collect_windows_recent,
     inherited_origin,
@@ -30,6 +31,7 @@ from .sources import (
     read_quarantine,
     read_shortcuts,
     read_sidecar,
+    read_sync,
     read_torrent,
     read_xmp,
 )
@@ -124,6 +126,7 @@ def scan(
     recent = collect_recent_files(home=home)
     quarantined = collect_quarantine_events(home=home)
     shortcuts = collect_windows_recent(home=home)
+    synced = collect_sync_roots(home=home)
 
     records: list[FileRecord] = []
     for path in files:
@@ -152,6 +155,8 @@ def scan(
             record.origins.append(sidecar)
         if named := read_messenger_name(path):
             record.origins.append(named)
+        if in_sync := read_sync(path, synced):
+            record.origins.append(in_sync)
         # A block found by sweeping an archive's raw bytes is a member's, not
         # the container's: a zip is not made by Photoshop because a photograph
         # inside it was. The members are read under their own names instead.

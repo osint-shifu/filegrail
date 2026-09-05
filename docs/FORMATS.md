@@ -204,6 +204,7 @@ That is worth knowing before you rely on one of them in something that matters.
 
 | What | Why |
 |:---|:---|
+| Who put a file in a synced folder | Dropbox encrypts its file cache, and for every client read here the answer lives on the server rather than on this machine. The folder and the account it syncs with are read; **who added the file is not** |
 | Messaging-app stores | Telegram Desktop encrypts `tdata` and keeps no chat history in it. Signal Desktop's `db.sqlite` is SQLCipher behind a key the operating system wraps, and opening it needs a crypto library this tool does not carry. Discord and Slack keep no local message database. **No claim here names a sender or a conversation** - only the file names those clients write, which is a much weaker thing and is ranked as one |
 | Vendor maker notes | Every manufacturer encodes them differently and each needs its own parser. The rest of EXIF is decoded |
 | C2PA signatures | The certificate chain is **not** verified; that needs a crypto library and a trust list that changes over time. The *hard binding* is checked, which is a different question - whether the manifest describes these bytes, not whether its signer is anyone you should trust |

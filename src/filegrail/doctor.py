@@ -32,6 +32,7 @@ from .sources.quarantine import QUARANTINE_DB, collect_quarantine_events
 from .sources.recent import RECENT_FILES, collect_recent_files
 from .sources.shell import HISTORY_FILES, _parse_history
 from .sources.shortcut import RECENT_LINKS, collect_windows_recent
+from .sources.sync import collect_sync_roots
 from .sources.torrent import TORRENT_STORES, collect_torrents
 from .util import birth_time, iso, xattrs_readable
 
@@ -58,6 +59,7 @@ HOME_SOURCES = {
     "collect_quarantine_events": ("macOS quarantine database",),
     "collect_windows_recent": ("Windows Recent shortcuts",),
     "collect_torrents": ("Torrent client stores",),
+    "collect_sync_roots": ("Sync client folders",),
 }
 
 
@@ -92,6 +94,7 @@ def survey(home: Path | None = None) -> Survey:
     found.checks.append(_quarantine(home, found))
     found.checks.append(_shortcuts(home))
     found.checks.append(_torrents(home))
+    found.checks.append(_synced(home))
     found.checks.append(_birth_times())
     found.checks.append(_c2pa())
     return found
@@ -292,6 +295,19 @@ def _torrents(home: Path) -> Check:
     if not found:
         return Check("Torrent client stores", PARTIAL, "a store with nothing readable in it")
     return Check("Torrent client stores", AVAILABLE, counted(len(found), "torrent"))
+
+
+def _synced(home: Path) -> Check:
+    """Which folders a sync client says it keeps in step, and with what.
+
+    No horizon: a configuration says what is being synced now and keeps no
+    record of when anything was, so there is no reach to report.
+    """
+    roots = collect_sync_roots(home)
+    if not roots:
+        return Check("Sync client folders", UNAVAILABLE, "no client configuration found")
+    named = ", ".join(sorted({root.client for root in roots}))
+    return Check("Sync client folders", AVAILABLE, f"{counted(len(roots), 'folder')} - {named}")
 
 
 def _birth_times() -> Check:

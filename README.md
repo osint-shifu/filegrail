@@ -51,6 +51,7 @@ At the same time, it checks traces already left on the machine:
 * torrent membership
 * download-tool sidecars
 * messaging-client file names
+* sync client folders
 * shell history
 * recent-document records
 

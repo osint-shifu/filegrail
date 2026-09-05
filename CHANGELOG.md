@@ -9,6 +9,25 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Folders a sync client keeps in step with an account are read - Nextcloud,
+  Dropbox, Syncthing and the Linux OneDrive client - and a file inside one is
+  reported as being inside it, with the account or server named where the
+  configuration names it.
+
+  Two limits are worth stating rather than discovering. **Who put the file
+  there is not readable**: Dropbox encrypts its file cache, and for all of
+  these that answer lives on the server. And **sync runs both ways** - a file
+  in a synced folder may have arrived from the account or may have been made
+  here and pushed to it, and containment cannot tell those apart. So this is
+  recorded as something that handled the file rather than as an account it came
+  from, which is what is actually known.
+
+  Containment is decided by path components rather than by text, because
+  `Nextcloud-old` is not inside `Nextcloud` and comparing the two as strings
+  says that it is.
+
+  `doctor` reports which clients are configured and how many folders they name.
+
 - The files inside an archive are read for their metadata, one at a time and
   without unpacking it. A photograph in a zip has the same EXIF it would have
   on disk, and none of it was being read; the archive was known only by the

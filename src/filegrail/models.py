@@ -50,6 +50,10 @@ CONFIDENCE = {
     # A hop the sender may have written in full before sending. Recorded by
     # something, but not by anything the recipient has reason to trust.
     "email-relay": 45,
+    # A file inside a folder a client keeps in step with an account. The
+    # containment is a fact and the configuration is authoritative about it;
+    # what it implies about origin is nothing, because sync runs both ways.
+    "sync-folder": 38,
     "shell-history": 40,
     # A file name, and nothing else. Both clients write a fixed pattern and a
     # file carrying one usually did come through that client - but a name is
@@ -93,6 +97,7 @@ SOURCE_LABELS = {
     "shell-history": "shell history",
     "messenger-name": "messenger file name",
     "recent-documents": "recent documents",
+    "sync-folder": "sync folder",
     "windows-recent": "recent shortcut",
     "filesystem": "filesystem",
 }
@@ -179,6 +184,7 @@ _KINDS = {
     "messenger-name": ACQUISITION,
     "filesystem": ACQUISITION,
     "recent-documents": INTERACTION,
+    "sync-folder": INTERACTION,
     "windows-recent": INTERACTION,
     "c2pa": INTRINSIC,
     "device-metadata": INTRINSIC,

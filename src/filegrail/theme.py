@@ -72,6 +72,7 @@ EVIDENCE = {
     "messenger-name": "circumstantial",
     "shell-history": "circumstantial",
     "recent-documents": "circumstantial",
+    "sync-folder": "circumstantial",
     "windows-recent": "circumstantial",
     "filesystem": "faint",
 }
