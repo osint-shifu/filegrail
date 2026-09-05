@@ -37,6 +37,20 @@ ARCHIVE_SUFFIXES = {".zip", ".whl", ".jar", ".tar", ".tgz", ".gz", ".bz2", ".xz"
 # deliberately hostile archive should not be able to stall a scan.
 _MAX_MEMBERS = 50_000
 
+#: What a package raises when it is not the package it says it is. `zipfile`
+#: supplies the two that are neither `OSError` nor `ValueError`: a file that is
+#: no archive at all, and one whose members name a compression method this
+#: interpreter cannot undo - which a crafted archive says in two bytes per
+#: member, and which used to leave here as `NotImplementedError` and end the run.
+_UNREADABLE = (
+    OSError,
+    zipfile.BadZipFile,
+    tarfile.TarError,
+    EOFError,
+    ValueError,
+    NotImplementedError,
+)
+
 
 def is_archive(path: Path) -> bool:
     return path.suffix.lower() in ARCHIVE_SUFFIXES
@@ -65,7 +79,7 @@ def list_members(path: Path) -> dict[str, set[int]]:
                     if entry.isfile():
                         record(entry.name, entry.size)
             return members
-    except (OSError, zipfile.BadZipFile, tarfile.TarError, EOFError, ValueError):
+    except _UNREADABLE:
         return {}
 
     return members
@@ -101,7 +115,7 @@ def read_contents(path: Path) -> list[Origin]:
                 if len(found) >= _MAX_READ:
                     break
                 found.extend(_read_member(name, extract))
-    except (OSError, zipfile.BadZipFile, tarfile.TarError, EOFError, ValueError):
+    except _UNREADABLE:
         return found
     return found
 
@@ -152,7 +166,7 @@ def _read_member(name: str, extract: Callable[[], bytes]) -> list[Origin]:
         copy = Path(room) / f"member{suffix}"
         try:
             copy.write_bytes(extract())
-        except (OSError, zipfile.BadZipFile, tarfile.TarError, EOFError, ValueError):
+        except _UNREADABLE:
             return []
 
         found = []

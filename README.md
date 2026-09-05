@@ -422,6 +422,15 @@ mypy
 
 `mypy` runs in strict mode over `src/filegrail`, against the oldest supported interpreter.
 
+The two hand-written binary decoders — CBOR, which a C2PA manifest is written in, and bencode, which a `.torrent` is — also have property tests, driven by `hypothesis`. They live in a separate extra and their own CI job, because they are the one thing here whose result depends on a seed rather than on the code:
+
+```bash
+python -m pip install -e ".[dev,fuzz]"
+pytest tests/test_properties.py
+```
+
+Without that extra they skip; `tests/test_malformed.py`, which cuts a file of every supported format short and hands the pieces to every reader, needs nothing and runs with the rest.
+
 Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before adding a reader or changing what a source is taken to prove. [`SECURITY.md`](SECURITY.md) covers what to report privately, and [`CHANGELOG.md`](CHANGELOG.md) carries the history.
 
 ---

@@ -249,3 +249,17 @@ def test_the_hash_algorithm_may_be_inherited_from_the_claim(tmp_path: Path):
     _png_with_binding(image, claim, alg=None)
 
     assert "hash binding matches" in read_c2pa_manifest(image).note
+
+
+def test_a_manifest_that_is_not_decodable_cbor_does_not_end_the_scan(tmp_path: Path):
+    """One crafted file must not take the run down with it.
+
+    `_walk` catches the decoder's own error and carries on, which is what makes
+    a malformed manifest ordinary here rather than fatal. An exception of any
+    other type walks straight past that clause, out of `read_c2pa_manifest` and
+    out of the scan - a hundred-byte file denying the whole tool.
+    """
+    image = tmp_path / "crafted.png"
+    _png_with(image, _manifest(b"\x5f\x00\xff"))
+
+    assert read_c2pa_manifest(image) is None

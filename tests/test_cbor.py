@@ -70,3 +70,37 @@ def test_empty_input_is_rejected():
 def test_deep_nesting_is_rejected():
     with pytest.raises(CborError):
         loads(b"\x81" * 64 + b"\x00")
+
+
+def test_an_indefinite_string_whose_chunk_is_not_a_string_is_rejected():
+    """RFC 8949 spells an indefinite-length string as definite-length chunks.
+
+    A chunk that decoded to something else used to be appended anyway and reach
+    `b"".join`, which raises `TypeError` - and `TypeError` is not what any
+    caller of this catches, so it left the reader, left the scan, and ended the
+    run on one crafted file.
+    """
+    with pytest.raises(CborError):
+        loads(b"\x5f\x00\xff")  # a byte string whose only chunk is the integer 0
+    with pytest.raises(CborError):
+        loads(b"\x7f\x80\xff")  # a text string whose only chunk is an empty array
+
+
+def test_an_indefinite_string_does_not_take_chunks_of_the_other_kind():
+    """The chunks of a text string are text strings, and a byte string's are bytes."""
+    with pytest.raises(CborError):
+        loads(b"\x7f\x41a\xff")
+    with pytest.raises(CborError):
+        loads(b"\x5f\x61a\xff")
+
+
+def test_a_map_keyed_by_a_nested_container_is_still_decodable():
+    """CBOR allows a container as a map key, and containers nest.
+
+    Flattening only the outer one leaves a list inside the tuple that is about
+    to be hashed, which raises `TypeError` from the dictionary rather than
+    `CborError` from here - and that is the difference between one unreadable
+    manifest and a scan that stops.
+    """
+    assert loads(b"\xa1\x81\x81\x00\x00") == {((0,),): 0}
+    assert loads(b"\xa1\xa1\x00\x81\x00\x00") == {((0, (0,)),): 0}

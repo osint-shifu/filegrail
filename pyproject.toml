@@ -45,6 +45,13 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=8.2,<9", "ruff>=0.6,<1", "mypy>=1.11,<2"]
 
+# Kept out of `dev` on purpose. `hypothesis` is the one thing in this repo whose
+# result depends on a seed rather than on the code, and the nine test jobs in
+# the matrix are there to answer "does this commit work", which is a question
+# that has to mean the same thing twice. The fuzzing gets its own job, where a
+# red run is a finding rather than a rerun.
+fuzz = ["hypothesis>=6,<7"]
+
 [project.urls]
 Homepage = "https://github.com/osint-shifu/filegrail"
 Repository = "https://github.com/osint-shifu/filegrail"

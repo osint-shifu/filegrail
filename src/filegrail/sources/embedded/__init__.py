@@ -30,6 +30,10 @@ _RECOVERABLE = (
     zipfile.BadZipFile,
     ElementTree.ParseError,
     KeyError,
+    # A package may name a compression method this interpreter cannot undo, and
+    # `zipfile` says so with `NotImplementedError` - two patched bytes per
+    # member, and none of the types above describes it.
+    NotImplementedError,
 )
 
 #: Every suffix any reader here claims. Used to skip files quickly.

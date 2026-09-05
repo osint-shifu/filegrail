@@ -9,6 +9,30 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The two hand-written binary decoders are fuzzed. `cbor.py` reads a C2PA
+  manifest and `bencode.py` reads a `.torrent`; both are `filegrail`'s own,
+  because it takes no runtime dependencies, and both read bytes that arrived
+  from somewhere else. `tests/test_properties.py` holds what they have to hold
+  for inputs nobody chose - an arbitrary string of bytes is decoded or refused
+  with the module's own error class, and a value encoded canonically decodes
+  back to itself. It is driven by `hypothesis`, which is a new `fuzz` extra and
+  a CI job of its own rather than part of `dev`: a run whose result depends on
+  a seed does not belong among the nine jobs that answer *does this commit
+  work*, and a red run in its own job is a finding rather than a rerun.
+
+  The generator is handed each format's own alphabet alongside random bytes,
+  and assembles an item of unstated length as a unit. Uniform noise practically
+  never spells a container - the head has to be right before anything inside it
+  is reached at all - and every decoder bug below was behind one.
+
+- Every reader is held against files that stop in the middle.
+  `tests/test_malformed.py` builds one valid file of each of thirteen formats,
+  cuts each at a ladder of lengths, and offers every piece to every reader and
+  to `clean`. Nothing is asserted about what comes back, only that something
+  does. It needs no extra and runs with the rest of the suite, and the cuts are
+  a fixed ladder rather than a sample, so a failure reproduces by running the
+  suite again rather than by recovering a seed.
+
 - The licence is declared as an SPDX expression, and the package says its
   annotations are meant to be used. `license = { text = "Apache-2.0" }` with the
   matching `License :: OSI Approved` classifier is the form PEP 639 replaced:
@@ -66,6 +90,30 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   the pair one file at a time now and answers for each before reading the next.
 
 ### Fixed
+
+- Four ways a small file could end a whole run, none of them found by reading
+  the code.
+
+  A CBOR indefinite-length string whose chunks are not strings reached
+  `b"".join` and raised `TypeError`, and a map keyed by a container inside a
+  container reached the dictionary and raised `TypeError` for an unhashable
+  key. Both are `CborError` now, which is the one refusal every caller of that
+  decoder catches: a hundred and twelve bytes of crafted JPEG used to end a
+  scan with a traceback, and a scan that ends is a scan whose remaining files
+  were never looked at.
+
+  A package naming a compression method this interpreter cannot undo raises
+  `NotImplementedError` out of `zipfile`, which is neither `OSError` nor
+  `ValueError` and so appeared in no reader's list of what a broken file can
+  raise. Two patched bytes per member did the same thing to a scan.
+  `sources/embedded`, `sources/archives` and `clean` all account for it now.
+
+  `clean` raised `BadZipFile` on a truncated `.docx` or `.odt`, and `IndexError`
+  on a JPEG that ends between the two bytes of a marker. The command already
+  had the right answer for both - *the file could not be taken apart safely* -
+  and it could not reach it. This is the one command that writes, so a
+  traceback in the middle leaves copies on disk and says nothing about the
+  files it never got to.
 
 - A scan says which directories it did not look inside. `os.walk` swallows
   access errors by default, so a directory that could not be opened produced no

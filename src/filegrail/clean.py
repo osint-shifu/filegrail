@@ -29,6 +29,17 @@ from .sources.embedded import read_embedded_metadata
 from .sources.iptc import read_iptc
 from .sources.xmp import read_xmp
 
+#: What a stripper raises when the file is not the shape its extension claims.
+#: The same family the readers keep, for the same reason: a truncated download,
+#: a file that was renamed and a file built to break a parser all land here, and
+#: none of the three is an error in `filegrail` - the answer to all of them is
+#: to decline this one file and go on to the next. `zipfile` supplies the two
+#: that are neither `ValueError` nor `struct.error`: a package that is not a
+#: package, and one whose members name a compression this interpreter cannot
+#: undo. Both used to leave `clean` as a traceback, taking with them any copies
+#: it had already written and telling nobody the job had stopped half done.
+_MALFORMED = (ValueError, struct.error, zipfile.BadZipFile, NotImplementedError)
+
 #: JPEG markers that carry metadata rather than image data. `APP1` holds Exif
 #: and XMP, `APP13` the Photoshop resource block IPTC lives in, `APP11` the
 #: JUMBF box a C2PA manifest sits in, and `COM` is a free-text comment.
@@ -137,7 +148,7 @@ def clean_file(
 
     try:
         body, removed = _STRIPPERS[suffix](raw)
-    except (ValueError, struct.error):
+    except _MALFORMED:
         return Cleaned(path, note="the file could not be taken apart safely")
 
     if not removed:
@@ -193,6 +204,11 @@ def _strip_jpeg(raw: bytes) -> tuple[bytes, list[str]]:
     offset = 2
 
     while offset < len(raw):
+        # A marker is two bytes, and a file that ends between them is truncated
+        # rather than readable. Reaching for the second one anyway raises
+        # `IndexError`, which says nothing and is caught nowhere.
+        if offset + 1 >= len(raw):
+            raise ValueError("the file ends inside a marker")
         if raw[offset] != 0xFF:
             raise ValueError("lost the marker stream")
         marker = raw[offset + 1]
