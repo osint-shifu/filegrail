@@ -184,12 +184,17 @@ def test_the_inventory_names_every_type_at_every_width(width: int):
         assert f"EXT{index}" in output, index
 
 
-def test_the_inventory_drops_a_column_before_it_drops_anything_else():
+def test_the_inventory_is_the_same_table_at_every_width():
+    """It used to pack entries across the line and drop a column as the
+    terminal narrowed, which meant the same directory read differently at two
+    widths. A row a type is a row a type at forty-eight columns and at a
+    hundred and ten."""
+
     def rows(width: int) -> int:
         output = render_text(_typed(20), ROOT, theme=Theme(colour=False, unicode=True, width=width))
         return len([line for line in output.splitlines() if "EXT" in line])
 
-    assert rows(110) < rows(48)
+    assert rows(110) == rows(48) == 20
 
 
 @pytest.mark.parametrize("width", WIDTHS)

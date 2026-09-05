@@ -202,3 +202,10 @@ def test_the_documents_agree_with_the_readers_about_how_many_formats_there_are()
 
 def test_the_readme_agrees_about_how_many_formats_are_read_as_text():
     assert _counted(README, "extensions in all") == len(CONTENT_SUFFIXES)
+
+
+def test_the_badge_agrees_too():
+    """It is the first number a reader sees, and the easiest to forget."""
+    badge = re.search(r"badge/formats-(\d+)", README.read_text(encoding="utf-8"))
+    assert badge is not None, "the readme no longer carries a format badge"
+    assert int(badge.group(1)) == len(_readable())

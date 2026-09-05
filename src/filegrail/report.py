@@ -385,9 +385,17 @@ def _wrapped(theme: Theme, text: str, indent: str, paint: Callable[[str], str]) 
 #: What the inventory grid calls its three columns.
 _TYPE_HEAD = ("type", "files", "size")
 
+#: And what it calls the two beneath it.
+_FAMILY_HEAD = ("family", "files")
+
 
 def _inventory(theme: Theme, found: Inventory) -> list[str]:
     """Every type present, how many of each, and how much of the scan it is.
+
+    A table, a row to a type. Three entries packed across a line - each of them
+    three figures - was a jumble however the columns were headed: the reader had
+    to work out where one entry ended before reading any of it. A row costs
+    vertical space and gives back the thing a table is for.
 
     One table rather than two. Counts and sizes answer the same question - what
     is this directory made of - and splitting them makes the reader hold half
@@ -396,98 +404,51 @@ def _inventory(theme: Theme, found: Inventory) -> list[str]:
     if not found.types:
         return []
 
-    # Wide enough for the column labels as well as the figures. Three unlabelled
-    # numbers to a cell and three cells to a line is a wall, and a header at the
-    # left would label the first group and leave the rest to be guessed at - so
-    # it repeats over every column, which is what makes each triple readable.
-    digits = max(max(len(str(entry.count)) for entry in found.types), len(_TYPE_HEAD[1]) - 2)
     sizes = {entry.name: _size(entry.size) for entry in found.types}
-    span = max(max(len(value) for value in sizes.values()), len(_TYPE_HEAD[2]) - 2)
-
-    # The name column is bounded by what still leaves a whole cell inside the
-    # terminal. An extension wider than that is not shortened - it steps out of
-    # the grid and takes lines of its own underneath, because an extension is
-    # data and the grid is a layout.
+    counts = max(max(len(str(entry.count)) for entry in found.types), len(_TYPE_HEAD[1]))
+    span = max(max(len(value) for value in sizes.values()), len(_TYPE_HEAD[2]))
+    # The name column is bounded by what still leaves the figures inside the
+    # terminal. An extension wider than that is not shortened - it takes lines
+    # of its own underneath, because an extension is data and this is a layout.
     room = theme.width - _INDENT
-    column = min(max(len(entry.name) for entry in found.types), max(4, room - digits - span - 4))
-    # One wider than the label, so `type` and `files` do not run together the
-    # way `PDF` and its count never can.
-    column = min(max(column, len(_TYPE_HEAD[0]) + 1), max(4, room - digits - span - 4))
-    fits = [entry for entry in found.types if len(entry.name) <= column]
-    wide = [entry for entry in found.types if len(entry.name) > column]
+    column = min(
+        max(max(len(entry.name) for entry in found.types), len(_TYPE_HEAD[0])),
+        max(4, room - counts - span - 4),
+    )
 
     lines = _heading(theme, "inventory", len(found.types), noun="type")
-    if fits:
-        # Lower case: a column label is not a section heading, and it also tells
-        # the labels apart from the extensions, which are upper case.
-        header = (
-            _TYPE_HEAD[0].ljust(column)
-            + _TYPE_HEAD[1].rjust(digits + 2)
-            + _TYPE_HEAD[2].rjust(span + 2)
-        )
-        lines.extend(_grid(theme, [theme.dim(header)] * len(fits), column + digits + span + 4)[:1])
-        lines.extend(
-            _grid(
-                theme,
-                [
-                    theme.paint(entry.name.ljust(column), "body")
-                    + theme.label(str(entry.count).rjust(digits + 2))
-                    + theme.dim(sizes[entry.name].rjust(span + 2))
-                    for entry in fits
-                ],
-                column + digits + span + 4,
-            )
-        )
-    for entry in wide:
-        lines.extend(
-            f"{' ' * _INDENT}{theme.paint(part, 'body')}" for part in theme.wrap(entry.name, room)
-        )
-        tail = theme.label(str(entry.count).rjust(digits)) + theme.dim(
+    lines.append(
+        f"{' ' * _INDENT}{theme.dim(_TYPE_HEAD[0].ljust(column))}"
+        f"{theme.dim(_TYPE_HEAD[1].rjust(counts + 2))}"
+        f"{theme.dim(_TYPE_HEAD[2].rjust(span + 2))}"
+    )
+    for entry in found.types:
+        figures = theme.label(str(entry.count).rjust(counts + 2)) + theme.dim(
             sizes[entry.name].rjust(span + 2)
         )
-        lines.append(_row(theme, " " * _INDENT, "", tail, wrap=False))
+        if len(entry.name) <= column:
+            lines.append(f"{' ' * _INDENT}{theme.paint(entry.name.ljust(column), 'body')}{figures}")
+            continue
+        for part in theme.wrap(entry.name, room):
+            lines.append(f"{' ' * _INDENT}{theme.paint(part, 'body')}")
+        lines.append(f"{' ' * _INDENT}{' ' * column}{figures}")
 
     if found.families:
-        # It answers a different question from the table above - what kinds of
-        # file, not which extensions - and floated under it unlabelled.
-        lines.extend(["", f"{' ' * _INDENT}{theme.dim('by family')}"])
-        width = max(len(family) for family, _ in found.families)
-        counts = max(len(str(count)) for _, count in found.families)
-        lines.extend(
-            _grid(
-                theme,
-                [
-                    theme.label(family.ljust(width)) + theme.dim(str(count).rjust(counts + 2))
-                    for family, count in found.families
-                ],
-                width + counts + 2,
-            )
+        # A different question from the table above - what kinds of file, not
+        # which extensions - so it says which question it answers.
+        width = max(max(len(family) for family, _ in found.families), len(_FAMILY_HEAD[0]))
+        lines.append("")
+        lines.append(
+            f"{' ' * _INDENT}{theme.dim(_FAMILY_HEAD[0].ljust(width))}"
+            f"{theme.dim(_FAMILY_HEAD[1].rjust(counts + 2))}"
         )
+        for family, count in found.families:
+            lines.append(
+                f"{' ' * _INDENT}{theme.label(family.ljust(width))}"
+                f"{theme.dim(str(count).rjust(counts + 2))}"
+            )
     lines.append("")
     return lines
-
-
-#: Space between the columns of a grid. Wide enough that two cells never read
-#: as one, narrow enough to keep a column on an eighty-column terminal.
-_GAP = 4
-
-
-def _grid(theme: Theme, cells: list[str], width: int, indent: int = _INDENT) -> list[str]:
-    """Lay equal-width cells across the terminal, as many per row as fit.
-
-    Columns give way one at a time as the terminal narrows, down to one. The
-    cells themselves never give way: an inventory that dropped a digit to keep
-    four columns would be trading the answer for the layout.
-
-    The cells arrive painted and each one is already `width` columns wide, so
-    nothing here has to measure an escape sequence.
-    """
-    room = theme.width - indent
-    columns = max(1, (room + _GAP) // (width + _GAP))
-    return [
-        " " * indent + (" " * _GAP).join(cells[start : start + columns])
-        for start in range(0, len(cells), columns)
-    ]
 
 
 def _findings(theme: Theme, tallies: list[Tally]) -> list[str]:
