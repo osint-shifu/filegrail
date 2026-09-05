@@ -64,10 +64,12 @@ It works **after the fact**: no agent, no provenance database, no browser extens
 
 ```text
 file
-├── acquisition   how it reached the machine       browser, OS attributes, archives, torrents
-├── intrinsic     what it says of its earlier life  EXIF, XMP, IPTC, C2PA, document properties
-└── interaction   what touched it afterwards        recent documents, shortcuts, shell, the trash
+├── acquisition   how it reached the machine
+├── intrinsic     what it says of its earlier life
+└── interaction   what touched it afterwards
 ```
+
+**acquisition** is browser history, OS origin attributes, archive and torrent membership, download sidecars, fetch commands. **intrinsic** is EXIF, XMP, IPTC, C2PA, document and media properties. **interaction** is recent documents, shortcuts, sync folders, the trash.
 
 Rather than flattening all of that into one "origin" field, filegrail keeps the three apart and reports what each source actually supports. Disagreement between them is reported as a conflict rather than resolved silently.
 
@@ -308,7 +310,7 @@ filegrail ./case-files
 Scans recursively and leads with an overview, then an index — one line per file — and only then each file in full.
 
 <details>
-<summary><h3>▶&nbsp; See a whole report, exactly as filegrail prints it</h3></summary>
+<summary><h3>See a whole report, exactly as filegrail prints it</h3></summary>
 
 ```text
     __ _ _                   _ _
@@ -644,7 +646,7 @@ A format filegrail does not understand is reported as not understood — and sti
 ```json
 {
   "schema": "filegrail.scan/1",
-  "filegrail_version": "0.5.1",
+  "filegrail_version": "0.5.2",
   "root": "/mnt/evidence"
 }
 ```

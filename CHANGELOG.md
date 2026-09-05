@@ -5,6 +5,20 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.5.2 - 2026-09-05
+
+### Fixed
+
+- The disclosure summary in the readme carried a `▶` of its own beside the one
+  GitHub draws, so the row showed two triangles. GitHub styles a `<summary>` as
+  a list item with a `disclosure-closed` marker; the character was redundant
+  everywhere it rendered.
+
+- The diagram of the three classes had grown a third column and reached
+  ninety-seven characters, which scrolls sideways on the second thing a reader
+  sees. The examples it held are a sentence underneath it now, and no block on
+  the page is wider than the seventy-two columns the tool itself lays out to.
+
 ## 0.5.1 - 2026-09-05
 
 ### Changed
