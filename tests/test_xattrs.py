@@ -83,3 +83,49 @@ def test_a_macos_where_from_attribute_is_read_where_one_can_be_written(target: P
     assert found, [origin.source for origin in origins]
     assert found[0].url == "https://cdn.example.org/a.zip"
     assert found[0].referrer == "https://example.org/page"
+
+
+# --- a Windows zone stream on a machine that is not Windows ------------------
+#
+# `Zone.Identifier` is the richest thing Windows writes down about a download,
+# and reading it only on Windows put it out of reach of the one workflow built
+# to want it: `--home` on a volume mounted from an image. `ntfs-3g` maps named
+# data streams into the `user.` namespace and does so by default, and Samba's
+# `vfs_streams_xattr` writes the same stream under its own prefix. Both are
+# ordinary; neither needs a switch thrown to produce them.
+
+
+ZONE = (
+    "[ZoneTransfer]\r\n"
+    "ZoneId=3\r\n"
+    "HostUrl=https://portal.example.org/press/report.pdf\r\n"
+    "ReferrerUrl=https://portal.example.org/press/\r\n"
+)
+
+
+def test_a_zone_identifier_carried_as_an_attribute_is_read(target: Path):
+    """The spelling `ntfs-3g` produces, which is what a mounted image looks like."""
+    _set(target, "user.Zone.Identifier", ZONE.encode("utf-8"))
+
+    found = [o for o in read_file_attributes(target) if o.source == "windows-zone-identifier"]
+
+    assert len(found) == 1
+    assert found[0].url == "https://portal.example.org/press/report.pdf"
+    assert found[0].referrer == "https://portal.example.org/press/"
+    assert found[0].note == "ZoneId=3"
+
+
+def test_the_samba_spelling_of_the_same_stream_is_read(target: Path):
+    """`vfs_streams_xattr` prefixes what it stores with `user.DosStream.`."""
+    _set(target, "user.DosStream.Zone.Identifier:$DATA", ZONE.encode("utf-8"))
+
+    found = [o for o in read_file_attributes(target) if o.source == "windows-zone-identifier"]
+
+    assert len(found) == 1
+    assert found[0].url == "https://portal.example.org/press/report.pdf"
+
+
+def test_an_attribute_that_is_not_a_zone_stream_claims_nothing(target: Path):
+    _set(target, "user.Zone.Identifier", b"not an ini file at all")
+
+    assert [o for o in read_file_attributes(target) if o.source == "windows-zone-identifier"] == []

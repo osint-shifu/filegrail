@@ -9,13 +9,15 @@ the tool never supported.
 from __future__ import annotations
 
 import json
+import platform
 import sqlite3
 from pathlib import Path
 
 from filegrail.cli import main
-from filegrail.doctor import AVAILABLE, PARTIAL, UNAVAILABLE, survey
+from filegrail.doctor import AVAILABLE, PARTIAL, UNAVAILABLE, UNSUPPORTED, survey
 from filegrail.report import render_doctor
 from filegrail.theme import Theme
+from filegrail.util import xattrs_readable
 
 PLAIN = Theme(colour=False, unicode=False, width=88)
 
@@ -400,3 +402,22 @@ def test_a_single_record_is_counted_in_the_singular(tmp_path: Path):
     assert _detail(found, "Windows Recent shortcuts") == "1 shortcut"
     assert _detail(found, "macOS quarantine") == "1 download"
     assert "2 files" in _detail(found, "Recent documents")
+
+
+def test_a_windows_zone_stream_is_reported_where_attributes_can_be_read():
+    """A scan reads it off a mounted volume now, so `doctor` has to say so.
+
+    The capability is the platform's, not the mount's: the same answer as for
+    every other attribute this machine can read. Whether a volume carrying one
+    happens to be mounted is a fact about the run, not about the tool, and
+    `doctor` reports what could be searched.
+    """
+    found = survey()
+
+    if platform.system() == "Windows":
+        assert _state(found, "Windows Zone.Identifier") == AVAILABLE
+        return
+
+    assert _state(found, "Mounted Zone.Identifier") == (
+        AVAILABLE if xattrs_readable() else UNSUPPORTED
+    )

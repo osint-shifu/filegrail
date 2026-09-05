@@ -59,7 +59,7 @@ Rather than flattening everything into one vague "origin" field, FileGrail keeps
 Evidence the system and its applications already left behind:
 
 - browser download history
-- Windows `Zone.Identifier`
+- Windows `Zone.Identifier`, on Windows and off it — a volume mounted from an image carries the same stream as an extended attribute
 - macOS where-from and quarantine records
 - Linux XDG origin attributes
 - archive membership, with the archive's own origin inherited

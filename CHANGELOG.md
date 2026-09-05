@@ -7,6 +7,26 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- `Zone.Identifier` is read on machines that are not Windows. It is the richest
+  thing Windows writes down about a download - the address, the referrer and
+  the zone the bytes came from - and it was reachable only from Windows, which
+  put it out of reach of the one workflow built to want it. `--home` exists for
+  reading a profile off a mounted image, and an examiner doing that is not
+  running Windows.
+
+  Nothing exotic is needed to get at it. `ntfs-3g` maps named data streams into
+  the `user.` namespace and does so by default, so the stream is simply
+  `user.Zone.Identifier`; Samba's `vfs_streams_xattr` stores the same bytes
+  under a prefix of its own, and both spellings are read. The named-stream
+  syntax is still only asked for on Windows, because a colon is a legal
+  character in a POSIX file name and trying it elsewhere could open a file that
+  merely happens to be called that.
+
+  `doctor` gained a row for it, since a scan can now read a source `doctor`
+  never mentioned.
+
 ### Fixed
 
 - `LICENSE` is the Apache License 2.0. It had been reflowed and cut by about a

@@ -88,7 +88,7 @@ def survey(home: Path | None = None) -> Survey:
     home = home or Path.home()
     found = Survey()
     found.checks.extend(_browsers(home, found))
-    found.checks.append(_os_origin())
+    found.checks.extend(_os_origin())
     found.checks.append(_shell(home, found))
     found.checks.append(_recent(home, found))
     found.checks.append(_quarantine(home, found))
@@ -152,17 +152,32 @@ def _browsers(home: Path, found: Survey) -> list[Check]:
 # --- the rest ----------------------------------------------------------------
 
 
-def _os_origin() -> Check:
-    """Whether this platform's download attribute can be read at all."""
+def _os_origin() -> list[Check]:
+    """Which of the per-file download attributes can be read at all here.
+
+    Two answers rather than one off Windows. A machine keeps its own platform's
+    attribute, and it can also be reading a Windows volume mounted from an
+    image - where the zone stream arrives as an extended attribute and is
+    readable on exactly the same terms as any other. Whether such a volume
+    happens to be mounted is a fact about the run; this reports what could be
+    searched.
+    """
     system = platform.system()
 
     if system == "Windows":
-        return Check("Windows Zone.Identifier", AVAILABLE, "alternate data streams")
+        return [Check("Windows Zone.Identifier", AVAILABLE, "alternate data streams")]
+
+    carried = (
+        Check("Mounted Zone.Identifier", AVAILABLE, "user.Zone.Identifier on an NTFS mount")
+        if xattrs_readable()
+        else Check("Mounted Zone.Identifier", UNSUPPORTED, "no extended attributes")
+    )
+
     if system == "Darwin":
         state = AVAILABLE if xattrs_readable() else UNAVAILABLE
-        return Check("macOS where-from", state, "kMDItemWhereFroms")
+        return [Check("macOS where-from", state, "kMDItemWhereFroms"), carried]
     if not xattrs_readable():
-        return Check("XDG origin attribute", UNSUPPORTED, "no extended attributes")
+        return [Check("XDG origin attribute", UNSUPPORTED, "no extended attributes"), carried]
 
     # Reading the attribute needs the filesystem to carry it, which varies per
     # mount rather than per platform, so it is tested rather than assumed.
@@ -171,12 +186,18 @@ def _os_origin() -> Check:
             os.setxattr(probe.name, "user.filegrail.probe", b"1")
             os.getxattr(probe.name, "user.filegrail.probe")
     except OSError:
-        return Check("XDG origin attribute", UNAVAILABLE, "filesystem rejects user xattrs")
-    return Check(
-        "XDG origin attribute",
-        AVAILABLE,
-        "written by KDE tools and wget --xattr, but not by Firefox",
-    )
+        return [
+            Check("XDG origin attribute", UNAVAILABLE, "filesystem rejects user xattrs"),
+            carried,
+        ]
+    return [
+        Check(
+            "XDG origin attribute",
+            AVAILABLE,
+            "written by KDE tools and wget --xattr, but not by Firefox",
+        ),
+        carried,
+    ]
 
 
 def _shell(home: Path, found: Survey) -> Check:

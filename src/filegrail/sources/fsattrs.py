@@ -10,6 +10,11 @@ Coverage is uneven. Windows tags essentially every browser download. macOS tags
 Safari and Chrome downloads. On Linux the attribute is written only by some
 desktop tools and by wget/curl when explicitly asked, so it is frequently
 absent - which is why the browser history is the primary source, not this.
+
+The first of the three is not only readable on Windows. Mount a Windows volume
+anywhere else and its named data streams arrive as extended attributes, so the
+richest of these records is available in exactly the case `--home` was built
+for: a profile read off an image rather than off the machine underfoot.
 """
 
 from __future__ import annotations
@@ -26,6 +31,14 @@ _LINUX_ORIGIN = "user.xdg.origin.url"
 _LINUX_REFERRER = "user.xdg.referrer.url"
 _MACOS_WHEREFROMS = "com.apple.metadata:kMDItemWhereFroms"
 
+#: How the zone stream reaches a machine that is not Windows. `ntfs-3g` maps
+#: named data streams into the `user.` namespace and does that by default
+#: (`streams_interface=xattr`); Samba's `vfs_streams_xattr` stores the same
+#: stream under a prefix of its own. Neither is exotic - between them they are
+#: what an examiner sees after mounting a Windows volume read-only on anything
+#: else, which is the case `--home` exists for.
+_ZONE_XATTRS = ("user.Zone.Identifier", "user.DosStream.Zone.Identifier:$DATA")
+
 
 def read_file_attributes(path: Path) -> list[Origin]:
     """Return origin claims carried by the file itself."""
@@ -41,14 +54,16 @@ def read_file_attributes(path: Path) -> list[Origin]:
 
 
 def _read_zone_identifier(path: Path) -> Origin | None:
-    """Read the NTFS Zone.Identifier alternate data stream."""
-    if os.name != "nt":
-        return None
+    """Read the NTFS Zone.Identifier stream, however this machine exposes it.
 
-    stream = Path(f"{path}:Zone.Identifier")
-    try:
-        raw = stream.read_text(encoding="utf-8", errors="replace")
-    except OSError:
+    Windows carries it as an alternate data stream on the file itself. Off
+    Windows the same bytes arrive as an extended attribute, and that is the
+    case worth having: this is the richest thing Windows writes down about a
+    download, and reading it only on Windows put it out of reach of the one
+    workflow built to want it - a profile read off a mounted image.
+    """
+    raw = _zone_stream(path)
+    if raw is None:
         return None
 
     parser = configparser.ConfigParser(interpolation=None)
@@ -72,6 +87,26 @@ def _read_zone_identifier(path: Path) -> Origin | None:
         referrer=referrer,
         note=f"ZoneId={zone}" if zone else None,
     )
+
+
+def _zone_stream(path: Path) -> str | None:
+    """The zone stream's text, from the file's own stream or from an attribute.
+
+    The named-stream syntax is only asked for on Windows. A colon is a legal
+    character in a POSIX file name, so trying it elsewhere could open a file
+    that merely happens to be called that and report a zone for the wrong one.
+    """
+    if os.name == "nt":
+        try:
+            return Path(f"{path}:Zone.Identifier").read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+
+    for name in _ZONE_XATTRS:
+        carried = read_xattr(path, name)
+        if carried is not None:
+            return carried.decode("utf-8", "replace")
+    return None
 
 
 def _read_macos_wherefroms(path: Path) -> Origin | None:
