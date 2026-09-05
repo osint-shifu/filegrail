@@ -8,6 +8,7 @@
     and the files themselves already contain.
   </p>
   <p>
+    <a href="https://pypi.org/project/filegrail/"><img alt="PyPI" src="https://img.shields.io/pypi/v/filegrail?style=flat-square&color=3775A9"></a>
     <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square">
     <img alt="68 file extensions" src="https://img.shields.io/badge/formats-68-8250df?style=flat-square">
     <img alt="Zero runtime dependencies" src="https://img.shields.io/badge/runtime_dependencies-0-1f883d?style=flat-square">
@@ -81,7 +82,13 @@ It reads what is already there and reports what the available evidence actually 
 Requires **Python 3.10+**.
 
 ```bash
-pipx install git+https://github.com/osint-shifu/filegrail
+pipx install filegrail
+```
+
+Or with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv tool install filegrail
 ```
 
 Or run it directly from a checkout:
