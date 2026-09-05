@@ -511,9 +511,13 @@ def test_the_profile_that_was_read_is_a_row_of_the_banner():
     """It is a fact about the scan, like the target and the counts, and it used
     to float under the rule as a sentence with no label on it - the one line in
     the report saying the evidence did not come from this machine."""
-    output = render_text(_corpus(), Path("/case"), theme=PLAIN, home=Path("/mnt/image/home/ann"))
+    # The path is compared as this platform writes it: `Path` renders a POSIX
+    # literal with backslashes on Windows, and the claim here is about the row,
+    # not about separators.
+    profile = Path("/mnt/image/home/ann")
+    output = render_text(_corpus(), Path("/case"), theme=PLAIN, home=profile)
 
     row = next(line for line in output.splitlines() if line.strip().startswith("profile"))
-    assert "/mnt/image/home/ann" in row
+    assert str(profile) in row
     assert "another machine" in row
     assert "evidence read from the profile at" not in output
