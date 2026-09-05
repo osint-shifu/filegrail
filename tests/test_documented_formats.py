@@ -177,3 +177,28 @@ def test_nothing_is_documented_as_text_that_is_not_read_as_text():
 
     invented = documented - CONTENT_SUFFIXES
     assert not invented, f"documented as text but unread: {sorted(invented)}"
+
+
+# --- the numbers in the prose -------------------------------------------------
+#
+# The tables above cannot drift, because they are parsed. The counts written
+# beside them in English can: add a reader and the tables are forced to follow,
+# while `68 file extensions` keeps saying sixty-eight for ever. So they are read
+# out of the documents and compared too.
+
+README = Path(__file__).resolve().parent.parent / "README.md"
+
+
+def _counted(document: Path, phrase: str) -> int:
+    found = re.search(rf"(\d+)\s+(?:\*\*)?{phrase}", document.read_text(encoding="utf-8"))
+    assert found is not None, f"{document.name} no longer states the count for {phrase!r}"
+    return int(found.group(1))
+
+
+def test_the_documents_agree_with_the_readers_about_how_many_formats_there_are():
+    assert _counted(README, "file extensions") == len(_readable())
+    assert _counted(FORMATS, r"file extensions\*\*") == len(_readable())
+
+
+def test_the_readme_agrees_about_how_many_formats_are_read_as_text():
+    assert _counted(README, "extensions in all") == len(CONTENT_SUFFIXES)

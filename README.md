@@ -20,6 +20,7 @@
 [Usage](#usage) ·
 [Examples](#practical-examples) ·
 [Formats](#supported-formats) ·
+[Full report](#the-whole-report-top-to-bottom) ·
 [JSON](#json-and-automation)
 
 </div>
@@ -117,13 +118,26 @@ filegrail /mnt/image/home/ann/.local/share/Trash/files
   FILES IN DETAIL                                                 1 file
   ──────────────────────────────────────────────────────────────────────
 
-  ● report.pdf                                                      19 B
-  ← (no detail)
-  │ trash record · 2026-08-14T09:41:07Z             ▰▰▱▱▱ circumstantial
-  │ note      deleted from /home/ann/Cases/2026-08/report.pdf
+  ● holiday.jpg                                                   3.4 MB
+
+  ACQUISITION  how the file reached this machine
+  ← https://portal.example.org/press/2026/holiday-master.jpg
+  │ browser download · chromium · 2026-08-31T10:49:33Z      ▰▰▰▰▱ direct
+  │ referrer  https://portal.example.org/press/
+
+  INTRINSIC  what the file records about its own earlier life
+  ← made by NIKON COOLPIX P6000
+  │ device metadata · 2008-10-22T16:28:39Z           ▰▰▰▱▱ self-reported
+  │ geo       43.467447, 11.885128
   │
-  ├ Path          /home/ann/Cases/2026-08/report.pdf
-  └ DeletionDate  2026-08-14T09:41:07
+  ├ Make              NIKON
+  ├ Model             COOLPIX P6000
+  ├ DateTimeOriginal  2008:10:22 16:28:39
+  ├ BodySerialNumber  3001234
+  ├ GPSLatitudeRef    N
+  ├ GPSLatitude       43, 28, 2.81
+  ├ GPSLongitudeRef   E
+  └ GPSLongitude      11, 53, 6.46
 ```
 
 The record is found from the file itself, so no `--home` is needed and a trash on a mounted volume reads the same as the desktop's own — including the two per-volume layouts, where the recorded path is relative to the top of that volume.
@@ -305,35 +319,51 @@ The browser record says **how the bytes reached the machine**. The EXIF block de
 filegrail ./case-files
 ```
 
-A report is read from the top down: what is in the directory, what was found in it, what wants a second look, **one line per file**, and only then each file in full. The index is what a long report is missing without: it answers *which of these do I open* before anything else does.
+Scans recursively and leads with an overview.
+
+### The whole report, top to bottom
+
+A report is read downwards, and every part of it answers a different question:
+
+| | Section | Answers |
+| :--- | :--- | :--- |
+| 1 | banner | what was scanned, **whose profile** it was read from, how much of it answered |
+| 2 | `INVENTORY` | what the directory is made of — extensions with counts and bytes, then families |
+| 3 | `FINDINGS` | what kinds of thing were found, and in how many files |
+| 4 | `NOTABLE FINDINGS` | the handful a long report would otherwise bury |
+| 5 | `FILES` | **one line per file** — the index. Which of these do I open? |
+| 6 | `FILES IN DETAIL` | each of them in full, acquisition then intrinsic then interaction |
+| 7 | `METADATA SOURCES` | which readers actually returned something |
+
+Everything before `FILES` fits on one screen. `--brief` stops at `FILES`.
 
 <details>
-<summary><strong>A whole report, exactly as filegrail prints it</strong></summary>
+<summary><strong>▶ Open the whole report, exactly as filegrail prints it</strong></summary>
 
 ```text
     __ _ _                   _ _
    / _(_) |___ __ _ _ _ __ _(_) |
-  |  _| | / -_) _` | '_/ _` | | |   filegrail 0.4.1
+  |  _| | / -_) _` | '_/ _` | | |   filegrail 0.5.0
   |_| |_|_\___\__, |_| \__,_|_|_|
               |___/
 
   Trace where files came from. Extract what they reveal.
 
   target    ~/Cases/acme
+  profile   /mnt/image/home/ann · another machine
   scanned   4 files · 4 types · 3.4 MB
   findings  3 files · 1 without findings
 
   ──────────────────────────────────────────────────────────────────────
 
-  evidence read from the profile at
-  /mnt/image/home/ann
-
   INVENTORY                                                      4 types
   ──────────────────────────────────────────────────────────────────────
 
-    JPEG  1  3.4 MB    DOCX  1   498 B    PNG   1    88 B
-    MD    1    81 B
+    type files    size    type files    size    type files    size
+    JPEG     1  3.4 MB    DOCX     1   498 B    PNG      1    88 B
+    MD       1    81 B
 
+    by family
     image     2    document  1    text      1
 
   FINDINGS
@@ -359,7 +389,7 @@ A report is read from the top down: what is in the directory, what was found in 
   ● chart.png               88 B                        png-text
   ● invoice.docx           498 B  XDG attribute         ooxml-properties
   ● press/holiday.jpg     3.4 MB  browser download      exif
-  · notes.md                81 B  2026-09-05T19:21:14Z
+  · notes.md                81 B  2026-09-05T19:37:58Z
 
   FILES IN DETAIL                                                3 files
   ──────────────────────────────────────────────────────────────────────
@@ -368,7 +398,7 @@ A report is read from the top down: what is in the directory, what was found in 
 
   ACQUISITION  how the file reached this machine
   ← https://acme-legal.example/portal/invoice.docx
-  │ XDG attribute · 2026-09-05T19:21:14Z                    ▰▰▰▰▱ direct
+  │ XDG attribute · 2026-09-05T19:37:58Z                    ▰▰▰▰▱ direct
 
   INTRINSIC  what the file records about its own earlier life
   ← self-reported metadata
@@ -432,7 +462,7 @@ filegrail ./case-files --brief
   ● chart.png               88 B                        png-text
   ● invoice.docx           498 B  XDG attribute         ooxml-properties
   ● press/holiday.jpg     3.4 MB  browser download      exif
-  · notes.md                81 B  2026-09-05T19:21:14Z
+  · notes.md                81 B  2026-09-05T19:37:58Z
 ```
 
 A file nothing was found for carries its filesystem date instead of the columns it has nothing to put in them, and `--limit` caps how many of those are listed.
@@ -640,7 +670,7 @@ A format filegrail does not understand is reported as not understood — and sti
 ```json
 {
   "schema": "filegrail.scan/1",
-  "filegrail_version": "0.5.0",
+  "filegrail_version": "0.5.1",
   "root": "/mnt/evidence"
 }
 ```

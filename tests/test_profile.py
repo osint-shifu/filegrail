@@ -229,7 +229,7 @@ def test_the_scan_report_names_the_profile_it_read(carved: Path, mounted: Path, 
     """
     assert main(["scan", str(carved), "--home", str(mounted), "--no-color"]) == 0
 
-    assert "evidence read from the profile at" in capsys.readouterr().out
+    assert "another machine" in capsys.readouterr().out
 
 
 def test_the_timeline_names_the_profile_it_read(carved: Path, mounted: Path, capsys):
@@ -240,20 +240,20 @@ def test_the_timeline_names_the_profile_it_read(carved: Path, mounted: Path, cap
     """
     assert main(["scan", str(carved), "--home", str(mounted), "--timeline", "--no-color"]) == 0
 
-    assert "evidence read from the profile at" in capsys.readouterr().out
+    assert "another machine" in capsys.readouterr().out
 
 
 def test_a_timeline_of_this_machine_stays_one_line_per_event(carved: Path, capsys):
     assert main(["scan", str(carved), "--timeline", "--no-color"]) == 0
 
-    assert "evidence read from the profile at" not in capsys.readouterr().out
+    assert "another machine" not in capsys.readouterr().out
 
 
 def test_a_scan_of_this_machine_announces_no_profile(carved: Path, capsys):
     """The word `profile` appears in the source notes; the announcement must not."""
     assert main(["scan", str(carved), "--no-color"]) == 0
 
-    assert "evidence read from the profile at" not in capsys.readouterr().out
+    assert "another machine" not in capsys.readouterr().out
 
 
 def test_the_explanation_still_says_this_machine_when_it_is_this_machine(carved: Path, capsys):
@@ -292,16 +292,16 @@ def test_the_explanation_names_the_profile_it_read(carved: Path, mounted: Path, 
     argv = ["explain", str(carved / "evidence.zip"), "--home", str(mounted), "--no-color"]
     assert main(argv) == 0
 
-    assert "evidence read from the profile at" in capsys.readouterr().out
+    assert "another machine" in capsys.readouterr().out
 
 
 def test_the_survey_names_the_profile_it_read(mounted: Path, capsys):
     assert main(["doctor", "--home", str(mounted), "--no-color"]) == 0
 
-    assert "surveying the profile at" in capsys.readouterr().out
+    assert "another machine" in capsys.readouterr().out
 
 
 def test_a_survey_of_this_machine_announces_no_profile(capsys):
     assert main(["doctor", "--no-color"]) == 0
 
-    assert "surveying the profile at" not in capsys.readouterr().out
+    assert "another machine" not in capsys.readouterr().out

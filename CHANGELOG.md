@@ -5,6 +5,33 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.5.1 - 2026-09-05
+
+### Changed
+
+- The inventory says what its columns are. Three unlabelled figures to a cell
+  and three cells to a line was a wall of numbers: `JPEG  1  3.4 MB    DOCX  1
+  498 B` asked the reader to work out where one entry ended. The header repeats
+  over every column, because one at the left would label the first group and
+  leave the rest to be guessed at. Lower case, since a column label is not a
+  section heading - and it tells the labels apart from the extensions, which
+  are upper case. The families line, which answers a different question from
+  the table above it, is labelled rather than floating under it.
+
+- The profile a scan read is a row of the banner. It is a fact about the scan
+  like the target and the counts, and it used to sit under the rule as a
+  sentence with no label - the one line in the report saying the evidence did
+  not come from the machine the report was run on.
+
+### Fixed
+
+- The counts of supported formats in `README.md` and `docs/FORMATS.md` are held
+  against the readers by a test. The tables could not drift, because they are
+  parsed; the sentences beside them could, and `68 file extensions` would have
+  gone on saying sixty-eight after the sixty-ninth was added. Both numbers are
+  correct today - 68 read for metadata, 43 read as text - and now they cannot
+  quietly stop being.
+
 ## 0.5.0 - 2026-09-05
 
 The report was reorganised. Nothing about what filegrail reads or claims has

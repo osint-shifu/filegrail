@@ -481,3 +481,39 @@ def test_a_report_with_nothing_missed_says_nothing_about_it():
 
     assert "could not be read" not in output
     assert "skipped by name" not in output
+
+
+def test_the_inventory_says_what_its_columns_are():
+    """Three unlabelled figures to a cell and three cells to a line is a wall.
+
+    The header repeats over every column: one at the left would label the first
+    group and leave the rest to be guessed at, which is the state it was in.
+    Lower case, because a column label is not a section heading - and it also
+    tells the labels apart from the extensions, which are upper case.
+    """
+    output = render_text(_corpus(), Path("/case"), theme=PLAIN)
+
+    inventory = "\n".join(_section(output, "inventory"))
+    header = next(line for line in inventory.splitlines() if line.strip().startswith("type"))
+    assert header.split() == ["type", "files", "size"] * header.count("type")
+    assert "typefiles" not in header
+
+
+def test_the_families_line_says_what_it_is():
+    """It answers a different question from the table above it - what kinds of
+    file, not which extensions - and floated under it unlabelled."""
+    output = render_text(_corpus(), Path("/case"), theme=PLAIN)
+
+    assert "by family" in "\n".join(_section(output, "inventory"))
+
+
+def test_the_profile_that_was_read_is_a_row_of_the_banner():
+    """It is a fact about the scan, like the target and the counts, and it used
+    to float under the rule as a sentence with no label on it - the one line in
+    the report saying the evidence did not come from this machine."""
+    output = render_text(_corpus(), Path("/case"), theme=PLAIN, home=Path("/mnt/image/home/ann"))
+
+    row = next(line for line in output.splitlines() if line.strip().startswith("profile"))
+    assert "/mnt/image/home/ann" in row
+    assert "another machine" in row
+    assert "evidence read from the profile at" not in output

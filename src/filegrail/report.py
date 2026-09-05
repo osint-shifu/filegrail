@@ -146,9 +146,7 @@ def render_text(
     found = extract(records, content=content)
     contents = inventory(records)
 
-    lines = _masthead(theme, root, contents, len(known), len(unknown))
-    if home:
-        lines.extend([*_whose_machine(theme, home, "evidence read from the profile at"), ""])
+    lines = _masthead(theme, root, contents, len(known), len(unknown), home)
 
     # A directory is answered from the top down: what is in it, what was found
     # in it, what wants a second look, and only then one file at a time. A
@@ -303,7 +301,14 @@ _VERSION_BESIDE = 52
 _VERSION_LINE = 2
 
 
-def _masthead(theme: Theme, root: Path, found: Inventory, known: int, unknown: int) -> list[str]:
+def _masthead(
+    theme: Theme,
+    root: Path,
+    found: Inventory,
+    known: int,
+    unknown: int,
+    home: Path | None = None,
+) -> list[str]:
     """The report's own letterhead: what wrote this, and what it was pointed at.
 
     A report is redirected to a file more often than it is read on screen, and
@@ -347,7 +352,9 @@ def _masthead(theme: Theme, root: Path, found: Inventory, known: int, unknown: i
         rows.append(
             ("findings", _facts_line(theme, [f"{known} files", f"{unknown} without findings"]))
         )
-    for name, value in rows:
+    lines.extend(_labelled(theme, "target", _display(root)))
+    lines.extend(_whose_machine(theme, home))
+    for name, value in rows[1:]:
         lines.extend(_labelled(theme, name, value))
 
     lines.extend(["", f"  {theme.rule(theme.width - 2)}", ""])
@@ -375,6 +382,10 @@ def _wrapped(theme: Theme, text: str, indent: str, paint: Callable[[str], str]) 
     return [f"{indent}{paint(part)}" for part in theme.wrap(text, theme.width - len(indent) - 2)]
 
 
+#: What the inventory grid calls its three columns.
+_TYPE_HEAD = ("type", "files", "size")
+
+
 def _inventory(theme: Theme, found: Inventory) -> list[str]:
     """Every type present, how many of each, and how much of the scan it is.
 
@@ -385,9 +396,13 @@ def _inventory(theme: Theme, found: Inventory) -> list[str]:
     if not found.types:
         return []
 
-    digits = max(len(str(entry.count)) for entry in found.types)
+    # Wide enough for the column labels as well as the figures. Three unlabelled
+    # numbers to a cell and three cells to a line is a wall, and a header at the
+    # left would label the first group and leave the rest to be guessed at - so
+    # it repeats over every column, which is what makes each triple readable.
+    digits = max(max(len(str(entry.count)) for entry in found.types), len(_TYPE_HEAD[1]) - 2)
     sizes = {entry.name: _size(entry.size) for entry in found.types}
-    span = max(len(value) for value in sizes.values())
+    span = max(max(len(value) for value in sizes.values()), len(_TYPE_HEAD[2]) - 2)
 
     # The name column is bounded by what still leaves a whole cell inside the
     # terminal. An extension wider than that is not shortened - it steps out of
@@ -395,11 +410,22 @@ def _inventory(theme: Theme, found: Inventory) -> list[str]:
     # data and the grid is a layout.
     room = theme.width - _INDENT
     column = min(max(len(entry.name) for entry in found.types), max(4, room - digits - span - 4))
+    # One wider than the label, so `type` and `files` do not run together the
+    # way `PDF` and its count never can.
+    column = min(max(column, len(_TYPE_HEAD[0]) + 1), max(4, room - digits - span - 4))
     fits = [entry for entry in found.types if len(entry.name) <= column]
     wide = [entry for entry in found.types if len(entry.name) > column]
 
     lines = _heading(theme, "inventory", len(found.types), noun="type")
     if fits:
+        # Lower case: a column label is not a section heading, and it also tells
+        # the labels apart from the extensions, which are upper case.
+        header = (
+            _TYPE_HEAD[0].ljust(column)
+            + _TYPE_HEAD[1].rjust(digits + 2)
+            + _TYPE_HEAD[2].rjust(span + 2)
+        )
+        lines.extend(_grid(theme, [theme.dim(header)] * len(fits), column + digits + span + 4)[:1])
         lines.extend(
             _grid(
                 theme,
@@ -422,9 +448,11 @@ def _inventory(theme: Theme, found: Inventory) -> list[str]:
         lines.append(_row(theme, " " * _INDENT, "", tail, wrap=False))
 
     if found.families:
+        # It answers a different question from the table above - what kinds of
+        # file, not which extensions - and floated under it unlabelled.
+        lines.extend(["", f"{' ' * _INDENT}{theme.dim('by family')}"])
         width = max(len(family) for family, _ in found.families)
         counts = max(len(str(count)) for _, count in found.families)
-        lines.append("")
         lines.extend(
             _grid(
                 theme,
@@ -1066,7 +1094,7 @@ def render_doctor(found: Survey, theme: Theme | None = None, home: Path | None =
 
     lines = ["", f"  {theme.bold('filegrail')}  {theme.dim('evidence sources')}", rule, ""]
     if home:
-        lines.extend([*_whose_machine(theme, home, "surveying the profile at"), ""])
+        lines.extend([*_whose_machine(theme, home), ""])
 
     for check in found.checks:
         colour = {
@@ -1101,16 +1129,25 @@ def _note_line(theme: Theme, text: str) -> str:
     return f"  {theme.dim(theme.clip(text, theme.width - 4))}"
 
 
-def _whose_machine(theme: Theme, home: Path | None, said: str) -> list[str]:
+def _whose_machine(theme: Theme, home: Path | None, said: str = "") -> list[str]:
     """Say whose traces these are, when they are not this machine's.
 
-    Wrapped rather than clipped. A reader who cannot see which profile was read
-    cannot check the finding, and half a mount path is worse than none - it
-    looks like a path.
+    A labelled row rather than a sentence. This is the one line in the report
+    saying the evidence did not come from the machine the report was run on,
+    and it used to float under the rule with no label on it, reading as a note
+    somebody had left behind. It is a fact about the scan, so it is shaped like
+    the other facts about the scan.
+
+    Wrapped rather than clipped, for the reason every path here is: half a
+    mount path still looks like a path, and a reader who cannot see which
+    profile was read cannot check anything below it.
     """
     if not home:
         return []
-    return [f"  {theme.dim(part)}" for part in theme.wrap(f"{said} {home}", theme.width - 4)]
+    # "another machine" rather than "not this machine": the report is careful
+    # never to say `this machine` when the traces came from somewhere else, and
+    # a guard against that phrase should not have to make an exception here.
+    return _labelled(theme, "profile", _facts_line(theme, [str(home), said or "another machine"]))
 
 
 def render_explain(record: FileRecord, theme: Theme | None = None, home: Path | None = None) -> str:
@@ -1129,7 +1166,7 @@ def render_explain(record: FileRecord, theme: Theme | None = None, home: Path | 
     name = Path(record.path).name
     lines = ["", f"  {theme.bold('filegrail')}  {theme.dim('explain')}  {theme.bold(name)}", rule]
     if home:
-        lines.extend(["", *_whose_machine(theme, home, "evidence read from the profile at")])
+        lines.extend(["", *_whose_machine(theme, home)])
 
     lines.extend(["", f"  {theme.label('CONCLUSION')}", ""])
     for sentence in conclusion(record, verdict, home):
@@ -1397,7 +1434,7 @@ def render_timeline(
     rail = theme.rail_glyph()
     # Only when there is one, so anything already reading a line per event from
     # a scan of this machine sees exactly what it saw before.
-    lines = [*_whose_machine(theme, home, "evidence read from the profile at"), ""] if home else []
+    lines = [*_whose_machine(theme, home), ""] if home else []
     for when, name, detail, source in sorted(events):
         colour = theme.evidence(source)
         moment = theme.dim(when[:19].replace("T", " "))
