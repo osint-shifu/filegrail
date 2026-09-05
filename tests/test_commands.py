@@ -219,3 +219,100 @@ def test_no_skip_descends_into_the_names_a_scan_normally_leaves(tmp_path: Path, 
     document = json.loads(capsys.readouterr().out)
     assert document["summary"]["total"] == 1
     assert document["unsearched"]["skipped_by_name"] == []
+
+
+def _photo_that_will_not_come_fully_clean(path: Path) -> None:
+    """A JPEG whose XMP packet sits after the end-of-image marker.
+
+    Rebuilding the segment stream does not reach past that marker, so the packet
+    survives the strip - which is exactly the case the copies are read back for.
+    """
+    from tests.photo import jpeg_with_exif
+
+    jpeg_with_exif(path, "NIKON", "MODEL", "2008:10:22 16:28:39")
+    path.write_bytes(
+        path.read_bytes() + b'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF '
+        b'xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description '
+        b'xmlns:xmp="http://ns.adobe.com/xap/1.0/"><xmp:CreatorTool>Some Editor'
+        b"</xmp:CreatorTool></rdf:Description></rdf:RDF></x:xmpmeta>"
+    )
+
+
+def test_clean_check_answers_without_writing_anywhere(tmp_path: Path, capsys):
+    from tests.photo import jpeg_with_exif
+
+    source = tmp_path / "case"
+    source.mkdir()
+    jpeg_with_exif(source / "photo.jpg", "NIKON", "MODEL", "2008:10:22 16:28:39")
+
+    assert main(["clean", str(source), "--check", "--json"]) == 0
+
+    document = json.loads(capsys.readouterr().out)
+    assert document["checked"] is True
+    assert document["summary"]["cleaned"] == 1
+    assert "destination" not in document
+    assert [item["removed"] for item in document["files"]] == [["exif"]]
+    assert list(source.iterdir()) == [source / "photo.jpg"]
+    assert list(tmp_path.iterdir()) == [source]
+
+
+def test_clean_check_exits_non_zero_when_a_copy_would_not_come_clean(tmp_path: Path, capsys):
+    """The reason the mode has an exit code at all: it is a gate before publishing."""
+    source = tmp_path / "case"
+    source.mkdir()
+    _photo_that_will_not_come_fully_clean(source / "photo.jpg")
+
+    assert main(["clean", str(source), "--check", "--json"]) == 1
+
+    assert json.loads(capsys.readouterr().out)["summary"]["still_readable"] == 1
+
+
+def test_clean_exits_non_zero_when_a_copy_it_wrote_is_not_clean(tmp_path: Path, capsys):
+    """The same question asked of the run that writes, or the check would be
+    answering for a command that behaves differently."""
+    source = tmp_path / "case"
+    source.mkdir()
+    _photo_that_will_not_come_fully_clean(source / "photo.jpg")
+
+    assert main(["clean", str(source), "--out", str(tmp_path / "clean"), "--json"]) == 1
+
+
+def test_clean_needs_a_destination_or_the_word_that_there_will_be_none(tmp_path: Path, capsys):
+    source = tmp_path / "case"
+    source.mkdir()
+
+    assert main(["clean", str(source)]) == 2
+
+    assert "--check" in capsys.readouterr().err
+
+
+def test_the_check_report_says_that_nothing_was_written(tmp_path: Path, capsys, monkeypatch):
+    monkeypatch.setenv("COLUMNS", "110")
+    from tests.photo import jpeg_with_exif
+
+    source = tmp_path / "case"
+    source.mkdir()
+    jpeg_with_exif(source / "photo.jpg", "NIKON", "MODEL", "2008:10:22 16:28:39")
+
+    assert main(["clean", str(source), "--check"]) == 0
+
+    printed = " ".join(capsys.readouterr().out.split())
+    assert "nothing written" in printed
+    assert "1 would be cleaned" in printed
+
+
+def test_clean_check_does_not_even_make_the_directory_it_would_write_to(tmp_path: Path, capsys):
+    """A mode that writes nothing does not leave a directory behind as the one
+    trace that it ran. The name is still reported, because it was still asked
+    about: with `--out` this is a dry run of that exact command."""
+    from tests.photo import jpeg_with_exif
+
+    source = tmp_path / "case"
+    source.mkdir()
+    jpeg_with_exif(source / "photo.jpg", "NIKON", "MODEL", "2008:10:22 16:28:39")
+    out = tmp_path / "clean"
+
+    assert main(["clean", str(source), "--out", str(out), "--check", "--json"]) == 0
+
+    assert not out.exists()
+    assert json.loads(capsys.readouterr().out)["destination"] == str(out)

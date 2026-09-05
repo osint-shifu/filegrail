@@ -348,3 +348,66 @@ def test_overwrite_replaces_it_when_asked_to(tmp_path: Path):
 
     assert result.written == standing
     assert standing.read_bytes().startswith(b"\xff\xd8")
+
+
+# --- checking without writing -------------------------------------------------
+#
+# `--check` is the same work with the writing left out. The answer it gives -
+# what would come out, and what a reader would still find afterwards - is worth
+# having before the copy exists rather than after, because the copy is the thing
+# somebody is about to publish. Nothing is written where anybody could reach it:
+# the readers open a path, so the bytes get a scratch one that lasts for the
+# length of the question.
+
+
+def _photo_with_a_packet_after_the_end(path: Path) -> None:
+    """A JPEG whose XMP sits past the end-of-image marker, where no stripper reaches."""
+    jpeg_with_exif(path, "NIKON", "COOLPIX P6000", "2008:10:22 16:28:39")
+    path.write_bytes(
+        path.read_bytes() + b'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF '
+        b'xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description '
+        b'xmlns:xmp="http://ns.adobe.com/xap/1.0/"><xmp:CreatorTool>Some Editor'
+        b"</xmp:CreatorTool></rdf:Description></rdf:RDF></x:xmpmeta>"
+    )
+
+
+def test_a_check_says_what_would_come_out_and_writes_nothing(tmp_path: Path):
+    photo = tmp_path / "holiday.jpg"
+    jpeg_with_exif(photo, "NIKON", "COOLPIX P6000", "2008:10:22 16:28:39")
+    out = tmp_path / "clean"
+
+    result = clean_file(photo, out, write=False)
+
+    assert result.removed == ["exif"]
+    assert result.written is None
+    assert not out.exists()
+
+
+def test_a_check_needs_no_destination_at_all(tmp_path: Path):
+    """Nothing is going anywhere, so there is nowhere to name."""
+    photo = tmp_path / "holiday.jpg"
+    jpeg_with_exif(photo, "NIKON", "COOLPIX P6000", "2008:10:22 16:28:39")
+
+    assert clean_file(photo, None, write=False).removed == ["exif"]
+
+
+def test_a_check_reads_back_what_the_stripper_would_have_missed(tmp_path: Path):
+    """The warning arrives before the copy does, which is the point of the mode."""
+    photo = tmp_path / "holiday.jpg"
+    _photo_with_a_packet_after_the_end(photo)
+
+    result = clean_file(photo, None, write=False)
+
+    assert "xmp" in result.remaining
+    assert list(tmp_path.iterdir()) == [photo]
+
+
+def test_a_check_still_reports_a_name_already_taken(tmp_path: Path):
+    """A dry run that skips the destination is a dry run of a different command."""
+    photo = tmp_path / "holiday.jpg"
+    jpeg_with_exif(photo, "NIKON", "COOLPIX P6000", "2008:10:22 16:28:39")
+    out = tmp_path / "clean"
+    out.mkdir()
+    (out / "holiday.jpg").write_bytes(b"someone else's file")
+
+    assert "already there" in clean_file(photo, out, write=False).note

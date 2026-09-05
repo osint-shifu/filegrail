@@ -1311,44 +1311,65 @@ def _visible(text: str) -> int:
 
 
 def render_clean(
-    results: list[Cleaned], source: Path, destination: Path, *, theme: Theme | None = None
+    results: list[Cleaned],
+    source: Path,
+    destination: Path | None,
+    *,
+    theme: Theme | None = None,
+    check: bool = False,
 ) -> str:
-    """What each file gave up, and what it did not."""
+    """What each file gave up, and what it did not.
+
+    Under `check` nothing was written, so nothing is said to have been: the
+    same rows, in the conditional. A destination is optional there and may be
+    None, because a check can be asked without one.
+    """
     theme = theme or detect()
     rule = f"  {theme.rule(theme.width - 2)}"
-    written = [item for item in results if item.written]
-    survived = [item for item in written if item.remaining]
+    # What came out is the discriminator rather than where the copy went. In a
+    # run that writes the two agree; in a check there is no copy to point at,
+    # and a summary that counted those would report nothing done at all.
+    cleaned = [item for item in results if item.removed]
+    survived = [item for item in cleaned if item.remaining]
 
     lines = [
         "",
         f"  {theme.bold('filegrail')}  {theme.dim('clean')}  {theme.bold(str(source))}",
         rule,
         "",
-        f"  {theme.dim('copies written to')}  {theme.paint(str(destination), 'body')}",
+        f"  {_destination(theme, destination, check)}",
         "",
     ]
 
     for item in results:
         name = _relative(str(item.path), source)
         said = ", ".join(item.removed) if item.removed else theme.dim(item.note or "nothing")
-        colour = "recorded" if item.written else "faint"
+        colour = "recorded" if item.removed else "faint"
         lines.append(_row(theme, f"  {_mark(theme, BULLET, colour)} ", name, theme.dim(said)))
 
     lines.extend(["", rule])
     lines.append(
-        f"    {len(results)} files {MIDDOT} {len(written)} cleaned {MIDDOT} "
-        f"{len(results) - len(written)} left alone"
+        f"    {len(results)} files {MIDDOT} {len(cleaned)} "
+        f"{'would be cleaned' if check else 'cleaned'} {MIDDOT} "
+        f"{len(results) - len(cleaned)} left alone"
     )
 
     if survived:
         # The whole point of reading the copies back. A file reported as
         # cleaned that is not cleaned is worse than one nobody touched.
-        lines.extend(["", f"  {theme.paint('still readable in the copies', 'conflict')}"])
+        seen = "readable in the copies"
+        warning = f"would still be {seen}" if check else f"still {seen}"
+        lines.extend(["", f"  {theme.paint(warning, 'conflict')}"])
         for item in survived:
-            lines.append(
-                f"    {_relative(str(item.written), destination)}  "
-                f"{theme.dim(', '.join(item.remaining))}"
+            # A written copy is named where it lies, since that is the file
+            # somebody would publish. A check has no copy, so it names the
+            # original, which is the only thing it can point at.
+            where = (
+                _relative(str(item.path), source)
+                if item.written is None
+                else _relative(str(item.written), destination or source)
             )
+            lines.append(f"    {where}  {theme.dim(', '.join(item.remaining))}")
         lines.append(
             f"  {theme.dim('a stripper is written per format, and a format can carry a block')}"
         )
@@ -1358,17 +1379,33 @@ def render_clean(
     return "\n".join(lines)
 
 
-def render_json_clean(results: list[Cleaned], source: Path, destination: Path) -> str:
-    return document(
-        "clean",
-        {
-            "root": str(source),
-            "destination": str(destination),
-            "files": [item.to_dict() for item in results],
-            "summary": {
-                "total": len(results),
-                "cleaned": sum(1 for item in results if item.written),
-                "still_readable": sum(1 for item in results if item.remaining),
-            },
-        },
+def _destination(theme: Theme, destination: Path | None, check: bool) -> str:
+    """Where the copies went, or the fact that none did."""
+    if not check:
+        return f"{theme.dim('copies written to')}  {theme.paint(str(destination), 'body')}"
+    if destination is None:
+        return theme.dim("nothing written")
+    return (
+        f"{theme.dim('nothing written; copies would go to')}  "
+        f"{theme.paint(str(destination), 'body')}"
     )
+
+
+def render_json_clean(
+    results: list[Cleaned], source: Path, destination: Path | None, *, check: bool = False
+) -> str:
+    found: dict[str, object] = {"root": str(source)}
+    if check:
+        # Said outright rather than left to be inferred from an absent
+        # `written`: every count below is in the conditional, and a reader that
+        # takes them for a record of what happened has been misled.
+        found["checked"] = True
+    if destination is not None:
+        found["destination"] = str(destination)
+    found["files"] = [item.to_dict() for item in results]
+    found["summary"] = {
+        "total": len(results),
+        "cleaned": sum(1 for item in results if item.removed),
+        "still_readable": sum(1 for item in results if item.remaining),
+    }
+    return document("clean", found)

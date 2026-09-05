@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import io
 import struct
+import tempfile
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -118,10 +119,11 @@ def _under(path: Path, below: Path | None) -> Path:
 
 def clean_file(
     path: Path,
-    destination: Path,
+    destination: Path | None,
     *,
     below: Path | None = None,
     overwrite: bool = False,
+    write: bool = True,
 ) -> Cleaned:
     """Write `path` under `destination` without its metadata.
 
@@ -136,6 +138,48 @@ def clean_file(
     directory the user chose, which may hold work of their own; removing
     something nobody asked about would be a worse failure than declining to
     write. `overwrite` says to go ahead.
+
+    `write=False` is `--check`: everything happens except the writing, so the
+    caller learns what would come out of each file and what a reader would
+    still find in the copy, without a copy existing anywhere anybody could
+    publish it from. `destination` may then be None - a run that was never told
+    where copies would go - and where one is given, the name it would take is
+    still tested, because a dry run that skips that is a dry run of a different
+    command.
+    """
+    outcome = _stripped(path)
+    if isinstance(outcome, Cleaned):
+        return outcome
+    body, removed = outcome
+
+    target = None if destination is None else destination / _under(path, below)
+    if target is not None and target.exists() and not overwrite:
+        return Cleaned(path, note="a file is already there; --overwrite replaces it")
+
+    if not write:
+        return Cleaned(path, removed=sorted(set(removed)), remaining=_survivors_of(body, path))
+    if target is None:
+        return Cleaned(path, note="no destination to write the copy to")
+
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(body)
+    except OSError as problem:
+        return Cleaned(path, note=f"could not be written: {problem.strerror or problem}")
+    return Cleaned(
+        path,
+        written=target,
+        removed=sorted(set(removed)),
+        remaining=survivors(target),
+    )
+
+
+def _stripped(path: Path) -> tuple[bytes, list[str]] | Cleaned:
+    """The bytes a copy would hold and what came out - or why there is no copy.
+
+    The half of the work that is the same whether or not anything is written,
+    kept in one place so that a check and a clean cannot disagree about which
+    files they have anything to say about.
     """
     suffix = path.suffix.lower()
     if suffix not in _STRIPPERS:
@@ -153,21 +197,22 @@ def clean_file(
 
     if not removed:
         return Cleaned(path, note="nothing to remove")
+    return body, removed
 
-    target = destination / _under(path, below)
-    if target.exists() and not overwrite:
-        return Cleaned(path, note="a file is already there; --overwrite replaces it")
-    try:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(body)
-    except OSError as problem:
-        return Cleaned(path, note=f"could not be written: {problem.strerror or problem}")
-    return Cleaned(
-        path,
-        written=target,
-        removed=sorted(set(removed)),
-        remaining=survivors(target),
-    )
+
+def _survivors_of(body: bytes, path: Path) -> list[str]:
+    """What the readers would find in a copy that was never written.
+
+    They open a path, so the bytes need one, and it is a scratch file in the
+    system's temporary directory rather than in the destination: `--check`
+    promises to leave no copy anywhere somebody could publish from, and that
+    promise is the whole of the mode. The name carries the original's suffix,
+    because every reader here decides whether to look by reading it.
+    """
+    with tempfile.TemporaryDirectory(prefix="filegrail-check-") as scratch:
+        copy = Path(scratch) / f"copy{path.suffix.lower()}"
+        copy.write_bytes(body)
+        return survivors(copy)
 
 
 def survivors(path: Path) -> list[str]:

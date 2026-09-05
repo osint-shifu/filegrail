@@ -107,6 +107,8 @@ filegrail does more than extract:
 > [!IMPORTANT]
 > **The original is never touched.** Copies go to `--out`, which must be outside the directory being read. Every copy is then read back with the same readers that find metadata in the first place, and anything still visible is reported rather than hidden — because somebody is about to publish a file on the strength of the word *cleaned*.
 
+`--check` asks the same question without writing anything: what would come out of each file, and what would a reader still find in the copy. It exits non-zero if any copy would not come out clean, so a directory can be gated before it is published rather than cleaned twice.
+
 Removing the fields is removing the fields: pixels still carry sensor noise, an encoder still leaves its own fingerprints. This is not an anonymiser.
 
 ### Timelines
@@ -175,6 +177,7 @@ filegrail ./evidence
 | `filegrail compare A B` | Compare metadata, provenance and timing |
 | `filegrail doctor` | Show which local evidence sources are available |
 | `filegrail clean PATH --out DIR` | Write copies with the metadata removed |
+| `filegrail clean PATH --check` | Say what cleaning would remove, and write nothing |
 | `filegrail menu` | Open the interactive menu |
 | `filegrail help COMMAND` | Show help for one command |
 
@@ -292,6 +295,23 @@ The copies mirror the source tree, so two folders each holding a `photo.jpg` pro
 ```
 
 Anything the readers can still see in a copy is listed under `still readable in the copies` — do not publish those.
+
+`--check` runs all of that except the writing, and answers with an exit code:
+
+```bash
+filegrail clean ./ready-to-publish --check
+```
+
+```text
+  nothing written
+
+  ● chart.png                                                 png-text
+  ● holiday.jpg                                                   exif
+
+    2 files · 2 would be cleaned · 0 left alone
+```
+
+`0` means every copy would come out clean, `1` means at least one would not. `--out` is optional under it; given one, the check still reports a name already taken there. Whether or not `--check` was used, the same exit code says whether the copies that were made carry anything a reader can still see.
 
 ### Another profile, JSON, redaction
 

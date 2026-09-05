@@ -228,10 +228,16 @@ def _clean_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--out",
         dest="out",
-        required=True,
         type=Path,
         metavar="DIR",
-        help="Where to write the cleaned copies. Required, and never the source directory.",
+        help="Where to write the cleaned copies. Required unless --check, "
+        "and never the source directory.",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Write nothing. Report what would be removed and what a reader "
+        "would still find, and exit 1 if any copy would not come out clean.",
     )
     parser.add_argument(
         "--overwrite",
@@ -499,7 +505,13 @@ def _compare(rest: list[str]) -> int:
 
 
 def _clean(rest: list[str]) -> int:
-    """Write cleaned copies, and say what came out and what did not."""
+    """Write cleaned copies, and say what came out and what did not.
+
+    The exit code answers one question: would every copy come out clean? A file
+    nothing here can strip does not make a dirty copy and does not count; a
+    copy the readers can still see a block in does, in both modes, because a
+    check that disagreed with the run it is checking would be worth nothing.
+    """
     args = _clean_parser().parse_args(rest)
     from .clean import clean_file
     from .report import render_clean, render_json_clean
@@ -508,12 +520,17 @@ def _clean(rest: list[str]) -> int:
     if not args.path.exists():
         print(f"filegrail: {args.path} does not exist", file=sys.stderr)
         return 2
+    if args.out is None and not args.check:
+        print("filegrail: clean needs --out, or --check to write nothing", file=sys.stderr)
+        return 2
 
     source = args.path.resolve()
-    destination = args.out.resolve()
+    destination = args.out.resolve() if args.out is not None else None
     # Writing into the tree being read would make the run depend on the order
     # it happened to walk in, and a second run would clean its own output.
-    if destination == source or (source.is_dir() and destination.is_relative_to(source)):
+    if destination is not None and (
+        destination == source or (source.is_dir() and destination.is_relative_to(source))
+    ):
         print("filegrail: --out must be outside the directory being cleaned", file=sys.stderr)
         return 2
 
@@ -523,20 +540,28 @@ def _clean(rest: list[str]) -> int:
         print(f"filegrail: {unknown}", file=sys.stderr)
         return 2
 
-    destination.mkdir(parents=True, exist_ok=True)
+    if destination is not None and not args.check:
+        # Not under --check: a mode that writes nothing does not get to leave a
+        # directory behind as the one trace that it ran.
+        destination.mkdir(parents=True, exist_ok=True)
     # The copies mirror the tree, so `below` is the directory the walk started
     # from. A single file has no tree above it and keeps its own name.
     below = source if source.is_dir() else source.parent
     results = [
-        clean_file(path, destination, below=below, overwrite=args.overwrite)
+        clean_file(path, destination, below=below, overwrite=args.overwrite, write=not args.check)
         for path in iter_files(source, recursive=not args.no_recurse, suffixes=suffixes)
     ]
+    unclean = 1 if any(item.remaining for item in results) else 0
 
     if args.json:
-        print(render_json_clean(results, source, destination))
-        return 0
-    print(render_clean(results, source, destination, theme=detect(colour=args.colour)))
-    return 0
+        print(render_json_clean(results, source, destination, check=args.check))
+        return unclean
+    print(
+        render_clean(
+            results, source, destination, theme=detect(colour=args.colour), check=args.check
+        )
+    )
+    return unclean
 
 
 def _doctor(rest: list[str]) -> int:

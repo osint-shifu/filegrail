@@ -9,6 +9,20 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `clean --check` writes nothing. It runs every stripper, reads the result back
+  through the same readers, and says what would come out of each file and what
+  a reader would still find in the copy - then exits 1 if any copy would not
+  come out clean, so a directory can be gated before it is published rather
+  than cleaned twice and inspected afterwards.
+
+  `--out` is optional under it, and where one is given the check still reports
+  a name already taken there: a dry run that skips the destination is a dry run
+  of a different command. It does not create that directory, either - a mode
+  that writes nothing does not get to leave one behind as the only trace that
+  it ran. The readers open a path, so the stripped bytes are given a scratch
+  one in the system's temporary directory and it is gone before the answer is,
+  which is the whole point: no copy exists anywhere anybody could publish from.
+
 - The two hand-written binary decoders are fuzzed. `cbor.py` reads a C2PA
   manifest and `bencode.py` reads a `.torrent`; both are `filegrail`'s own,
   because it takes no runtime dependencies, and both read bytes that arrived
@@ -74,6 +88,13 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   never mentioned.
 
 ### Changed
+
+- `clean` exits 1 when a copy it wrote still carries something a reader can
+  find. It printed *Do not publish these* and exited 0, which is a
+  contradiction nothing automated could see - the report was already saying the
+  run had not done what its own summary claimed. The exit code answers one
+  question in both modes, *would every copy come out clean*, so a file no
+  stripper here handles does not count against it: it produces no copy at all.
 
 - Type checking runs in strict mode. The configuration used to name the flags
   that could be turned on, on the principle that a flag nothing satisfies is a
