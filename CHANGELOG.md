@@ -9,6 +9,25 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `LICENSE` is the Apache License 2.0. It had been reflowed and cut by about a
+  third: the APPENDIX was gone and so were normative sentences from section 1,
+  including the whole definition of what a "Contribution" is - *"means any form
+  of electronic, verbal, or written communication sent to the Licensor"*, and
+  the clause excluding communication conspicuously marked otherwise. 1078 words
+  where the licence has 1581.
+
+  Nothing about that is cosmetic. `pyproject.toml`, the README badge and the
+  metadata on PyPI all say Apache-2.0, and the file under that name said
+  something else, which is why GitHub reported the repository as carrying no
+  licence at all and why the same shortened text was shipping inside the wheel.
+  Section 4 of the licence asks that recipients be given a copy of *the*
+  Licence; a copy with clauses removed is not one. A tool that lists
+  `Intended Audience :: Legal Industry` can least afford this particular bug.
+
+  The text is now verbatim from `apache.org`, and a test pins its sha256 beside
+  the licence the package declares - one licence stated twice, held together
+  the way the version already is.
+
 - A crafted document no longer costs what it says it does. ODF, OOXML and EPUB
   keep what they say about themselves in a named part inside a zip, and those
   four parts were read with `ZipFile.read`, which returns as much as the
