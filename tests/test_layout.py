@@ -13,7 +13,7 @@ import pytest
 
 from filegrail.models import FileRecord, Origin
 from filegrail.report import render_text, render_timeline
-from filegrail.theme import ARROW, BULLET, FLAG, RAIL, Theme
+from filegrail.theme import ARROW, BULLET, FLAG, MIDDOT, RAIL, Theme
 
 ROOT = Path("/case")
 
@@ -116,7 +116,8 @@ def test_every_entry_line_starts_in_the_gutter():
     # Headings start at column two and are upper-cased, so their first letter
     # sits in the gutter column as well.
     letters = "abcdefghijklmnopqrstuvwxyz"
-    allowed = {BULLET, ARROW, RAIL, FLAG, "─", ".", *letters, *letters.upper()}
+    # MIDDOT marks an index row for a file nothing explains.
+    allowed = {BULLET, ARROW, RAIL, FLAG, MIDDOT, "─", ".", *letters, *letters.upper()}
     assert gutter <= allowed, gutter
 
 
@@ -172,7 +173,10 @@ def test_the_strongest_class_is_reported_first():
 
     output = render_text(mixed, ROOT, theme=theme)
 
-    assert output.index("b.pdf") < output.index("a.jpg")
+    # The index is a triage list and has an order of its own; this is a claim
+    # about the entries, so it is measured from the section that holds them.
+    detail = output.split("FILES IN DETAIL")[1]
+    assert detail.index("b.pdf") < detail.index("a.jpg")
 
 
 # --- the sections that describe the whole scan -------------------------------
@@ -233,7 +237,7 @@ def test_section_headings_are_uppercase_so_they_survive_plain_text():
 
     assert "\n  INVENTORY" in output
     assert "\n  FINDINGS" in output
-    assert "\n  NO FINDINGS" in output
+    assert "\n  FILES" in output
     assert "\n  inventory" not in output
 
 
@@ -244,3 +248,94 @@ def test_a_heading_keeps_its_count_beside_it():
 
     heading = next(line for line in output.splitlines() if line.startswith("  INVENTORY"))
     assert heading.rstrip().endswith("types")
+
+
+# --- the index ----------------------------------------------------------------
+
+
+def _mixed() -> list[FileRecord]:
+    return [
+        _record("holiday.jpg", Origin(source="browser-download", url="https://a.example/h.jpg")),
+        _record("report.pdf", Origin(source="document-metadata", block="pdf-info", tool="Word")),
+        _record("scratch.bin"),
+    ]
+
+
+def test_the_report_opens_with_one_line_a_file():
+    """A report with no index makes the reader scroll the whole thing to learn
+    which files are worth opening. One line each answers that first."""
+    theme = Theme(colour=False, unicode=True, width=88)
+
+    output = render_text(_mixed(), ROOT, theme=theme)
+
+    index = _index_rows(output)
+    assert [line.split()[1] for line in index] == ["holiday.jpg", "report.pdf", "scratch.bin"]
+
+
+def test_a_file_nothing_explains_carries_its_date_in_the_index():
+    """The one thing that section used to add over a bare name, kept."""
+    theme = Theme(colour=False, unicode=True, width=88)
+
+    output = render_text(_mixed(), ROOT, theme=theme)
+
+    row = next(line for line in _index_rows(output) if "scratch.bin" in line)
+    assert "2026-08-24" in row
+
+
+def test_the_index_replaces_the_list_of_files_with_nothing_in_them():
+    """Two lists of the same files is one list too many."""
+    theme = Theme(colour=False, unicode=True, width=88)
+
+    output = render_text(_mixed(), ROOT, theme=theme)
+
+    assert "\n  NO FINDINGS" not in output
+    assert "scratch.bin" in output
+
+
+def test_brief_stops_at_the_index():
+    """`--brief` used to print the same report without the decoded fields, which
+    is not a triage mode - it is the same length minus the useful part."""
+    theme = Theme(colour=False, unicode=True, width=88)
+
+    output = render_text(_mixed(), ROOT, theme=theme, brief=True)
+
+    assert "\n  FILES" in output
+    assert "\n  FILES IN DETAIL" not in output
+    assert "https://a.example/h.jpg" not in output
+
+
+def _index_rows(output: str) -> list[str]:
+    lines = output.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith("  FILES")) + 3
+    end = next(i for i, line in enumerate(lines[start:], start) if not line.strip())
+    return lines[start:end]
+
+
+def test_an_entry_names_the_class_of_each_claim_when_there_is_more_than_one():
+    """The order was already acquisition, then intrinsic, then interaction -
+    and a reader had to know that to read it. Naming them costs three lines and
+    turns the report's own thesis from a convention into something legible."""
+    theme = Theme(colour=False, unicode=True, width=88)
+    record = _record(
+        "holiday.jpg",
+        Origin(source="browser-download", url="https://a.example/h.jpg"),
+    )
+    record.origins.append(Origin(source="device-metadata", tool="NIKON COOLPIX P6000"))
+
+    output = render_text([record], ROOT, theme=theme)
+
+    detail = output.split("FILES IN DETAIL")[1]
+    assert "ACQUISITION" in detail
+    assert "INTRINSIC" in detail
+    assert detail.index("ACQUISITION") < detail.index("INTRINSIC")
+
+
+def test_one_class_needs_no_heading_to_tell_it_from_another():
+    """A file whose whole story is its own metadata does not need a heading
+    saying so; that is relabelling rather than grouping."""
+    theme = Theme(colour=False, unicode=True, width=88)
+    record = _record("a.jpg", Origin(source="device-metadata", tool="Canon EOS 40D"))
+
+    output = render_text([record], ROOT, theme=theme)
+
+    assert "INTRINSIC" not in output.split("FILES IN DETAIL")[1]

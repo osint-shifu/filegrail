@@ -172,13 +172,13 @@ def test_fields_are_shown_without_asking():
 
 
 def test_brief_puts_them_away_again():
-    """The summary view still exists for anyone scanning a large tree."""
+    """`--brief` is the index and stops there, so no field block is reached."""
     record = _record(source="device-metadata", tool="NIKON", fields={"BodySerialNumber": "3001"})
 
     output = render_text([record], Path("/case"), theme=_plain(), brief=True)
 
     assert "BodySerialNumber" not in output
-    assert "NIKON" in output
+    assert "FILES IN DETAIL" not in output
 
 
 def test_the_field_block_reads_as_a_tree():

@@ -20,11 +20,9 @@ def _record(name: str, origin: Origin | None = None) -> FileRecord:
 
 
 def _listed(output: str) -> int:
-    """How many unexplained files the report actually named."""
+    """How many unexplained files the index actually named."""
     return sum(
-        1
-        for line in output.splitlines()
-        if line.strip().startswith("f") and line.strip().split()[0].endswith(".txt")
+        1 for line in output.splitlines() if any(token.endswith(".txt") for token in line.split())
     )
 
 
@@ -297,9 +295,9 @@ def test_the_report_reads_from_the_directory_down_to_the_file():
 
     assert _at(output, "inventory") < _at(output, "findings")
     assert _at(output, "findings") < _at(output, "notable findings")
-    assert _at(output, "notable findings") < _line(output, "photo.jpg")
-    assert _line(output, "photo.jpg") < _at(output, "no findings")
-    assert _at(output, "no findings") < _at(output, "metadata sources")
+    assert _at(output, "notable findings") < _at(output, "files")
+    assert _at(output, "files") < _at(output, "files in detail")
+    assert _at(output, "files in detail") < _at(output, "metadata sources")
 
 
 def test_the_reader_table_is_technical_detail_and_goes_last():
@@ -335,13 +333,12 @@ def test_one_file_is_not_given_an_inventory_of_itself():
 
 def test_the_section_headings_say_what_the_section_holds():
     """`claimed by the file itself` is true and says nothing about what is in
-    there; `no recorded origin` describes a narrower case than the list it
-    heads, which holds every file nothing at all was found for."""
+    there, and `no recorded origin` describes a narrower case than the files it
+    used to head - a file with nothing at all found for it."""
     output = render_text(_corpus(), Path("/case"), theme=PLAIN)
 
     assert "FILE METADATA" in output
     assert "claimed by the file itself" not in output
-    assert "NO FINDINGS" in output
     assert "no recorded origin" not in output
 
 

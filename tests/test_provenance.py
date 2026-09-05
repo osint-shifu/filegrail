@@ -97,12 +97,12 @@ def test_a_file_with_one_kind_gains_no_empty_section():
     assert output.count("←") == 1
 
 
-def test_brief_still_collapses_the_fields_of_both():
+def test_brief_shows_the_index_and_stops():
     output = render_text([_record(DOWNLOAD, CAMERA)], Path("/case"), theme=PLAIN, brief=True)
 
+    assert "holiday.jpg" in output
     assert "BodySerialNumber" not in output
-    assert "NIKON COOLPIX P6000" in output
-    assert "example.org/holiday.jpg" in output
+    assert "example.org/holiday.jpg" not in output
 
 
 def test_verbose_still_shows_every_claim():

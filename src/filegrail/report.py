@@ -20,7 +20,7 @@ from . import TAGLINE, __version__
 from .about import WORDMARK
 from .clean import Cleaned
 from .cluster import cluster as group_sources
-from .explain import conclusion, grouped
+from .explain import conclusion, grouped, questions
 from .identify import CONTENT, METADATA, PLACE, Identifier, extract
 from .models import ACQUISITION, INTERACTION, INTRINSIC, FileRecord, Origin, kind, label
 from .overview import Alert, Inventory, Tally, attention, findings, inventory
@@ -159,10 +159,14 @@ def render_text(
         lines.extend(_findings(theme, findings(records)))
         lines.extend(_attention(theme, attention(records, found, listed=identify), root))
 
-    lines.extend(_sections(theme, known, root, verbose=verbose, brief=brief))
-
-    if unknown:
-        lines.extend(_unknown(theme, unknown, root, limit))
+    # The index first, then the same files in full. `--brief` is the index and
+    # what leads to it: a mode meant for a large directory that then prints an
+    # entry per file is not a mode, it is the report with the fields taken out.
+    lines.extend(_index(theme, records, root, limit))
+    if not brief:
+        if known:
+            lines.extend(_heading(theme, "files in detail", len(known)))
+        lines.extend(_sections(theme, known, root, verbose=verbose, brief=brief))
 
     if identify:
         lines.extend(_identifiers(theme, found, content=content))
@@ -513,6 +517,120 @@ def _attention(theme: Theme, raised: list[Alert], root: Path) -> list[str]:
     return lines
 
 
+#: How much of the index a name may take before the columns beside it give way.
+#: A name shorter than this is unreadable, and the columns are a summary of what
+#: the entries below say in full - so they are what goes, in the order below.
+_INDEX_NAME = 14
+
+
+def _index(theme: Theme, records: list[FileRecord], root: Path, limit: int) -> list[str]:
+    """One line a file: the report's own table of contents.
+
+    Without it a reader learns which files are worth opening by scrolling the
+    whole report, which on a case directory is hundreds of lines. This answers
+    it first, and it is allowed to abbreviate precisely because it is an index:
+    every one of these files is written out in full below, so a column that
+    gives way here loses nothing.
+
+    A file nothing explains carries its filesystem date instead of the columns
+    it has nothing to put in them. That date used to be the only thing the
+    separate list of unexplained files added over a bare name, and this is
+    where it goes now that there is one list rather than two.
+    """
+    if not records:
+        return []
+
+    # Whatever needs a second look first, then the rest in the order they were
+    # walked. An index sorted by path is a directory listing; the question it
+    # is here to answer is which file to open, and that has an order of its own.
+    flag, bullet = theme.glyph(FLAG), theme.glyph(BULLET)
+    order = {flag: 0, bullet: 1}
+    rows = [_index_row(theme, record, root) for record in records]
+    rows.sort(key=lambda row: order.get(row[0], 2))
+    unexplained = [index for index, record in enumerate(records) if not record.origins]
+    hidden = 0
+    if limit > 0 and len(unexplained) > limit:
+        keep = set(unexplained[:limit])
+        hidden = len(unexplained) - limit
+        rows = [row for index, row in enumerate(rows) if index not in set(unexplained) - keep]
+
+    # Size, then how it arrived, then what it says of itself. Each asks for
+    # exactly what it holds; the name gets what is left, and a column gives way
+    # from the right once the name would be too short to read.
+    widths = [max(len(row[column]) for row in rows) for column in (2, 3, 4)]
+
+    def room() -> int:
+        return theme.width - 4 - widths[0] - 2 - sum(2 + width for width in widths[1:])
+
+    while len(widths) > 1 and room() < _INDEX_NAME:
+        widths.pop()
+    name_width = room()
+
+    lines = _heading(theme, "files", len(records))
+    for mark, name, *cells in rows:
+        tail = cells[0].rjust(widths[0] + 2)
+        for column, value in enumerate(cells[1 : len(widths)], start=1):
+            tail += "  " + value.ljust(widths[column])
+        tail = tail.rstrip()
+        paint = theme.dim if mark == theme.glyph(MIDDOT) else str
+
+        if len(name) <= name_width:
+            lines.append(paint(f"  {mark} {name.ljust(name_width)}{tail}".rstrip()))
+            continue
+
+        # Nothing here is truncated. A name too long for its column takes the
+        # width it needs and the columns follow it, which is what the list of
+        # unexplained files did before this replaced it: cutting a name in half
+        # to keep a size company is the layout winning an argument it should
+        # not have had.
+        parts = theme.wrap(name, theme.width - 4)
+        for index, part in enumerate(parts[:-1]):
+            lines.append(paint(f"  {mark if index == 0 else ' '} {part}"))
+        last = parts[-1]
+        if len(last) <= name_width:
+            lines.append(paint(f"    {last.ljust(name_width)}{tail}".rstrip()))
+        else:
+            lines.append(paint(f"    {last}"))
+            lines.append(paint(f"    {' ' * name_width}{tail}".rstrip()))
+
+    if hidden:
+        note = f"... and {hidden} more (--limit 0 for all, --json for each)"
+        if _INDENT + len(note) > theme.width:
+            note = f"... and {hidden} more (--limit 0)"
+        lines.append(theme.dim(f"{' ' * _INDENT}{note}"))
+    lines.append("")
+    return lines
+
+
+def _index_row(theme: Theme, record: FileRecord, root: Path) -> tuple[str, str, str, str, str]:
+    """The mark, the name, the size, how it arrived and what it says of itself."""
+    if not record.origins:
+        return (
+            theme.glyph(MIDDOT),
+            _relative(record.path, root),
+            _size(record.size),
+            _moment(record.btime or record.mtime),
+            "",
+        )
+
+    verdict = reconcile(record)
+    contested = verdict.state in (PARTIAL, CONFLICT) or verdict.notable
+    arrivals = [origin for origin in record.origins if kind(origin) == ACQUISITION]
+    if verdict.state == CONFLICT and len(arrivals) > 1:
+        arrival = _plural(len(arrivals), "source")
+    else:
+        arrival = label(arrivals[0]) if arrivals else ""
+
+    said = record.intrinsic
+    return (
+        theme.glyph(FLAG) if contested else theme.glyph(BULLET),
+        _relative(record.path, root),
+        _size(record.size),
+        arrival,
+        (said.block or said.source) if said else "",
+    )
+
+
 def _sections(
     theme: Theme, known: list[FileRecord], root: Path, *, verbose: bool, brief: bool
 ) -> list[str]:
@@ -604,8 +722,22 @@ def _entry(
         # fact that something opened the file.
         claims = [record.acquisition, *_self_descriptions(record, verdict), record.interaction]
 
-    for index, origin in enumerate(claim for claim in claims if claim is not None):
-        if index:
+    # The class of each claim, named - but only where there is more than one to
+    # tell apart. A file whose whole story is its own metadata does not need a
+    # heading saying so; that is relabelling rather than grouping, and it is
+    # the same rule the sections above this one follow.
+    shown = [claim for claim in claims if claim is not None]
+    named = {kind(origin) for origin in shown}
+    glosses = dict(questions())
+
+    for index, origin in enumerate(shown):
+        if len(named) > 1 and (index == 0 or kind(shown[index - 1]) != kind(origin)):
+            head = f"  {theme.label(kind(origin).upper())}"
+            room = theme.width - len(kind(origin)) - 6
+            if room >= 12:
+                head += f"  {theme.dim(theme.clip(glosses[kind(origin)], room))}"
+            lines.extend(["" if index else "", head])
+        elif index:
             lines.append(f"  {_mark(theme, RAIL)}".rstrip())
         lines.extend(_origin(theme, origin, record, brief=brief))
 
@@ -778,48 +910,6 @@ def _headline(origin: Origin, record: FileRecord) -> str:
             )
         return "self-reported metadata"
     return origin.url or origin.command or origin.tool or "(no detail)"
-
-
-def _unknown(theme: Theme, unknown: list[FileRecord], root: Path, limit: int) -> list[str]:
-    """Files nothing was found for.
-
-    Not `no recorded origin`, which names a narrower case than this list holds:
-    a file here has no acquisition record, no metadata and nothing that touched
-    it. It is a list of open questions, not of failures.
-    """
-    shown = unknown if limit <= 0 else unknown[:limit]
-    lines = _heading(theme, "no findings", len(unknown))
-
-    for record in shown:
-        when = theme.dim(_moment(record.btime or record.mtime))
-        prefix = " " * _INDENT
-        beside = max(8, theme.width - _INDENT - _visible(when) - 2)
-        name = _relative(record.path, root)
-
-        if len(name) <= beside:
-            lines.append(_row(theme, prefix, name, when, wrap=False, paint=theme.dim))
-            continue
-
-        # It did not fit beside the timestamp, so it takes the whole width and
-        # the timestamp follows it. Splitting `...9B53.xml` into `...9B53.x`
-        # and `ml` to keep a timestamp company is the layout winning an
-        # argument it should not have had.
-        parts = theme.wrap(name, theme.width - _INDENT - 2)
-        lines.extend(f"{prefix}{theme.dim(part)}" for part in parts[:-1])
-        if len(parts[-1]) <= beside:
-            lines.append(_row(theme, prefix, parts[-1], when, wrap=False, paint=theme.dim))
-        else:
-            lines.append(f"{prefix}{theme.dim(parts[-1])}")
-            lines.append(_row(theme, prefix, "", when, wrap=False))
-
-    if len(shown) < len(unknown):
-        hidden = len(unknown) - len(shown)
-        note = f"... and {hidden} more (--limit 0 for all, --json for each)"
-        if _INDENT + len(note) > theme.width:
-            note = f"... and {hidden} more (--limit 0)"
-        lines.append(theme.dim(f"{' ' * _INDENT}{note}"))
-    lines.append("")
-    return lines
 
 
 def _summary(

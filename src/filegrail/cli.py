@@ -121,7 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--brief",
         action="store_true",
-        help="Summarise each file instead of listing every metadata field.",
+        help="Stop at the index: one line a file, and no per-file detail.",
     )
     parser.add_argument(
         "--timeline",

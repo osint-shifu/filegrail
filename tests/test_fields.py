@@ -56,11 +56,14 @@ def test_the_report_shows_every_field_by_default():
         assert value in output, value
 
 
-def test_brief_summarises_instead():
+def test_brief_stops_before_any_field_block():
+    """`--brief` is the index and what leads to it. It used to be the same
+    report with the fields taken out, which is not a shorter answer to the
+    question a large directory asks - it is the same length minus the detail."""
     output = render_text([_record()], Path("/case"), theme=PLAIN, brief=True)
 
-    assert "NIKON COOLPIX P6000" in output
     assert "BodySerialNumber" not in output
+    assert "FILES IN DETAIL" not in output
 
 
 def test_the_field_block_keeps_the_report_inside_the_width():
