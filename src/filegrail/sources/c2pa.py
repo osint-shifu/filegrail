@@ -21,7 +21,7 @@ import hashlib
 import struct
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from ..cbor import CborError, loads
 from ..models import Origin
@@ -82,7 +82,7 @@ def read_c2pa_manifest(path: Path) -> Origin | None:
     if not jumbf:
         return None
 
-    payloads: list[tuple[str | None, dict]] = []
+    payloads: list[tuple[str | None, dict[str, Any]]] = []
     try:
         _walk(jumbf, 0, len(jumbf), 0, payloads)
     except (CborError, struct.error, ValueError):
@@ -160,7 +160,7 @@ def _walk(
     offset: int,
     end: int,
     depth: int,
-    found: list[tuple[str | None, dict]],
+    found: list[tuple[str | None, dict[str, Any]]],
     label: str | None = None,
 ) -> None:
     """Collect every decodable CBOR payload, under the label it was filed as.
@@ -225,7 +225,7 @@ def _label(data: bytes, offset: int, end: int) -> str | None:
 # --- the hard binding -------------------------------------------------------
 
 
-def _binding(path: Path, assertion: dict, inherited: object = None) -> str | None:
+def _binding(path: Path, assertion: dict[str, Any], inherited: object = None) -> str | None:
     """Whether the manifest's own hash still describes the file it sits in.
 
     This is not the signature. It says nothing about who produced the manifest
@@ -307,7 +307,7 @@ def _feed(handle: BinaryIO, digest: _Hash, count: int) -> None:
 # --- interpretation ----------------------------------------------------------
 
 
-def _summarise(claims: list[dict], binding: str | None = None) -> Origin | None:
+def _summarise(claims: list[dict[str, Any]], binding: str | None = None) -> Origin | None:
     generator = None
     software = None
     when = None
@@ -330,7 +330,7 @@ def _summarise(claims: list[dict], binding: str | None = None) -> Origin | None:
     return Origin(source="c2pa", block="c2pa", tool=tool, at=when, note="; ".join(notes))
 
 
-def _generator_name(claim: dict) -> str | None:
+def _generator_name(claim: dict[str, Any]) -> str | None:
     info = claim.get("claim_generator_info")
     if isinstance(info, dict):
         name = _string(info.get("name"))
@@ -344,7 +344,7 @@ def _generator_name(claim: dict) -> str | None:
     return _string(claim.get("claim_generator"))
 
 
-def _actions(claim: dict) -> list[dict]:
+def _actions(claim: dict[str, Any]) -> list[dict[str, Any]]:
     actions = claim.get("actions")
     if isinstance(actions, list):
         return [item for item in actions if isinstance(item, dict)]

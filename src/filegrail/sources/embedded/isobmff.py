@@ -15,6 +15,7 @@ import re
 import struct
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import BinaryIO
 
 SUFFIXES = {".mp4", ".m4v", ".m4a", ".mov", ".qt", ".3gp", ".heic", ".heif", ".avif"}
 
@@ -61,7 +62,7 @@ def read_movie(path: Path) -> Movie | None:
     return movie if movie else None
 
 
-def _walk(handle, start: int, end: int, depth: int, movie: Movie) -> None:
+def _walk(handle: BinaryIO, start: int, end: int, depth: int, movie: Movie) -> None:
     if depth > _MAX_DEPTH:
         return
     offset = start

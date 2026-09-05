@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, replace
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # a Link is attached by `lineage`, which imports this module
+    from .lineage import Link
 
 # How much a source is trusted when several disagree. Higher wins.
 CONFIDENCE: dict[str, int] = {
@@ -295,7 +298,7 @@ class FileRecord:
     #: identifiers XMP carries for it. Not an origin: an origin is one source's
     #: claim about where this file came from, and a link is a relation between
     #: two records that only exists because both were scanned together.
-    links: list = field(default_factory=list)
+    links: list[Link] = field(default_factory=list)
 
     @property
     def best(self) -> Origin | None:

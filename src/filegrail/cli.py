@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from . import __version__
 from .filters import FAMILIES, UnknownType, describe, selection
@@ -31,6 +32,9 @@ from .report import (
 )
 from .scan import Unsearched, scan
 from .theme import detect
+
+if TYPE_CHECKING:  # only for the signatures; the scan brings the real thing
+    from .models import FileRecord
 
 COMMANDS = ("scan", "explain", "compare", "doctor", "menu", "clean", "help")
 
@@ -331,7 +335,7 @@ def _help(rest: list[str]) -> int:
 BRIEF_LIMIT = 25
 
 
-def _limit(args) -> int:
+def _limit(args: argparse.Namespace) -> int:
     """How much of the `no findings` list to print.
 
     All of it, unless asked otherwise. A report that hides part of a list it
@@ -349,7 +353,7 @@ def _missing(path: Path) -> int:
     return 2
 
 
-def _home(args) -> Path | None | int:
+def _home(args: argparse.Namespace) -> Path | None | int:
     """Resolve `--home`, refusing a profile that is not there.
 
     A mistyped path would otherwise read as an answer: every source comes back
@@ -437,7 +441,7 @@ def _scan(rest: list[str]) -> int:
     return 0
 
 
-def _one(path: Path, home: Path | None = None):
+def _one(path: Path, home: Path | None = None) -> FileRecord | None:
     """Scan exactly one file, for the commands that take one."""
     resolved = path.resolve()
     if not resolved.is_file():
@@ -473,13 +477,16 @@ def _compare(rest: list[str]) -> int:
     if isinstance(home, int):
         return home
 
-    left, right = _one(args.left, home), _one(args.right, home)
-    for path, record in ((args.left, left), (args.right, right)):
+    # Built one at a time rather than as a pair, so that "this one is missing"
+    # is answered before the next line rather than after both are read.
+    pair: list[FileRecord] = []
+    for path in (args.left, args.right):
+        record = _one(path, home)
         if record is None:
             print(f"filegrail: compare takes two files: {path}", file=sys.stderr)
             return 2
-    if args.redact:
-        left, right = left.redacted(), right.redacted()
+        pair.append(record.redacted() if args.redact else record)
+    left, right = pair
 
     if args.json:
         print(render_json_compare(left, right, home))

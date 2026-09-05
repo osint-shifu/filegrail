@@ -165,7 +165,7 @@ def scan(
     # that was later moved into the case directory still resolves. The record
     # keeps the path as its own operating system spelled it, which is why the
     # name is taken with `basename` and not with `Path`.
-    downloads_by_name: dict[str, list] = {}
+    downloads_by_name: dict[str, list[Origin]] = {}
     for target, origins in downloads.items():
         downloads_by_name.setdefault(basename(target), []).extend(origins)
 

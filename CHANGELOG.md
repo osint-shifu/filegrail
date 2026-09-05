@@ -49,6 +49,22 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   `doctor` gained a row for it, since a scan can now read a source `doctor`
   never mentioned.
 
+### Changed
+
+- Type checking runs in strict mode. The configuration used to name the flags
+  that could be turned on, on the principle that a flag nothing satisfies is a
+  comment rather than a check - and what it could not name was forty-two
+  missing annotations, in twenty-two bare `dict`, `list` and `tuple` types and
+  twenty parameters and returns nobody had written down. Those are written, so
+  the boundary the list described is gone and `strict` replaces it.
+
+  Two of them turned out to be worth having. `_which_is_stale` in `explain`
+  was annotated here as taking a list of origins and is called with a list of
+  findings, which the checker refused the moment the claim was made in
+  writing; and `compare` decided whether two files existed in a loop the
+  checker could not follow, which means a reader could not either. It builds
+  the pair one file at a time now and answers for each before reading the next.
+
 ### Fixed
 
 - A scan says which directories it did not look inside. `os.walk` swallows

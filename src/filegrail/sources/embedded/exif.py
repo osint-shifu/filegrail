@@ -118,7 +118,7 @@ _MAX_STRING = 1024
 _HEIF_SCAN_BYTES = 4 * 1024 * 1024
 
 
-class Exif(dict):
+class Exif(dict[int, object]):
     """Decoded tags, keyed by tag number, with the GPS block kept separate."""
 
     def __init__(self) -> None:
@@ -272,7 +272,7 @@ def _parse_tiff(data: Raw) -> Exif | None:
     return exif if (exif or exif.gps) else None
 
 
-def _read_ifd(data: Raw, offset: int, endian: str, into: dict, exif: Exif) -> None:
+def _read_ifd(data: Raw, offset: int, endian: str, into: dict[int, object], exif: Exif) -> None:
     if offset <= 0 or offset + 2 > len(data):
         return
     (count,) = struct.unpack_from(endian + "H", data, offset)
@@ -293,7 +293,7 @@ def _read_ifd(data: Raw, offset: int, endian: str, into: dict, exif: Exif) -> No
             into[tag] = value
 
 
-def _read_value(data: Raw, entry: int, endian: str, kind: int, length: int):
+def _read_value(data: Raw, entry: int, endian: str, kind: int, length: int) -> object | None:
     if kind == _ASCII:
         if length == 0 or length > _MAX_STRING:
             return None

@@ -417,7 +417,10 @@ python -m pip install -e ".[dev]"
 pytest
 ruff check .
 ruff format --check .
+mypy
 ```
+
+`mypy` runs in strict mode over `src/filegrail`, against the oldest supported interpreter.
 
 Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before adding a reader or changing what a source is taken to prove. [`SECURITY.md`](SECURITY.md) covers what to report privately, and [`CHANGELOG.md`](CHANGELOG.md) carries the history.
 

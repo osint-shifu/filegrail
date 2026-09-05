@@ -23,6 +23,7 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TextIO
 
 from .scan import iter_files
 from .theme import Theme, detect
@@ -257,7 +258,7 @@ def _command(target: Path, action: Action) -> str:
     return " ".join(["filegrail", _short(target), *action.flags])
 
 
-def available(stream=None) -> bool:
+def available(stream: TextIO | None = None) -> bool:
     """Whether a menu can be shown at all.
 
     Redirected output must never reach the loop: `filegrail menu > out.txt`

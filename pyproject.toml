@@ -75,11 +75,9 @@ select = ["E", "F", "I", "UP", "B"]
 python_version = "3.10"
 files = ["src/filegrail"]
 
-# Everything below already passes. Each one is here to keep it that way rather
-# than as an aspiration: a flag nothing satisfies is a comment, not a check.
-warn_unused_ignores = true
-warn_redundant_casts = true
-warn_return_any = true
-no_implicit_optional = true
-strict_equality = true
-disallow_untyped_calls = true
+# `strict` rather than the list of flags that used to be here, on the same
+# principle: everything under it already passes, and a flag nothing satisfies is
+# a comment rather than a check. The list was what could be turned on while
+# forty-two annotations were missing; those are written, so the whole of strict
+# holds and there is no boundary left to describe.
+strict = true

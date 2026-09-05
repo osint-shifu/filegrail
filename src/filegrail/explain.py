@@ -23,6 +23,7 @@ from .reconcile import (
     PARTIAL,
     SINGLE,
     TIMELINE_CONFLICT,
+    Finding,
     Verdict,
 )
 
@@ -49,7 +50,7 @@ KINDS = questions()
 _COUNTS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
 
 
-def grouped(record: FileRecord, home: Path | None = None) -> list[tuple[str, str, list]]:
+def grouped(record: FileRecord, home: Path | None = None) -> list[tuple[str, str, list[Origin]]]:
     """Every claim, under the question it answers. Empty kinds are dropped."""
     out = []
     for name, question in questions(home):
@@ -101,7 +102,7 @@ def conclusion(record: FileRecord, verdict: Verdict, home: Path | None = None) -
     return said
 
 
-def _which_is_stale(contested: list) -> str:
+def _which_is_stale(contested: list[Finding]) -> str:
     """Why one of the two blocks is the likelier to be out of date.
 
     Whichever block an editor understands is the one it rewrites; the other it
@@ -137,7 +138,7 @@ def _which_is_stale(contested: list) -> str:
     )
 
 
-def _arrival(verdict: Verdict, acquisition: list, home: Path | None = None) -> str:
+def _arrival(verdict: Verdict, acquisition: list[Origin], home: Path | None = None) -> str:
     count = _COUNTS.get(len(acquisition), str(len(acquisition)))
 
     if verdict.state == NONE:

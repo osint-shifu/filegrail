@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from ..models import Origin
 
@@ -80,14 +81,14 @@ def read_sidecar(path: Path) -> Origin | None:
     )
 
 
-def _tool(document: dict) -> str:
+def _tool(document: dict[str, Any]) -> str:
     """`yt-dlp 2026.08.19`, where the document says which version wrote it."""
     version = document.get("_version")
     named = _text(version.get("version")) if isinstance(version, dict) else None
     return f"yt-dlp {named}" if named else "yt-dlp"
 
 
-def _fetched(document: dict) -> str | None:
+def _fetched(document: dict[str, Any]) -> str | None:
     """When the download ran - not when the video was published.
 
     `epoch` is the moment yt-dlp wrote the document, which is the moment the
@@ -107,7 +108,7 @@ def _fetched(document: dict) -> str | None:
     return moment.isoformat().replace("+00:00", "Z")
 
 
-def _first(document: dict, names: tuple[str, ...]) -> str | None:
+def _first(document: dict[str, Any], names: tuple[str, ...]) -> str | None:
     for name in names:
         if value := _text(document.get(name)):
             return value

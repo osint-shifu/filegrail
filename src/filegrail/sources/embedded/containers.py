@@ -111,7 +111,7 @@ def _read_odf(path: Path) -> Document:
     )
 
 
-def _declared(element) -> dict[str, str]:
+def _declared(element: ElementTree.Element) -> dict[str, str]:
     """Every child element that carries text, by local name.
 
     Attributes are included because the statistics element keeps its page, table

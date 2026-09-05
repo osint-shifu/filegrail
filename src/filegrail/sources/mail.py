@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 from datetime import timezone
+from email.message import Message
 from email.parser import BytesHeaderParser
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -105,7 +106,7 @@ def read_mail(path: Path) -> list[Origin]:
     return []
 
 
-def _claims(message) -> list[Origin]:
+def _claims(message: Message) -> list[Origin]:
     """The hops, then what the message says about itself."""
     hops = message.get_all("Received") or []
     found = [
@@ -206,7 +207,7 @@ def _hop(value: str, source: str) -> Origin | None:
     )
 
 
-def _self_description(message) -> Origin | None:
+def _self_description(message: Message) -> Origin | None:
     """What the message says about itself, none of which anybody checked."""
     fields = {}
     for name in _HEADERS:

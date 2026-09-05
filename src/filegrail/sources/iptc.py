@@ -13,6 +13,7 @@ that structure serves JPEG, TIFF and PSD alike.
 from __future__ import annotations
 
 import struct
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -247,7 +248,7 @@ def _place(fields: dict[str, str]) -> str | None:
     return ", ".join(part for name in _PLACE if (part := fields.get(name))) or None
 
 
-def _walk(block: bytes):
+def _walk(block: bytes) -> Iterator[tuple[int, int, bytes]]:
     """Yield (record, dataset, value) for each entry, in the order written.
 
     A length with its top bit set is not a length: the remaining bits count how

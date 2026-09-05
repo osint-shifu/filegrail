@@ -310,7 +310,7 @@ def _read_section(blob: bytes, base: int) -> dict[int, object]:
     return found
 
 
-def _read_value(blob: bytes, offset: int):
+def _read_value(blob: bytes, offset: int) -> object | None:
     if offset + 4 > len(blob) or offset < 0:
         return None
     (kind,) = struct.unpack_from("<I", blob, offset)
@@ -340,7 +340,7 @@ def _read_value(blob: bytes, offset: int):
         width = 2 if kind == _VT_I2 else 4
         if body + width > len(blob):
             return None
-        return struct.unpack_from("<h" if kind == _VT_I2 else "<i", blob, body)[0]
+        return int(struct.unpack_from("<h" if kind == _VT_I2 else "<i", blob, body)[0])
 
     return None
 

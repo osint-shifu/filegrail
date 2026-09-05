@@ -20,6 +20,7 @@ import re
 import struct
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import BinaryIO
 
 from . import id3
 
@@ -138,7 +139,7 @@ def read_riff(path: Path) -> Riff | None:
     return found or None
 
 
-def _walk(handle, start: int, end: int, found: Riff, depth: int, inside: bytes) -> None:
+def _walk(handle: BinaryIO, start: int, end: int, found: Riff, depth: int, inside: bytes) -> None:
     """Read every chunk between `start` and `end`, descending into lists."""
     at = start
     for _ in range(_MAX_CHUNKS):
@@ -165,7 +166,7 @@ def _walk(handle, start: int, end: int, found: Riff, depth: int, inside: bytes) 
         _leaf(handle, name, body, size, found, inside)
 
 
-def _leaf(handle, name: bytes, body: int, size: int, found: Riff, inside: bytes) -> None:
+def _leaf(handle: BinaryIO, name: bytes, body: int, size: int, found: Riff, inside: bytes) -> None:
     if not 0 < size <= _MAX_PAYLOAD:
         return
     if name in _ID3_CHUNKS:

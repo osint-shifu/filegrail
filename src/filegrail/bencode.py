@@ -112,7 +112,7 @@ def _string(data: bytes, offset: int) -> tuple[bytes, int]:
     return data[colon + 1 : end], end
 
 
-def _list(data: bytes, offset: int, depth: int) -> tuple[list, int]:
+def _list(data: bytes, offset: int, depth: int) -> tuple[list[Any], int]:
     items: list[Any] = []
     offset += 1
     while True:
@@ -124,7 +124,7 @@ def _list(data: bytes, offset: int, depth: int) -> tuple[list, int]:
         items.append(value)
 
 
-def _dictionary(data: bytes, offset: int, depth: int) -> tuple[dict, int]:
+def _dictionary(data: bytes, offset: int, depth: int) -> tuple[dict[bytes, Any], int]:
     found: dict[bytes, Any] = {}
     offset += 1
     while True:

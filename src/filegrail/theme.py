@@ -16,6 +16,7 @@ import os
 import shutil
 import sys
 from dataclasses import dataclass
+from typing import TextIO
 
 RESET = "\x1b[0m"
 
@@ -251,7 +252,7 @@ class Theme:
         )
 
 
-def detect(stream=None, *, colour: bool | None = None) -> Theme:
+def detect(stream: TextIO | None = None, *, colour: bool | None = None) -> Theme:
     """Choose a theme from the environment, honouring the usual overrides."""
     stream = stream or sys.stdout
 
@@ -282,7 +283,7 @@ def _depth() -> int:
     return ANSI_256
 
 
-def _wants_colour(stream) -> bool:
+def _wants_colour(stream: TextIO) -> bool:
     if os.environ.get("NO_COLOR") is not None:
         return False
     if os.environ.get("TERM", "").lower() in ("dumb", ""):

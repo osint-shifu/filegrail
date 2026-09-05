@@ -12,7 +12,9 @@ saying which class of source made a claim.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from . import TAGLINE, __version__
 from .about import WORDMARK
@@ -24,6 +26,10 @@ from .models import ACQUISITION, INTRINSIC, FileRecord, Origin, kind, label
 from .overview import Alert, Inventory, Tally, attention, findings, inventory
 from .reconcile import ATTRIBUTION_CONFLICT, CONFLICT, KINDS, PARTIAL, Verdict, reconcile
 from .scan import Unsearched
+
+if TYPE_CHECKING:  # both are imported where they are used, to keep startup light
+    from .compare import Comparison
+    from .doctor import Survey
 from .theme import (
     ARROW,
     BRANCH,
@@ -92,7 +98,15 @@ def _mark(theme: Theme, symbol: str, colour: str | None = None) -> str:
     return theme.paint(glyph, colour) if colour else theme.paint(glyph, "rail")
 
 
-def _row(theme: Theme, prefix: str, body: str, right: str, *, paint=None, wrap: bool = True) -> str:
+def _row(
+    theme: Theme,
+    prefix: str,
+    body: str,
+    right: str,
+    *,
+    paint: Callable[[str], str] | None = None,
+    wrap: bool = True,
+) -> str:
     """One line carrying a single right-aligned column.
 
     `prefix` and `right` arrive painted, so only their visible width matters.
@@ -325,7 +339,7 @@ def _labelled(theme: Theme, name: str, value: str) -> list[str]:
     ]
 
 
-def _wrapped(theme: Theme, text: str, indent: str, paint) -> list[str]:
+def _wrapped(theme: Theme, text: str, indent: str, paint: Callable[[str], str]) -> list[str]:
     """One run of text over as many lines as the terminal needs for all of it."""
     return [f"{indent}{paint(part)}" for part in theme.wrap(text, theme.width - len(indent) - 2)]
 
@@ -929,7 +943,7 @@ def _file_json(record: FileRecord) -> dict[str, object]:
     return data
 
 
-def render_doctor(found, theme: Theme | None = None, home: Path | None = None) -> str:
+def render_doctor(found: Survey, theme: Theme | None = None, home: Path | None = None) -> str:
     """What could be searched, and how far back it reaches."""
     theme = theme or detect()
     rule = f"  {theme.rule(theme.width - 2)}"
@@ -1069,7 +1083,9 @@ def _explained(theme: Theme, origin: Origin) -> list[str]:
     return lines
 
 
-def render_compare(left: FileRecord, right: FileRecord, found, theme: Theme | None = None) -> str:
+def render_compare(
+    left: FileRecord, right: FileRecord, found: Comparison, theme: Theme | None = None
+) -> str:
     """What two files share, where they differ, and how each one arrived."""
     theme = theme or detect()
     rule = f"  {theme.rule(theme.width - 2)}"
@@ -1153,7 +1169,7 @@ def _whose(home: Path | None) -> dict[str, object]:
     return {"home": str(home)} if home else {}
 
 
-def render_json_doctor(found, home: Path | None = None) -> str:
+def render_json_doctor(found: Survey, home: Path | None = None) -> str:
     return document("doctor", {**_whose(home), **found.to_dict()})
 
 

@@ -18,6 +18,7 @@ import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 from ..bencode import BencodeError, loads, value_span
@@ -113,7 +114,7 @@ def read_torrent(path: Path) -> Torrent | None:
     return Torrent(origin=_origin(raw, document, info), members=members)
 
 
-def _members(info: dict) -> dict[str, set[int]]:
+def _members(info: dict[bytes, Any]) -> dict[str, set[int]]:
     """Every file the torrent lists, by base name, with the sizes given."""
     members: dict[str, set[int]] = {}
 
@@ -136,7 +137,7 @@ def _members(info: dict) -> dict[str, set[int]]:
     return {name: sizes for name, sizes in members.items() if name}
 
 
-def _origin(raw: bytes, document: dict, info: dict) -> Origin:
+def _origin(raw: bytes, document: dict[bytes, Any], info: dict[bytes, Any]) -> Origin:
     name = _text(info.get(b"name"))
     fields: dict[str, str] = {}
     if name:
@@ -178,7 +179,7 @@ def _magnet(raw: bytes, name: str | None) -> str | None:
     return f"{address}&dn={quote(name)}" if name else address
 
 
-def _trackers(document: dict) -> list[str]:
+def _trackers(document: dict[bytes, Any]) -> list[str]:
     """`announce`, plus every tier of `announce-list`, in the order written."""
     found: list[str] = []
 

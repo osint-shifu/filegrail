@@ -30,6 +30,7 @@ import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 from urllib.parse import unquote, urlparse
 
 from ..models import Origin
@@ -192,7 +193,7 @@ def _name(url: str | None) -> str | None:
     return tail or None
 
 
-def _rows(path: Path) -> list[tuple]:
+def _rows(path: Path) -> list[tuple[Any, ...]]:
     """Read the database without touching it.
 
     The file is copied first and opened read-only. A live profile has a
