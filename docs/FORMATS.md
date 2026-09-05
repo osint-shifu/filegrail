@@ -183,6 +183,36 @@ directory is usually the *result* of unpacking something that lives elsewhere.
 
 ---
 
+## Text a document holds
+
+A different axis from everything above. The tables so far are what a file
+records *about itself*; this is what it *says*, and it is read only when
+`--content` asks for it. The identifier detectors are then pointed at the text
+as well as at the metadata, and every value carries which of the two it came
+from, and where in the document it was.
+
+Nothing here is a claim about provenance. A body is not evidence of arrival.
+The point of reading it is the correlation: a name a document carries that the
+record of the file's *arrival* also carries was written down twice, by two
+separate acts, and neither half says that alone.
+
+| Extensions | What is read |
+|:---|:---|
+| `.txt` `.text` `.md` `.markdown` `.rst` `.log` | The file, a line at a time, and the line is what a value is reported against |
+| `.csv` `.tsv` `.json` `.ndjson` `.jsonl` `.ipynb` `.yaml` `.yml` `.toml` `.ini` `.cfg` `.conf` `.vcf` `.ics` | The same. Data formats are text, and an export out of an application is exactly the sort of file an examiner is handed |
+| `.html` `.htm` `.xhtml` `.xml` `.svg` | The text, and the addresses in `href`, `src` and their kin, by the line of the file. `<script>` and `<style>` are left out - a colour is a short hex digest and a bundler writes hosts nobody typed - and a namespace declaration is markup rather than something the document said |
+| `.docx` `.docm` `.dotx` `.xlsx` `.xlsm` `.xltx` `.pptx` `.pptm` | The body, footnotes, endnotes and comments of a Word file; every slide and its notes; a workbook's shared strings and its inline cell text. Reported as `body`, `footnotes`, `slide 4`, `sheet 2` - the terms the format has. There is no page number: pagination happens when something renders the file, which does not record where the breaks fell |
+| `.odt` `.ods` `.odp` `.odg` `.odf` `.ott` `.otp` | `content.xml` as the body, `styles.xml` as headers and footers |
+| `.epub` | Each chapter, under the name the book gives it |
+| `.eml` `.msg` | The message body, decoded first - quoted-printable and base64 both hide an address from anything reading the bytes as they lie. The headers are not taken again here: they are already read as evidence of delivery, and counting them twice would file the second copy under the wrong axis |
+
+No dependency comes with any of this. The formats where a text search fails
+hardest are zip archives of XML, and the reader that already opens them for
+their properties opens them for this, under the same bound on what one member
+may cost.
+
+---
+
 ## Written from the specification
 
 Three readers have never been run against a file the originating software
@@ -211,6 +241,9 @@ That is worth knowing before you rely on one of them in something that matters.
 | `.mbox` | Many messages, one record per file. There is no honest single claim to make about a mailbox |
 | Jump Lists (`.automaticDestinations-ms`) | In the Recent folder beside the shortcuts, and a different format. Shortcuts first |
 | Fixed-length MAPI properties | Delivery and submit times live in `__properties_version1.0`, not a `__substg1.0_` stream. Left unread rather than guessed at, with no real `.msg` to check the layout against |
+| PDF text | The only format `--content` does not read. Pulling the string literals out of a content stream is an afternoon's work that produces readable text for perhaps half of real documents and mush for the rest, and a confident wrong answer is worse than an absent one here. Metadata **is** read from a PDF; only its text is not |
+| Source code as text | A checkout is thousands of files whose identifiers are dependency hosts and licence URLs. `SKIP_DIRECTORIES` keeps a scan out of `node_modules` on the same principle |
+| RTF text | Text under a layer of control words and hex escapes. It needs a parser to read honestly and yields noise without one. RTF **metadata** is read |
 | PNG `Creation Time` in RFC 1123 form | Skipped rather than compared against XMP, because parsing it touches the moment path shared with EXIF, IIM and PDF |
 
 Anything else is still scanned. A format `filegrail` does not understand is

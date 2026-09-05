@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "filegrail"
-version = "0.4.0"
+version = "0.4.1"
 description = "Reconstruct where the files in a directory came from, after the fact."
 readme = "README.md"
 requires-python = ">=3.10"

@@ -24,6 +24,7 @@ from filegrail.models import BLOCK_LABELS
 from filegrail.sources import mail
 from filegrail.sources.archives import ARCHIVE_SUFFIXES
 from filegrail.sources.c2pa import SUPPORTED_SUFFIXES as C2PA_SUFFIXES
+from filegrail.sources.content import SUFFIXES as CONTENT_SUFFIXES
 from filegrail.sources.embedded import SUFFIXES as EMBEDDED_SUFFIXES
 
 FORMATS = Path(__file__).resolve().parent.parent / "docs" / "FORMATS.md"
@@ -34,6 +35,7 @@ METADATA_HEADER = ("block", "extensions", "what comes out")
 CROSS_HEADER = ("block", "where it is found", "what comes out")
 MAIL_HEADER = ("extension", "what comes out")
 ARCHIVE_HEADER = ("extensions", "what filegrail does with them")
+CONTENT_HEADER = ("extensions", "what is read")
 
 _EXTENSION = re.compile(r"`(\.[a-z0-9]+)`")
 _NAME = re.compile(r"`([a-z0-9][a-z0-9-]*)`")
@@ -153,3 +155,25 @@ def test_every_block_the_table_names_is_one_the_code_declares():
     }
     assert named, "the table names no blocks at all"
     assert named <= declared, sorted(named - declared)
+
+
+# --- the other axis -----------------------------------------------------------
+#
+# `--content` reads what a document *says*, which is neither what it records
+# about itself nor what the machine remembers about it. A third axis and a third
+# table, held the same way in both directions - the document exists precisely so
+# that a reader added later cannot quietly go undocumented.
+
+
+def test_every_format_content_reads_is_documented():
+    documented = _documented(CONTENT_HEADER, 0)
+
+    missing = CONTENT_SUFFIXES - documented
+    assert not missing, f"read as text but undocumented: {sorted(missing)}"
+
+
+def test_nothing_is_documented_as_text_that_is_not_read_as_text():
+    documented = _documented(CONTENT_HEADER, 0)
+
+    invented = documented - CONTENT_SUFFIXES
+    assert not invented, f"documented as text but unread: {sorted(invented)}"

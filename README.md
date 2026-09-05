@@ -192,7 +192,7 @@ filegrail <path> [options]
 filegrail <command> [options]
 ```
 
-A path can be one file or a whole directory; with no path, the current directory.
+A path can be one file or a whole directory. `filegrail` with no arguments at all introduces the tool rather than scanning — starting an unasked-for scan of wherever the shell happens to be is a surprise, and in a home directory an expensive one. `filegrail .` scans the current directory, and so does `filegrail scan`.
 
 ```bash
 filegrail suspicious.pdf
@@ -236,8 +236,19 @@ filegrail ./evidence
 | `--no-archives` | Do not read archives or inherit their origins |
 | `--no-color` | Disable ANSI colour |
 
+### Clean options
+
+| Option | Purpose |
+| :--- | :--- |
+| `--out DIR` | Where the copies go. Required unless `--check`, and never inside the source |
+| `--check` | Write nothing; say what would be removed and what would survive |
+| `--overwrite` | Replace a file already at the destination path |
+| `--type NAME`, `--ext LIST` | The same filters a scan takes |
+| `--no-recurse` | Do not descend into subdirectories |
+
 ```bash
 filegrail help scan
+filegrail help clean
 ```
 
 gives the complete reference.
@@ -253,19 +264,26 @@ filegrail holiday.jpg
 ```
 
 ```text
-● holiday.jpg                                                   3.4 MB
-← https://portal.example.org/press/holiday.jpg
-│ browser download · firefox · 2026-08-24T19:02:11Z
-│
-← made by NIKON COOLPIX P6000
-│ device metadata · 2008-10-22T16:28:39Z
-│ geo       43.467448, 11.885127
-│
-├ Make               NIKON
-├ Model              COOLPIX P6000
-├ BodySerialNumber   3001234
-└ DateTimeOriginal   2008:10:22 16:28:39
+  ● holiday.jpg                                                   3.4 MB
+  ← https://portal.example.org/press/holiday.jpg
+  │ browser download · chromium · 2026-08-31T10:49:33Z      ▰▰▰▰▱ direct
+  │ referrer  https://portal.example.org/press/
+  │
+  ← made by NIKON COOLPIX P6000
+  │ device metadata · 2008-10-22T16:28:39Z           ▰▰▰▱▱ self-reported
+  │ geo       43.467447, 11.885128
+  │
+  ├ Make              NIKON
+  ├ Model             COOLPIX P6000
+  ├ DateTimeOriginal  2008:10:22 16:28:39
+  ├ BodySerialNumber  3001234
+  ├ GPSLatitudeRef    N
+  ├ GPSLatitude       43, 28, 2.81
+  ├ GPSLongitudeRef   E
+  └ GPSLongitude      11, 53, 6.46
 ```
+
+The meter on the right is the class of the claim, not a probability: how directly the source knows what it says.
 
 The browser record says **how the bytes reached the machine**. The EXIF block describes **the image before that**. Both stay.
 
@@ -334,7 +352,7 @@ Exposes shared device metadata, creation context and timing, and differences in 
 filegrail clean ./photos --out ./cleaned --type image
 ```
 
-Writes copies without their metadata and leaves the originals alone. `--out` is required and must be outside the directory being read.
+Writes copies without their metadata and leaves the originals alone. `--out` is required unless `--check` is given, and must be outside the directory being read.
 
 The copies mirror the source tree, so two folders each holding a `photo.jpg` produce two copies and not one. A name already taken in the destination is reported and skipped rather than replaced; `--overwrite` says to replace it.
 
@@ -416,7 +434,9 @@ Readers cover 68 file extensions across the major families.
 | Archives | ZIP, TAR and compressed TAR variants |
 | Other | EPUB, RTF, SVG, IPYNB, `.torrent` |
 
-The readers define what is supported, not this table. The complete matrix is in [`docs/FORMATS.md`](docs/FORMATS.md), which is held against the code by a test and so cannot drift.
+That table is what filegrail decodes **metadata** out of. What it reads as **text** under `--content` is a different axis and a different list — plain text and data files, markup, the zip-based document formats and message bodies, 43 extensions in all.
+
+The readers define what is supported, not either table. The complete matrix for both is in [`docs/FORMATS.md`](docs/FORMATS.md), which is held against the code by a test and so cannot drift.
 
 A format filegrail does not understand is reported as not understood — and still takes part in provenance analysis when local evidence about it exists.
 
@@ -429,7 +449,7 @@ A format filegrail does not understand is reported as not understood — and sti
 ```json
 {
   "schema": "filegrail.scan/1",
-  "filegrail_version": "0.4.0",
+  "filegrail_version": "0.4.1",
   "root": "/mnt/evidence"
 }
 ```

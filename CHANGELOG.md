@@ -5,6 +5,30 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.1 - 2026-09-05
+
+### Fixed
+
+- The readme said a bare `filegrail` scans the current directory. It does not,
+  and deliberately: starting an unasked-for scan of wherever the shell happens
+  to be is a surprise, and in a home directory an expensive one. It introduces
+  the tool, and `filegrail .` is the scan.
+
+- The first example in the readme was not what the tool prints. It had lost the
+  strength meter that ends every evidence line and the indentation every other
+  block in the file has, and it listed four decoded fields where the scan shows
+  eight. Replaced with the real output of a real run, down to the coordinates.
+
+- `--out` was still documented as required. It has not been since `--check`
+  arrived in this release, and `clean` now has six options of its own with a
+  table to match - they were prose or nothing.
+
+- `docs/FORMATS.md` did not say what `--content` reads. The file exists to be a
+  list that cannot go stale, and it was held against the metadata readers only,
+  so forty-three extensions of a new reader went undocumented without a test
+  noticing. It has a section of that axis now, and the test holds it in both
+  directions like the rest.
+
 ## 0.4.0 - 2026-09-05
 
 ### Added
