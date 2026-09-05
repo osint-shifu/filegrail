@@ -9,6 +9,24 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A crafted document no longer costs what it says it does. ODF, OOXML and EPUB
+  keep what they say about themselves in a named part inside a zip, and those
+  four parts were read with `ZipFile.read`, which returns as much as the
+  member's header declares. XML deflates at roughly fifteen hundred to one, so
+  a **780 KB `.docx` whose `docProps/core.xml` declared 601 MB took 1.2 GB of
+  memory and four and a half seconds** - allocated twice, once as bytes and
+  once as the tree parsed from them. A directory of them is an out-of-memory
+  kill. The same file now costs 33 MB and a tenth of a second.
+
+  Every member goes through `read_part`, which reads through `ZipFile.open`
+  with a bound on the decompressed stream and so needs no agreement between
+  what the archive claims and what it holds. The bound is four megabytes, the
+  same figure the PDF reader already allowed itself for inflated object
+  streams; real property parts are kilobytes, and the ones that are not are not
+  property parts. A test reads the modules' own source and fails on a bare
+  `archive.read(`, because the thing to hold is the absence of a call and any
+  test that lists today's sites would miss tomorrow's.
+
 - `clean` no longer loses files. Every copy was written straight into `--out`
   under the file's own name, so two folders each holding a `photo.jpg` produced
   one copy: the second replaced the first, and the report said two files had

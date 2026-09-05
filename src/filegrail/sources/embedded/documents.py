@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ...models import Origin
+from .parts import read_part
 
 PDF_SUFFIXES = {".pdf"}
 OOXML_SUFFIXES = {".docx", ".xlsx", ".pptx", ".docm", ".xlsm", ".pptm", ".dotx", ".xltx"}
@@ -239,8 +240,11 @@ def _parse_xml(
 ) -> ElementTree.Element | None:
     if member not in names:
         return None
+    part = read_part(archive, member)
+    if part is None:
+        return None
     try:
-        return ElementTree.fromstring(archive.read(member))
+        return ElementTree.fromstring(part)
     except ElementTree.ParseError:
         return None
 

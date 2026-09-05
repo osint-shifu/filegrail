@@ -1,7 +1,8 @@
+import tracemalloc
 import zipfile
 from pathlib import Path
 
-from filegrail.sources.embedded import read_embedded_metadata
+from filegrail.sources.embedded import containers, documents, read_embedded_metadata
 from tests.photo import jpeg_with_exif
 
 CORE_XML = """<?xml version="1.0"?>
@@ -186,3 +187,87 @@ def test_undecompressable_stream_is_not_an_error(tmp_path: Path):
 
     assert origin is not None
     assert origin.tool == "Fallback 1.0"
+
+
+# --- how much of a member is read --------------------------------------------
+#
+# A zip member's uncompressed size is whatever its header declares, and
+# `ZipFile.read` hands back as much as the archive asks for. XML compresses
+# around fifteen hundred to one, so a document under a megabyte on disk can
+# name a property part of six hundred, and reading it allocates that twice -
+# once as bytes and once as a parse tree. Property parts are kilobytes in every
+# real file, and the ones that are not are not property parts.
+
+
+def _bomb(path: Path, member: str, size: int, alongside: dict[str, str] | None = None) -> None:
+    """A zip whose named member inflates to `size` bytes of well-formed XML."""
+    filler = b"<!-- " + b"A" * 4000 + b" -->"
+    body = b"<r>" + filler * (size // len(filler)) + b"</r>"
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, text in (alongside or {}).items():
+            archive.writestr(name, text)
+        archive.writestr(member, body)
+
+
+def _peak_reading(path: Path) -> int:
+    """Bytes the readers allocate while looking at one file."""
+    tracemalloc.start()
+    try:
+        read_embedded_metadata(path)
+        return tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+
+
+BOMB_BYTES = 32 * 1024 * 1024
+
+
+def test_an_odf_does_not_allocate_the_part_it_declares(tmp_path: Path):
+    document = tmp_path / "report.odt"
+    _bomb(document, "meta.xml", BOMB_BYTES)
+
+    assert document.stat().st_size < 1024 * 1024  # small on disk
+    assert _peak_reading(document) < BOMB_BYTES // 2
+    assert read_embedded_metadata(document) is None
+
+
+def test_an_ooxml_does_not_allocate_the_part_it_declares(tmp_path: Path):
+    document = tmp_path / "report.docx"
+    _bomb(document, "docProps/core.xml", BOMB_BYTES, {"docProps/app.xml": APP_XML})
+
+    assert _peak_reading(document) < BOMB_BYTES // 2
+
+
+def test_an_epub_does_not_allocate_the_package_it_declares(tmp_path: Path):
+    container = (
+        '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
+        '<rootfiles><rootfile full-path="content.opf"/></rootfiles></container>'
+    )
+    book = tmp_path / "book.epub"
+    _bomb(book, "content.opf", BOMB_BYTES, {"META-INF/container.xml": container})
+
+    assert _peak_reading(book) < BOMB_BYTES // 2
+
+
+def test_a_property_part_of_an_ordinary_size_is_still_read_whole(tmp_path: Path):
+    """The bound has to be a bound and not a refusal to read anything."""
+    document = tmp_path / "report.docx"
+    with zipfile.ZipFile(document, "w") as archive:
+        archive.writestr("docProps/core.xml", CORE_XML)
+        archive.writestr("docProps/app.xml", APP_XML)
+
+    origin = read_embedded_metadata(document)
+
+    assert origin is not None and origin.tool == "Microsoft Office Word 16.0000"
+
+
+def test_no_reader_takes_a_zip_member_without_a_bound():
+    """Every member goes through `read_part`, and a new one has to as well.
+
+    Written against the source rather than against behaviour because the point
+    is the absence of a call, and a site added tomorrow would be missed by any
+    test that enumerates the ones present today.
+    """
+    for module in (containers, documents):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "archive.read(" not in source, module.__name__

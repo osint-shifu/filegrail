@@ -19,6 +19,8 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .parts import read_part
+
 ODF_SUFFIXES = {".odt", ".ods", ".odp", ".odg", ".odf", ".otp", ".ott"}
 EPUB_SUFFIXES = {".epub"}
 RTF_SUFFIXES = {".rtf"}
@@ -91,7 +93,10 @@ def _read_odf(path: Path) -> Document:
     with zipfile.ZipFile(path) as archive:
         if "meta.xml" not in archive.namelist():
             return Document()
-        root = ElementTree.fromstring(archive.read("meta.xml"))
+        meta_xml = read_part(archive, "meta.xml")
+        if meta_xml is None:
+            return Document()
+        root = ElementTree.fromstring(meta_xml)
 
     meta = root.find(f"{{{_OFFICE}}}meta")
     if meta is None:
@@ -153,15 +158,20 @@ def _read_epub(path: Path) -> Document:
         names = archive.namelist()
         opf_name = None
         if "META-INF/container.xml" in names:
-            container = ElementTree.fromstring(archive.read("META-INF/container.xml"))
-            root_file = container.find(f".//{{{_CONTAINER_NS}}}rootfile")
-            if root_file is not None:
-                opf_name = root_file.get("full-path")
+            declaration = read_part(archive, "META-INF/container.xml")
+            if declaration is not None:
+                container = ElementTree.fromstring(declaration)
+                root_file = container.find(f".//{{{_CONTAINER_NS}}}rootfile")
+                if root_file is not None:
+                    opf_name = root_file.get("full-path")
         if opf_name is None:
             opf_name = next((name for name in names if name.endswith(".opf")), None)
         if opf_name is None or opf_name not in names:
             return Document()
-        package = ElementTree.fromstring(archive.read(opf_name))
+        opf = read_part(archive, opf_name)
+        if opf is None:
+            return Document()
+        package = ElementTree.fromstring(opf)
 
     generator = None
     for meta in package.iter(f"{{{_OPF}}}meta"):
