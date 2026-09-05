@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import TAGLINE, __version__
 from .about import WORDMARK
+from .clean import Cleaned
 from .cluster import cluster as group_sources
 from .explain import conclusion, grouped
 from .identify import PLACE, Identifier, extract
@@ -1235,3 +1236,70 @@ def _visible(text: str) -> int:
         length += 1
         index += 1
     return length
+
+
+# --- clean -------------------------------------------------------------------
+
+
+def render_clean(
+    results: list[Cleaned], source: Path, destination: Path, *, theme: Theme | None = None
+) -> str:
+    """What each file gave up, and what it did not."""
+    theme = theme or detect()
+    rule = f"  {theme.rule(theme.width - 2)}"
+    written = [item for item in results if item.written]
+    survived = [item for item in written if item.remaining]
+
+    lines = [
+        "",
+        f"  {theme.bold('filegrail')}  {theme.dim('clean')}  {theme.bold(str(source))}",
+        rule,
+        "",
+        f"  {theme.dim('copies written to')}  {theme.paint(str(destination), 'body')}",
+        "",
+    ]
+
+    for item in results:
+        name = _relative(str(item.path), source)
+        said = ", ".join(item.removed) if item.removed else theme.dim(item.note or "nothing")
+        colour = "recorded" if item.written else "faint"
+        lines.append(_row(theme, f"  {_mark(theme, BULLET, colour)} ", name, theme.dim(said)))
+
+    lines.extend(["", rule])
+    lines.append(
+        f"    {len(results)} files {MIDDOT} {len(written)} cleaned {MIDDOT} "
+        f"{len(results) - len(written)} left alone"
+    )
+
+    if survived:
+        # The whole point of reading the copies back. A file reported as
+        # cleaned that is not cleaned is worse than one nobody touched.
+        lines.extend(["", f"  {theme.paint('still readable in the copies', 'conflict')}"])
+        for item in survived:
+            lines.append(
+                f"    {_relative(str(item.written), destination)}  "
+                f"{theme.dim(', '.join(item.remaining))}"
+            )
+        lines.append(
+            f"  {theme.dim('a stripper is written per format, and a format can carry a block')}"
+        )
+        lines.append(f"  {theme.dim('somewhere it does not reach. Do not publish these.')}")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_json_clean(results: list[Cleaned], source: Path, destination: Path) -> str:
+    return document(
+        "clean",
+        {
+            "root": str(source),
+            "destination": str(destination),
+            "files": [item.to_dict() for item in results],
+            "summary": {
+                "total": len(results),
+                "cleaned": sum(1 for item in results if item.written),
+                "still_readable": sum(1 for item in results if item.remaining),
+            },
+        },
+    )

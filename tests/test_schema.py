@@ -52,11 +52,12 @@ def _arguments(name: str, case: Path) -> list[str]:
         "explain": [name, str(case / "a.txt")],
         "compare": [name, str(case / "a.txt"), str(case / "b.txt")],
         "doctor": [name],
+        "clean": [name, str(case), "--out", str(case.parent / "cleaned")],
     }[name]
 
 
 #: Every command that can be asked for JSON, and how to ask it for some.
-DOCUMENTS = ("scan", "explain", "compare", "doctor")
+DOCUMENTS = ("scan", "explain", "compare", "doctor", "clean")
 
 
 def _run(capsys, name: str, case: Path) -> dict:
@@ -78,6 +79,10 @@ def test_a_comparison_says_which_shape_it_is(case: Path, capsys):
 
 def test_a_survey_says_which_shape_it_is(case: Path, capsys):
     assert _run(capsys, "doctor", case)["schema"] == "filegrail.doctor/1"
+
+
+def test_a_cleaning_run_says_which_shape_it_is(case: Path, capsys):
+    assert _run(capsys, "clean", case)["schema"] == "filegrail.clean/1"
 
 
 def test_every_document_names_the_release_that_wrote_it(case: Path, capsys):

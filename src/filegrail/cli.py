@@ -32,7 +32,7 @@ from .report import (
 from .scan import scan
 from .theme import detect
 
-COMMANDS = ("scan", "explain", "compare", "doctor", "menu", "help")
+COMMANDS = ("scan", "explain", "compare", "doctor", "menu", "clean", "help")
 
 
 # --- parsers -----------------------------------------------------------------
@@ -193,6 +193,45 @@ def _doctor_parser() -> argparse.ArgumentParser:
     )
 
 
+def _clean_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="filegrail clean",
+        parents=[_common()],
+        description=(
+            "Write copies of files with their metadata removed. The originals are never modified."
+        ),
+    )
+    parser.add_argument("path", nargs="?", default=".", type=Path, help="File or directory.")
+    parser.add_argument(
+        "--out",
+        dest="out",
+        required=True,
+        type=Path,
+        metavar="DIR",
+        help="Where to write the cleaned copies. Required, and never the source directory.",
+    )
+    parser.add_argument(
+        "--type",
+        dest="families",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help=f"Only these kinds of file: {', '.join(sorted(FAMILIES))}.",
+    )
+    parser.add_argument(
+        "--ext",
+        dest="extensions",
+        action="append",
+        default=[],
+        metavar="LIST",
+        help="Only these extensions, e.g. --ext jpg,png.",
+    )
+    parser.add_argument(
+        "--no-recurse", action="store_true", help="Do not descend into subdirectories."
+    )
+    return parser
+
+
 def _menu_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="filegrail menu",
@@ -209,6 +248,7 @@ PARSERS = {
     "compare": _compare_parser,
     "doctor": _doctor_parser,
     "menu": _menu_parser,
+    "clean": _clean_parser,
 }
 
 
@@ -240,6 +280,7 @@ def main(argv: list[str] | None = None) -> int:
         "compare": _compare,
         "doctor": _doctor,
         "menu": _menu,
+        "clean": _clean,
     }[command](rest)
 
 
@@ -406,6 +447,44 @@ def _compare(rest: list[str]) -> int:
     from .compare import compare
 
     print(render_compare(left, right, compare(left, right), theme=detect(colour=args.colour)))
+    return 0
+
+
+def _clean(rest: list[str]) -> int:
+    """Write cleaned copies, and say what came out and what did not."""
+    args = _clean_parser().parse_args(rest)
+    from .clean import clean_file
+    from .report import render_clean, render_json_clean
+    from .scan import iter_files
+
+    if not args.path.exists():
+        print(f"filegrail: {args.path} does not exist", file=sys.stderr)
+        return 2
+
+    source = args.path.resolve()
+    destination = args.out.resolve()
+    # Writing into the tree being read would make the run depend on the order
+    # it happened to walk in, and a second run would clean its own output.
+    if destination == source or (source.is_dir() and destination.is_relative_to(source)):
+        print("filegrail: --out must be outside the directory being cleaned", file=sys.stderr)
+        return 2
+
+    try:
+        suffixes = selection(args.families, args.extensions)
+    except UnknownType as unknown:
+        print(f"filegrail: {unknown}", file=sys.stderr)
+        return 2
+
+    destination.mkdir(parents=True, exist_ok=True)
+    results = [
+        clean_file(path, destination)
+        for path in iter_files(source, recursive=not args.no_recurse, suffixes=suffixes)
+    ]
+
+    if args.json:
+        print(render_json_clean(results, source, destination))
+        return 0
+    print(render_clean(results, source, destination, theme=detect(colour=args.colour)))
     return 0
 
 

@@ -66,7 +66,7 @@ START = (
 #: Named rather than described. What each one does is a sentence away in
 #: `filegrail help <command>`, and six sentences here would double the screen.
 #: `help` is not in the list because it is the line underneath it.
-COMMANDS = ("scan", "explain", "compare", "doctor", "menu")
+COMMANDS = ("scan", "explain", "compare", "doctor", "menu", "clean")
 
 #: Below this the wordmark and the attributes cannot sit side by side.
 _SIDE_BY_SIDE = 78

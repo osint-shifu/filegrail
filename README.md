@@ -100,6 +100,15 @@ FileGrail does more than extract:
 
 `--cluster` reduces a directory to the sources behind it, on three axes kept deliberately apart: a **camera body** (one physical device, by serial), a **camera model** (a product thousands of people own — not the same claim) and an **author** (a name, as somebody typed it).
 
+### Remove metadata
+
+`filegrail clean` writes copies of files with their metadata taken out — JPEG, PNG, MP4/MOV and the zip-based Office and OpenDocument formats. It reuses `--type` and `--ext`, so a directory can be cleaned one format at a time.
+
+> [!IMPORTANT]
+> **The original is never touched.** Copies go to `--out`, which must be outside the directory being read. Every copy is then read back with the same readers that find metadata in the first place, and anything still visible is reported rather than hidden — because somebody is about to publish a file on the strength of the word *cleaned*.
+
+Removing the fields is removing the fields: pixels still carry sensor noise, an encoder still leaves its own fingerprints. This is not an anonymiser.
+
 ### Timelines
 
 `--timeline` places acquisition, creation, editing and interaction events in chronological order.
@@ -163,6 +172,7 @@ filegrail ./evidence
 | `filegrail explain FILE` | Show every source behind the findings for one file |
 | `filegrail compare A B` | Compare metadata, provenance and timing |
 | `filegrail doctor` | Show which local evidence sources are available |
+| `filegrail clean PATH --out DIR` | Write copies with the metadata removed |
 | `filegrail menu` | Open the interactive menu |
 | `filegrail help COMMAND` | Show help for one command |
 

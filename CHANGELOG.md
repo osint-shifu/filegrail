@@ -7,6 +7,39 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- `filegrail clean` writes copies of files with their metadata removed. JPEG
+  segments, PNG chunks, the `udta` and `meta` atoms of an ISO base media file
+  along with the two timestamps in its movie header, and the property parts of
+  the zip-based Office and OpenDocument formats. `--type` and `--ext` narrow it
+  the way they narrow a scan, so a directory can be cleaned one format at a
+  time.
+
+  **The original is never touched.** This is the only command that writes
+  anything, and the rest of the tool rests on not writing, so copies go to
+  `--out` - which is required, and refused if it sits inside the directory
+  being read.
+
+  Every copy is then read back with the readers that find metadata in the first
+  place, and whatever they can still see is reported. A stripper is written per
+  format and a format can carry a block somewhere it does not reach: a packet
+  appended after a JPEG's end marker survives, and the check is what says so
+  rather than leaving somebody to publish on the strength of the word
+  *cleaned*.
+
+  Two decisions worth stating. A movie is not shortened - its sample tables
+  address the media by absolute offset, so the metadata atoms keep their length,
+  become `free` boxes and have their payloads overwritten. And a document's
+  property parts are emptied rather than deleted, because they are named in the
+  package relationships and a part that is named and then missing is a broken
+  document rather than a clean one.
+
+  **PDF is deliberately not cleaned.** Without a library the only safe way to
+  change one is an incremental update, which leaves the old `Info` dictionary
+  physically in the file and merely stops pointing at it. For a cleaning tool
+  that is worse than doing nothing, so it does nothing and says so.
+
 ### Changed
 
 - The type annotations are checked. There were 362 of them and nothing verified
