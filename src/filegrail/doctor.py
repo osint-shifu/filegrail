@@ -32,6 +32,7 @@ from .sources.quarantine import QUARANTINE_DB, collect_quarantine_events
 from .sources.recent import RECENT_FILES, collect_recent_files
 from .sources.shell import HISTORY_FILES, _parse_history
 from .sources.shortcut import RECENT_LINKS, collect_windows_recent
+from .sources.torrent import TORRENT_STORES, collect_torrents
 from .util import birth_time, iso, xattrs_readable
 
 
@@ -56,6 +57,7 @@ HOME_SOURCES = {
     "collect_recent_files": ("Recent documents",),
     "collect_quarantine_events": ("macOS quarantine database",),
     "collect_windows_recent": ("Windows Recent shortcuts",),
+    "collect_torrents": ("Torrent client stores",),
 }
 
 
@@ -89,6 +91,7 @@ def survey(home: Path | None = None) -> Survey:
     found.checks.append(_recent(home, found))
     found.checks.append(_quarantine(home, found))
     found.checks.append(_shortcuts(home))
+    found.checks.append(_torrents(home))
     found.checks.append(_birth_times())
     found.checks.append(_c2pa())
     return found
@@ -272,6 +275,23 @@ def _shortcuts(home: Path) -> Check:
         )
     total = sum(len(claims) for claims in found.values())
     return Check("Windows Recent shortcuts", AVAILABLE, counted(total, "shortcut"))
+
+
+def _torrents(home: Path) -> Check:
+    """The copy a torrent client keeps of everything it has ever loaded.
+
+    No horizon. A torrent's creation date says when the torrent was made, not
+    when anything in it was fetched, so the oldest one in the store bounds
+    nothing about what this machine can answer.
+    """
+    where = [name for name in TORRENT_STORES if (home / name).is_dir()]
+    if not where:
+        return Check("Torrent client stores", UNAVAILABLE, "no client store found")
+
+    found = collect_torrents(home)
+    if not found:
+        return Check("Torrent client stores", PARTIAL, "a store with nothing readable in it")
+    return Check("Torrent client stores", AVAILABLE, counted(len(found), "torrent"))
 
 
 def _birth_times() -> Check:

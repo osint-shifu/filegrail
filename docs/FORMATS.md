@@ -102,6 +102,34 @@ document and its Office-style properties sit exactly where a `.doc`'s do.
 
 ---
 
+## Torrents
+
+A torrent is a container in the same sense an archive is: it lists its members
+by name and exact size, so a file matching both was very likely one of them.
+Unlike an archive it carries an origin of its own rather than one to inherit.
+
+| File | What comes out |
+|:---|:---|
+| `.torrent` | The trackers it was announced to, the client that wrote it, any comment, and a magnet address built from the info hash |
+
+Torrents are read from the scanned tree and from the stores the clients keep -
+qBittorrent's `BT_backup`, Transmission's `torrents`, Deluge's `state` - which
+is the ordinary case, since a downloaded file rarely has a `.torrent` beside it
+and the client has kept one all along. `filegrail doctor` says whether any such
+store was found.
+
+The info hash is taken over the `info` value exactly as its author wrote it,
+not over a re-encoding of what was decoded: the two differ wherever the author
+was not canonical, and that is precisely where a hash computed from the
+re-encoding would name the wrong content. The decoder refuses non-canonical
+bencode for the same reason.
+
+The claim is not dated. A torrent's creation date says when the torrent was
+made, which can be years before anything in it was fetched, so the date is
+reported as what it is rather than as an arrival.
+
+---
+
 ## Sidecars
 
 Not metadata either, and not inside the file at all. A download tool can be

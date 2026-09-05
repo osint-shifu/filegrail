@@ -24,6 +24,11 @@ CONFIDENCE = {
     # that pairing in a way an extended attribute cannot be broken.
     "ytdlp-sidecar": 75,
     "archive-member": 70,
+    # A torrent lists its members by name and exact size, and a file matching
+    # both was very likely one of them. The same strength of inference as an
+    # archive member, and the same way of being wrong: two files can share a
+    # name and a size without being the same file.
+    "torrent": 70,
     # A purpose-built provenance standard, but the signature is not verified here.
     "c2pa": 60,
     "device-metadata": 55,
@@ -72,6 +77,7 @@ SOURCE_LABELS = {
     "xdg-xattr": "XDG attribute",
     "ytdlp-sidecar": "yt-dlp sidecar",
     "archive-member": "archive member",
+    "torrent": "torrent",
     "c2pa": "content credentials",
     "device-metadata": "device metadata",
     "xmp": "XMP",
@@ -163,6 +169,7 @@ _KINDS = {
     "email-delivery": ACQUISITION,
     "email-relay": ACQUISITION,
     "archive-member": ACQUISITION,
+    "torrent": ACQUISITION,
     "messenger-name": ACQUISITION,
     "filesystem": ACQUISITION,
     "recent-documents": INTERACTION,

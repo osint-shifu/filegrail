@@ -14,9 +14,11 @@ from .sources import (
     collect_quarantine_events,
     collect_recent_files,
     collect_shell_history,
+    collect_torrents,
     collect_windows_recent,
     inherited_origin,
     is_archive,
+    is_torrent,
     list_members,
     read_c2pa_manifest,
     read_embedded_metadata,
@@ -27,6 +29,7 @@ from .sources import (
     read_quarantine,
     read_shortcuts,
     read_sidecar,
+    read_torrent,
     read_xmp,
 )
 from .util import basename, birth_time, iso, sha256_file
@@ -161,6 +164,7 @@ def scan(
 
     if follow_archives:
         _attach_archive_origins(records, downloads, downloads_by_name)
+    _attach_torrent_origins(records, files, home)
     attach_lineage(records)
 
     return records
@@ -208,6 +212,30 @@ def _attach_archive_origins(
             for size in sizes:
                 for record in by_signature.get((name, size), []):
                     record.origins.append(inherited_origin(best, archive_name))
+
+
+def _attach_torrent_origins(
+    records: list[FileRecord], files: list[Path], home: Path | None = None
+) -> None:
+    """Give a file the torrent that lists it, where one was scanned beside it.
+
+    A torrent is paired the way an archive member is - base name and exact size
+    together - because a name alone matches far too much and a size alone
+    matches more. What differs is that a torrent carries an origin of its own
+    rather than one to inherit, so every matching record gets it, including the
+    ones that already know something about themselves: a photograph with EXIF
+    is no less interesting for also having been in a torrent.
+    """
+    by_signature: dict[tuple[str, int], list[FileRecord]] = {}
+    for record in records:
+        by_signature.setdefault((Path(record.path).name, record.size), []).append(record)
+
+    scanned = (read_torrent(path) for path in files if is_torrent(path))
+    for torrent in [*(t for t in scanned if t is not None), *collect_torrents(home=home)]:
+        for name, sizes in torrent.members.items():
+            for size in sizes:
+                for record in by_signature.get((name, size), []):
+                    record.origins.append(torrent.origin)
 
 
 #: Why a name match was needed, for a source that recorded where the file was

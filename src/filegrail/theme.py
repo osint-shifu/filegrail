@@ -60,6 +60,7 @@ EVIDENCE = {
     "email-delivery": "recorded",
     "email-relay": "recorded",
     "archive-member": "inherited",
+    "torrent": "inherited",
     "c2pa": "credentialed",
     "device-metadata": "self-reported",
     "xmp": "self-reported",

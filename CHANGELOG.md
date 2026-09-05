@@ -5,6 +5,39 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- A `.torrent` is read for the files it distributes. It lists its members by
+  name and exact size, which is the pairing the archive reader already makes,
+  so a file matching both is given the torrent as an origin: the trackers it
+  was announced to, the client that wrote it, any comment, and a magnet address
+  built from the info hash.
+
+  Unlike an archive member this is not an inherited origin. An archive passes
+  on where the archive came from; a torrent states where the content came from
+  itself, so every matching record gets it - including ones that already know
+  something about themselves. A photograph with EXIF is no less interesting for
+  also having been in a torrent.
+
+  The clients' own stores are read as well as the scanned tree - qBittorrent's
+  `BT_backup`, Transmission's `torrents`, Deluge's `state` - because that is
+  the ordinary case: a downloaded file rarely has a `.torrent` beside it and
+  the client has kept one all along. `doctor` reports whether a store was
+  found, and the invariant holding the survey against the sources is what
+  noticed that it had to.
+
+  The claim is undated. A torrent's creation date is when the torrent was made,
+  which can be years before anything in it was fetched.
+
+  Reading one meant a bencode decoder, which joins the CBOR decoder as
+  something the standard library does not provide and the zero-dependency rule
+  will not import. It refuses non-canonical input rather than being lenient
+  about it: an info hash is taken over the `info` value exactly as written, so
+  bytes no honest encoder produced would hash to something that identifies
+  nothing.
+
 ## 0.1.0 - 2026-09-05
 
 ### Fixed

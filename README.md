@@ -48,6 +48,7 @@ At the same time, it checks traces already left on the machine:
 * macOS where-from and quarantine records
 * Linux XDG attributes
 * archive membership
+* torrent membership
 * download-tool sidecars
 * messaging-client file names
 * shell history
@@ -245,7 +246,7 @@ Those are different claims from different sources. `filegrail` keeps them separa
 
 | Class | Question | Typical sources |
 | :--- | :--- | :--- |
-| **Acquisition** | How did the file reach this machine? | Browser history, OS origin metadata, download-tool sidecars, archive inheritance, fetch commands |
+| **Acquisition** | How did the file reach this machine? | Browser history, OS origin metadata, download-tool sidecars, archive and torrent membership, fetch commands |
 | **Intrinsic** | What does the file reveal about its earlier life? | EXIF, XMP, IPTC, C2PA, document and media metadata |
 | **Interaction** | What touched it after arrival? | Recent documents, Windows shortcuts, shell commands |
 
