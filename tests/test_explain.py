@@ -9,6 +9,8 @@ reader can disagree with it.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from filegrail.explain import conclusion
 from filegrail.models import FileRecord, Origin
 from filegrail.reconcile import reconcile
@@ -225,3 +227,60 @@ def test_every_heading_is_uppercase_in_explain_and_compare():
     compared = render_compare(record, other, compare(record, other), theme=PLAIN)
     for heading in ("IDENTICAL", "ARRIVED BY", "ASSESSMENT"):
         assert f"\n  {heading}" in compared, heading
+
+
+# --- what explain answers first -----------------------------------------------
+
+NARROW = Theme(colour=False, unicode=False, width=72)
+
+
+def test_the_conclusion_comes_before_the_evidence():
+    """The command exists to answer *why does filegrail say this*. Putting the
+    answer under everything it rests on makes the reader scroll for it."""
+    output = render_explain(_record(DOWNLOAD, CAMERA, OPENED), theme=PLAIN)
+
+    lines = output.splitlines()
+    said = next(i for i, line in enumerate(lines) if line.startswith("  CONCLUSION"))
+    evidence = next(i for i, line in enumerate(lines) if line.startswith("  ACQUISITION"))
+
+    assert said < evidence
+
+
+def test_the_state_of_the_evidence_is_stated_before_it_is_shown():
+    output = render_explain(_record(DOWNLOAD, CAMERA, OPENED), theme=PLAIN)
+
+    state = "\n".join(
+        line for line in output.splitlines() if line.startswith("    ") and "record" in line
+    )
+    assert "acquisition" in state
+    assert "intrinsic" in state
+    assert "interaction" in state
+
+
+def test_a_class_with_nothing_in_it_says_so_rather_than_vanishing():
+    """An absent class is a fact about the file, not a gap in the report."""
+    output = render_explain(_record(CAMERA), theme=PLAIN)
+
+    assert "acquisition none" in " ".join(output.split())
+
+
+def test_an_address_is_not_broken_in_the_middle_of_itself(tmp_path: Path):
+    """A URL used to share a line with the source name and the strength, which
+    left it a third of the terminal. Anything longer broke inside a token, and
+    an address the report cut in half is one nothing can open or grep for."""
+    long_url = "https://portal.example.org/press/2026/holiday-master.jpg"
+    record = _record(Origin(source="browser-download", url=long_url, tool="firefox"))
+
+    output = render_explain(record, theme=NARROW)
+
+    assert long_url in output
+
+
+def test_a_claim_carries_the_same_meter_the_scan_shows():
+    """One vocabulary for strength across the two reports, or a reader has to
+    learn that `direct` here and four bars there are the same statement."""
+    output = render_explain(_record(DOWNLOAD), theme=Theme(colour=False, unicode=True, width=88))
+
+    headline = next(line for line in output.splitlines() if line.startswith("  ←"))
+    assert "▰" in headline
+    assert headline.rstrip().endswith("direct")

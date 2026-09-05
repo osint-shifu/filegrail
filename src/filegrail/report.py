@@ -22,7 +22,7 @@ from .clean import Cleaned
 from .cluster import cluster as group_sources
 from .explain import conclusion, grouped
 from .identify import CONTENT, METADATA, PLACE, Identifier, extract
-from .models import ACQUISITION, INTRINSIC, FileRecord, Origin, kind, label
+from .models import ACQUISITION, INTERACTION, INTRINSIC, FileRecord, Origin, kind, label
 from .overview import Alert, Inventory, Tally, attention, findings, inventory
 from .reconcile import ATTRIBUTION_CONFLICT, CONFLICT, KINDS, PARTIAL, Verdict, reconcile
 from .scan import Unsearched
@@ -1026,7 +1026,14 @@ def _whose_machine(theme: Theme, home: Path | None, said: str) -> list[str]:
 
 
 def render_explain(record: FileRecord, theme: Theme | None = None, home: Path | None = None) -> str:
-    """Every source for one file, grouped by the question it answers."""
+    """Why the tool says what it says: the answer, then what it rests on.
+
+    The reading comes first. This command exists to be asked *why*, and an
+    answer printed under everything it depends on is one the reader has to go
+    looking for. What follows it is the material, grouped by the question each
+    claim answers, and the reconciliation last - it is a note about the
+    evidence above rather than a step towards the conclusion above that.
+    """
     theme = theme or detect()
     rule = f"  {theme.rule(theme.width - 2)}"
     verdict = reconcile(record)
@@ -1036,17 +1043,25 @@ def render_explain(record: FileRecord, theme: Theme | None = None, home: Path | 
     if home:
         lines.extend(["", *_whose_machine(theme, home, "evidence read from the profile at")])
 
+    lines.extend(["", f"  {theme.label('CONCLUSION')}", ""])
+    for sentence in conclusion(record, verdict, home):
+        for part in theme.wrap(sentence, theme.width - 6):
+            lines.append(f"    {theme.paint(part, 'body')}")
+        lines.append("")
+
+    lines.extend([f"  {theme.label('EVIDENCE STATE')}", "", *_state(theme, record, verdict), ""])
+
     for name_of_kind, question, claims in grouped(record, home):
         head = f"  {theme.label(name_of_kind.upper())}"
         room = theme.width - len(name_of_kind) - 6
         if room >= 12:
             head += f"  {theme.dim(theme.clip(question, room))}"
-        lines.extend(["", head, ""])
+        lines.extend([rule, "", head, ""])
         for origin in claims:
             lines.extend(_explained(theme, origin))
 
     lines.extend(
-        ["", rule, "", f"  {theme.label('RECONCILIATION')}  {theme.dim(verdict.headline)}", ""]
+        [rule, "", f"  {theme.label('RECONCILIATION')}  {theme.dim(verdict.headline)}", ""]
     )
     # Wide enough for the longest kind there is. Clipping it would leave two
     # findings sharing a prefix and no way to tell which is which - and this
@@ -1060,52 +1075,75 @@ def render_explain(record: FileRecord, theme: Theme | None = None, home: Path | 
             )
     if not verdict.findings:
         lines.append(f"    {theme.dim('nothing to reconcile')}")
-
-    lines.extend(["", rule, "", f"  {theme.label('CONCLUSION')}", ""])
-    for sentence in conclusion(record, verdict, home):
-        for part in theme.wrap(sentence, theme.width - 6):
-            lines.append(f"    {theme.paint(part, 'body')}")
-        lines.append("")
+    lines.append("")
     return "\n".join(lines)
 
 
-def _explained(theme: Theme, origin: Origin) -> list[str]:
-    """One claim: what it says, then the detail underneath.
+def _state(theme: Theme, record: FileRecord, verdict: Verdict) -> list[str]:
+    """One line per class of evidence, whether or not the file has any.
 
-    The label column and the strength both give way on a narrow terminal, in
-    that order, because what the record actually says is the part worth keeping.
+    An absent class is a fact about the file rather than a gap in the report:
+    a photograph nothing recorded the arrival of is a different thing from one
+    whose arrival record disagrees with itself, and a section that simply does
+    not appear cannot tell those apart.
+    """
+    width = max(len(kind_name) for kind_name in (ACQUISITION, INTRINSIC, INTERACTION))
+    lines = []
+    for kind_name in (ACQUISITION, INTRINSIC, INTERACTION):
+        claims = [origin for origin in record.origins if kind(origin) == kind_name]
+        said = _plural(len(claims), "record") if claims else "none"
+        if kind_name == ACQUISITION and claims:
+            said += f" {theme.glyph(MIDDOT)} {verdict.headline}"
+        lines.append(f"    {theme.dim(kind_name.ljust(width))}  {theme.paint(said, 'body')}")
+    return lines
+
+
+def _explained(theme: Theme, origin: Origin) -> list[str]:
+    """One claim: what it is and how strong, then what it said, a field a line.
+
+    The value used to share its line with the source name and the strength,
+    which left it about a third of the width. Anything longer broke inside a
+    token, so a URL in this report was an address nobody could open, copy or
+    grep for - the one thing an investigator is most likely to want out of it.
+    A field to a line gives the value the page instead.
     """
     colour = theme.evidence(origin.source)
-    name = label(origin)
-    word = STRENGTH.get(colour, colour)
-    said = origin.url or origin.command or origin.tool or origin.note or "(no detail)"
-
-    column = min(20, max(10, theme.width // 3))
-    room = theme.width - 4 - column - 2 - len(word)
-    show_strength = room >= 12
-    if not show_strength:
-        room = theme.width - 4 - column
-
-    lines = []
-    for index, part in enumerate(theme.wrap(said, room)):
-        head = theme.paint(theme.clip(name, column).ljust(column), colour)
-        if index:
-            head = " " * column
-        tail = f"  {theme.dim(word)}" if index == 0 and show_strength else ""
-        lines.append(f"    {head}{theme.paint(part.ljust(room), 'body')}{tail}".rstrip())
-
-    # Whatever became the headline must not be repeated underneath it.
-    detail = [
-        value
-        for value in (origin.tool, shown(origin.at), origin.geo, origin.location)
-        if value and value != said
+    # The same meter the scan prints, so the two reports say strength one way.
+    meter = f"{theme.meter(origin.confidence, colour)} {theme.dim(STRENGTH.get(colour, colour))}"
+    fields = [
+        (name, value)
+        for name, value in (
+            ("url", origin.url),
+            ("referrer", origin.referrer),
+            ("command", origin.command),
+            ("tool", origin.tool),
+            ("at", shown(origin.at)),
+            ("geo", origin.geo),
+            ("place", origin.location),
+            ("note", origin.note),
+        )
+        if value
     ]
-    if origin.note and origin.note != said:
-        detail.append(origin.note)
-    if detail:
-        text = theme.glyph(MIDDOT).join(f" {value} " for value in detail).strip()
-        for part in theme.wrap(text, theme.width - 6 - column):
-            lines.append(f"    {' ' * column}{theme.dim(part)}")
+
+    indent = _gutter(theme)
+    lines = [
+        _row(
+            theme,
+            f"  {_mark(theme, ARROW, colour)} ",
+            label(origin),
+            meter,
+            paint=lambda text: theme.paint(text, colour),
+        ).rstrip()
+    ]
+
+    width = max((len(name) for name, _ in fields), default=0)
+    room = max(8, theme.width - indent - width - 2)
+    for name, value in fields:
+        for index, part in enumerate(theme.wrap(value, room)):
+            tag = theme.dim(name.ljust(width)) if index == 0 else " " * width
+            lines.append(f"  {_mark(theme, RAIL)} {tag}  {theme.paint(part, 'body')}".rstrip())
+    if not fields:
+        lines.append(f"  {_mark(theme, RAIL)} {theme.dim('(no detail)')}")
     lines.append("")
     return lines
 
