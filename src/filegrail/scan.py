@@ -25,6 +25,7 @@ from .sources import (
     read_mail,
     read_quarantine,
     read_shortcuts,
+    read_sidecar,
     read_xmp,
 )
 from .util import basename, birth_time, iso, sha256_file
@@ -142,6 +143,8 @@ def scan(
 
         record.origins.extend(read_file_attributes(path))
         record.origins.extend(read_quarantine(path, quarantined))
+        if sidecar := read_sidecar(path):
+            record.origins.append(sidecar)
         for reader in (read_c2pa_manifest, read_embedded_metadata, read_iptc):
             claim = reader(path)
             if claim is not None:

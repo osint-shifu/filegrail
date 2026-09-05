@@ -102,6 +102,33 @@ document and its Office-style properties sit exactly where a `.doc`'s do.
 
 ---
 
+## Sidecars
+
+Not metadata either, and not inside the file at all. A download tool can be
+asked to write what it knows beside what it fetched, and that record names the
+page the bytes came from.
+
+| File | What comes out |
+|:---|:---|
+| `<name>.info.json` | `yt-dlp --write-info-json`: the page URL, the uploader and channel, the publication date, the extractor, and the moment the fetch ran |
+
+The moment reported is the fetch, not the publication. `epoch` is when the tool
+wrote the document; `upload_date` is when the video became available and can be
+years earlier, so reading it as the arrival would place the file on this
+machine before it was.
+
+The estimated size is deliberately not carried. `filesize_approx` is an
+estimate for the format that was chosen, and reported as a byte count it would
+contradict the file on disk and be reported as a size mismatch nothing is
+actually wrong about.
+
+A sidecar is paired to its media by file name alone, which is why it ranks
+below the attributes an operating system attaches to the file itself: a copy
+that brings one and not the other, or a rename, breaks that pairing in a way an
+extended attribute cannot be broken.
+
+---
+
 ## Archives
 
 Not metadata. These are read so that a file extracted from one can inherit the

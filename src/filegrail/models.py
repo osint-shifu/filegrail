@@ -17,6 +17,12 @@ CONFIDENCE = {
     # where-from attribute and recorded beside it rather than instead of it.
     "macos-quarantine": 85,
     "xdg-xattr": 80,
+    # Written by the program that fetched the bytes, and it names the page
+    # they came from. Below the attributes an operating system attaches to the
+    # file itself, because a sidecar is a separate file paired to the media by
+    # name alone: a copy that brings one and not the other, or a rename, breaks
+    # that pairing in a way an extended attribute cannot be broken.
+    "ytdlp-sidecar": 75,
     "archive-member": 70,
     # A purpose-built provenance standard, but the signature is not verified here.
     "c2pa": 60,
@@ -58,6 +64,7 @@ SOURCE_LABELS = {
     "macos-wherefroms": "macOS where-from",
     "macos-quarantine": "macOS quarantine",
     "xdg-xattr": "XDG attribute",
+    "ytdlp-sidecar": "yt-dlp sidecar",
     "archive-member": "archive member",
     "c2pa": "content credentials",
     "device-metadata": "device metadata",
@@ -145,6 +152,7 @@ _KINDS = {
     "macos-wherefroms": ACQUISITION,
     "macos-quarantine": ACQUISITION,
     "xdg-xattr": ACQUISITION,
+    "ytdlp-sidecar": ACQUISITION,
     "email-delivery": ACQUISITION,
     "email-relay": ACQUISITION,
     "archive-member": ACQUISITION,

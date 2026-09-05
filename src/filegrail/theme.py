@@ -51,6 +51,10 @@ EVIDENCE = {
     "macos-wherefroms": "recorded",
     "macos-quarantine": "recorded",
     "xdg-xattr": "recorded",
+    # A program wrote down where it fetched the bytes, which is the same kind
+    # of claim a browser's database makes. How much the pairing to this file is
+    # worth is what the rank says, not the colour.
+    "ytdlp-sidecar": "recorded",
     # Both are a note another system wrote as the message passed through. How
     # much that system is worth believing is what the rank says, not the colour.
     "email-delivery": "recorded",

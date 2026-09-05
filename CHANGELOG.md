@@ -9,6 +9,27 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The record `yt-dlp` writes beside what it fetched is read. `--write-info-json`
+  leaves `<name>.info.json` next to the media, and that document names the page
+  the bytes came from, the uploader and channel, the publication date, and the
+  moment the fetch ran. It is an acquisition record in the plainest sense - the
+  program that got the bytes wrote down where it got them - and unlike a
+  browser database it travels with the file.
+
+  It ranks below the attributes an operating system attaches to the file
+  itself. A sidecar is a separate file paired to the media by name alone, so a
+  copy that brings one and not the other, or a rename, breaks that pairing in a
+  way an extended attribute cannot be broken, and nothing in the document
+  proves it describes the file it happens to sit beside.
+
+  The moment reported is the fetch and not the publication. `upload_date` can
+  be years earlier, and reading it as the arrival would put the file on the
+  timeline before it was ever on this machine.
+
+  `filesize_approx` is not carried as a byte count. It is an estimate for the
+  format that was chosen, and reporting it as the size would produce a size
+  mismatch that nothing is actually wrong about.
+
 - An editing history recorded out of order is reported. `xmpMM:History` is a
   sequence and the reader already keeps the order the encoder wrote, so a step
   dated before the one it follows contradicts the list it sits in - a clock
