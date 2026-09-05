@@ -59,7 +59,7 @@ def test_explain_takes_one_file(two, capsys):
 
     assert main(["explain", str(left), "--no-color"]) == 0
 
-    assert "conclusion" in capsys.readouterr().out
+    assert "CONCLUSION" in capsys.readouterr().out
 
 
 def test_explain_refuses_a_directory(tmp_path: Path, capsys):
@@ -73,7 +73,7 @@ def test_compare_takes_two_files(two, capsys):
 
     assert main(["compare", str(left), str(right), "--no-color"]) == 0
 
-    assert "assessment" in capsys.readouterr().out
+    assert "ASSESSMENT" in capsys.readouterr().out
 
 
 def test_compare_refuses_a_missing_file(two, capsys):

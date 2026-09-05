@@ -18,7 +18,7 @@ from filegrail.models import FileRecord, Origin
 from filegrail.report import render_text, render_timeline
 from filegrail.theme import Theme
 
-WIDTHS = [48, 56, 64, 80, 88, 110]
+WIDTHS = [48, 56, 64, 72, 80, 88, 110]
 
 #: The right-aligned timestamp column, which shares a line with the name beside
 #: it and has to be removed before that name can be reassembled.

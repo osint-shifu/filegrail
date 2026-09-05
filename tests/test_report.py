@@ -200,7 +200,12 @@ def _at(output: str, heading: str) -> int:
     A heading is a line at column two with a rule directly under it. Both halves
     matter: `findings` is a word the banner uses as a row label too, and a plain
     substring search compared the wrong two positions and passed.
+
+    The name is upper-cased here rather than at every call site. What a section
+    is called and how a heading is cased are two different claims, and only one
+    test needs to make the second one.
     """
+    heading = heading.upper()
     lines = output.splitlines()
     for index, line in enumerate(lines[:-1]):
         if line.startswith(f"  {heading}") and _rule(lines[index + 1]):
@@ -221,6 +226,7 @@ def _section(output: str, heading: str) -> list[str]:
     Asserting that a name appears somewhere in a long report proves nothing:
     every name in the attention block also appears in the entry it points at.
     """
+    heading = heading.upper()
     lines = output.splitlines()
     start = next(index for index, line in enumerate(lines) if line.strip().startswith(heading))
     rules = [index for index, line in enumerate(lines) if _rule(line) and index > start + 1]
@@ -248,7 +254,7 @@ def test_the_masthead_does_not_call_a_metadata_block_a_traced_origin():
 def test_the_inventory_lists_every_type_with_its_share_of_the_bytes():
     output = render_text(_corpus(), Path("/case"), theme=PLAIN)
 
-    assert "inventory" in output
+    assert "INVENTORY" in output
     for extension in ("PDF", "JPEG", "PNG", "TXT", "BIN"):
         assert extension in output, extension
 
@@ -263,10 +269,10 @@ def test_the_inventory_names_the_families_the_type_filter_uses():
 def test_the_findings_section_says_what_was_found():
     output = render_text(_corpus(), Path("/case"), theme=PLAIN)
 
-    assert "findings" in output
-    assert "file metadata" in output
+    assert "FINDINGS" in output
+    assert "FILE METADATA" in output
     assert "device information" in output
-    assert "content credentials" in output
+    assert "CONTENT CREDENTIALS" in output
 
 
 def test_attention_raises_the_conflict_and_names_the_file():
@@ -301,7 +307,7 @@ def test_the_reader_table_is_technical_detail_and_goes_last():
     question as "what was found" and must not stand in for it."""
     output = render_text(_corpus(), Path("/case"), theme=PLAIN)
 
-    assert "metadata sources" in output
+    assert "METADATA SOURCES" in output
     assert _at(output, "metadata sources") > _at(output, "findings")
 
 
@@ -323,7 +329,7 @@ def test_one_file_is_not_given_an_inventory_of_itself():
         theme=PLAIN,
     )
 
-    assert "inventory" not in output
+    assert "INVENTORY" not in output
     assert "suspicious.pdf" in output
 
 
@@ -333,9 +339,9 @@ def test_the_section_headings_say_what_the_section_holds():
     heads, which holds every file nothing at all was found for."""
     output = render_text(_corpus(), Path("/case"), theme=PLAIN)
 
-    assert "file metadata" in output
+    assert "FILE METADATA" in output
     assert "claimed by the file itself" not in output
-    assert "no findings" in output
+    assert "NO FINDINGS" in output
     assert "no recorded origin" not in output
 
 
@@ -395,7 +401,7 @@ def test_the_section_is_not_named_as_an_alarm():
     """Coordinates and Content Credentials are findings, not problems."""
     output = render_text(_corpus(), Path("/case"), theme=PLAIN)
 
-    assert "notable findings" in output
+    assert "NOTABLE FINDINGS" in output
     assert "attention" not in output
 
 

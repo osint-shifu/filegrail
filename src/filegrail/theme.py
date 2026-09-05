@@ -256,6 +256,13 @@ class Theme:
         )
 
 
+#: What a report is laid out to when it is not going to a terminal. Seventy-two
+#: is what a file survives being quoted in mail, pasted into a ticket, read in a
+#: side pane and diffed at - the same number, for the same reason, that git uses
+#: for the body of a commit message.
+ARCHIVE_WIDTH = 72
+
+
 def detect(stream: TextIO | None = None, *, colour: bool | None = None) -> Theme:
     """Choose a theme from the environment, honouring the usual overrides."""
     stream = stream or sys.stdout
@@ -266,13 +273,37 @@ def detect(stream: TextIO | None = None, *, colour: bool | None = None) -> Theme
     encoding = (getattr(stream, "encoding", None) or "").lower()
     unicode_ok = "utf" in encoding or os.environ.get("LANG", "").lower().find("utf") >= 0
 
-    width = shutil.get_terminal_size(fallback=(88, 24)).columns
+    width = _width(stream)
+
     return Theme(
         colour=colour,
         unicode=unicode_ok,
-        width=max(48, min(width, 110)),
+        width=width,
         depth=_depth() if colour else NONE,
     )
+
+
+def _width(stream: TextIO) -> int:
+    """How wide to lay the report out.
+
+    A terminal is asked how wide it is. Anything else is not a terminal and
+    outlives one: a redirected report is quoted in mail, pasted into a ticket,
+    read in a side pane and diffed, and the width of the machine that produced
+    it is of no interest to any of those. Baking that width in makes every rule
+    wrap the moment the file is opened somewhere narrower, and a wrapped rule
+    is a stray line of dashes that reads as damage rather than as a divider.
+
+    `COLUMNS` still wins in both cases, for somebody who wants a wide file on
+    purpose - `shutil.get_terminal_size` reads it first, so asking about it
+    here is only about knowing whether it was set at all.
+    """
+    try:
+        terminal = bool(stream.isatty())
+    except (AttributeError, ValueError):
+        terminal = False
+    if not terminal and not os.environ.get("COLUMNS"):
+        return ARCHIVE_WIDTH
+    return max(48, min(shutil.get_terminal_size(fallback=(88, 24)).columns, 110))
 
 
 def _depth() -> int:

@@ -147,7 +147,7 @@ def test_the_section_is_absent_unless_it_was_asked_for():
         _record("/case/b.docx", "ooxml-properties", creator="A. Person"),
     ]
 
-    assert "shared sources" not in render_text(records, Path("/case"), theme=PLAIN)
+    assert "SHARED SOURCES" not in render_text(records, Path("/case"), theme=PLAIN)
 
 
 def test_the_names_line_up_under_one_another():
@@ -162,7 +162,7 @@ def test_the_names_line_up_under_one_another():
 
     out = render_text(records, Path("/case"), theme=PLAIN, cluster=True)
     # The names appear in the per-file entries too; only the section is at issue.
-    section = out.split("shared sources")[1].splitlines()
+    section = out.split("SHARED SOURCES")[1].splitlines()
     rows = [line for line in section if "A. Person" in line or "COOLPIX" in line]
 
     assert len(rows) == 2

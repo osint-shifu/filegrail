@@ -105,9 +105,9 @@ def test_a_timeline_conflict_is_called_out_in_the_conclusion():
 def test_it_groups_the_sources_by_kind():
     output = render_explain(_record(DOWNLOAD, CAMERA, OPENED), theme=PLAIN)
 
-    assert "acquisition" in output
-    assert "intrinsic" in output
-    assert "interaction" in output
+    assert "ACQUISITION" in output
+    assert "INTRINSIC" in output
+    assert "INTERACTION" in output
 
 
 def test_it_names_every_record_it_found():
@@ -122,7 +122,7 @@ def test_it_shows_the_reconciliation_and_the_conclusion():
     output = render_explain(_record(DOWNLOAD, MIRROR), theme=PLAIN)
 
     assert "conflict" in output
-    assert "conclusion" in output
+    assert "CONCLUSION" in output
     assert "mirror.example.net" in output
 
 
@@ -207,3 +207,21 @@ def test_the_conclusion_names_the_blocks_that_actually_disagree():
     assert "disagree about Model" in output
     assert "device metadata" in output
     assert "IPTC" not in output
+
+
+def test_every_heading_is_uppercase_in_explain_and_compare():
+    """The same reasoning as the scan report: without colour a heading has only
+    its letters and its position left to distinguish it from body text, and a
+    report read from a file has no colour."""
+    from filegrail.compare import compare
+    from filegrail.report import render_compare
+
+    record = _record(DOWNLOAD, CAMERA, OPENED)
+    explained = render_explain(record, theme=PLAIN)
+    for heading in ("ACQUISITION", "RECONCILIATION", "CONCLUSION"):
+        assert f"\n  {heading}" in explained, heading
+
+    other = _record(DOWNLOAD, CAMERA)
+    compared = render_compare(record, other, compare(record, other), theme=PLAIN)
+    for heading in ("IDENTICAL", "ARRIVED BY", "ASSESSMENT"):
+        assert f"\n  {heading}" in compared, heading

@@ -17,7 +17,7 @@ from filegrail.theme import ARROW, BULLET, FLAG, RAIL, Theme
 
 ROOT = Path("/case")
 
-WIDTHS = [48, 56, 64, 80, 88, 110]
+WIDTHS = [48, 56, 64, 72, 80, 88, 110]
 
 
 def _record(name: str, origin: Origin | None = None, size: int = 4096) -> FileRecord:
@@ -113,7 +113,11 @@ def test_every_entry_line_starts_in_the_gutter():
     body = [line for line in lines[first:] if line[:2] == "  " and line[2:3].strip()]
 
     gutter = {line[2] for line in body}
-    assert gutter <= {BULLET, ARROW, RAIL, FLAG, "─", *"abcdefghijklmnopqrstuvwxyz."}, gutter
+    # Headings start at column two and are upper-cased, so their first letter
+    # sits in the gutter column as well.
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    allowed = {BULLET, ARROW, RAIL, FLAG, "─", ".", *letters, *letters.upper()}
+    assert gutter <= allowed, gutter
 
 
 def test_headings_appear_only_when_classes_differ():
@@ -125,7 +129,7 @@ def test_headings_appear_only_when_classes_differ():
 
     output = render_text(one_class, ROOT, theme=theme)
 
-    assert "file metadata" not in output
+    assert "FILE METADATA" not in output
     assert "Canon EOS 40D" in output
 
 
@@ -139,8 +143,8 @@ def test_headings_appear_once_a_class_collects_more_than_one_file():
 
     output = render_text(mixed, ROOT, theme=theme)
 
-    assert "file metadata" in output
-    assert "recorded by another system" in output
+    assert "FILE METADATA" in output
+    assert "RECORDED BY ANOTHER SYSTEM" in output
 
 
 def test_no_headings_when_every_class_holds_one_file():
@@ -153,8 +157,8 @@ def test_no_headings_when_every_class_holds_one_file():
 
     output = render_text(scattered, ROOT, theme=theme)
 
-    assert "file metadata" not in output
-    assert "recorded by another system" not in output
+    assert "FILE METADATA" not in output
+    assert "RECORDED BY ANOTHER SYSTEM" not in output
     assert "b.pdf" in output
 
 
@@ -213,3 +217,30 @@ def test_the_whole_report_is_ascii_when_the_terminal_is():
     output = render_text(_corpus(), ROOT, theme=theme, limit=0, identify=True)
 
     assert output.isascii()
+
+
+# --- what a heading is made of when there is no colour ------------------------
+
+
+def test_section_headings_are_uppercase_so_they_survive_plain_text():
+    """`theme.bold` and `theme.paint` both return the text unchanged when
+    colour is off, and colour is off in exactly the case that matters: a report
+    redirected to a file. Case and position are the only emphasis left, so the
+    headings have to carry it themselves rather than lean on styling."""
+    theme = Theme(colour=False, unicode=True, width=88)
+
+    output = render_text(_corpus(), ROOT, theme=theme, identify=True, limit=1)
+
+    assert "\n  INVENTORY" in output
+    assert "\n  FINDINGS" in output
+    assert "\n  NO FINDINGS" in output
+    assert "\n  inventory" not in output
+
+
+def test_a_heading_keeps_its_count_beside_it():
+    theme = Theme(colour=False, unicode=True, width=88)
+
+    output = render_text(_corpus(), ROOT, theme=theme, limit=1)
+
+    heading = next(line for line in output.splitlines() if line.startswith("  INVENTORY"))
+    assert heading.rstrip().endswith("types")

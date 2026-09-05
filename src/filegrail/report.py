@@ -554,10 +554,16 @@ def _heading(theme: Theme, text: str, count: int | None = None, noun: str = "fil
 
     The count is optional: a section whose rows each carry their own count has
     nothing to put up there that is not already below it.
+
+    Upper case, and not as decoration. `theme.bold` and `theme.paint` both hand
+    the text back untouched when colour is off, and colour is off in exactly
+    the case that matters most - a report redirected to a file, read months
+    later by somebody who was not there. Case and position are then the only
+    emphasis left, so a heading has to carry it in the letters themselves.
     """
     right = theme.dim(_plural(count, noun)) if count is not None else ""
     return [
-        _row(theme, "  ", text, right, paint=theme.label).rstrip(),
+        _row(theme, "  ", text.upper(), right, paint=theme.label).rstrip(),
         f"  {theme.rule(theme.width - 2)}",
         "",
     ]
@@ -986,7 +992,7 @@ def render_doctor(found: Survey, theme: Theme | None = None, home: Path | None =
             lines.append(f"  {' ' * width}    {theme.dim(part)}")
 
     if found.horizon:
-        lines.extend(["", rule, "", f"  {theme.label('how far back the records reach')}", ""])
+        lines.extend(["", rule, "", f"  {theme.label('HOW FAR BACK THE RECORDS REACH')}", ""])
         edge = max(len(check.name) for check in found.horizon)
         for check in found.horizon:
             lines.append(
@@ -1031,7 +1037,7 @@ def render_explain(record: FileRecord, theme: Theme | None = None, home: Path | 
         lines.extend(["", *_whose_machine(theme, home, "evidence read from the profile at")])
 
     for name_of_kind, question, claims in grouped(record, home):
-        head = f"  {theme.label(name_of_kind)}"
+        head = f"  {theme.label(name_of_kind.upper())}"
         room = theme.width - len(name_of_kind) - 6
         if room >= 12:
             head += f"  {theme.dim(theme.clip(question, room))}"
@@ -1040,7 +1046,7 @@ def render_explain(record: FileRecord, theme: Theme | None = None, home: Path | 
             lines.extend(_explained(theme, origin))
 
     lines.extend(
-        ["", rule, "", f"  {theme.label('reconciliation')}  {theme.dim(verdict.headline)}", ""]
+        ["", rule, "", f"  {theme.label('RECONCILIATION')}  {theme.dim(verdict.headline)}", ""]
     )
     # Wide enough for the longest kind there is. Clipping it would leave two
     # findings sharing a prefix and no way to tell which is which - and this
@@ -1055,7 +1061,7 @@ def render_explain(record: FileRecord, theme: Theme | None = None, home: Path | 
     if not verdict.findings:
         lines.append(f"    {theme.dim('nothing to reconcile')}")
 
-    lines.extend(["", rule, "", f"  {theme.label('conclusion')}", ""])
+    lines.extend(["", rule, "", f"  {theme.label('CONCLUSION')}", ""])
     for sentence in conclusion(record, verdict, home):
         for part in theme.wrap(sentence, theme.width - 6):
             lines.append(f"    {theme.paint(part, 'body')}")
@@ -1127,24 +1133,24 @@ def render_compare(
     )
 
     if found.shared:
-        lines.extend(["", f"  {theme.label('identical')}", ""])
+        lines.extend(["", f"  {theme.label('IDENTICAL')}", ""])
         for name, value in found.shared:
             lines.extend(_pair(theme, name, value, width, "recorded"))
 
     if found.differing:
-        lines.extend(["", f"  {theme.label('differing')}", ""])
+        lines.extend(["", f"  {theme.label('DIFFERING')}", ""])
         for name, one, other in found.differing:
             lines.extend(_pair(theme, name, f"{one}  vs  {other}", width, "warning"))
 
-    lines.extend(["", f"  {theme.label('arrived by')}", ""])
+    lines.extend(["", f"  {theme.label('ARRIVED BY')}", ""])
     for name, route in found.acquisition:
         lines.extend(_pair(theme, name, route, width, "inherited"))
 
     if found.interval:
-        lines.extend(["", f"  {theme.label('created')}", ""])
+        lines.extend(["", f"  {theme.label('CREATED')}", ""])
         lines.extend(_pair(theme, "apart", found.interval, width, "body"))
 
-    lines.extend(["", rule, "", f"  {theme.label('assessment')}", ""])
+    lines.extend(["", rule, "", f"  {theme.label('ASSESSMENT')}", ""])
     for part in theme.wrap(found.assessment, theme.width - 6):
         lines.append(f"    {theme.paint(part, 'body')}")
     lines.append("")

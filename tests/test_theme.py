@@ -2,7 +2,7 @@ from pathlib import Path
 
 from filegrail.models import CONFIDENCE, FileRecord, Origin
 from filegrail.report import render_text
-from filegrail.theme import EVIDENCE, Theme, detect
+from filegrail.theme import ARCHIVE_WIDTH, EVIDENCE, Theme, detect
 
 
 class _Stream:
@@ -106,3 +106,35 @@ def test_every_ranked_source_has_an_evidence_colour():
     """A source absent from the palette is painted faint, which the legend reads
     as "filesystem timestamps only" - a silent demotion of real evidence."""
     assert set(CONFIDENCE) <= set(EVIDENCE)
+
+
+# --- the width a report that outlives its terminal is laid out to -------------
+
+
+def test_a_report_not_going_to_a_terminal_is_laid_out_for_reading_later(monkeypatch):
+    """A redirected report outlives the terminal that made it.
+
+    Baking that terminal's width into a file makes every rule wrap the moment
+    somebody opens it somewhere narrower, and a wrapped rule is a stray line of
+    dashes that reads as a damaged file rather than as a divider.
+    """
+    monkeypatch.delenv("COLUMNS", raising=False)
+
+    # The literal, not the constant: 72 is a decision - what a file survives
+    # being quoted, pasted, diffed and read in a side pane at - and a test that
+    # compares the constant to itself would let that decision drift unnoticed.
+    assert detect(_Stream(tty=False)).width == 72
+    assert ARCHIVE_WIDTH == 72
+
+
+def test_a_terminal_still_gets_its_own_width(monkeypatch):
+    monkeypatch.setenv("COLUMNS", "104")
+
+    assert detect(_Stream(tty=True)).width == 104
+
+
+def test_a_named_width_is_honoured_even_when_redirected(monkeypatch):
+    """The escape hatch for somebody who wants a wide file on purpose."""
+    monkeypatch.setenv("COLUMNS", "100")
+
+    assert detect(_Stream(tty=False)).width == 100
