@@ -12,7 +12,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from filegrail.identify import extract, find_coordinates, normalize_domain, normalize_url
+from filegrail.identify import (
+    PLACE,
+    extract,
+    find_coordinates,
+    normalize_domain,
+    normalize_url,
+)
 from filegrail.models import FileRecord, Origin
 from filegrail.report import render_json, render_text
 from filegrail.theme import Theme
@@ -266,6 +272,21 @@ def test_content_widens_the_corpus_to_what_the_document_says(tmp_path: Path):
         "ann.shaw@acme-legal.example"
     ]
     assert [entry.corpora for entry in found if entry.type == "email"] == [{"content"}]
+
+
+def test_a_value_from_a_document_says_where_in_the_document_it_was(tmp_path: Path):
+    """An identifier reported as `notes.txt` sends somebody back to search the
+    file. One reported as `notes.txt - line 3` does not."""
+    record = _document(
+        tmp_path,
+        "nothing here\nnor here\nwrite to ann.shaw@acme-legal.example\n",
+        name="notes.txt",
+        source="document-metadata",
+    )
+
+    email = next(e for e in extract([record], content=True) if e.type == "email")
+
+    assert email.where == [f"notes.txt{PLACE}line 3"]
 
 
 def test_a_value_written_in_a_document_and_recorded_about_it_says_both(tmp_path: Path):

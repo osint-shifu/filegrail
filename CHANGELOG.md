@@ -34,6 +34,16 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   and it is raised in the notable findings where a long report cannot bury it.
   Each entry in `--json` carries `corpora` and `acquired` for the same reason.
 
+  Every value says where in the document it was found. The text is read in
+  passages rather than as one string, and each passage is addressed in whatever
+  terms its format actually has: a line for text and markup, a slide, a sheet,
+  a named chapter, the body or the footnotes of a Word file, the body of a
+  message. A Word file gets no page number - pagination happens when something
+  renders it and the file does not record where the breaks fell, so a page
+  there would be a number this invented. Scanning the passages apart rather
+  than together costs about a fifth more and is the whole difference between
+  `notes.md` and `notes.md · line 1`.
+
 - `clean --check` writes nothing. It runs every stripper, reads the result back
   through the same readers, and says what would come out of each file and what
   a reader would still find in the copy - then exits 1 if any copy would not

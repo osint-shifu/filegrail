@@ -3,7 +3,7 @@ from __future__ import annotations
 from .archives import inherited_origin, is_archive, list_members, read_contents
 from .browser import collect_browser_downloads
 from .c2pa import read_c2pa_manifest
-from .content import read_text
+from .content import read_passages
 from .embedded import read_embedded_metadata
 from .fsattrs import read_file_attributes
 from .iptc import read_iptc
@@ -23,7 +23,7 @@ __all__ = [
     "read_file_attributes",
     "read_embedded_metadata",
     "read_c2pa_manifest",
-    "read_text",
+    "read_passages",
     "read_iptc",
     "read_mail",
     "read_messenger_name",

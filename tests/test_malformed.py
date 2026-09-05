@@ -35,7 +35,7 @@ import pytest
 from filegrail.clean import clean_file
 from filegrail.sources.archives import list_members, read_contents
 from filegrail.sources.c2pa import read_c2pa_manifest
-from filegrail.sources.content import read_text
+from filegrail.sources.content import read_passages
 from filegrail.sources.embedded import read_embedded_metadata
 from filegrail.sources.iptc import read_iptc
 from filegrail.sources.mail import read_mail
@@ -54,7 +54,7 @@ from tests.shortcut import link_info, shortcut, volume_id
 _READERS: tuple[Callable[[Path], object], ...] = (
     read_c2pa_manifest,
     read_contents,
-    read_text,
+    read_passages,
     read_embedded_metadata,
     read_iptc,
     list_members,

@@ -340,7 +340,7 @@ def _texts(records: list[FileRecord], *, content: bool = False) -> Iterator[_Tex
         # Imported here rather than at the top: reading bodies pulls in the
         # container readers, and a scan that was not asked for them should not
         # pay to import them.
-        from .sources.content import read_text
+        from .sources.content import read_passages
     for record in records:
         name = Path(record.path).name
         for origin in record.origins:
@@ -360,9 +360,12 @@ def _texts(records: list[FileRecord], *, content: bool = False) -> Iterator[_Tex
                 if value:
                     yield _Text(name, label, str(value), METADATA, arrival)
         if content:
-            body = read_text(Path(record.path))
-            if body:
-                yield _Text(name, "text", body, CONTENT, False)
+            # One yield per passage rather than one per file. Scanning them
+            # apart is what lets a value carry the line, slide or chapter it
+            # was on, and it costs about a fifth more than scanning the
+            # document as one string.
+            for passage in read_passages(Path(record.path)) or ():
+                yield _Text(name, passage.place, passage.text, CONTENT, False)
 
 
 def extract(records: list[FileRecord], *, content: bool = False) -> list[Identifier]:

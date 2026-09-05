@@ -98,6 +98,8 @@ filegrail does more than extract:
 
 `--content` widens the corpus from what files record about themselves to what they say — the body of a Word or OpenDocument file, a slide deck, a spreadsheet's strings, HTML, XML, a message body, plain text and data files. **No dependency is added for it**: those formats are zip archives of XML, and filegrail already opens them for their properties. PDF text is deliberately not read: pulling string literals out of a content stream produces readable text for perhaps half of real documents and mush for the rest, and in a tool that reports evidence a confident wrong answer is worse than an absent one. Source code and RTF are left out for reasons of the same kind, written down in `sources/content.py`.
 
+Every value says where in the document it was found, in whatever terms the format actually has: a **line** for text and markup, a **slide**, a **sheet**, a named chapter, the **body** or the **footnotes** of a Word file, the body of a message. A Word file gets no page number, because pagination happens when something renders it and the file does not record where the breaks fell.
+
 The two corpora are kept apart on every value, because prose is an order of magnitude noisier than a property field. That separation is also what makes the interesting answer visible:
 
 > **A value a document names, that the record of the file's arrival also names.** Either alone is ordinary. The two together were put there by separate acts, and only something that already read the arrival record can see it.
@@ -279,8 +281,12 @@ With `--content`, each value says which side of the file it came from, and a val
 
     domain  acme-legal.example                       both      3 in 1
             invoice.docx · url
-    domain  innafirma.example                        text      1 in 1
-            notes.md · text
+    email   ann.shaw@acme-legal.example              text      1 in 1
+            invoice.docx · body
+    md5     8f14e45fceea167a5a36dedd4bea2543         text      1 in 1
+            notes.md · line 1
+    url     https://acme-legal.example/portal        recorded  1 in 1
+            invoice.docx · referrer
 ```
 
 ### Explain one result

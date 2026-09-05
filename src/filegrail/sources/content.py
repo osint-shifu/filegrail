@@ -41,6 +41,7 @@ import re
 import zipfile
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import NamedTuple
 
 from .embedded.containers import EPUB_SUFFIXES, ODF_SUFFIXES, SVG_SUFFIXES
 from .embedded.documents import OOXML_SUFFIXES
@@ -56,6 +57,20 @@ MAX_TEXT_BYTES = 1024 * 1024
 #: How many members of one package are read. A deck can hold a thousand slides
 #: and each one costs an open, a bounded read and a parse.
 MAX_PARTS = 64
+
+
+class Passage(NamedTuple):
+    """A run of a document's text, and where in the document it sits.
+
+    The place is written in whatever terms the format actually has - a line, a
+    slide, a sheet, a chapter, the body of a message - and no others. It is the
+    difference between an identifier a reader can go and look at and one they
+    have to search the file for again.
+    """
+
+    place: str
+    text: str
+
 
 #: Files that already are text. Data formats are included - a JSON export from
 #: an application is exactly the sort of file an examiner is handed - and
@@ -91,16 +106,31 @@ PACKAGE_SUFFIXES = OOXML_SUFFIXES | ODF_SUFFIXES | EPUB_SUFFIXES
 
 SUFFIXES = PLAIN_SUFFIXES | MARKUP_SUFFIXES | PACKAGE_SUFFIXES | MAIL_SUFFIXES | OUTLOOK_SUFFIXES
 
-#: Which members of a package hold what the document says. Word keeps the notes
-#: and comments outside the main part, a deck keeps one member per slide, and a
-#: spreadsheet keeps every string it shows in one table - so the body of a file
-#: is several members and never just one.
-_BODY_PARTS = re.compile(
-    r"(?:^word/(?:document|footnotes|endnotes|comments)\d*\.xml$)"
-    r"|(?:^ppt/(?:slides|notesSlides)/[^/]+\.xml$)"
-    r"|(?:^xl/(?:sharedStrings\.xml|worksheets/[^/]+\.xml)$)"
-    r"|(?:^content\.xml$)|(?:^styles\.xml$)"
-    r"|(?:\.x?html?$)"
+#: Which members of a package hold what the document says, and what to call
+#: each one. Word keeps the notes and comments outside the main part, a deck
+#: keeps one member per slide, and a spreadsheet keeps every string it shows in
+#: one table - so the body of a document is several members and never just one.
+#:
+#: The name on the right is what a reader is told, in the terms the format
+#: actually has. A deck has slides and a workbook has sheets; a Word file has
+#: neither pages nor lines, because pagination happens when something renders
+#: it and the file does not record where the breaks fell. Naming a page there
+#: would be inventing a number, which is the one thing a report of evidence
+#: must not do.
+_PARTS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"^word/document\d*\.xml$"), "body"),
+    (re.compile(r"^word/footnotes\d*\.xml$"), "footnotes"),
+    (re.compile(r"^word/endnotes\d*\.xml$"), "endnotes"),
+    (re.compile(r"^word/comments\d*\.xml$"), "comments"),
+    (re.compile(r"^ppt/slides/slide(\d+)\.xml$"), "slide {}"),
+    (re.compile(r"^ppt/notesSlides/notesSlide(\d+)\.xml$"), "slide {} notes"),
+    (re.compile(r"^xl/sharedStrings\.xml$"), "cell text"),
+    (re.compile(r"^xl/worksheets/sheet(\d+)\.xml$"), "sheet {}"),
+    (re.compile(r"^content\.xml$"), "body"),
+    (re.compile(r"^styles\.xml$"), "headers and footers"),
+    # An EPUB is a book of chapters, each its own document, and the file name
+    # is what the book itself calls them.
+    (re.compile(r"^(?:.*/)?([^/]+\.x?html?)$", re.IGNORECASE), "{}"),
 )
 
 #: Elements whose text is not what the document says. A stylesheet is full of
@@ -129,8 +159,8 @@ _UNREADABLE = (
 )
 
 
-def read_text(path: Path) -> str | None:
-    """The readable text of `path`, or None where there is none to read.
+def read_passages(path: Path) -> list[Passage] | None:
+    """The readable text of `path`, in pieces that each know where they are.
 
     None is the answer for a format nothing here handles, for a file that is
     not the format its name claims, and for a document that turns out to hold
@@ -142,19 +172,44 @@ def read_text(path: Path) -> str | None:
 
     try:
         if suffix in PLAIN_SUFFIXES:
-            text = _decode(_head(path))
+            found = _lines(_decode(_head(path)))
         elif suffix in MARKUP_SUFFIXES:
-            text = _stripped(_decode(_head(path)))
+            found = _read(_decode(_head(path)))
         elif suffix in PACKAGE_SUFFIXES:
-            text = _package(path)
+            found = _package(path)
         elif suffix in MAIL_SUFFIXES:
-            text = _message(path)
+            found = _message(path)
         else:
-            text = _outlook(path)
+            found = _outlook(path)
     except _UNREADABLE:
         return None
 
-    return text[:MAX_TEXT_BYTES] if text.strip() else None
+    return _bounded(found) or None
+
+
+def _bounded(found: list[Passage]) -> list[Passage]:
+    """The passages that fit in the budget, with the blank ones dropped.
+
+    The budget is spent across the document rather than per piece, so a file
+    cannot cost more by being cut into many pieces than by being one - which is
+    the same reasoning `MAX_PARTS` applies to a package's members.
+    """
+    kept: list[Passage] = []
+    budget = MAX_TEXT_BYTES
+    for passage in found:
+        text = passage.text.strip()
+        if not text:
+            continue
+        kept.append(Passage(passage.place, text[:budget]))
+        budget -= len(kept[-1].text)
+        if budget <= 0:
+            break
+    return kept
+
+
+def _lines(text: str) -> list[Passage]:
+    """One passage per line, because a line is what a text file has."""
+    return [Passage(f"line {number}", line) for number, line in enumerate(text.split("\n"), 1)]
 
 
 def _head(path: Path) -> bytes:
@@ -203,15 +258,20 @@ class _Text(HTMLParser):
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
-        self.parts: list[str] = []
+        self.found: list[Passage] = []
         self._silent = 0
+
+    def _keep(self, text: str) -> None:
+        # `getpos` is the line of the markup being handled, which is the line
+        # of the file - the one number here a person can act on.
+        self.found.append(Passage(f"line {self.getpos()[0]}", text))
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag in _SILENT:
             self._silent += 1
         for name, value in attrs:
             if value and name.lower() in _LINK_ATTRIBUTES:
-                self.parts.append(value)
+                self._keep(value)
 
     handle_startendtag = handle_starttag
 
@@ -221,39 +281,55 @@ class _Text(HTMLParser):
 
     def handle_data(self, data: str) -> None:
         if not self._silent:
-            self.parts.append(data)
+            self._keep(data)
 
 
-def _stripped(markup: str) -> str:
+def _read(markup: str) -> list[Passage]:
     parser = _Text()
     parser.feed(markup)
     parser.close()
-    return " ".join(parser.parts)
+    return parser.found
 
 
-def _package(path: Path) -> str:
+def _stripped(markup: str) -> str:
+    """The text of some markup as one string, for a place that has no lines.
+
+    A member of a package is addressed by which member it is; the line it fell
+    on inside `word/document.xml` is a fact about the writer's XML formatter
+    and about nothing a reader could go and look at.
+    """
+    return " ".join(passage.text for passage in _read(markup))
+
+
+def _place(member: str) -> str | None:
+    """What to call this member of a package, or None if it holds no text."""
+    for pattern, name in _PARTS:
+        found = pattern.match(member)
+        if found is not None:
+            return name.format(*found.groups())
+    return None
+
+
+def _package(path: Path) -> list[Passage]:
     """The body members of a zip-based document, in the order it stores them.
 
     Read through `read_part`, so one member cannot cost more than the bound it
     already sets, and capped at `MAX_PARTS` members so a package cannot cost
     more by holding many small ones instead of one large one.
     """
-    collected: list[str] = []
-    size = 0
+    found: list[Passage] = []
     with zipfile.ZipFile(path) as archive:
-        members = [name for name in archive.namelist() if _BODY_PARTS.search(name)]
-        for name in members[:MAX_PARTS]:
+        named = [(name, _place(name)) for name in archive.namelist()]
+        bodies = [(name, place) for name, place in named if place is not None]
+        for name, place in bodies[:MAX_PARTS]:
             payload = read_part(archive, name)
             if payload is None:
                 continue
-            collected.append(_stripped(_decode(payload)))
-            size += len(collected[-1])
-            if size >= MAX_TEXT_BYTES:
-                break
-    return " ".join(collected)
+            found.append(Passage(place, _stripped(_decode(payload))))
+    return found
 
 
-def _message(path: Path) -> str:
+def _message(path: Path) -> list[Passage]:
     """A message's body, and none of its headers.
 
     The headers are already read as evidence of delivery, so taking them again
@@ -267,7 +343,7 @@ def _message(path: Path) -> str:
     with path.open("rb") as handle:
         message = BytesParser(policy=policy.default).parsebytes(handle.read(MAX_TEXT_BYTES * 2))
 
-    collected: list[str] = []
+    found: list[Passage] = []
     for part in message.walk():
         if part.get_content_maintype() != "text":
             continue
@@ -275,20 +351,26 @@ def _message(path: Path) -> str:
             payload = part.get_content()
         except (LookupError, ValueError):
             continue  # an encoding this interpreter has no codec for
-        if isinstance(payload, str):
-            collected.append(
-                _stripped(payload) if part.get_content_subtype() == "html" else payload
-            )
-    return "\n".join(collected)
+        if not isinstance(payload, str):
+            continue
+        if part.get_content_subtype() == "html":
+            found.append(Passage("body (html)", _stripped(payload)))
+        else:
+            # Not cut into lines: a body reaches here decoded, and its lines no
+            # longer correspond to the file's - quoted-printable puts soft
+            # breaks where the message has none. A line number nobody can find
+            # is worse than saying "the body" and meaning it.
+            found.append(Passage("body", payload))
+    return found
 
 
-def _outlook(path: Path) -> str:
+def _outlook(path: Path) -> list[Passage]:
     """The body stream of a compound message, unicode spelling first."""
     from .embedded.ole import read_streams
 
     streams = read_streams(path, list(_OUTLOOK_BODY))
-    unicode_body = streams.get(_OUTLOOK_BODY[0])
-    if unicode_body is not None:
-        return unicode_body.decode("utf-16-le", "replace").rstrip("\x00")
-    ansi_body = streams.get(_OUTLOOK_BODY[1])
-    return ansi_body.decode("utf-8", "replace").rstrip("\x00") if ansi_body is not None else ""
+    for name, encoding in zip(_OUTLOOK_BODY, ("utf-16-le", "utf-8"), strict=True):
+        raw = streams.get(name)
+        if raw is not None:
+            return [Passage("body", raw.decode(encoding, "replace").rstrip("\x00"))]
+    return []
