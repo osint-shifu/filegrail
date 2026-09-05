@@ -429,7 +429,7 @@ A format filegrail does not understand is reported as not understood — and sti
 ```json
 {
   "schema": "filegrail.scan/1",
-  "filegrail_version": "0.3.0",
+  "filegrail_version": "0.4.0",
   "root": "/mnt/evidence"
 }
 ```
