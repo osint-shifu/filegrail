@@ -42,6 +42,11 @@ CONFIDENCE = {
     # often a record of an earlier state rather than the current one.
     "iptc": 51,
     "document-metadata": 50,
+    # Metadata read from a file inside an archive, restated as a claim about
+    # the archive. One number is a simplification: what was read is as strong
+    # as it would be on disk - a camera naming itself is a camera naming
+    # itself - but what it establishes here is only what the container holds.
+    "archive-content": 50,
     # A hop the sender may have written in full before sending. Recorded by
     # something, but not by anything the recipient has reason to trust.
     "email-relay": 45,
@@ -84,6 +89,7 @@ SOURCE_LABELS = {
     "xmp-history": "XMP history",
     "iptc": "IPTC",
     "document-metadata": "document metadata",
+    "archive-content": "archive content",
     "shell-history": "shell history",
     "messenger-name": "messenger file name",
     "recent-documents": "recent documents",
@@ -181,6 +187,7 @@ _KINDS = {
     "iptc": INTRINSIC,
     "email-header": INTRINSIC,
     "document-metadata": INTRINSIC,
+    "archive-content": INTRINSIC,
 }
 
 

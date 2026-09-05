@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .archives import inherited_origin, is_archive, list_members
+from .archives import inherited_origin, is_archive, list_members, read_contents
 from .browser import collect_browser_downloads
 from .c2pa import read_c2pa_manifest
 from .embedded import read_embedded_metadata
@@ -38,5 +38,6 @@ __all__ = [
     "read_sidecar",
     "is_archive",
     "list_members",
+    "read_contents",
     "inherited_origin",
 ]

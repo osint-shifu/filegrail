@@ -21,6 +21,7 @@ from .sources import (
     is_torrent,
     list_members,
     read_c2pa_manifest,
+    read_contents,
     read_embedded_metadata,
     read_file_attributes,
     read_iptc,
@@ -151,11 +152,18 @@ def scan(
             record.origins.append(sidecar)
         if named := read_messenger_name(path):
             record.origins.append(named)
-        for reader in (read_c2pa_manifest, read_embedded_metadata, read_iptc):
-            claim = reader(path)
-            if claim is not None:
-                record.origins.append(claim)
-        record.origins.extend(read_xmp(path))
+        # A block found by sweeping an archive's raw bytes is a member's, not
+        # the container's: a zip is not made by Photoshop because a photograph
+        # inside it was. The members are read under their own names instead.
+        if is_archive(path):
+            if follow_archives:
+                record.origins.extend(read_contents(path))
+        else:
+            for reader in (read_c2pa_manifest, read_embedded_metadata, read_iptc):
+                claim = reader(path)
+                if claim is not None:
+                    record.origins.append(claim)
+            record.origins.extend(read_xmp(path))
         record.origins.extend(read_mail(path))
         record.origins.extend(history.get(path.name, []))
         record.origins.extend(recent.get(str(path), []))

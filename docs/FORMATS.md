@@ -167,6 +167,17 @@ archive's origin, when the member name and uncompressed size both match.
 | `.zip` `.jar` `.whl` | Member names and uncompressed sizes |
 | `.tar` `.tgz` `.gz` `.bz2` `.xz` | The same, through the compression |
 
+The files inside are also read, one at a time, without unpacking the archive:
+a photograph in a zip has the same EXIF it would have on disk. That claim is
+about the **archive**, so the member's moment and its coordinates do not
+survive into it - a photograph taken in 2008 inside a zip written last week
+does not date the zip, and a zip has never been anywhere. Both keep saying what
+they say in the fields, under the member's name.
+
+For the same reason the readers that sweep raw bytes for a block, XMP and IPTC,
+are not run on an archive at all. What they would find there belongs to a
+member, and a zip is not made by Photoshop because a photograph inside it was.
+
 The archive is considered whether or not it is inside the scanned tree — a case
 directory is usually the *result* of unpacking something that lives elsewhere.
 

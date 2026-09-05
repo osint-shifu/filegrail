@@ -9,6 +9,32 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The files inside an archive are read for their metadata, one at a time and
+  without unpacking it. A photograph in a zip has the same EXIF it would have
+  on disk, and none of it was being read; the archive was known only by the
+  names and sizes it listed.
+
+  The claim that comes back is about the **archive**, and that is the whole
+  difficulty. The member's moment and its coordinates do not survive into it: a
+  photograph taken in 2008 inside a zip written last week does not date the
+  zip, and a zip has never been anywhere. Both keep saying what they say in the
+  fields, under the name of the member they came from.
+
+  Members are read by the ordinary readers rather than by anything new, so no
+  format is understood twice. Only members a reader claims are opened, only
+  below a size, and only the first twenty-five: the section says what kind of
+  thing is in there, and an archive of ten thousand photographs is not read ten
+  thousand times to say it.
+
+### Fixed
+
+- An archive is no longer swept for XMP and IPTC blocks in its own raw bytes.
+  Those readers look for a block wherever it turns up, and inside a container
+  what they find is a member's - which is how a zip came to be reported as
+  "made by Adobe Photoshop Elements" because a photograph inside it was. Now
+  that the members are read under their own names, the sweep is both redundant
+  and wrong.
+
 - A `.torrent` is read for the files it distributes. It lists its members by
   name and exact size, which is the pairing the archive reader already makes,
   so a file matching both is given the torrent as an origin: the trackers it

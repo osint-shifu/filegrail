@@ -47,7 +47,7 @@ At the same time, it checks traces already left on the machine:
 * Windows origin metadata
 * macOS where-from and quarantine records
 * Linux XDG attributes
-* archive membership
+* archive membership and contents
 * torrent membership
 * download-tool sidecars
 * messaging-client file names
