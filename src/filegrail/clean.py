@@ -90,8 +90,42 @@ class Cleaned:
         return found
 
 
-def clean_file(path: Path, destination: Path) -> Cleaned:
-    """Write `path` to `destination` without its metadata."""
+def _under(path: Path, below: Path | None) -> Path:
+    """Where the copy of `path` belongs, relative to the destination directory.
+
+    Mirroring the tree is what keeps two files that share a name apart. A path
+    that is not under `below` has no relative form and keeps its own name,
+    which is also what a single file cleaned on its own gets.
+    """
+    if below is not None:
+        try:
+            return path.relative_to(below)
+        except ValueError:
+            pass
+    return Path(path.name)
+
+
+def clean_file(
+    path: Path,
+    destination: Path,
+    *,
+    below: Path | None = None,
+    overwrite: bool = False,
+) -> Cleaned:
+    """Write `path` under `destination` without its metadata.
+
+    `below` is the root the copies mirror: a file at `below/a/photo.jpg` is
+    written to `destination/a/photo.jpg`. Without it the copy goes directly
+    into `destination` under its own name, which is right for one file and
+    wrong for a tree - two folders holding a `photo.jpg` would write one copy
+    over the other.
+
+    A name already taken is a refusal, not a replacement. This is the one
+    command in the project that writes a file, and the destination is a
+    directory the user chose, which may hold work of their own; removing
+    something nobody asked about would be a worse failure than declining to
+    write. `overwrite` says to go ahead.
+    """
     suffix = path.suffix.lower()
     if suffix not in _STRIPPERS:
         return Cleaned(path, note="no stripper for this format")
@@ -109,8 +143,11 @@ def clean_file(path: Path, destination: Path) -> Cleaned:
     if not removed:
         return Cleaned(path, note="nothing to remove")
 
-    target = destination / path.name
+    target = destination / _under(path, below)
+    if target.exists() and not overwrite:
+        return Cleaned(path, note="a file is already there; --overwrite replaces it")
     try:
+        target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(body)
     except OSError as problem:
         return Cleaned(path, note=f"could not be written: {problem.strerror or problem}")

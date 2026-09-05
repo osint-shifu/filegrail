@@ -224,6 +224,11 @@ def _clean_parser() -> argparse.ArgumentParser:
         help="Where to write the cleaned copies. Required, and never the source directory.",
     )
     parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace a file already at the destination path.",
+    )
+    parser.add_argument(
         "--type",
         dest="families",
         action="append",
@@ -493,8 +498,11 @@ def _clean(rest: list[str]) -> int:
         return 2
 
     destination.mkdir(parents=True, exist_ok=True)
+    # The copies mirror the tree, so `below` is the directory the walk started
+    # from. A single file has no tree above it and keeps its own name.
+    below = source if source.is_dir() else source.parent
     results = [
-        clean_file(path, destination)
+        clean_file(path, destination, below=below, overwrite=args.overwrite)
         for path in iter_files(source, recursive=not args.no_recurse, suffixes=suffixes)
     ]
 

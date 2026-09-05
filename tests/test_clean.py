@@ -272,3 +272,79 @@ def test_what_the_stripper_missed_is_reported_rather_than_hidden(tmp_path: Path)
     result = clean_file(photo, out)
 
     assert "xmp" in result.remaining
+
+
+# --- where the copy goes -----------------------------------------------------
+#
+# The destination is a directory, and until now every copy was written straight
+# into it under the file's own name. That is right for one file and wrong for a
+# tree: two folders holding a `photo.jpg` produced one copy, and the second one
+# silently replaced the first while the report said both had been written. The
+# copies mirror the source tree instead, and a name already taken is a refusal
+# rather than a replacement - this command writes files, so the one thing it
+# must never do is remove one nobody asked it about.
+
+
+def _tree(root: Path) -> tuple[Path, Path]:
+    """Two photographs sharing a name, in two folders, from two cameras."""
+    for folder, make in (("a", "NIKON"), ("b", "CANON")):
+        (root / folder).mkdir(parents=True)
+        jpeg_with_exif(root / folder / "photo.jpg", make, "MODEL", "2008:10:22 16:28:39")
+    return root / "a" / "photo.jpg", root / "b" / "photo.jpg"
+
+
+def test_a_copy_keeps_the_folder_it_came_from(tmp_path: Path):
+    source = tmp_path / "case"
+    first, _ = _tree(source)
+    out = tmp_path / "clean"
+    out.mkdir()
+
+    result = clean_file(first, out, below=source)
+
+    assert result.written == out / "a" / "photo.jpg"
+    assert result.written.is_file()
+
+
+def test_two_folders_holding_one_name_produce_two_copies(tmp_path: Path):
+    """The report said two files were cleaned and one file existed."""
+    source = tmp_path / "case"
+    first, second = _tree(source)
+    out = tmp_path / "clean"
+    out.mkdir()
+
+    written = [clean_file(path, out, below=source).written for path in (first, second)]
+
+    assert written == [out / "a" / "photo.jpg", out / "b" / "photo.jpg"]
+    # What is on disk, against what was reported. The two copies are byte for
+    # byte the same here and that is correct: everything these fixtures differ
+    # by lived in the block that was removed.
+    assert sorted(out.rglob("*.jpg")) == written
+
+
+def test_a_file_already_there_is_left_alone(tmp_path: Path):
+    source = tmp_path / "case"
+    first, _ = _tree(source)
+    out = tmp_path / "clean"
+    (out / "a").mkdir(parents=True)
+    standing = out / "a" / "photo.jpg"
+    standing.write_bytes(b"someone else's file")
+
+    result = clean_file(first, out, below=source)
+
+    assert standing.read_bytes() == b"someone else's file"
+    assert result.written is None
+    assert result.note and "--overwrite" in result.note
+
+
+def test_overwrite_replaces_it_when_asked_to(tmp_path: Path):
+    source = tmp_path / "case"
+    first, _ = _tree(source)
+    out = tmp_path / "clean"
+    (out / "a").mkdir(parents=True)
+    standing = out / "a" / "photo.jpg"
+    standing.write_bytes(b"someone else's file")
+
+    result = clean_file(first, out, below=source, overwrite=True)
+
+    assert result.written == standing
+    assert standing.read_bytes().startswith(b"\xff\xd8")

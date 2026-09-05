@@ -9,6 +9,23 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `clean` no longer loses files. Every copy was written straight into `--out`
+  under the file's own name, so two folders each holding a `photo.jpg` produced
+  one copy: the second replaced the first, and the report said two files had
+  been cleaned while one existed. That is the worse half of it. Somebody strips
+  metadata from a tree of photographs, reads a summary that says the work is
+  done, and publishes a directory that is missing files.
+
+  A copy now mirrors the tree it came from - `case/a/photo.jpg` is written to
+  `out/a/photo.jpg` - which is what keeps two files sharing a name apart.
+
+- `clean` does not write over a file that is already at the destination path.
+  The destination is a directory the user chose and may hold work of their own;
+  an unrelated file with a colliding name was replaced without a word. It is
+  now reported and skipped, and `--overwrite` asks for the old behaviour. This
+  is the one command in the project that writes a file, so removing one nobody
+  asked about is the failure it can least afford.
+
 - `--redact` reaches `explain` and `compare`. It had only ever been a scan
   option, and `explain` is the command that prints the most of what it would
   remove: its whole purpose is to show every source behind a finding, including

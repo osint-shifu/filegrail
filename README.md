@@ -279,6 +279,8 @@ filegrail clean ./photos --out ./cleaned --type image
 
 Writes copies without their metadata and leaves the originals alone. `--out` is required and must be outside the directory being read.
 
+The copies mirror the source tree, so two folders each holding a `photo.jpg` produce two copies and not one. A name already taken in the destination is reported and skipped rather than replaced; `--overwrite` says to replace it.
+
 ```text
   ● holiday.jpg                                              exif, xmp
   ● chart.png                                                 png-text

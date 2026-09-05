@@ -152,3 +152,43 @@ def test_the_type_option_lists_every_family_it_accepts():
     )
 
     assert sorted(FAMILIES) == sorted(name for name in FAMILIES if name in text)
+
+
+def test_clean_writes_every_file_it_says_it_wrote(tmp_path: Path, capsys):
+    """The count in the summary has to match the files on disk.
+
+    Two folders holding a `photo.jpg` used to produce one copy and a report
+    claiming two, which is the worse half: somebody publishes the output of a
+    command that told them it was complete.
+    """
+    from tests.photo import jpeg_with_exif
+
+    source = tmp_path / "case"
+    for folder, make in (("a", "NIKON"), ("b", "CANON")):
+        (source / folder).mkdir(parents=True)
+        jpeg_with_exif(source / folder / "photo.jpg", make, "MODEL", "2008:10:22 16:28:39")
+    out = tmp_path / "clean"
+
+    assert main(["clean", str(source), "--out", str(out), "--json"]) == 0
+
+    document = json.loads(capsys.readouterr().out)
+    claimed = {item["written"] for item in document["files"] if "written" in item}
+    assert len(claimed) == document["summary"]["cleaned"] == 2
+    assert {str(path) for path in out.rglob("*.jpg")} == claimed
+
+
+def test_clean_does_not_overwrite_what_is_already_in_the_output(tmp_path: Path, capsys):
+    from tests.photo import jpeg_with_exif
+
+    source = tmp_path / "case"
+    source.mkdir()
+    jpeg_with_exif(source / "photo.jpg", "NIKON", "MODEL", "2008:10:22 16:28:39")
+    out = tmp_path / "clean"
+    out.mkdir()
+    standing = out / "photo.jpg"
+    standing.write_bytes(b"someone else's file")
+
+    assert main(["clean", str(source), "--out", str(out), "--json"]) == 0
+
+    assert standing.read_bytes() == b"someone else's file"
+    assert json.loads(capsys.readouterr().out)["summary"]["cleaned"] == 0
