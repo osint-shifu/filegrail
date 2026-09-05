@@ -12,8 +12,8 @@ import struct
 from datetime import datetime, timezone
 from pathlib import Path
 
-from filetrail.sources.embedded import read_embedded_metadata
-from filetrail.sources.embedded.ole import read_ole
+from filegrail.sources.embedded import read_embedded_metadata
+from filegrail.sources.embedded.ole import read_ole
 from tests.compound import (
     DOCSUMMARY_FMTID,
     MINI_CUTOFF,

@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from filetrail.scan import iter_files, scan
-from filetrail.sources.fsattrs import read_file_attributes
+from filegrail.scan import iter_files, scan
+from filegrail.sources.fsattrs import read_file_attributes
 
 from .test_browser import CHROMIUM_SCHEMA, START_TIME
 

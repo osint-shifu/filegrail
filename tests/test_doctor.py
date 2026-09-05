@@ -12,10 +12,10 @@ import json
 import sqlite3
 from pathlib import Path
 
-from filetrail.cli import main
-from filetrail.doctor import AVAILABLE, PARTIAL, UNAVAILABLE, survey
-from filetrail.report import render_doctor
-from filetrail.theme import Theme
+from filegrail.cli import main
+from filegrail.doctor import AVAILABLE, PARTIAL, UNAVAILABLE, survey
+from filegrail.report import render_doctor
+from filegrail.theme import Theme
 
 PLAIN = Theme(colour=False, unicode=False, width=88)
 
@@ -253,8 +253,8 @@ def test_every_source_that_reads_a_home_directory_is_surveyed():
     """
     import inspect
 
-    from filetrail import sources
-    from filetrail.doctor import HOME_SOURCES
+    from filegrail import sources
+    from filegrail.doctor import HOME_SOURCES
 
     reads_a_home = {
         name
@@ -267,7 +267,7 @@ def test_every_source_that_reads_a_home_directory_is_surveyed():
 
 def test_every_surveyed_source_is_named_in_the_report(tmp_path: Path):
     """The registry is only worth having if the survey actually emits it."""
-    from filetrail.doctor import HOME_SOURCES
+    from filegrail.doctor import HOME_SOURCES
 
     found = survey(home=tmp_path)
 
@@ -303,7 +303,7 @@ def test_the_horizon_note_covers_every_source_it_lists(tmp_path: Path):
 def _quarantine(home: Path, rows: int) -> None:
     import sqlite3
 
-    from filetrail.sources.quarantine import QUARANTINE_DB
+    from filegrail.sources.quarantine import QUARANTINE_DB
 
     path = home / QUARANTINE_DB
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -351,7 +351,7 @@ def test_the_quarantine_database_reports_how_far_back_it_reaches(tmp_path: Path)
 
 
 def _shortcuts(home: Path, count: int) -> None:
-    from filetrail.sources.shortcut import RECENT_LINKS
+    from filegrail.sources.shortcut import RECENT_LINKS
     from tests.shortcut import DRIVE_FIXED, link_info, shortcut, volume_id
 
     folder = home / RECENT_LINKS

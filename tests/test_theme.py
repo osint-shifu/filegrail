@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from filetrail.models import CONFIDENCE, FileRecord, Origin
-from filetrail.report import render_text
-from filetrail.theme import EVIDENCE, Theme, detect
+from filegrail.models import CONFIDENCE, FileRecord, Origin
+from filegrail.report import render_text
+from filegrail.theme import EVIDENCE, Theme, detect
 
 
 class _Stream:

@@ -1,6 +1,6 @@
 # Formats
 
-What `filetrail` can read out of a file you point it at.
+What `filegrail` can read out of a file you point it at.
 
 This is the reference list. The [README](README.md) has the short version; this
 one is complete, and it is checked against the code by
@@ -15,7 +15,7 @@ answers:
   headers. That is this file.
 - **What your machine remembers about the file** — browser history, OS origin
   attributes, quarantine records, shell history, Recent shortcuts. Different
-  axis, and `filetrail doctor` tells you which of those are available.
+  axis, and `filegrail doctor` tells you which of those are available.
 
 ---
 
@@ -107,7 +107,7 @@ document and its Office-style properties sit exactly where a `.doc`'s do.
 Not metadata. These are read so that a file extracted from one can inherit the
 archive's origin, when the member name and uncompressed size both match.
 
-| Extensions | What filetrail does with them |
+| Extensions | What filegrail does with them |
 |:---|:---|
 | `.zip` `.jar` `.whl` | Member names and uncompressed sizes |
 | `.tar` `.tgz` `.gz` `.bz2` `.xz` | The same, through the compression |
@@ -145,7 +145,7 @@ That is worth knowing before you rely on one of them in something that matters.
 | Fixed-length MAPI properties | Delivery and submit times live in `__properties_version1.0`, not a `__substg1.0_` stream. Left unread rather than guessed at, with no real `.msg` to check the layout against |
 | PNG `Creation Time` in RFC 1123 form | Skipped rather than compared against XMP, because parsing it touches the moment path shared with EXIF, IIM and PDF |
 
-Anything else is still scanned. A format `filetrail` does not understand is
+Anything else is still scanned. A format `filegrail` does not understand is
 reported as not understood, rather than guessed at.
 
 ---
@@ -153,9 +153,9 @@ reported as not understood, rather than guessed at.
 ## Filtering by any of this
 
 ```bash
-filetrail . --type image          # image, video, audio, document, archive, mail, text
-filetrail . --ext jpg,pdf         # exactly these
-filetrail . --json | jq '.files[].origins[] | select(.block == "pdf-info")'
+filegrail . --type image          # image, video, audio, document, archive, mail, text
+filegrail . --ext jpg,pdf         # exactly these
+filegrail . --json | jq '.files[].origins[] | select(.block == "pdf-info")'
 ```
 
 The `--type` families are derived from the readers themselves, so a format
@@ -167,7 +167,7 @@ too.
 ## Adding one
 
 [`CONTRIBUTING.md`](CONTRIBUTING.md) has the bar for a new reader. The short
-version: one module per container family under `src/filetrail/sources/embedded/`,
+version: one module per container family under `src/filegrail/sources/embedded/`,
 a test that builds a minimal valid file rather than committing a sample, and no
 byte length counted by hand.
 

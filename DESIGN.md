@@ -1,10 +1,10 @@
-# Evidence — filetrail TUI Design System
+# Evidence — filegrail TUI Design System
 
 > A forensic report that happens to live in a terminal. Quiet, dense, and
 > honest about how much it knows.
 
 Written to the [awesome-tui-design](https://github.com/cola-runner/awesome-tui-design)
-`TEMPLATE.md` structure. Every value here is what `src/filetrail/theme.py`
+`TEMPLATE.md` structure. Every value here is what `src/filegrail/theme.py`
 actually emits — this is a description of the implementation, not an aspiration.
 
 ## 1. Theme Overview
@@ -116,12 +116,12 @@ hierarchy, and changing it makes the mark say something the tool does not.
 
 | File | Use |
 | --- | --- |
-| `assets/filetrail-banner.svg` | 1280×360 README header |
-| `assets/filetrail-logo-dark.svg` | horizontal lockup, dark backgrounds |
-| `assets/filetrail-logo-light.svg` | horizontal lockup, light backgrounds |
-| `assets/filetrail-mark.svg` | square mark, dark backgrounds and favicon |
-| `assets/filetrail-mark-light.svg` | square mark, light backgrounds |
-| `assets/filetrail-mark-mono.svg` | single colour, for one-colour contexts |
+| `assets/filegrail-banner.svg` | 1280×360 README header |
+| `assets/filegrail-logo-dark.svg` | horizontal lockup, dark backgrounds |
+| `assets/filegrail-logo-light.svg` | horizontal lockup, light backgrounds |
+| `assets/filegrail-mark.svg` | square mark, dark backgrounds and favicon |
+| `assets/filegrail-mark-light.svg` | square mark, light backgrounds |
+| `assets/filegrail-mark-mono.svg` | single colour, for one-colour contexts |
 
 Light-background variants darken the same five hues for contrast on white; the
 monochrome variant uses Foreground `#d0d0d0`. Clear space is one bar-height - 6
@@ -231,7 +231,7 @@ one already knows what they ran.
 ```
     __ _ _     _           _ _
    / _(_) |___| |_ _ _ __ _(_) |
-  |  _| | / -_)  _| '_/ _` | | |   filetrail 0.1.0
+  |  _| | / -_)  _| '_/ _` | | |   filegrail 0.1.0
   |_| |_|_\___|\__|_| \__,_|_|_|
 
   Trace where files came from. Extract what they reveal.

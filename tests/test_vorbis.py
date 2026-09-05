@@ -10,8 +10,8 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-from filetrail.sources.embedded import read_embedded_metadata
-from filetrail.sources.embedded.vorbis import read_comments
+from filegrail.sources.embedded import read_embedded_metadata
+from filegrail.sources.embedded.vorbis import read_comments
 
 VENDOR = b"reference libFLAC 1.4.3 20230623"
 

@@ -2,8 +2,8 @@ import sqlite3
 import zipfile
 from pathlib import Path
 
-from filetrail.scan import scan
-from filetrail.sources.archives import is_archive, list_members
+from filegrail.scan import scan
+from filegrail.sources.archives import is_archive, list_members
 
 from .test_browser import CHROMIUM_SCHEMA, START_TIME
 

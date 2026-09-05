@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from filetrail.models import FileRecord, Origin
-from filetrail.reconcile import (
+from filegrail.models import FileRecord, Origin
+from filegrail.reconcile import (
     AGREEMENT,
     ATTRIBUTION_CONFLICT,
     CONFLICT,
@@ -20,8 +20,8 @@ from filetrail.reconcile import (
     SINGLE,
     reconcile,
 )
-from filetrail.report import render_text
-from filetrail.theme import Theme
+from filegrail.report import render_text
+from filegrail.theme import Theme
 
 PLAIN = Theme(colour=False, unicode=True, width=88)
 

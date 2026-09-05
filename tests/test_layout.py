@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from filetrail.models import FileRecord, Origin
-from filetrail.report import render_text, render_timeline
-from filetrail.theme import ARROW, BULLET, FLAG, RAIL, Theme
+from filegrail.models import FileRecord, Origin
+from filegrail.report import render_text, render_timeline
+from filegrail.theme import ARROW, BULLET, FLAG, RAIL, Theme
 
 ROOT = Path("/case")
 

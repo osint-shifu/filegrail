@@ -1,7 +1,7 @@
 <a id="top"></a>
 
 <div align="center">
-  <img src="assets/filetrail-banner.svg" alt="filetrail - trace origins, extract metadata" width="820">
+  <img src="assets/filegrail-banner.svg" alt="filegrail - trace origins, extract metadata" width="820">
   <p><strong>Trace origins, extract metadata.</strong></p>
   <p>
     Fast, local file provenance and metadata analysis from traces your machine
@@ -14,10 +14,10 @@
     <img alt="Local and read-only" src="https://img.shields.io/badge/local_%26_read--only-yes-1f883d?style=flat-square">
     <img alt="Network requests" src="https://img.shields.io/badge/network_requests-none-1f883d?style=flat-square">
     <img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache--2.0-8250df?style=flat-square">
-    <a href="https://github.com/osint-shifu/filetrail/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/osint-shifu/filetrail/actions/workflows/ci.yml/badge.svg"></a>
+    <a href="https://github.com/osint-shifu/filegrail/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/osint-shifu/filegrail/actions/workflows/ci.yml/badge.svg"></a>
   </p>
   <p>
-    <a href="#what-filetrail-does">What it does</a> ·
+    <a href="#what-filegrail-does">What it does</a> ·
     <a href="#installation">Installation</a> ·
     <a href="#quick-start">Quick start</a> ·
     <a href="#metadata-analysis">Metadata</a> ·
@@ -29,11 +29,11 @@
 
 ---
 
-## What filetrail does
+## What filegrail does
 
 You have a folder full of files - a case directory, a download folder, an unpacked archive. You want to know **where they came from, what they reveal, and what happened to them**. All of them, in one pass.
 
-`filetrail` combines two things that are usually analyzed separately:
+`filegrail` combines two things that are usually analyzed separately:
 
 * **metadata extraction and file analysis**
 * **retroactive provenance reconstruction**
@@ -57,11 +57,11 @@ Then it correlates the results while keeping three questions separate:
 3. **What touched it after arrival?**
 
 > [!IMPORTANT]
-> `filetrail` works after the fact. No agent, monitoring service, provenance database or prior setup needs to exist before the file appears.
+> `filegrail` works after the fact. No agent, monitoring service, provenance database or prior setup needs to exist before the file appears.
 
 ### Fast by design
 
-`filetrail` is intentionally small and direct:
+`filegrail` is intentionally small and direct:
 
 * no daemon
 * no index to build
@@ -79,13 +79,13 @@ It reads what is already there and reports what the available evidence actually 
 Requires **Python 3.10+**.
 
 ```bash
-pipx install git+https://github.com/osint-shifu/filetrail
+pipx install git+https://github.com/osint-shifu/filegrail
 ```
 
 Or run it directly from a checkout:
 
 ```bash
-PYTHONPATH=src python -m filetrail.cli /path/to/files
+PYTHONPATH=src python -m filegrail.cli /path/to/files
 ```
 
 Runtime dependencies: **zero**.
@@ -97,45 +97,45 @@ Runtime dependencies: **zero**.
 Inspect a file or directory:
 
 ```bash
-filetrail /path/to/files
+filegrail /path/to/files
 ```
 
 Common workflows:
 
 ```bash
-filetrail suspicious.pdf
-filetrail . --unknown-only
-filetrail explain statement.pdf
-filetrail compare a.jpg b.jpg
-filetrail . --identify
-filetrail . --timeline
-filetrail doctor
-filetrail menu
+filegrail suspicious.pdf
+filegrail . --unknown-only
+filegrail explain statement.pdf
+filegrail compare a.jpg b.jpg
+filegrail . --identify
+filegrail . --timeline
+filegrail doctor
+filegrail menu
 ```
 
 Useful options:
 
 ```bash
-filetrail . --verbose
-filetrail . --brief
-filetrail . --json
-filetrail . --hash
-filetrail . --redact
-filetrail . --type image
-filetrail . --ext jpg,pdf
-filetrail . --no-recurse
-filetrail . --no-shell-history
-filetrail . --no-archives
-filetrail . --no-color
+filegrail . --verbose
+filegrail . --brief
+filegrail . --json
+filegrail . --hash
+filegrail . --redact
+filegrail . --type image
+filegrail . --ext jpg,pdf
+filegrail . --no-recurse
+filegrail . --no-shell-history
+filegrail . --no-archives
+filegrail . --no-color
 ```
 
-Run `filetrail doctor` when missing evidence matters. It shows which local sources are available and, where possible, how far back they reach.
+Run `filegrail doctor` when missing evidence matters. It shows which local sources are available and, where possible, how far back they reach.
 
 ---
 
 ## Metadata analysis
 
-Metadata is not an add-on in `filetrail`. It is one of the core evidence layers.
+Metadata is not an add-on in `filegrail`. It is one of the core evidence layers.
 
 The tool extracts and normalizes useful metadata from files while preserving the fields that may matter during an investigation.
 
@@ -164,7 +164,7 @@ Normal output keeps decoded fields visible as a tree. Use `--brief` for a more c
 `--identify` extracts useful values from decoded metadata while preserving the file and field they came from.
 
 ```bash
-filetrail ./case-files --identify
+filegrail ./case-files --identify
 ```
 
 Supported pivot classes include:
@@ -184,7 +184,7 @@ For the complete format and metadata matrix, see [`FORMATS.md`](FORMATS.md).
 
 ## Provenance and evidence
 
-`filetrail` does not collapse everything into one "origin" field.
+`filegrail` does not collapse everything into one "origin" field.
 
 ```text
 file
@@ -203,7 +203,7 @@ A single image can contain all of these at once:
 * XMP or C2PA describing later processing
 * recent-document records showing which application opened it
 
-Those are different claims from different sources. `filetrail` keeps them separate.
+Those are different claims from different sources. `filegrail` keeps them separate.
 
 ### Evidence classes
 
@@ -219,7 +219,7 @@ Confidence values help rank **competing claims of the same type**. They are not 
 
 Conflicts are reported rather than silently resolved.
 
-`filetrail` can detect or surface:
+`filegrail` can detect or surface:
 
 * conflicting acquisition URLs
 * matching evidence from independent sources
@@ -230,7 +230,7 @@ Conflicts are reported rather than silently resolved.
 * derivation relationships between related files
 
 > [!NOTE]
-> A conflict is evidence too. `filetrail` shows the disagreement and the sources behind it instead of inventing certainty.
+> A conflict is evidence too. `filegrail` shows the disagreement and the sources behind it instead of inventing certainty.
 
 ---
 
@@ -239,7 +239,7 @@ Conflicts are reported rather than silently resolved.
 ### Inspect one file
 
 ```bash
-filetrail holiday.jpg
+filegrail holiday.jpg
 ```
 
 Example:
@@ -267,7 +267,7 @@ Both remain visible.
 ### Explain the evidence
 
 ```bash
-filetrail explain statement.pdf
+filegrail explain statement.pdf
 ```
 
 Use `explain` when you want to see every source supporting or contradicting a result.
@@ -275,7 +275,7 @@ Use `explain` when you want to see every source supporting or contradicting a re
 ### Compare two files
 
 ```bash
-filetrail compare a.jpg b.jpg
+filegrail compare a.jpg b.jpg
 ```
 
 Comparison can expose shared device metadata, creation context, timing and differences in acquisition history.
@@ -283,7 +283,7 @@ Comparison can expose shared device metadata, creation context, timing and diffe
 ### Find files nothing was found for
 
 ```bash
-filetrail ./case-files --unknown-only
+filegrail ./case-files --unknown-only
 ```
 
 `no findings` means exactly that: **no acquisition record, no metadata, and nothing on this machine that touched the file**.
@@ -293,7 +293,7 @@ It does not mean the file appeared from nowhere.
 ### Build a timeline
 
 ```bash
-filetrail ./case-files --timeline
+filegrail ./case-files --timeline
 ```
 
 Acquisition, creation and recorded editing events can be viewed chronologically instead of as isolated metadata fields.
@@ -327,11 +327,11 @@ See [`FORMATS.md`](FORMATS.md) for the complete matrix.
 
 | Command | What it does |
 | :--- | :--- |
-| `filetrail PATH` | Scan a file or directory |
-| `filetrail explain FILE` | Show the evidence behind a result |
-| `filetrail compare FILE_A FILE_B` | Compare metadata, provenance and timing |
-| `filetrail doctor` | Inspect available evidence sources |
-| `filetrail menu` | Open the interactive terminal interface |
+| `filegrail PATH` | Scan a file or directory |
+| `filegrail explain FILE` | Show the evidence behind a result |
+| `filegrail compare FILE_A FILE_B` | Compare metadata, provenance and timing |
+| `filegrail doctor` | Inspect available evidence sources |
+| `filegrail menu` | Open the interactive terminal interface |
 
 Useful scan options include:
 
@@ -341,18 +341,18 @@ Useful scan options include:
 
 ## Analyze another user profile
 
-By default, `filetrail` reads evidence from the current user's home directory.
+By default, `filegrail` reads evidence from the current user's home directory.
 
 `--home` points the same readers at another mounted or copied profile:
 
 ```bash
-filetrail /mnt/case/files --home /mnt/case/Users/Alice
-filetrail doctor --home /mnt/case/Users/Alice
+filegrail /mnt/case/files --home /mnt/case/Users/Alice
+filegrail doctor --home /mnt/case/Users/Alice
 ```
 
 This is useful when working with evidence copied from another system.
 
-Browser profiles can be analyzed across platforms. For example, a Windows Chromium profile can be examined while running `filetrail` on Linux.
+Browser profiles can be analyzed across platforms. For example, a Windows Chromium profile can be examined while running `filegrail` on Linux.
 
 `--home` is not a disk-image parser. It expects an accessible user profile and reads the same sources it would inspect locally.
 
@@ -362,7 +362,7 @@ Browser profiles can be analyzed across platforms. For example, a Windows Chromi
 
 The default interface is a dense terminal report rather than a dashboard.
 
-Colour indicates **how `filetrail` knows something**, not whether the result is good, bad or suspicious.
+Colour indicates **how `filegrail` knows something**, not whether the result is good, bad or suspicious.
 
 Output supports:
 
@@ -382,7 +382,7 @@ The terminal and evidence design are documented in [`DESIGN.md`](DESIGN.md).
 Need structured data instead of terminal output?
 
 ```bash
-filetrail /mnt/evidence --hash --json > filetrail.json
+filegrail /mnt/evidence --hash --json > filegrail.json
 ```
 
 JSON preserves:
@@ -399,8 +399,8 @@ The main command families expose versioned schemas such as:
 
 ```json
 {
-  "schema": "filetrail.scan/1",
-  "filetrail_version": "0.1.0",
+  "schema": "filegrail.scan/1",
+  "filegrail_version": "0.1.0",
   "root": "/mnt/evidence"
 }
 ```
@@ -411,14 +411,14 @@ The main command families expose versioned schemas such as:
 
 Everything runs locally.
 
-`filetrail` makes **no network requests**.
+`filegrail` makes **no network requests**.
 
 That does not automatically make reports safe to publish. Local evidence can contain credentials, tokens, private URLs or other sensitive information.
 
 Use:
 
 ```bash
-filetrail . --redact --json > report.json
+filegrail . --redact --json > report.json
 ```
 
 `--redact` hides credentials in URLs, referrers, commands and decoded free-text fields while preserving enough structure for repeated values to remain recognizable.
@@ -430,11 +430,11 @@ filetrail . --redact --json > report.json
 
 ## Limits
 
-`filetrail` can only analyze evidence that still exists.
+`filegrail` can only analyze evidence that still exists.
 
 Browser history can be cleared. Extended attributes disappear during copies. Shell history may lack timestamps. Some files never carried origin metadata.
 
-`filetrail` is deliberately:
+`filegrail` is deliberately:
 
 * **not proof**
 * **not chain of custody**
@@ -448,7 +448,7 @@ C2PA manifests are parsed, but their cryptographic signatures are currently **no
 
 Three readers are written from the specification and have never been run against a file the originating software produced: Outlook `.msg` messages, Windows `.lnk` shortcuts, and the `id3 ` chunk a WAV file may carry. [`FORMATS.md`](FORMATS.md) names them and says why.
 
-Use `filetrail doctor` to understand what evidence sources are actually available before drawing conclusions from missing data.
+Use `filegrail doctor` to understand what evidence sources are actually available before drawing conclusions from missing data.
 
 ---
 

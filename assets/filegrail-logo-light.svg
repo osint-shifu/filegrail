@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 344 64" width="344" height="64" role="img" aria-label="filegrail">
+  <title>filegrail logo (light backgrounds)</title>
+  <rect x="26" y="9" width="32" height="6" rx="3" fill="#3f7a5f"></rect>
+  <rect x="16" y="19" width="42" height="6" rx="3" fill="#3d7c7c"></rect>
+  <rect x="6" y="29" width="52" height="6" rx="3" fill="#8a5f8a"></rect>
+  <rect x="16" y="39" width="42" height="6" rx="3" fill="#436a8f"></rect>
+  <rect x="26" y="49" width="32" height="6" rx="3" fill="#a8802f"></rect>
+  <text x="84" y="47" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &#34;Liberation Mono&#34;, monospace" font-size="46" font-weight="700" letter-spacing="-1" fill="#1c1f21">filegrail</text>
+</svg>

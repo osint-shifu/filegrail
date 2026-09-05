@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from filetrail.sources.fsattrs import read_file_attributes
-from filetrail.util import read_xattr, xattrs_readable
+from filegrail.sources.fsattrs import read_file_attributes
+from filegrail.util import read_xattr, xattrs_readable
 from tests.xattrs import supported, write
 
 WHERE_FROM = "com.apple.metadata:kMDItemWhereFroms"
@@ -40,20 +40,20 @@ def _set(path: Path, name: str, value: bytes) -> None:
 
 
 def test_an_attribute_written_here_can_be_read_back(target: Path):
-    _set(target, "user.filetrail.probe", b"a value")
+    _set(target, "user.filegrail.probe", b"a value")
 
-    assert read_xattr(target, "user.filetrail.probe") == b"a value"
+    assert read_xattr(target, "user.filegrail.probe") == b"a value"
 
 
 def test_an_attribute_that_is_not_there_reads_as_nothing(target: Path):
     if not supported():
         pytest.skip("no interface for extended attributes on this platform")
 
-    assert read_xattr(target, "user.filetrail.absent") is None
+    assert read_xattr(target, "user.filegrail.absent") is None
 
 
 def test_a_file_that_is_not_there_reads_as_nothing(tmp_path: Path):
-    assert read_xattr(tmp_path / "nowhere", "user.filetrail.probe") is None
+    assert read_xattr(tmp_path / "nowhere", "user.filegrail.probe") is None
 
 
 def test_the_platform_says_whether_it_keeps_attributes_at_all():
@@ -68,7 +68,7 @@ def test_a_macos_where_from_attribute_is_read_where_one_can_be_written(target: P
     macOS volume carries it; on macOS it is written under its own name. Either
     way the reader has to come back with the URL.
     """
-    from filetrail.sources.fsattrs import _MACOS_WHEREFROMS
+    from filegrail.sources.fsattrs import _MACOS_WHEREFROMS
 
     plist = plistlib.dumps(["https://cdn.example.org/a.zip", "https://example.org/page"])
     for name in (_MACOS_WHEREFROMS, f"user.{_MACOS_WHEREFROMS}"):

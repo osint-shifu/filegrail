@@ -2,9 +2,9 @@ import struct
 import zlib
 from pathlib import Path
 
-from filetrail.models import CONFIDENCE, INTRINSIC, SOURCE_LABELS, kind
-from filetrail.scan import scan
-from filetrail.sources.xmp import read_xmp
+from filegrail.models import CONFIDENCE, INTRINSIC, SOURCE_LABELS, kind
+from filegrail.scan import scan
+from filegrail.sources.xmp import read_xmp
 
 
 def _jpeg(*segments: tuple[bytes, bytes]) -> bytes:

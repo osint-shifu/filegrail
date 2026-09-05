@@ -13,7 +13,7 @@ and a suggested mitigation if you have one.
 
 ## What is in scope
 
-`filetrail` reads local records that are, by design, sensitive. The output can
+`filegrail` reads local records that are, by design, sensitive. The output can
 contain every URL a file came from and every command that touched it. Issues
 worth reporting:
 

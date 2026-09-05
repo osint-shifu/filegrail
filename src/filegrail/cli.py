@@ -5,7 +5,7 @@ The tool does several distinct things, and they are commands rather than flags.
 ignored most of the other options, and every pair of them was mutually
 exclusive, which is exactly the shape subcommands exist to express.
 
-`filetrail <path>` still scans, with no command word, because that is the thing
+`filegrail <path>` still scans, with no command word, because that is the thing
 people do ninety per cent of the time and making them type `scan` for it would
 be ceremony.
 """
@@ -83,7 +83,7 @@ def _profile() -> argparse.ArgumentParser:
 def build_parser() -> argparse.ArgumentParser:
     """The scan parser, which is also what a bare path is parsed with."""
     parser = argparse.ArgumentParser(
-        prog="filetrail scan",
+        prog="filegrail scan",
         parents=[_common(), _profile()],
         description="Analyze a file or directory and report where its files came from.",
     )
@@ -155,15 +155,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-archives", action="store_true", help="Do not inherit origins from archives."
     )
-    parser.add_argument("--version", action="version", version=f"filetrail {__version__}")
+    parser.add_argument("--version", action="version", version=f"filegrail {__version__}")
     return parser
 
 
 def _explain_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="filetrail explain",
+        prog="filegrail explain",
         parents=[_common(), _profile()],
-        description="Explain why filetrail reached a conclusion about one file.",
+        description="Explain why filegrail reached a conclusion about one file.",
     )
     parser.add_argument("path", type=Path, help="The file to explain.")
     return parser
@@ -171,7 +171,7 @@ def _explain_parser() -> argparse.ArgumentParser:
 
 def _compare_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="filetrail compare",
+        prog="filegrail compare",
         parents=[_common(), _profile()],
         description="Compare what two files record about themselves and how each arrived.",
     )
@@ -182,7 +182,7 @@ def _compare_parser() -> argparse.ArgumentParser:
 
 def _doctor_parser() -> argparse.ArgumentParser:
     return argparse.ArgumentParser(
-        prog="filetrail doctor",
+        prog="filegrail doctor",
         parents=[_common(), _profile()],
         description="Report which evidence sources this machine has, and how far back they reach.",
     )
@@ -190,7 +190,7 @@ def _doctor_parser() -> argparse.ArgumentParser:
 
 def _menu_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="filetrail menu",
+        prog="filegrail menu",
         parents=[_common()],
         description="Choose what to run from a list instead of remembering flags.",
     )
@@ -239,7 +239,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _help(rest: list[str]) -> int:
-    """`filetrail help <command>`, and the landing screen without one."""
+    """`filegrail help <command>`, and the landing screen without one."""
     if not rest:
         from .about import render
 
@@ -248,8 +248,8 @@ def _help(rest: list[str]) -> int:
 
     name = rest[0]
     if name not in PARSERS:
-        print(f"filetrail: no such command: {name}", file=sys.stderr)
-        print(f"filetrail: try one of: {', '.join(COMMANDS)}", file=sys.stderr)
+        print(f"filegrail: no such command: {name}", file=sys.stderr)
+        print(f"filegrail: try one of: {', '.join(COMMANDS)}", file=sys.stderr)
         return 2
     PARSERS[name]().print_help()
     return 0
@@ -275,7 +275,7 @@ def _limit(args) -> int:
 
 
 def _missing(path: Path) -> int:
-    print(f"filetrail: no such file or directory: {path}", file=sys.stderr)
+    print(f"filegrail: no such file or directory: {path}", file=sys.stderr)
     return 2
 
 
@@ -308,7 +308,7 @@ def _scan(rest: list[str]) -> int:
     try:
         suffixes = selection(args.families, args.extensions)
     except UnknownType as unknown:
-        print(f"filetrail: {unknown}", file=sys.stderr)
+        print(f"filegrail: {unknown}", file=sys.stderr)
         return 2
 
     stats: dict[str, int] = {}
@@ -370,7 +370,7 @@ def _explain(rest: list[str]) -> int:
 
     record = _one(args.path, home)
     if record is None:
-        print(f"filetrail: explain takes one file: {args.path}", file=sys.stderr)
+        print(f"filegrail: explain takes one file: {args.path}", file=sys.stderr)
         return 2
 
     if args.json:
@@ -390,7 +390,7 @@ def _compare(rest: list[str]) -> int:
     left, right = _one(args.left, home), _one(args.right, home)
     for path, record in ((args.left, left), (args.right, right)):
         if record is None:
-            print(f"filetrail: compare takes two files: {path}", file=sys.stderr)
+            print(f"filegrail: compare takes two files: {path}", file=sys.stderr)
             return 2
 
     if args.json:
@@ -426,7 +426,7 @@ def _menu(rest: list[str]) -> int:
 
     if not menu.available():
         print(
-            "filetrail: menu needs a terminal; it cannot be piped or redirected.",
+            "filegrail: menu needs a terminal; it cannot be piped or redirected.",
             file=sys.stderr,
         )
         return 2

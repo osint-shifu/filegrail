@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from filetrail import menu
-from filetrail.theme import Theme
+from filegrail import menu
+from filegrail.theme import Theme
 
 PLAIN = Theme(colour=False, unicode=False, width=80)
 
@@ -104,7 +104,7 @@ def test_the_command_is_shown_before_it_runs(tmp_path: Path):
 
     session.go(tmp_path)
 
-    assert "filetrail" in session.text
+    assert "filegrail" in session.text
     assert "--unknown-only" in session.text
 
 
@@ -144,7 +144,7 @@ def test_help_shows_the_real_usage_and_returns(tmp_path: Path):
     session.go(tmp_path)
 
     assert "--unknown-only" in session.text
-    assert "usage: filetrail" in session.text
+    assert "usage: filegrail" in session.text
     assert session.ran == []
 
 

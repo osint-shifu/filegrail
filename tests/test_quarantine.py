@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from filetrail.scan import scan
-from filetrail.sources.quarantine import (
+from filegrail.scan import scan
+from filegrail.sources.quarantine import (
     QUARANTINE_DB,
     collect_quarantine_events,
     read_quarantine,

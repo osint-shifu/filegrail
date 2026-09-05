@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from filetrail.scan import scan
-from filetrail.sources.mail import read_mail
+from filegrail.scan import scan
+from filegrail.sources.mail import read_mail
 from tests.compound import ole
 
 #: [MS-OXMSG] names a property stream `__substg1.0_` then the property tag then

@@ -11,9 +11,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from filetrail.models import FileRecord, Origin
-from filetrail.report import render_json, render_text
-from filetrail.theme import Theme
+from filegrail.models import FileRecord, Origin
+from filegrail.report import render_json, render_text
+from filegrail.theme import Theme
 
 PLAIN = Theme(colour=False, unicode=False, width=88)
 

@@ -1,4 +1,4 @@
-"""The screen a bare `filetrail` prints.
+"""The screen a bare `filegrail` prints.
 
 Typing a tool's name and having it silently start work on the current directory
 is a surprise, and in a home directory an expensive one. So a run with no
@@ -27,16 +27,17 @@ from .theme import MIDDOT, Theme, detect
 #: Plain ASCII, so the wordmark survives a terminal that cannot print box
 #: drawing and never needs a second variant.
 WORDMARK = (
-    r"  __ _ _     _           _ _  ",
-    r" / _(_) |___| |_ _ _ __ _(_) |",
-    r"|  _| | / -_)  _| '_/ _` | | |",
-    r"|_| |_|_\___|\__|_| \__,_|_|_|",
+    r"  __ _ _                   _ _ ",
+    r" / _(_) |___ __ _ _ _ __ _(_) |",
+    r"|  _| | / -_) _` | '_/ _` | | |",
+    r"|_| |_|_\___\__, |_| \__,_|_|_|",
+    r"            |___/              ",
 )
 
 #: The three things the tool is for, and enough of what is under each one that
 #: a reader recognises their own case instead of having to infer it. Not a
 #: feature list: three lines, one per area, and the option table stays in
-#: `filetrail help`.
+#: `filegrail help`.
 AREAS = (
     ("metadata", ("EXIF", "XMP", "IPTC", "C2PA", "PDF", "Office", "media", "email")),
     ("provenance", ("browser history", "OS origin", "archives", "shell history")),
@@ -44,8 +45,8 @@ AREAS = (
 )
 
 USAGE = (
-    ("filetrail <path> [options]", ""),
-    ("filetrail <command> [options]", ""),
+    ("filegrail <path> [options]", ""),
+    ("filegrail <command> [options]", ""),
 )
 
 #: Six ways in, ordered as a progression: one file, a directory, the two views
@@ -54,16 +55,16 @@ USAGE = (
 #: table - a landing screen exists to get somebody to their first command, and
 #: a reader who has to choose from eleven has been given the choosing to do.
 START = (
-    ("filetrail suspicious.pdf", "analyze one file"),
-    ("filetrail ~/Downloads", "analyze a directory"),
-    ("filetrail . --identify", "extract investigation pivots"),
-    ("filetrail . --timeline", "reconstruct recorded events"),
-    ("filetrail explain file.pdf", "inspect evidence behind findings"),
-    ("filetrail doctor", "check available local sources"),
+    ("filegrail suspicious.pdf", "analyze one file"),
+    ("filegrail ~/Downloads", "analyze a directory"),
+    ("filegrail . --identify", "extract investigation pivots"),
+    ("filegrail . --timeline", "reconstruct recorded events"),
+    ("filegrail explain file.pdf", "inspect evidence behind findings"),
+    ("filegrail doctor", "check available local sources"),
 )
 
 #: Named rather than described. What each one does is a sentence away in
-#: `filetrail help <command>`, and six sentences here would double the screen.
+#: `filegrail help <command>`, and six sentences here would double the screen.
 #: `help` is not in the list because it is the line underneath it.
 COMMANDS = ("scan", "explain", "compare", "doctor", "menu")
 
@@ -80,15 +81,15 @@ _LABEL = 11
 def invocation() -> str:
     """The command that will actually work in the caller's shell.
 
-    Someone running from a checkout has no `filetrail` on their PATH. Printing
+    Someone running from a checkout has no `filegrail` on their PATH. Printing
     it at them anyway is the difference between a screen that helps and one that
     is immediately proved wrong.
     """
-    if Path(sys.argv[0]).stem == "filetrail" or shutil.which("filetrail"):
-        return "filetrail"
+    if Path(sys.argv[0]).stem == "filegrail" or shutil.which("filegrail"):
+        return "filegrail"
 
     prefix = "PYTHONPATH=src " if "src" in os.environ.get("PYTHONPATH", "") else ""
-    return f"{prefix}{Path(sys.executable).name} -m filetrail.cli"
+    return f"{prefix}{Path(sys.executable).name} -m filegrail.cli"
 
 
 def render(theme: Theme | None = None) -> str:
@@ -96,7 +97,7 @@ def render(theme: Theme | None = None) -> str:
     run = invocation()
 
     lines = ["", *_head(theme), ""]
-    if run != "filetrail":
+    if run != "filegrail":
         lines.extend(_install(theme, run))
 
     # The label column is the spine and stays fixed. The body column is sized
@@ -109,7 +110,7 @@ def render(theme: Theme | None = None) -> str:
     lines.extend(_section(theme, "start", START))
     lines.extend(_listed(theme, "commands", COMMANDS))
 
-    lines.append(_row(theme, "help", "filetrail help <command>"))
+    lines.append(_row(theme, "help", "filegrail help <command>"))
     lines.append("")
     return "\n".join(lines)
 
@@ -133,7 +134,7 @@ def _wrapped(theme: Theme, label: str, body: str) -> list[str]:
     """A labelled run of text over as many lines as the terminal needs.
 
     It wraps rather than clips because there is nowhere else to read it: the
-    option table has `filetrail help`, but nothing repeats these three lines.
+    option table has `filegrail help`, but nothing repeats these three lines.
     """
     room = max(12, theme.width - _LABEL - 5)
     parts = theme.wrap(body, room)
@@ -202,8 +203,8 @@ def _section(
 def _install(theme: Theme, run: str) -> list[str]:
     """What makes the examples below work, said once and never repeated."""
     return [
-        _row(theme, "install", "pipx install filetrail", "to get the bare command", 22),
-        _row(theme, "", f"alias filetrail='{run}'"),
+        _row(theme, "install", "pipx install filegrail", "to get the bare command", 22),
+        _row(theme, "", f"alias filegrail='{run}'"),
         "",
     ]
 

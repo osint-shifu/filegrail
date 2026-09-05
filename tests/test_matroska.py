@@ -10,8 +10,8 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-from filetrail.sources.embedded import read_embedded_metadata
-from filetrail.sources.embedded.matroska import read_matroska
+from filegrail.sources.embedded import read_embedded_metadata
+from filegrail.sources.embedded.matroska import read_matroska
 
 EBML = b"\x1a\x45\xdf\xa3"
 SEGMENT = b"\x18\x53\x80\x67"

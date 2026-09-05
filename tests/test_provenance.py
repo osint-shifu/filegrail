@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from filetrail.models import ACQUISITION, CONFIDENCE, INTRINSIC, FileRecord, Origin
-from filetrail.report import render_text
-from filetrail.theme import Theme
+from filegrail.models import ACQUISITION, CONFIDENCE, INTRINSIC, FileRecord, Origin
+from filegrail.report import render_text
+from filegrail.theme import Theme
 
 PLAIN = Theme(colour=False, unicode=True, width=88)
 
@@ -44,7 +44,7 @@ def _record(*origins: Origin) -> FileRecord:
 
 def test_every_source_is_classified():
     """An unclassified source would silently vanish from every view."""
-    from filetrail.models import INTERACTION, kind
+    from filegrail.models import INTERACTION, kind
 
     for source in CONFIDENCE:
         assert kind(Origin(source=source)) in (ACQUISITION, INTERACTION, INTRINSIC)
@@ -140,7 +140,7 @@ def test_the_number_survives_in_json():
     """It still ranks sources against each other; it just is not printed."""
     import json
 
-    from filetrail.report import render_json
+    from filegrail.report import render_json
 
     payload = json.loads(render_json([_record(DOWNLOAD, CAMERA)], Path("/case")))
     scores = {origin["confidence"] for origin in payload["files"][0]["origins"]}
@@ -149,6 +149,6 @@ def test_the_number_survives_in_json():
 
 
 def test_every_evidence_class_has_a_strength_word():
-    from filetrail.theme import EVIDENCE, STRENGTH
+    from filegrail.theme import EVIDENCE, STRENGTH
 
     assert set(EVIDENCE.values()) <= set(STRENGTH)

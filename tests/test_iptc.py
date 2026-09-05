@@ -3,9 +3,9 @@
 import struct
 from pathlib import Path
 
-from filetrail.models import CONFIDENCE, INTRINSIC, SOURCE_LABELS, kind
-from filetrail.scan import scan
-from filetrail.sources.iptc import read_iptc
+from filegrail.models import CONFIDENCE, INTRINSIC, SOURCE_LABELS, kind
+from filegrail.scan import scan
+from filegrail.sources.iptc import read_iptc
 
 
 def _dataset(number: int, value: bytes, record: int = 2) -> bytes:

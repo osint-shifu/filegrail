@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "filetrail"
+name = "filegrail"
 version = "0.1.0"
 description = "Reconstruct where the files in a directory came from, after the fact."
 readme = "README.md"
@@ -46,20 +46,20 @@ dependencies = []
 dev = ["pytest>=8.2,<9", "ruff>=0.6,<1"]
 
 [project.urls]
-Homepage = "https://github.com/osint-shifu/filetrail"
-Repository = "https://github.com/osint-shifu/filetrail"
-Issues = "https://github.com/osint-shifu/filetrail/issues"
-Changelog = "https://github.com/osint-shifu/filetrail/blob/master/CHANGELOG.md"
+Homepage = "https://github.com/osint-shifu/filegrail"
+Repository = "https://github.com/osint-shifu/filegrail"
+Issues = "https://github.com/osint-shifu/filegrail/issues"
+Changelog = "https://github.com/osint-shifu/filegrail/blob/master/CHANGELOG.md"
 
 [project.scripts]
-filetrail = "filetrail.cli:main"
+filegrail = "filegrail.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/filetrail"]
+packages = ["src/filegrail"]
 
 # The IANA TLD list is data, not code, and hatchling will not guess that.
 [tool.hatch.build.targets.wheel.force-include]
-"src/filetrail/data" = "filetrail/data"
+"src/filegrail/data" = "filegrail/data"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `filetrail` are documented here.
+All notable changes to `filegrail` are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
@@ -69,7 +69,7 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 - The landing screen is twenty-four lines instead of forty. It says what the
   tool is for in three - metadata, provenance, analysis - then six ways in, the
   command names, and where the rest is. The option table it used to reprint is
-  in `filetrail help <command>`, which is where somebody looking for an option
+  in `filegrail help <command>`, which is where somebody looking for an option
   goes anyway. The tagline says both halves of the job.
 
 - Every claim records which metadata block it was decoded from, beside the
@@ -125,12 +125,12 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   the same laptop either side of a daylight change; comparing the readings would
   have reported a single moment as a contested attribution.
 
-- Modes are commands now, not flags: `filetrail explain FILE`,
-  `filetrail compare A B`, `filetrail doctor`, `filetrail menu`,
-  `filetrail help <command>`. `--doctor` and `--explain` were modes wearing an
+- Modes are commands now, not flags: `filegrail explain FILE`,
+  `filegrail compare A B`, `filegrail doctor`, `filegrail menu`,
+  `filegrail help <command>`. `--doctor` and `--explain` were modes wearing an
   option's clothes - each ignored most of the other options, and every pair of
   them was mutually exclusive, which is exactly the shape subcommands exist to
-  express. `filetrail <path>` still scans with no command word, because that is
+  express. `filegrail <path>` still scans with no command word, because that is
   what people do most of the time and making them type `scan` would be ceremony.
 - `-v`, `-j` and `-h` short forms. The evidence-source table moved off the
   landing screen into `doctor`, where the question has actually been asked;
@@ -200,9 +200,9 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   nothing to find - which is the exact confusion `doctor` exists to prevent.
 
 - Every `--json` document now begins with what it is: a `schema` naming the
-  shape, and a `filetrail_version` naming the build that wrote it. The four
-  shapes are `filetrail.scan/1`, `filetrail.explain/1`, `filetrail.compare/1`
-  and `filetrail.doctor/1`.
+  shape, and a `filegrail_version` naming the build that wrote it. The four
+  shapes are `filegrail.scan/1`, `filegrail.explain/1`, `filegrail.compare/1`
+  and `filegrail.doctor/1`.
 
   `--json` is a contract with software, not a convenience for reading, and it
   had no way to say which contract. Something switching on the keys it found
@@ -474,13 +474,13 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 - The tagline says both halves of what the tool does: `trace origins, extract
   metadata`. It said only the first, and the landing screen it sits on had ten
-  examples without one that mentioned metadata - including `filetrail
+  examples without one that mentioned metadata - including `filegrail
   suspicious.pdf`, the command that prints the whole field tree, described as
   `one file`. The capability now sits in the examples, where a reader looks for
   capabilities, rather than in a second slogan under the first.
 
   Four characters longer than the line it replaces, because `where files came
-  from` spent five words on one idea and the wordmark says `filetrail` directly
+  from` spent five words on one idea and the wordmark says `filegrail` directly
   above it. The banner, both READMEs and the `aria-label` say the same thing.
 
   `--home` and `--timeline` are in the options list. `--home` is the newest
@@ -496,7 +496,7 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   the way the scan report does.
 
 - The README is rewritten around what the tool does rather than around how its
-  evidence model works. `What filetrail does` opens with metadata extraction and
+  evidence model works. `What filegrail does` opens with metadata extraction and
   provenance reconstruction as two named capabilities; `Metadata analysis` is a
   section of its own rather than a table two thirds of the way down; the
   contents list and the per-section back-links are gone, and the anchors that
@@ -723,7 +723,7 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   `exif:GPSVersionID`, which reads 2.2.0.0 in almost every geotagged photograph
   ever taken and has never been an address.
 
-- `filetrail compare A B`: what two files record about themselves that agrees,
+- `filegrail compare A B`: what two files record about themselves that agrees,
   what differs, how each one arrived, and how far apart they claim to have been
   created. Two files can share an earlier life without sharing an acquisition
   path, and that combination - one camera, two routes - says something neither
@@ -839,17 +839,17 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   declare, so teaching a reader a new format also teaches the filter. The filter
   is applied while walking, before a file is opened, hashed or parsed. An empty
   result names the filter rather than reading as "this folder holds nothing".
-- A landing screen. `filetrail` with no arguments now introduces itself - name,
+- A landing screen. `filegrail` with no arguments now introduces itself - name,
   version, author, repository, licence, worked examples and the sources it reads
   with their confidences - instead of silently scanning the current directory.
   Starting an unasked-for scan of wherever the shell happens to be is a surprise,
-  and in a home directory an expensive one; the screen says `filetrail .` for the
+  and in a home directory an expensive one; the screen says `filegrail .` for the
   folder you are standing in. `--about` prints it again from anywhere. Nothing on
   it waits for input, so it works piped and in a script.
-- An interactive front end, `filetrail --menu`, for choosing a view without
+- An interactive front end, `filegrail --menu`, for choosing a view without
   memorising flags. It is printed text and `input()` rather than curses, so it
   keeps the zero-dependency promise and works over SSH and on Windows. It
-  refuses to start when output is redirected, and it prints the `filetrail`
+  refuses to start when output is redirected, and it prints the `filegrail`
   command it is about to run — a menu should make itself unnecessary.
 - Legacy Office documents. A `.doc`, `.xls` or `.ppt` is a compound file, and
   the two property-set streams every Office release has written since 1995 give
@@ -881,7 +881,7 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   glyph sets by `tests/test_layout.py` — a wrapped line was previously possible
   on a narrow window and nothing would have caught it.
 - Timestamps in the unexplained-files column are trimmed to the second.
-- Renamed the project to `filetrail`. The previous name was crowded on GitHub,
+- Renamed the project to `filegrail`. The previous name was crowded on GitHub,
   including one repository that is the same tool by concept.
 - `--no-recurse` is listed in the README, having been implemented but not
   documented.

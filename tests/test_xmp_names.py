@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from filetrail.sources.xmp import read_xmp
+from filegrail.sources.xmp import read_xmp
 
 RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 

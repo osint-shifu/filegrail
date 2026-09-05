@@ -232,7 +232,7 @@ def _masthead(theme: Theme, root: Path, found: Inventory, known: int, unknown: i
     and a PDF with an Info dictionary has not been traced anywhere - it has
     described itself.
     """
-    stamp = theme.label(f"filetrail {__version__}")
+    stamp = theme.label(f"filegrail {__version__}")
     beside = theme.width >= _VERSION_BESIDE
     gutter = len(WORDMARK[0]) + 5
 
@@ -847,7 +847,7 @@ def render_doctor(found, theme: Theme | None = None, home: Path | None = None) -
     rule = f"  {theme.rule(theme.width - 2)}"
     width = max(len(check.name) for check in found.checks)
 
-    lines = ["", f"  {theme.bold('filetrail')}  {theme.dim('evidence sources')}", rule, ""]
+    lines = ["", f"  {theme.bold('filegrail')}  {theme.dim('evidence sources')}", rule, ""]
     if home:
         lines.extend([*_whose_machine(theme, home, "surveying the profile at"), ""])
 
@@ -903,7 +903,7 @@ def render_explain(record: FileRecord, theme: Theme | None = None, home: Path | 
     verdict = reconcile(record)
 
     name = Path(record.path).name
-    lines = ["", f"  {theme.bold('filetrail')}  {theme.dim('explain')}  {theme.bold(name)}", rule]
+    lines = ["", f"  {theme.bold('filegrail')}  {theme.dim('explain')}  {theme.bold(name)}", rule]
     if home:
         lines.extend(["", *_whose_machine(theme, home, "evidence read from the profile at")])
 
@@ -989,7 +989,7 @@ def render_compare(left: FileRecord, right: FileRecord, found, theme: Theme | No
 
     lines = [
         "",
-        f"  {theme.bold('filetrail')}  {theme.dim('compare')}  "
+        f"  {theme.bold('filegrail')}  {theme.dim('compare')}  "
         f"{theme.bold(names[0])} {theme.dim(theme.glyph(MIDDOT))} {theme.bold(names[1])}",
         rule,
     ]
@@ -1048,8 +1048,8 @@ def document(shape: str, payload: dict[str, object]) -> str:
     release did.
     """
     stamped: dict[str, object] = {
-        "schema": f"filetrail.{shape}/{SCHEMA}",
-        "filetrail_version": __version__,
+        "schema": f"filegrail.{shape}/{SCHEMA}",
+        "filegrail_version": __version__,
     }
     stamped.update(payload)
     return json.dumps(stamped, ensure_ascii=False, indent=2)

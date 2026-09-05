@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from filetrail.models import CONFIDENCE, INTERACTION, Origin, kind
-from filetrail.sources.recent import collect_recent_files
+from filegrail.models import CONFIDENCE, INTERACTION, Origin, kind
+from filegrail.sources.recent import collect_recent_files
 
 XBEL = """<?xml version="1.0" encoding="UTF-8"?>
 <xbel version="1.0"

@@ -9,9 +9,9 @@ So it is parsed. Every extension a reader declares has to appear in the table,
 and every extension in the table has to be one a reader actually reads. Either
 direction failing is a red test rather than a wrong document.
 
-This checks what `filetrail` reads out of the *files it is pointed at*. What it
+This checks what `filegrail` reads out of the *files it is pointed at*. What it
 reads from the machine - browser history, quarantine records, shell history,
-Recent shortcuts - is a different axis, and `filetrail doctor` reports it.
+Recent shortcuts - is a different axis, and `filegrail doctor` reports it.
 """
 
 from __future__ import annotations
@@ -20,11 +20,11 @@ import ast
 import re
 from pathlib import Path
 
-from filetrail.models import BLOCK_LABELS
-from filetrail.sources import mail
-from filetrail.sources.archives import ARCHIVE_SUFFIXES
-from filetrail.sources.c2pa import SUPPORTED_SUFFIXES as C2PA_SUFFIXES
-from filetrail.sources.embedded import SUFFIXES as EMBEDDED_SUFFIXES
+from filegrail.models import BLOCK_LABELS
+from filegrail.sources import mail
+from filegrail.sources.archives import ARCHIVE_SUFFIXES
+from filegrail.sources.c2pa import SUPPORTED_SUFFIXES as C2PA_SUFFIXES
+from filegrail.sources.embedded import SUFFIXES as EMBEDDED_SUFFIXES
 
 FORMATS = Path(__file__).resolve().parent.parent / "FORMATS.md"
 
@@ -33,7 +33,7 @@ FORMATS = Path(__file__).resolve().parent.parent / "FORMATS.md"
 METADATA_HEADER = ("block", "extensions", "what comes out")
 CROSS_HEADER = ("block", "where it is found", "what comes out")
 MAIL_HEADER = ("extension", "what comes out")
-ARCHIVE_HEADER = ("extensions", "what filetrail does with them")
+ARCHIVE_HEADER = ("extensions", "what filegrail does with them")
 
 _EXTENSION = re.compile(r"`(\.[a-z0-9]+)`")
 _NAME = re.compile(r"`([a-z0-9][a-z0-9-]*)`")
@@ -86,7 +86,7 @@ def _readable() -> set[str]:
 def _declared_blocks() -> set[str]:
     """Every block name the source tree actually passes to an `Origin`."""
     found = set(BLOCK_LABELS)
-    for path in (Path(__file__).resolve().parent.parent / "src" / "filetrail").rglob("*.py"):
+    for path in (Path(__file__).resolve().parent.parent / "src" / "filegrail").rglob("*.py"):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if not isinstance(node, ast.Call):
                 continue

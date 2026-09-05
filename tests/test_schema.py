@@ -1,7 +1,7 @@
 """Every machine-readable document says what it is and what wrote it.
 
 `--json` is a contract with software, not a convenience for reading. Something
-piping filetrail into jq, a case tool or a log pipeline has to know which shape
+piping filegrail into jq, a case tool or a log pipeline has to know which shape
 it received and which release produced it. Without that, the first time a field
 is renamed the breakage is silent and it happens in somebody else's program.
 
@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from filetrail import __version__
-from filetrail.cli import PARSERS, main
+from filegrail import __version__
+from filegrail.cli import PARSERS, main
 
 #: `menu` inherits `--json` from the shared options but is interactive: it
 #: refuses to run without a terminal, so it has no document to stamp.
@@ -65,19 +65,19 @@ def _run(capsys, name: str, case: Path) -> dict:
 
 
 def test_a_scan_says_which_shape_it_is(case: Path, capsys):
-    assert _run(capsys, "scan", case)["schema"] == "filetrail.scan/1"
+    assert _run(capsys, "scan", case)["schema"] == "filegrail.scan/1"
 
 
 def test_an_explanation_says_which_shape_it_is(case: Path, capsys):
-    assert _run(capsys, "explain", case)["schema"] == "filetrail.explain/1"
+    assert _run(capsys, "explain", case)["schema"] == "filegrail.explain/1"
 
 
 def test_a_comparison_says_which_shape_it_is(case: Path, capsys):
-    assert _run(capsys, "compare", case)["schema"] == "filetrail.compare/1"
+    assert _run(capsys, "compare", case)["schema"] == "filegrail.compare/1"
 
 
 def test_a_survey_says_which_shape_it_is(case: Path, capsys):
-    assert _run(capsys, "doctor", case)["schema"] == "filetrail.doctor/1"
+    assert _run(capsys, "doctor", case)["schema"] == "filegrail.doctor/1"
 
 
 def test_every_document_names_the_release_that_wrote_it(case: Path, capsys):
@@ -88,13 +88,13 @@ def test_every_document_names_the_release_that_wrote_it(case: Path, capsys):
     can be matched against.
     """
     for name in DOCUMENTS:
-        assert _run(capsys, name, case)["filetrail_version"] == __version__, name
+        assert _run(capsys, name, case)["filegrail_version"] == __version__, name
 
 
 def test_the_stamp_comes_before_the_content(case: Path, capsys):
     """`head` on a piped document should be enough to identify it."""
     for name in DOCUMENTS:
-        assert list(_run(capsys, name, case))[:2] == ["schema", "filetrail_version"], name
+        assert list(_run(capsys, name, case))[:2] == ["schema", "filegrail_version"], name
 
 
 def test_stamping_left_the_documents_otherwise_alone(case: Path, capsys):

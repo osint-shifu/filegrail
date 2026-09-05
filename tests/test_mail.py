@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from filetrail.identify import extract
-from filetrail.models import ACQUISITION, INTRINSIC, FileRecord, kind
-from filetrail.sources.mail import read_mail
+from filegrail.identify import extract
+from filegrail.models import ACQUISITION, INTRINSIC, FileRecord, kind
+from filegrail.sources.mail import read_mail
 
 DELIVERED = """\
 Received: from mail.example.com (mail.example.com [203.0.113.5])

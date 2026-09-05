@@ -15,7 +15,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from filetrail.models import (
+from filegrail.models import (
     ACQUISITION,
     BLOCK_LABELS,
     CONFIDENCE,
@@ -25,7 +25,7 @@ from filetrail.models import (
     Origin,
     kind,
 )
-from filetrail.reconcile import (
+from filegrail.reconcile import (
     CORROBORATION,
     SIZE_MISMATCH,
     SOURCE_CONFLICT,
@@ -33,7 +33,7 @@ from filetrail.reconcile import (
     WEAK_MATCH,
     reconcile,
 )
-from filetrail.sources import embedded
+from filegrail.sources import embedded
 
 
 def _record(*origins: Origin) -> FileRecord:

@@ -145,7 +145,7 @@ def _arrival(verdict: Verdict, acquisition: list, home: Path | None = None) -> s
         # Sending a reader to survey their own laptop about somebody else's
         # profile wastes the one step that would have told them the truth.
         where = f"in the profile at {home}" if home else "on this machine"
-        survey = f"filetrail doctor --home {home}" if home else "filetrail doctor"
+        survey = f"filegrail doctor --home {home}" if home else "filegrail doctor"
         return (
             f"Nothing {where} recorded how the file arrived. Run `{survey}` to see whether "
             f"that evidence exists {'there' if home else 'here'} at all before reading it "

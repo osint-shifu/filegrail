@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from filetrail.sources.embedded import read_embedded_metadata
+from filegrail.sources.embedded import read_embedded_metadata
 
 from .test_formats import _jpeg, _png, _tiff
 
@@ -188,7 +188,7 @@ def test_an_xmp_packet_names_its_own_block(tmp_path: Path):
     their source read alike. Setting it anyway keeps `block` meaning one thing
     everywhere, so a mirror can key on it without a fallback that would also
     match a source name by coincidence."""
-    from filetrail.sources.xmp import read_xmp
+    from filegrail.sources.xmp import read_xmp
 
     from .test_xmp import _app1_xmp, _packet
     from .test_xmp import _jpeg as _xmp_jpeg
@@ -213,7 +213,7 @@ def test_an_xmp_packet_names_its_own_block(tmp_path: Path):
 
 
 def test_an_iim_block_names_its_own_block(tmp_path: Path):
-    from filetrail.sources.iptc import read_iptc
+    from filegrail.sources.iptc import read_iptc
 
     from .test_iptc import _app13, _dataset, _irb
     from .test_iptc import _jpeg as _iptc_jpeg
@@ -225,7 +225,7 @@ def test_an_iim_block_names_its_own_block(tmp_path: Path):
 
 
 def test_a_content_credential_names_its_own_block(tmp_path: Path):
-    from filetrail.sources.c2pa import read_c2pa_manifest
+    from filegrail.sources.c2pa import read_c2pa_manifest
 
     from .test_c2pa import GENERATED_CLAIM, _manifest, _png_with
 
@@ -238,7 +238,7 @@ def test_a_content_credential_names_its_own_block(tmp_path: Path):
 def test_a_claim_that_read_no_block_does_not_invent_one():
     """`block` records what a reader decoded. A download record read no metadata
     block at all, and naming one for it would be a claim nobody made."""
-    from filetrail.models import Origin
+    from filegrail.models import Origin
 
     assert Origin(source="browser-download", url="https://example.org/a.pdf").block is None
 
@@ -250,7 +250,7 @@ def test_a_block_is_named_where_the_source_would_only_say_document():
     """`document metadata` names a category rather than a thing: nine readers
     answer to it, and a reader told only that has been told the claim is
     self-reported and nothing else."""
-    from filetrail.models import Origin, label
+    from filegrail.models import Origin, label
 
     pdf = Origin(source="document-metadata", block="pdf-info", tool="LibreOffice 25.2")
 
@@ -261,7 +261,7 @@ def test_a_camera_keeps_the_name_that_says_a_camera_made_the_claim():
     """`device metadata` says more than `EXIF`: it says the block held a make
     and a model, which is why it outranks a bare document property. Replacing
     it with the name of the standard would throw that away."""
-    from filetrail.models import Origin, label
+    from filegrail.models import Origin, label
 
     camera = Origin(source="device-metadata", block="exif", tool="NIKON COOLPIX P6000")
 
@@ -269,7 +269,7 @@ def test_a_camera_keeps_the_name_that_says_a_camera_made_the_claim():
 
 
 def test_a_record_that_read_no_block_is_named_by_its_source():
-    from filetrail.models import Origin, label
+    from filegrail.models import Origin, label
 
     assert label(Origin(source="browser-download", url="https://example.org/a.pdf")) == (
         "browser download"
@@ -277,9 +277,9 @@ def test_a_record_that_read_no_block_is_named_by_its_source():
 
 
 def test_the_report_calls_a_pdf_claim_by_the_block_it_read(tmp_path: Path):
-    from filetrail.models import FileRecord, Origin
-    from filetrail.report import render_text
-    from filetrail.theme import Theme
+    from filegrail.models import FileRecord, Origin
+    from filegrail.report import render_text
+    from filegrail.theme import Theme
 
     record = FileRecord(path="/case/paper.pdf", size=4096, mtime="2026-08-24T19:00:00Z")
     record.origins.append(

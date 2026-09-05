@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from filetrail.cli import COMMANDS, main
+from filegrail.cli import COMMANDS, main
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def test_scan_can_be_named_explicitly(tmp_path: Path, capsys):
 def test_help_lists_a_command(capsys):
     assert main(["help", "explain"]) == 0
 
-    assert "filetrail explain" in capsys.readouterr().out
+    assert "filegrail explain" in capsys.readouterr().out
 
 
 def test_help_refuses_an_unknown_command(capsys):
@@ -104,7 +104,7 @@ def test_explain_is_machine_readable(two, capsys):
 
 
 def test_a_path_named_like_a_command_still_needs_the_command_form(tmp_path: Path, capsys):
-    """`filetrail scan` with no path scans the current directory, not a file
+    """`filegrail scan` with no path scans the current directory, not a file
     called `scan`. Ambiguity resolved in favour of the command, which is what a
     reader of the usage line expects."""
     assert main(["scan", "--no-color", "--limit", "0"]) == 0
@@ -122,8 +122,8 @@ def test_short_flags_work(tmp_path: Path, capsys):
 
 def test_compare_ignores_what_merely_opened_a_file(tmp_path: Path, capsys):
     """An application that opened a file is not software that made it."""
-    from filetrail.compare import compare
-    from filetrail.models import FileRecord, Origin
+    from filegrail.compare import compare
+    from filegrail.models import FileRecord, Origin
 
     def _rec(name: str, tool: str) -> FileRecord:
         record = FileRecord(path=f"/case/{name}", size=1, mtime="2026-08-24T19:00:00Z")

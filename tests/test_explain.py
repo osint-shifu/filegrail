@@ -9,11 +9,11 @@ reader can disagree with it.
 
 from __future__ import annotations
 
-from filetrail.explain import conclusion
-from filetrail.models import FileRecord, Origin
-from filetrail.reconcile import reconcile
-from filetrail.report import render_explain
-from filetrail.theme import Theme
+from filegrail.explain import conclusion
+from filegrail.models import FileRecord, Origin
+from filegrail.reconcile import reconcile
+from filegrail.report import render_explain
+from filegrail.theme import Theme
 
 PLAIN = Theme(colour=False, unicode=False, width=88)
 
@@ -53,7 +53,7 @@ def test_nothing_at_all_says_so_and_points_at_doctor():
     said = _said(_record())
 
     assert "nothing" in said.lower()
-    assert "filetrail doctor" in said
+    assert "filegrail doctor" in said
     assert "--doctor" not in said
 
 

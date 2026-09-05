@@ -18,13 +18,13 @@ from pathlib import Path
 
 import pytest
 
-from filetrail.models import FileRecord
-from filetrail.reconcile import ATTRIBUTION_CONFLICT, MIRRORS, reconcile
-from filetrail.sources import iptc as iptc_reader
-from filetrail.sources import xmp as xmp_reader
-from filetrail.sources.embedded import exif as exif_reader
-from filetrail.sources.embedded import ole as ole_reader
-from filetrail.sources.embedded import read_embedded_metadata
+from filegrail.models import FileRecord
+from filegrail.reconcile import ATTRIBUTION_CONFLICT, MIRRORS, reconcile
+from filegrail.sources import iptc as iptc_reader
+from filegrail.sources import xmp as xmp_reader
+from filegrail.sources.embedded import exif as exif_reader
+from filegrail.sources.embedded import ole as ole_reader
+from filegrail.sources.embedded import read_embedded_metadata
 
 CORPUS = Path(__file__).resolve().parent.parent / "test-data"
 

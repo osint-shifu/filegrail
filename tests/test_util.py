@@ -20,12 +20,12 @@ from pathlib import Path
 
 import pytest
 
-from filetrail import util
+from filegrail import util
 
 
 @pytest.fixture
 def fresh():
-    """`filetrail.util` with no libc handle remembered yet, restored after.
+    """`filegrail.util` with no libc handle remembered yet, restored after.
 
     What these tests watch is process-wide state, so each starts from a
     reloaded module rather than inheriting whatever an earlier test left

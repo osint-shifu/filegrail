@@ -13,10 +13,10 @@ from pathlib import Path
 
 import pytest
 
-from filetrail.lineage import Link
-from filetrail.models import FileRecord, Origin
-from filetrail.report import render_text, render_timeline
-from filetrail.theme import Theme
+from filegrail.lineage import Link
+from filegrail.models import FileRecord, Origin
+from filegrail.report import render_text, render_timeline
+from filegrail.theme import Theme
 
 WIDTHS = [48, 56, 64, 80, 88, 110]
 

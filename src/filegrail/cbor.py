@@ -1,7 +1,7 @@
 """Minimal CBOR decoder (RFC 8949).
 
 C2PA manifests are CBOR, and reading them is the only reason this exists. A
-third-party decoder would be the obvious choice, but `filetrail` takes no runtime
+third-party decoder would be the obvious choice, but `filegrail` takes no runtime
 dependencies, and the subset needed here is small: the major types, indefinite
 lengths, tag 0 for timestamps, and the simple values.
 
@@ -149,5 +149,5 @@ def _decode_simple(data: memoryview, offset: int, argument: int) -> tuple[Any, i
         return simple[argument], offset
     if argument == -1:
         return _BREAK, offset
-    # Floats were consumed by _read_head as raw bits; filetrail never reads one.
+    # Floats were consumed by _read_head as raw bits; filegrail never reads one.
     return None, offset

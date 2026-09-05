@@ -5,8 +5,8 @@ Contributions are welcome.
 ## Development setup
 
 ```bash
-git clone https://github.com/osint-shifu/filetrail.git
-cd filetrail
+git clone https://github.com/osint-shifu/filegrail.git
+cd filegrail
 
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
@@ -17,7 +17,7 @@ ruff check .
 ruff format --check .
 ```
 
-`filetrail` has **no runtime dependencies** and that is a deliberate constraint,
+`filegrail` has **no runtime dependencies** and that is a deliberate constraint,
 not an accident. A change that adds one has to earn it; so far everything,
 including the CBOR decoder needed for C2PA, has been reachable with the standard
 library.
@@ -41,7 +41,7 @@ bar for a new one:
 ## Adding a format
 
 Metadata is the substance of this tool, so a format that carries any is worth
-reading. Put the reader in `src/filetrail/sources/embedded/`, one module per
+reading. Put the reader in `src/filegrail/sources/embedded/`, one module per
 container family, and add a test that builds a minimal valid file rather than
 committing a sample.
 

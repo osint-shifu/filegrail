@@ -18,7 +18,7 @@ Those identifiers make a file say two things it cannot otherwise say:
 - **what it was made from**, by name, so a chain of edits can be reconstructed
   even when the intermediate files are gone.
 
-`filetrail` already decodes all four and prints them. It does nothing with them.
+`filegrail` already decodes all four and prints them. It does nothing with them.
 
 ## What the identifiers mean
 
@@ -70,7 +70,7 @@ Two things the corpus does show:
 
 Needs no other file. Reads the four identifiers plus `xmpMM:RenditionClass` and
 `xmpMM:VersionID` from one XMP packet and states them as a sentence in
-`filetrail explain`.
+`filegrail explain`.
 
 Verifiable against the corpus today, on the one file that carries a full chain.
 
@@ -108,7 +108,7 @@ worded as a common ancestor and reported apart from the directed edges.
 - **An identifier is copied, not earned.** `cp a.jpg b.jpg` produces two files
   with the same `DocumentID` *and* the same `InstanceID`, and no editing
   happened at all. Two files sharing an `InstanceID` are the same bytes or a
-  tool that failed to update it; `filetrail` already hashes on request, and the
+  tool that failed to update it; `filegrail` already hashes on request, and the
   report should say which of the two it is when it knows.
 - **Templates**, as above.
 - **Forgery.** Every one of these values is plain text in a packet nobody signs.

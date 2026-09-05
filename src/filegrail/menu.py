@@ -8,7 +8,7 @@ in a broken state if it dies half way.
 Two rules shape it:
 
 **It teaches the command line rather than replacing it.** Every action prints
-the `filetrail` invocation it is about to run. A menu that leaves you dependent
+the `filegrail` invocation it is about to run. A menu that leaves you dependent
 on the menu is worse than no menu; this one should make itself unnecessary in a
 week.
 
@@ -72,7 +72,7 @@ def run(
     """Loop until the reader asks to stop.
 
     `execute` runs one argv through the ordinary command line, so there is no
-    second code path here that could drift away from what `filetrail` does.
+    second code path here that could drift away from what `filegrail` does.
     """
     theme = theme or detect()
     target = start.resolve()
@@ -113,7 +113,7 @@ def run(
 def _screen(write: Callable[[str], None], theme: Theme, target: Path) -> None:
     rule = f"  {theme.rule(theme.width - 2)}"
     write("")
-    write(f"  {theme.bold('filetrail')}  {theme.dim('interactive')}")
+    write(f"  {theme.bold('filegrail')}  {theme.dim('interactive')}")
     write(rule)
     write("")
 
@@ -252,14 +252,14 @@ def _short(target: Path) -> str:
 
 def _command(target: Path, action: Action) -> str:
     if action.flags and not action.flags[0].startswith("-"):
-        return " ".join(["filetrail", *action.flags, _short(target)])
-    return " ".join(["filetrail", _short(target), *action.flags])
+        return " ".join(["filegrail", *action.flags, _short(target)])
+    return " ".join(["filegrail", _short(target), *action.flags])
 
 
 def available(stream=None) -> bool:
     """Whether a menu can be shown at all.
 
-    Redirected output must never reach the loop: `filetrail menu > out.txt`
+    Redirected output must never reach the loop: `filegrail menu > out.txt`
     would otherwise block on a prompt nobody can see.
     """
     stream = stream or sys.stdout

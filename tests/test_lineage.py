@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from filetrail.lineage import (
+from filegrail.lineage import (
     COMMON_ANCESTOR,
     DERIVED_FROM,
     DESCENDS_FROM,
@@ -19,9 +19,9 @@ from filetrail.lineage import (
     SOURCE_OF,
     attach_lineage,
 )
-from filetrail.models import FileRecord, Origin
-from filetrail.report import render_text
-from filetrail.theme import Theme
+from filegrail.models import FileRecord, Origin
+from filegrail.report import render_text
+from filegrail.theme import Theme
 
 PLAIN = Theme(colour=False, unicode=True, width=88)
 

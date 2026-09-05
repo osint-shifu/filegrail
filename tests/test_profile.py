@@ -19,11 +19,11 @@ from pathlib import Path
 
 import pytest
 
-from filetrail.cli import main
-from filetrail.explain import conclusion
-from filetrail.models import FileRecord
-from filetrail.reconcile import reconcile
-from filetrail.util import basename
+from filegrail.cli import main
+from filegrail.explain import conclusion
+from filegrail.models import FileRecord
+from filegrail.reconcile import reconcile
+from filegrail.util import basename
 
 CHROMIUM_SCHEMA = """
 CREATE TABLE downloads (
@@ -275,7 +275,7 @@ def test_an_empty_profile_points_the_reader_at_the_right_doctor(carved: Path, tm
 
     said = conclusion(record, reconcile(record), bare)
 
-    assert f"filetrail doctor --home {bare}" in said[0]
+    assert f"filegrail doctor --home {bare}" in said[0]
 
 
 def test_the_same_advice_on_this_machine_names_no_profile(carved: Path):
@@ -283,7 +283,7 @@ def test_the_same_advice_on_this_machine_names_no_profile(carved: Path):
 
     said = conclusion(record, reconcile(record))
 
-    assert "`filetrail doctor`" in said[0]
+    assert "`filegrail doctor`" in said[0]
     assert "--home" not in said[0]
 
 

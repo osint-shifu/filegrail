@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from filetrail.models import FileRecord, Origin
-from filetrail.reconcile import reconcile
-from filetrail.scan import matched_by_name
+from filegrail.models import FileRecord, Origin
+from filegrail.reconcile import reconcile
+from filegrail.scan import matched_by_name
 
 
 def _origin(size: int | None) -> Origin:

@@ -2,10 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from filetrail import TAGLINE, __version__
-from filetrail.models import FileRecord, Origin
-from filetrail.report import render_text, render_timeline
-from filetrail.theme import Theme
+from filegrail import TAGLINE, __version__
+from filegrail.models import FileRecord, Origin
+from filegrail.report import render_text, render_timeline
+from filegrail.theme import Theme
 
 #: Deterministic rendering for assertions: no colour, no box drawing.
 PLAIN = Theme(colour=False, unicode=False, width=88)
@@ -314,7 +314,7 @@ def test_the_last_line_counts_files_rather_than_recorded_origins():
 
 
 def test_one_file_is_not_given_an_inventory_of_itself():
-    """`filetrail suspicious.pdf` is a common way in. A one-row inventory and a
+    """`filegrail suspicious.pdf` is a common way in. A one-row inventory and a
     findings table over a single file is ceremony in front of the answer."""
     output = render_text(
         [_record("suspicious.pdf", Origin(source="document-metadata", tool="Word"))],
@@ -342,13 +342,13 @@ def test_the_section_headings_say_what_the_section_holds():
 
 
 def test_a_saved_report_says_what_produced_it():
-    """`filetrail evidence/ --no-color > report.txt` has to be recognisable as
-    a filetrail report months later, pasted into a case file, with nothing but
+    """`filegrail evidence/ --no-color > report.txt` has to be recognisable as
+    a filegrail report months later, pasted into a case file, with nothing but
     the text."""
     output = render_text(_corpus(), Path("/case"), theme=PLAIN)
 
-    assert "|_| |_|_" in output  # the wordmark's last line
-    assert f"filetrail {__version__}" in output
+    assert "|_| |_|_" in output  # the wordmark's baseline row
+    assert f"filegrail {__version__}" in output
     assert TAGLINE in output
 
 
@@ -377,7 +377,7 @@ def test_the_banner_fits_every_terminal(width: int):
 
     output = render_text(_corpus(), Path("/case"), theme=theme)
 
-    assert f"filetrail {__version__}" in output
+    assert f"filegrail {__version__}" in output
     assert not [line for line in output.splitlines() if len(line) > width]
 
 

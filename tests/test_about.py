@@ -1,7 +1,7 @@
-"""The screen `filetrail` shows when it is run with nothing to do.
+"""The screen `filegrail` shows when it is run with nothing to do.
 
 Typing the name of a tool and having it start work on the current directory is
-a surprise, and in a home directory an expensive one. Bare `filetrail`
+a surprise, and in a home directory an expensive one. Bare `filegrail`
 introduces itself and says how to point it somewhere instead.
 """
 
@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from filetrail import REPOSITORY, __version__, about
-from filetrail.cli import COMMANDS as CLI_COMMANDS
-from filetrail.cli import main
-from filetrail.theme import Theme
+from filegrail import REPOSITORY, __version__, about
+from filegrail.cli import COMMANDS as CLI_COMMANDS
+from filegrail.cli import main
+from filegrail.theme import Theme
 
 #: The screen prints the repository without its scheme, so the line fits beside
 #: the wordmark on an eighty-column terminal.
@@ -32,7 +32,7 @@ def _screen(theme: Theme | None = None) -> str:
 
 def test_the_version_shown_is_the_pyproject_version():
     """One number stated twice: importers read `__version__`, installers read
-    pyproject. A release where the two drift apart answers "which filetrail is
+    pyproject. A release where the two drift apart answers "which filegrail is
     this" differently depending on who is asked, and nothing else holds the
     pair together."""
     pyproject = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text("utf-8")
@@ -45,7 +45,7 @@ def test_the_version_shown_is_the_pyproject_version():
 def test_it_says_what_it_is():
     screen = _screen()
 
-    assert "filetrail" in screen
+    assert "filegrail" in screen
     assert __version__ in screen
     assert SHOWN_REPOSITORY in screen
 
@@ -53,7 +53,7 @@ def test_it_says_what_it_is():
 def test_it_says_how_to_scan_the_current_folder():
     """The one thing someone needs next, and the one thing a bare run no
     longer does for them."""
-    assert "filetrail <path>" in _screen()
+    assert "filegrail <path>" in _screen()
 
 
 def test_it_shows_the_wordmark():
@@ -61,25 +61,25 @@ def test_it_shows_the_wordmark():
 
 
 def test_a_checkout_is_told_what_makes_the_examples_work(monkeypatch):
-    """Printing `filetrail` at a shell that has no such command is how the
+    """Printing `filegrail` at a shell that has no such command is how the
     screen gets disproved on the reader's first attempt."""
-    monkeypatch.setattr(about.sys, "argv", ["/data/filetrail/src/filetrail/cli.py"])
+    monkeypatch.setattr(about.sys, "argv", ["/data/filegrail/src/filegrail/cli.py"])
     monkeypatch.setattr(about.shutil, "which", lambda name: None)
     monkeypatch.setenv("PYTHONPATH", "src")
 
     screen = _screen(Theme(colour=False, unicode=False, width=92))
 
-    assert "alias filetrail=" in screen
-    assert "pipx install filetrail" in screen
+    assert "alias filegrail=" in screen
+    assert "pipx install filegrail" in screen
     assert "PYTHONPATH=src" in screen
 
 
 def test_an_installed_run_says_nothing_about_installing(monkeypatch):
-    monkeypatch.setattr(about.shutil, "which", lambda name: "/usr/local/bin/filetrail")
+    monkeypatch.setattr(about.shutil, "which", lambda name: "/usr/local/bin/filegrail")
 
     screen = _screen()
 
-    assert "alias filetrail=" not in screen
+    assert "alias filegrail=" not in screen
     assert "pipx install" not in screen
 
 
@@ -102,7 +102,7 @@ def test_the_tagline_says_both_halves_of_what_it_does():
 def test_it_shows_a_short_way_in_rather_than_every_example():
     screen = _screen()
 
-    for start in ("filetrail suspicious.pdf", "filetrail ~/Downloads", "filetrail doctor"):
+    for start in ("filegrail suspicious.pdf", "filegrail ~/Downloads", "filegrail doctor"):
         assert start in screen, start
     for flag in ("--identify", "--timeline"):
         assert flag in screen, flag
@@ -117,12 +117,12 @@ def test_every_command_is_named():
 
 def test_the_option_list_lives_under_help_rather_than_on_the_front_door():
     """A landing screen that reprints the whole option table is a help page
-    wearing a welcome mat. `filetrail help scan` has all of them."""
+    wearing a welcome mat. `filegrail help scan` has all of them."""
     screen = _screen()
 
     for flag in ("--unknown-only", "--redact", "--no-recurse", "--hash"):
         assert flag not in screen, flag
-    assert "filetrail help <command>" in screen
+    assert "filegrail help <command>" in screen
 
 
 def test_it_is_short_enough_to_read_at_a_glance():

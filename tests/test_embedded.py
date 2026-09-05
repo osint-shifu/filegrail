@@ -2,7 +2,7 @@ import struct
 import zipfile
 from pathlib import Path
 
-from filetrail.sources.embedded import read_embedded_metadata
+from filegrail.sources.embedded import read_embedded_metadata
 
 CORE_XML = """<?xml version="1.0"?>
 <cp:coreProperties

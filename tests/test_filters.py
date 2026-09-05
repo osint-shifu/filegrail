@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from filetrail.cli import main
-from filetrail.filters import FAMILIES, UnknownType, selection
-from filetrail.sources.embedded import SUFFIXES as READABLE
+from filegrail.cli import main
+from filegrail.filters import FAMILIES, UnknownType, selection
+from filegrail.sources.embedded import SUFFIXES as READABLE
 
 MIXED = ("holiday.jpg", "figure.PNG", "report.pdf", "notes.md", "clip.mp4", "book.epub")
 

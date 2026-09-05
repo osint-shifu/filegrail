@@ -12,10 +12,10 @@ refers to cannot disagree.
 
 from __future__ import annotations
 
-from filetrail.filters import FAMILIES
-from filetrail.identify import Identifier
-from filetrail.models import FileRecord, Origin
-from filetrail.overview import NAMED, OTHER, attention, findings, inventory
+from filegrail.filters import FAMILIES
+from filegrail.identify import Identifier
+from filegrail.models import FileRecord, Origin
+from filegrail.overview import NAMED, OTHER, attention, findings, inventory
 
 
 def _record(name: str, *origins: Origin, size: int = 1024) -> FileRecord:
@@ -395,10 +395,10 @@ def test_every_block_is_either_given_an_author_field_or_declared_to_have_none():
     import ast
     from pathlib import Path as _Path
 
-    from filetrail.overview import AUTHOR_FIELDS, WITHOUT_AUTHOR
+    from filegrail.overview import AUTHOR_FIELDS, WITHOUT_AUTHOR
 
     declared = set()
-    for path in (_Path(__file__).resolve().parent.parent / "src" / "filetrail").rglob("*.py"):
+    for path in (_Path(__file__).resolve().parent.parent / "src" / "filegrail").rglob("*.py"):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.Call):
                 for keyword in node.keywords:

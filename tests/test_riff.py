@@ -3,8 +3,8 @@
 import struct
 from pathlib import Path
 
-from filetrail.sources.embedded import read_embedded_metadata
-from filetrail.sources.embedded.riff import read_riff
+from filegrail.sources.embedded import read_embedded_metadata
+from filegrail.sources.embedded.riff import read_riff
 
 
 def chunk(fourcc: bytes, payload: bytes) -> bytes:

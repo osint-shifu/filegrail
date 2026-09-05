@@ -22,8 +22,8 @@ from pathlib import Path
 
 import pytest
 
-from filetrail.scan import scan
-from filetrail.sources.shortcut import RECENT_LINKS, collect_windows_recent, read_link
+from filegrail.scan import scan
+from filegrail.sources.shortcut import RECENT_LINKS, collect_windows_recent, read_link
 from tests.shortcut import (
     DRIVE_CDROM,
     DRIVE_FIXED,
@@ -216,7 +216,7 @@ def test_a_scan_reports_the_volume_a_file_was_opened_from(recent, carved: Path, 
 
 def test_the_claim_is_about_handling_and_not_about_arrival(recent, carved: Path, tmp_path: Path):
     """A shortcut proves the file was opened. It says nothing about how it came."""
-    from filetrail.models import INTERACTION, kind
+    from filegrail.models import INTERACTION, kind
 
     recent("report.docx.lnk", _local())
 

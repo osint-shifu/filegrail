@@ -162,8 +162,8 @@ def _os_origin() -> Check:
     # mount rather than per platform, so it is tested rather than assumed.
     try:
         with tempfile.NamedTemporaryFile() as probe:
-            os.setxattr(probe.name, "user.filetrail.probe", b"1")
-            os.getxattr(probe.name, "user.filetrail.probe")
+            os.setxattr(probe.name, "user.filegrail.probe", b"1")
+            os.getxattr(probe.name, "user.filegrail.probe")
     except OSError:
         return Check("XDG origin attribute", UNAVAILABLE, "filesystem rejects user xattrs")
     return Check(
