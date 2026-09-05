@@ -188,7 +188,7 @@ filegrail ./evidence
 | `--unknown-only` | Only files nothing was found for |
 | `--hash` | Compute SHA-256 for each file |
 | `-j`, `--json` | Machine-readable output |
-| `--redact` | Redact credentials before printing |
+| `--redact` | Redact credentials before printing (also on `explain` and `compare`) |
 | `--type NAME` | One family: `archive`, `audio`, `document`, `image`, `mail`, `text`, `video` |
 | `--ext LIST` | Only these extensions, e.g. `--ext jpg,pdf` |
 | `--limit N` | Cap the list of files with no findings; `0` for all |
@@ -373,6 +373,12 @@ filegrail . --redact --json > report.json
 ```
 
 `--redact` removes credentials from URLs, commands and free-text fields while keeping enough structure for repeated values to stay recognisable.
+
+It is available on `scan`, `explain` and `compare` — every command that renders evidence. `explain` is the one that prints the most of it, since its job is to show every source behind a finding including the ones that disagree.
+
+```bash
+filegrail explain statement.pdf --redact
+```
 
 > [!WARNING]
 > Redaction is biased towards precision, not towards catching everything. Always review investigation output before sharing it.

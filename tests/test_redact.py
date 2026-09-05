@@ -1,3 +1,11 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from filegrail.cli import main
 from filegrail.models import FileRecord, Origin
 from filegrail.redact import fingerprint, looks_like_secret, redact_text, redact_url
 
@@ -124,3 +132,73 @@ def test_file_record_redacts_every_origin():
 
     assert "abcdef123456" not in safe.origins[0].command
     assert "abcdef123456" in record.origins[0].command  # original untouched
+
+
+# --- the commands that print evidence ----------------------------------------
+#
+# `--redact` began life as a scan option, but `explain` exists precisely to
+# print every source behind a finding, including the ones that disagree, and
+# `compare` prints the route each file arrived by. Both render URLs, so both
+# can render a credential in one. A flag that covers the least dense of the
+# three is a flag a user learns to trust and then gets caught by.
+
+
+SECRET = "abcdef1234567890"
+SECRET_URL = f"https://media.example.org/v/12?access_token={SECRET}"
+
+
+def _downloaded(directory: Path, name: str, url: str) -> Path:
+    """A media file beside the record a download tool wrote for it."""
+    media = directory / name
+    media.write_bytes(b"")
+    media.with_suffix(".info.json").write_text(
+        json.dumps({"webpage_url": url, "title": "quarterly briefing"}), encoding="utf-8"
+    )
+    return media
+
+
+def _unwrapped(printed: str) -> str:
+    """The output as one run of characters, so a wrapped value reads whole."""
+    return "".join(printed.split())
+
+
+def _invocation(command: str, media: Path, other: Path) -> list[str]:
+    if command == "compare":
+        return ["compare", str(media), str(other)]
+    return [command, str(media)]
+
+
+@pytest.mark.parametrize("command", ("scan", "explain", "compare"))
+@pytest.mark.parametrize("shape", ("--no-color", "--json"))
+def test_a_command_that_prints_a_credentialed_url_can_redact_it(
+    command: str, shape: str, tmp_path: Path, monkeypatch, capsys
+):
+    """Whatever surfaces the URL has to be able to hide the credential in it.
+
+    The set is derived, not listed: the plain run has to print the secret for
+    the assertion about the redacted run to mean anything, so a command that
+    stops carrying it fails here loudly instead of passing on nothing.
+
+    Both assertions are made against the output with its whitespace collapsed,
+    because a long URL wraps rather than being truncated and the wrap can fall
+    inside the credential. Read raw, a secret split across two lines would
+    answer "not printed" to the first assertion and, worse, "not present" to
+    the second.
+    """
+    # These commands build their own theme from the terminal, so the width has
+    # to be pinned or the wrap point - and with it what a substring search over
+    # the output can see - depends on whoever is running the suite.
+    monkeypatch.setenv("COLUMNS", "110")
+
+    media = _downloaded(tmp_path, "briefing.mp4", SECRET_URL)
+    other = _downloaded(tmp_path, "annex.mp4", "https://media.example.org/v/13")
+    argv = _invocation(command, media, other)
+
+    assert main([*argv, shape]) == 0
+    assert SECRET in _unwrapped(capsys.readouterr().out)
+
+    assert main([*argv, shape, "--redact"]) == 0
+    printed = _unwrapped(capsys.readouterr().out)
+    assert SECRET not in printed
+    assert "REDACTED" in printed
+    assert "media.example.org" in printed  # the address itself is evidence and stays

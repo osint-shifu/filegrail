@@ -5,6 +5,26 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- `--redact` reaches `explain` and `compare`. It had only ever been a scan
+  option, and `explain` is the command that prints the most of what it would
+  remove: its whole purpose is to show every source behind a finding, including
+  the ones that disagree, so a download URL carrying a session token reached the
+  terminal in full. `compare` prints the route each file arrived by, which is
+  the same URL. Asking either for `--redact` did not print an unredacted report
+  — it failed with `unrecognized arguments`, which is the better half of the
+  bug, but a user who has learned the flag on `scan` has no reason to expect
+  the command that shows more to offer less.
+
+  The flag now lives in a parent parser beside `--home` rather than in
+  `_common()`, because it belongs to the commands that render evidence and to no
+  others. `doctor` reports which sources exist and `clean` reports file names
+  and the blocks taken out of them; neither can carry a credential, and an
+  option that does nothing there would read as a promise.
+
 ## 0.3.0 - 2026-09-05
 
 ### Added

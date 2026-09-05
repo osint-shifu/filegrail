@@ -80,11 +80,25 @@ def _profile() -> argparse.ArgumentParser:
     return shared
 
 
+def _redaction() -> argparse.ArgumentParser:
+    """The option for output that is about to leave the machine.
+
+    A parent rather than a member of `_common()` because it belongs to the
+    commands that render evidence and to no others: `doctor` prints which
+    sources exist, `clean` prints file names and the blocks taken out of them,
+    and neither can carry a credential. An option that does nothing is worse
+    than an absent one - it reads as a promise.
+    """
+    shared = argparse.ArgumentParser(add_help=False)
+    shared.add_argument("--redact", action="store_true", help="Redact credentials before printing.")
+    return shared
+
+
 def build_parser() -> argparse.ArgumentParser:
     """The scan parser, which is also what a bare path is parsed with."""
     parser = argparse.ArgumentParser(
         prog="filegrail scan",
-        parents=[_common(), _profile()],
+        parents=[_common(), _profile(), _redaction()],
         description="Analyze a file or directory and report where its files came from.",
     )
     parser.add_argument(
@@ -123,7 +137,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Group the files by the authors and cameras more than one of them names.",
     )
-    parser.add_argument("--redact", action="store_true", help="Redact credentials before printing.")
     parser.add_argument(
         "--hash", action="store_true", dest="hash_files", help="Compute SHA-256 for each file."
     )
@@ -167,7 +180,7 @@ def build_parser() -> argparse.ArgumentParser:
 def _explain_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="filegrail explain",
-        parents=[_common(), _profile()],
+        parents=[_common(), _profile(), _redaction()],
         description="Explain why filegrail reached a conclusion about one file.",
     )
     parser.add_argument("path", type=Path, help="The file to explain.")
@@ -177,7 +190,7 @@ def _explain_parser() -> argparse.ArgumentParser:
 def _compare_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="filegrail compare",
-        parents=[_common(), _profile()],
+        parents=[_common(), _profile(), _redaction()],
         description="Compare what two files record about themselves and how each arrived.",
     )
     parser.add_argument("left", type=Path, help="The first file.")
@@ -419,6 +432,8 @@ def _explain(rest: list[str]) -> int:
     if record is None:
         print(f"filegrail: explain takes one file: {args.path}", file=sys.stderr)
         return 2
+    if args.redact:
+        record = record.redacted()
 
     if args.json:
         print(render_json_explain(record, home))
@@ -439,6 +454,8 @@ def _compare(rest: list[str]) -> int:
         if record is None:
             print(f"filegrail: compare takes two files: {path}", file=sys.stderr)
             return 2
+    if args.redact:
+        left, right = left.redacted(), right.redacted()
 
     if args.json:
         print(render_json_compare(left, right, home))
