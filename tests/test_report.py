@@ -268,9 +268,11 @@ def test_the_findings_section_says_what_was_found():
     output = render_text(_corpus(), Path("/case"), theme=PLAIN)
 
     assert "FINDINGS" in output
-    assert "FILE METADATA" in output
+    # The rows are what was found, in the words the tally uses. Only the
+    # heading above them is upper case; a row is not a heading.
     assert "device information" in output
-    assert "CONTENT CREDENTIALS" in output
+    assert "content credentials" in output
+    assert "conflicting evidence" in output
 
 
 def test_attention_raises_the_conflict_and_names_the_file():
@@ -337,7 +339,6 @@ def test_the_section_headings_say_what_the_section_holds():
     used to head - a file with nothing at all found for it."""
     output = render_text(_corpus(), Path("/case"), theme=PLAIN)
 
-    assert "FILE METADATA" in output
     assert "claimed by the file itself" not in output
     assert "no recorded origin" not in output
 

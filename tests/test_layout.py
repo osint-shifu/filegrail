@@ -121,7 +121,10 @@ def test_every_entry_line_starts_in_the_gutter():
     assert gutter <= allowed, gutter
 
 
-def test_headings_appear_only_when_classes_differ():
+def test_the_entries_carry_no_class_heading_of_their_own():
+    """There is an index above them now. A heading per class was a substitute
+    for one, and stacking the two put a second vocabulary directly above the
+    class names inside each entry."""
     theme = Theme(colour=False, unicode=True, width=88)
     one_class = [
         _record("a.jpg", Origin(source="device-metadata", tool="Canon EOS 40D")),
@@ -132,20 +135,6 @@ def test_headings_appear_only_when_classes_differ():
 
     assert "FILE METADATA" not in output
     assert "Canon EOS 40D" in output
-
-
-def test_headings_appear_once_a_class_collects_more_than_one_file():
-    theme = Theme(colour=False, unicode=True, width=88)
-    mixed = [
-        _record("a.jpg", Origin(source="device-metadata", tool="Canon EOS 40D")),
-        _record("b.jpg", Origin(source="device-metadata", tool="Canon EOS 40D")),
-        _record("c.pdf", Origin(source="browser-download", url="https://example.org/c.pdf")),
-    ]
-
-    output = render_text(mixed, ROOT, theme=theme)
-
-    assert "FILE METADATA" in output
-    assert "RECORDED BY ANOTHER SYSTEM" in output
 
 
 def test_no_headings_when_every_class_holds_one_file():
@@ -159,7 +148,6 @@ def test_no_headings_when_every_class_holds_one_file():
     output = render_text(scattered, ROOT, theme=theme)
 
     assert "FILE METADATA" not in output
-    assert "RECORDED BY ANOTHER SYSTEM" not in output
     assert "b.pdf" in output
 
 

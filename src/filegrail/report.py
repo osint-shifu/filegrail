@@ -634,31 +634,23 @@ def _index_row(theme: Theme, record: FileRecord, root: Path) -> tuple[str, str, 
 def _sections(
     theme: Theme, known: list[FileRecord], root: Path, *, verbose: bool, brief: bool
 ) -> list[str]:
-    """Group entries by the class of evidence that explains them.
+    """Every entry, strongest class of evidence first.
 
-    Strongest class first, always - that ordering is free and it puts the
-    trustworthy findings where the eye lands.
-
-    Headings are another matter. One over every entry is not grouping, it is
-    relabelling: the colour and the source line already say which class a claim
-    belongs to. So they appear only once a class actually collects something,
-    which is also the point at which the report is long enough to need them.
+    That ordering is free and it puts the trustworthy findings where the eye
+    lands. It used to carry a heading per class as well, which was a substitute
+    for an index - a way of telling the reader where in a long report they were.
+    There is an index now, so the headings were a second grouping stacked under
+    the first, in a second vocabulary, immediately above the class names inside
+    each entry. The order is the part that was doing the work; it stays.
     """
     grouped: dict[str, list[FileRecord]] = {}
     for record in known:
         source = record.best.source if record.best else "filesystem"
         grouped.setdefault(theme.evidence(source), []).append(record)
 
-    show_headings = len(grouped) > 1 and max(len(m) for m in grouped.values()) > 1
     lines: list[str] = []
-
-    for key, heading in EVIDENCE_HEADINGS:
-        members = grouped.pop(key, None)
-        if not members:
-            continue
-        if show_headings:
-            lines.extend(_heading(theme, heading, len(members)))
-        for record in members:
+    for key, _heading_name in EVIDENCE_HEADINGS:
+        for record in grouped.pop(key, []):
             lines.extend(_entry(theme, record, root, verbose=verbose, brief=brief))
 
     for members in grouped.values():  # any class the table above did not name
