@@ -401,6 +401,154 @@ filegrail ./case --redact --json > report.json
 
 ---
 
+## Example views
+
+Real output, from real runs. A redirected report is laid out to 72 columns so it stays readable wherever it is opened later.
+
+<details>
+<summary><strong>One file</strong> &nbsp;·&nbsp; <code>filegrail holiday.jpg</code></summary>
+
+```text
+  FILES IN DETAIL                                                 1 file
+  ──────────────────────────────────────────────────────────────────────
+
+  ● holiday.jpg                                                   3.4 MB
+
+  ACQUISITION  how the file reached this machine
+  ← https://portal.example.org/press/2026/holiday-master.jpg
+  │ browser download · chromium · 2026-08-31T10:49:33Z      ▰▰▰▰▱ direct
+  │ referrer  https://portal.example.org/press/
+
+  INTRINSIC  what the file records about its own earlier life
+  ← made by NIKON COOLPIX P6000
+  │ device metadata · 2008-10-22T16:28:39Z           ▰▰▰▱▱ self-reported
+  │ geo       43.467447, 11.885128
+  │
+  ├ Make              NIKON
+  ├ Model             COOLPIX P6000
+  ├ DateTimeOriginal  2008:10:22 16:28:39
+  ├ BodySerialNumber  3001234
+  ├ GPSLatitudeRef    N
+  ├ GPSLatitude       43, 28, 2.81
+  ├ GPSLongitudeRef   E
+  └ GPSLongitude      11, 53, 6.46
+```
+
+Two claims about the same file, under the question each one answers. The meter says how directly a source knows what it claims — it is not a probability.
+
+</details>
+
+<details>
+<summary><strong>A directory, index only</strong> &nbsp;·&nbsp; <code>filegrail ./case --brief</code></summary>
+
+```text
+  FILES                                                          4 files
+  ──────────────────────────────────────────────────────────────────────
+
+  ● chart.png               88 B                        png-text
+  ● invoice.docx           498 B  XDG attribute         ooxml-properties
+  ● press/holiday.jpg     3.4 MB  browser download      exif
+  · notes.md                81 B  2026-09-05T20:15:16Z
+```
+
+A row a file: whatever needs a second look first, then the rest. A file nothing was found for carries its filesystem date instead of the columns it has nothing to put in them.
+
+</details>
+
+<details>
+<summary><strong>Why a finding was produced</strong> &nbsp;·&nbsp; <code>filegrail explain holiday.jpg</code></summary>
+
+```text
+  CONCLUSION
+
+    One record explains how the file arrived, and nothing corroborates
+    it. That is the ordinary case, not a weakness, but it rests on
+    browser download.
+
+    The file describes an earlier life of its own - NIKON COOLPIX
+    P6000 - which says nothing about how it arrived and does not
+    contest the record above.
+
+  EVIDENCE STATE
+
+    acquisition  1 record · single source
+    intrinsic    1 record
+    interaction  none
+
+  ──────────────────────────────────────────────────────────────────────
+
+  ACQUISITION  how the file reached that machine
+
+  ← browser download                                        ▰▰▰▰▱ direct
+  │ url       https://portal.example.org/press/2026/holiday-master.jpg
+  │ referrer  https://portal.example.org/press/
+  │ tool      chromium
+  │ at        2026-08-31T10:49:33Z
+
+  ──────────────────────────────────────────────────────────────────────
+
+  INTRINSIC  what the file records about its own earlier life
+
+  ← device metadata                                  ▰▰▰▱▱ self-reported
+  │ tool  NIKON COOLPIX P6000
+  │ at    2008-10-22T16:28:39Z
+  │ geo   43.467447, 11.885128
+
+  ──────────────────────────────────────────────────────────────────────
+
+  RECONCILIATION  single source
+
+    nothing to reconcile
+```
+
+The answer first, then what it rests on. A class with nothing in it says so rather than disappearing.
+
+</details>
+
+<details>
+<summary><strong>Identifiers, including document content</strong> &nbsp;·&nbsp; <code>filegrail ./case --content</code></summary>
+
+```text
+  IDENTIFIERS                                                  11 values
+  ──────────────────────────────────────────────────────────────────────
+
+    domain  acme-legal.example                          both      2 in 1
+            invoice.docx · url
+    domain  portal.example.org                          recorded  2 in 1
+            holiday.jpg · url
+    domain  innafirma.example                           text      1 in 1
+            notes.md · line 1
+    email   ann.shaw@acme-legal.example                 text      1 in 1
+            invoice.docx · body
+    email   kontakt@innafirma.example                   text      1 in 1
+            notes.md · line 1
+```
+
+`both` means the value is in the document *and* in what the file records about itself. `recorded` is only the latter, `text` only the former.
+
+</details>
+
+<details>
+<summary><strong>Checking before publishing</strong> &nbsp;·&nbsp; <code>filegrail clean ./case --check</code></summary>
+
+```text
+  nothing written
+
+  ● chart.png                                                   png-text
+  ● invoice.docx                                     document properties
+  ● notes.md                                 no stripper for this format
+  ● press/holiday.jpg                                               exif
+
+  ──────────────────────────────────────────────────────────────────────
+    4 files · 3 would be cleaned · 1 left alone
+```
+
+Exit code `0` if every copy would come out clean, `1` if any would not.
+
+</details>
+
+---
+
 ## Metadata removal
 
 `filegrail clean` removes supported metadata from **copies**. Originals are never modified.

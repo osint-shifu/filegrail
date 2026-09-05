@@ -5,6 +5,16 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.1 - 2026-09-05
+
+### Added
+
+- Five example views in the readme, each folded: one file, a directory's index,
+  `explain`, identifiers over document content, and the check before
+  publishing. Real output from real runs rather than written out, and folded so
+  the page stays a reference that answers *does it read this* in one look, with
+  the output a click away for anyone who wants to see the shape of it.
+
 ## 0.6.0 - 2026-09-05
 
 ### Changed
