@@ -20,6 +20,13 @@ what files record **about themselves** - an author line, a company, a template
 path, a producing URL, a camera's GPS fix - which is exactly where identifiers a
 document body never mentions turn out to live. That corpus is short strings
 rather than prose, so precision costs less here than it does there.
+
+Document text is available too, under `content=True`, and it is kept as its own
+corpus rather than merged: the precision argument above is the reason, and
+telling the two apart is what makes the answer worth having. A name in a
+document is a lead. A name in a document that the record of the file's *arrival*
+also carries was put there twice, by separate acts - and nothing that reads only
+one corpus can say so.
 """
 
 from __future__ import annotations
@@ -31,9 +38,35 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
+from typing import NamedTuple
 from urllib.parse import urlsplit
 
-from .models import FileRecord
+from .models import ACQUISITION, FileRecord, kind
+
+#: What files record about themselves: the corpus this has always read, and the
+#: one the detectors were tuned for. Short structured strings, where a match is
+#: nearly always a real identifier.
+METADATA = "metadata"
+
+#: What files say. Read only when asked, and kept as its own corpus rather than
+#: merged into the one above: prose is an order of magnitude noisier - a
+#: citation, a file name, an abbreviation with a dot in it all match something -
+#: and letting that into the metadata list would drown the half that is reliable.
+CONTENT = "content"
+
+
+class _Text(NamedTuple):
+    """One string to search, with everything needed to say where it came from."""
+
+    file: str
+    where: str
+    text: str
+    corpus: str
+
+    #: Whether the origin this came from is a record of how the file arrived.
+    #: Meaningless for content, which records nothing.
+    acquired: bool
+
 
 #: Occurrences are counted exactly; the sampled list of places is capped so one
 #: value repeated across a huge tree cannot dominate the output.
@@ -162,6 +195,17 @@ class Identifier:
     private: bool | None = None
     where: list[str] = field(default_factory=list)
 
+    #: Which corpora it was seen in. Both is the interesting answer: the value
+    #: was written into the document and recorded about it, by two separate
+    #: acts, and neither one alone says that.
+    corpora: set[str] = field(default_factory=set)
+
+    #: Whether one of the places was a record of how the file arrived - a
+    #: download address, a referrer, a quarantine event. A value a document
+    #: names that its own arrival record also names is a link rather than a
+    #: coincidence, and it is the whole reason for reading content at all.
+    acquired: bool = False
+
     def to_dict(self) -> dict[str, object]:
         data: dict[str, object] = {
             "type": self.type,
@@ -169,6 +213,8 @@ class Identifier:
             "normalized": self.normalized,
             "count": self.count,
             "files": self.files,
+            "corpora": sorted(self.corpora),
+            "acquired": self.acquired,
             "where": self.where,
         }
         if self.private is not None:
@@ -280,15 +326,25 @@ def _looks_like_version(text: str, start: int) -> bool:
 # --- the corpus --------------------------------------------------------------
 
 
-def _texts(records: list[FileRecord]) -> Iterator[tuple[str, str, str]]:
-    """Yield (file, where, text) for everything a scan recorded.
+def _texts(records: list[FileRecord], *, content: bool = False) -> Iterator[_Text]:
+    """Yield every string a scan can search, and where each one came from.
 
     The field name travels with the value because an identifier without its
     source is a lead nobody can check.
+
+    `content` adds what the documents themselves say. It is off by default and
+    costs an open, a decode and a parse per file - the metadata was already in
+    hand, and this is not.
     """
+    if content:
+        # Imported here rather than at the top: reading bodies pulls in the
+        # container readers, and a scan that was not asked for them should not
+        # pay to import them.
+        from .sources.content import read_text
     for record in records:
         name = Path(record.path).name
         for origin in record.origins:
+            arrival = kind(origin) == ACQUISITION
             for label, value in (
                 ("url", origin.url),
                 ("referrer", origin.referrer),
@@ -299,25 +355,37 @@ def _texts(records: list[FileRecord]) -> Iterator[tuple[str, str, str]]:
                 ("location", origin.location),
             ):
                 if value:
-                    yield name, label, value
+                    yield _Text(name, label, value, METADATA, arrival)
             for label, value in origin.fields.items():
                 if value:
-                    yield name, label, str(value)
+                    yield _Text(name, label, str(value), METADATA, arrival)
+        if content:
+            body = read_text(Path(record.path))
+            if body:
+                yield _Text(name, "text", body, CONTENT, False)
 
 
-def extract(records: list[FileRecord]) -> list[Identifier]:
-    """Every identifier in what the scan read, deduplicated across files."""
+def extract(records: list[FileRecord], *, content: bool = False) -> list[Identifier]:
+    """Every identifier in what the scan read, deduplicated across files.
+
+    `content` widens the corpus from what the files record about themselves to
+    what they say. The two are kept apart on each entry rather than merged, so
+    a reader can tell a name in a document from a name in a download record -
+    and see where one value is both.
+    """
     found: dict[tuple[str, str], Identifier] = {}
 
-    for name, where, text in _texts(records):
-        origin = f"{name}{PLACE}{where}"
-        for kind, raw, normalized, private in _scan(text, where):
-            key = (kind, normalized)
+    for source in _texts(records, content=content):
+        origin = f"{source.file}{PLACE}{source.where}"
+        for family, raw, normalized, private in _scan(source.text, source.where):
+            key = (family, normalized)
             entry = found.get(key)
             if entry is None:
-                entry = Identifier(type=kind, value=raw, normalized=normalized, private=private)
+                entry = Identifier(type=family, value=raw, normalized=normalized, private=private)
                 found[key] = entry
             entry.count += 1
+            entry.corpora.add(source.corpus)
+            entry.acquired = entry.acquired or source.acquired
             if origin not in entry.where:
                 if len(entry.where) < MAX_SAMPLES:
                     entry.where.append(origin)

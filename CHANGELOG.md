@@ -9,6 +9,31 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `--content` reads what documents say, not only what they record about
+  themselves. `--identify` has always swept the metadata a scan decoded - an
+  author line, a company, a producing URL, a GPS fix - which is where
+  identifiers a body never mentions turn out to live. This adds the other side:
+  the text of a Word or OpenDocument file, a slide deck, a spreadsheet's
+  strings, HTML, XML, a message body, and files that are already text.
+
+  **No dependency comes with it.** The formats where a text search fails
+  hardest are zip archives of XML, and this package already opens them for
+  their properties, with a bounded member reader written for exactly that
+  hazard; the body is a different member of the same archive. PDF text is
+  deliberately not read - pulling string literals out of a content stream is an
+  afternoon's work that produces readable text for perhaps half of real
+  documents and mush for the rest, and a confident wrong answer is worse than
+  an absent one in a tool that reports evidence. Source code and RTF are out
+  for reasons of the same kind, each written down where the decision was made.
+
+  The two corpora are kept apart on every value rather than merged, because
+  prose is an order of magnitude noisier than a property field and letting it
+  into the metadata list would drown the half that is reliable. That separation
+  is also what makes the answer worth having: a value a document names *and*
+  the record of the file's arrival names was put there twice, by separate acts,
+  and it is raised in the notable findings where a long report cannot bury it.
+  Each entry in `--json` carries `corpora` and `acquired` for the same reason.
+
 - `clean --check` writes nothing. It runs every stripper, reads the result back
   through the same readers, and says what would come out of each file and what
   a reader would still find in the copy - then exits 1 if any copy would not

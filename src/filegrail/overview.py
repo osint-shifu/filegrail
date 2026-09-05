@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .filters import FAMILIES
-from .identify import Identifier
+from .identify import CONTENT, Identifier
 from .models import ACQUISITION, INTERACTION, INTRINSIC, FileRecord, kind
 from .reconcile import reconcile
 
@@ -334,6 +334,17 @@ def attention(
         count = sum(1 for record in records if matches(record))
         if count:
             raised.append(Alert(text=_said(count, verb, what)))
+
+    linked = [entry for entry in identifiers if entry.acquired and CONTENT in entry.corpora]
+    if linked:
+        # The one thing reading document text is for. A name inside a document
+        # is a lead; a name inside a document that the record of the file's
+        # arrival also carries was put there twice, by two separate acts, and
+        # neither half says that on its own.
+        phrase = "identifier is" if len(linked) == 1 else "identifiers are"
+        raised.append(
+            Alert(text=f"{len(linked)} {phrase} named in a document and in how it arrived")
+        )
 
     if identifiers:
         # Counted in identifiers, not in files: fifteen of these are fifteen

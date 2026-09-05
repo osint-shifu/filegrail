@@ -35,6 +35,7 @@ import pytest
 from filegrail.clean import clean_file
 from filegrail.sources.archives import list_members, read_contents
 from filegrail.sources.c2pa import read_c2pa_manifest
+from filegrail.sources.content import read_text
 from filegrail.sources.embedded import read_embedded_metadata
 from filegrail.sources.iptc import read_iptc
 from filegrail.sources.mail import read_mail
@@ -53,6 +54,7 @@ from tests.shortcut import link_info, shortcut, volume_id
 _READERS: tuple[Callable[[Path], object], ...] = (
     read_c2pa_manifest,
     read_contents,
+    read_text,
     read_embedded_metadata,
     read_iptc,
     list_members,
@@ -159,6 +161,8 @@ _NAMES = (
     "bundle.zip",
     "linux.torrent",
     "message.eml",
+    "message.msg",
+    "page.html",
     "photo.xmp",
     "report.doc",
     "voice.wav",
@@ -201,6 +205,13 @@ def corpus(tmp_path_factory: pytest.TempPathFactory) -> dict[str, bytes]:
             b"From: sender@example.test\r\nTo: someone@example.test\r\n"
             b"Subject: the file\r\nDate: Tue, 22 Oct 2008 16:28:39 +0000\r\n"
             b"Content-Type: text/plain\r\n\r\nHere it is.\r\n"
+        ),
+        "message.msg": ole(
+            {"__substg1.0_1000001F": "write to ann.shaw@acme.example".encode("utf-16-le")}
+        ),
+        "page.html": (
+            b"<html><head><title>Invoice</title></head><body><p>Invoice from Acme</p>"
+            b'<a href="https://acme-legal.example/pay">pay</a></body></html>'
         ),
         "photo.xmp": _XMP_PACKET.encode(),
         "report.doc": ole({"WordDocument": b"\xec\xa5" + b"\x00" * 512}),

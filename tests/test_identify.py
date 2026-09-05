@@ -1,8 +1,10 @@
-"""Identifiers pulled out of the metadata a scan already read.
+"""Identifiers pulled out of what a scan read.
 
-The corpus here is not document text. It is what files record about themselves -
-an author line, a company, a template path, a producing URL, a GPS fix - which
-is where the identifiers a document body never mentions actually live.
+The corpus is what files record about themselves - an author line, a company, a
+template path, a producing URL, a GPS fix - which is where the identifiers a
+document body never mentions actually live. Document text is the second corpus,
+off unless asked for, and the tests at the end of this file are about keeping
+the two apart.
 """
 
 from __future__ import annotations
@@ -226,3 +228,155 @@ def test_a_message_id_is_not_offered_as_an_address():
 
     assert ("email", "jan@example.com") in found
     assert not [value for kind, value in found if kind == "email" and "7ttq1a" in value]
+
+
+# --- the second corpus --------------------------------------------------------
+#
+# `--content` widens what is searched from what files record about themselves to
+# what they say. The two are kept apart on every entry: prose is an order of
+# magnitude noisier than a property field, and a reader has to be able to tell a
+# name somebody typed into a letter from a name a download record carried.
+
+
+def _document(tmp_path: Path, text: str, name: str = "letter.txt", **origin: object) -> FileRecord:
+    """A real file on disk, because reading content means opening it."""
+    written = tmp_path / name
+    written.write_text(text, encoding="utf-8")
+    record = FileRecord(
+        path=str(written), size=written.stat().st_size, mtime="2026-08-24T19:00:00Z"
+    )
+    if origin:
+        record.origins.append(Origin(**origin))
+    return record
+
+
+def test_the_corpus_is_still_only_metadata_unless_asked(tmp_path: Path):
+    """Every existing scan pays nothing for this and reports nothing from it."""
+    record = _document(tmp_path, "write to ann.shaw@acme-legal.example", source="document-metadata")
+
+    assert extract([record]) == []
+
+
+def test_content_widens_the_corpus_to_what_the_document_says(tmp_path: Path):
+    record = _document(tmp_path, "write to ann.shaw@acme-legal.example", source="document-metadata")
+
+    found = extract([record], content=True)
+
+    assert [entry.normalized for entry in found if entry.type == "email"] == [
+        "ann.shaw@acme-legal.example"
+    ]
+    assert [entry.corpora for entry in found if entry.type == "email"] == [{"content"}]
+
+
+def test_a_value_written_in_a_document_and_recorded_about_it_says_both(tmp_path: Path):
+    """Two separate acts put it there, and neither half says that alone."""
+    record = _document(
+        tmp_path,
+        "write to ann.shaw@acme-legal.example",
+        source="document-metadata",
+        fields={"Author": "ann.shaw@acme-legal.example"},
+    )
+
+    email = next(e for e in extract([record], content=True) if e.type == "email")
+
+    assert email.corpora == {"metadata", "content"}
+    assert email.count == 2
+
+
+def test_a_value_the_document_names_and_the_arrival_record_names_is_marked(tmp_path: Path):
+    """The whole reason for reading content: the body and the download agree."""
+    record = _document(
+        tmp_path,
+        "invoice from acme-legal.example",
+        source="browser-download",
+        url="https://acme-legal.example/invoice.pdf",
+    )
+
+    found = extract([record], content=True)
+    domain = next(entry for entry in found if entry.normalized == "acme-legal.example")
+
+    assert domain.acquired is True
+    assert domain.corpora == {"metadata", "content"}
+
+
+def test_a_value_only_a_document_claims_about_itself_is_not_an_arrival(tmp_path: Path):
+    """An intrinsic field travelled with the bytes; it does not say they arrived."""
+    record = _document(
+        tmp_path,
+        "invoice from acme-legal.example",
+        source="document-metadata",
+        fields={"Company": "acme-legal.example"},
+    )
+
+    found = extract([record], content=True)
+    domain = next(entry for entry in found if entry.normalized == "acme-legal.example")
+
+    assert domain.acquired is False
+
+
+def test_the_document_carries_the_corpus_of_every_identifier(tmp_path: Path):
+    record = _document(
+        tmp_path,
+        "invoice from acme-legal.example",
+        source="browser-download",
+        url="https://acme-legal.example/invoice.pdf",
+    )
+
+    payload = json.loads(render_json([record], tmp_path, identify=True, content=True))
+    domain = next(e for e in payload["identifiers"] if e["normalized"] == "acme-legal.example")
+
+    assert domain["corpora"] == ["content", "metadata"]
+    assert domain["acquired"] is True
+
+
+def test_the_report_says_which_side_of_the_file_a_value_came_from(tmp_path: Path):
+    # Two files, because the section that raises this only runs for a directory:
+    # a report about one file has nothing to bury it under.
+    records = [
+        _document(
+            tmp_path,
+            "invoice from acme-legal.example",
+            name="invoice.txt",
+            source="browser-download",
+            url="https://acme-legal.example/invoice.pdf",
+        ),
+        _document(
+            tmp_path,
+            "write to ann.shaw@other.example",
+            name="notes.txt",
+            source="document-metadata",
+        ),
+        _document(
+            tmp_path,
+            "not read, this is not a text format",
+            name="holiday.jpg",
+            source="device-metadata",
+            fields={"Company": "third.example"},
+        ),
+    ]
+
+    printed = " ".join(
+        render_text(records, tmp_path, identify=True, content=True, theme=PLAIN).split()
+    )
+
+    assert "1 identifier is named in a document and in how it arrived" in printed
+    # One word per side of the file, and the three cases are distinguishable.
+    assert "acme-legal.example both" in printed
+    assert "other.example text" in printed
+    assert "third.example recorded" in printed
+
+
+def test_the_report_has_no_corpus_column_when_there_is_one_corpus(tmp_path: Path):
+    """A column saying the same word on every row is noise, not information."""
+    record = _document(
+        tmp_path,
+        "nothing here",
+        source="browser-download",
+        url="https://acme-legal.example/invoice.pdf",
+    )
+
+    printed = " ".join(render_text([record], tmp_path, identify=True, theme=PLAIN).split())
+
+    assert "acme-legal.example" in printed
+    assert "recorded" not in printed
+    assert "named in a document" not in printed

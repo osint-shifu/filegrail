@@ -21,7 +21,7 @@ from .about import WORDMARK
 from .clean import Cleaned
 from .cluster import cluster as group_sources
 from .explain import conclusion, grouped
-from .identify import PLACE, Identifier, extract
+from .identify import CONTENT, METADATA, PLACE, Identifier, extract
 from .models import ACQUISITION, INTRINSIC, FileRecord, Origin, kind, label
 from .overview import Alert, Inventory, Tally, attention, findings, inventory
 from .reconcile import ATTRIBUTION_CONFLICT, CONFLICT, KINDS, PARTIAL, Verdict, reconcile
@@ -136,13 +136,14 @@ def render_text(
     filtered: str = "",
     identify: bool = False,
     cluster: bool = False,
+    content: bool = False,
     home: Path | None = None,
     unsearched: Unsearched | None = None,
 ) -> str:
     theme = theme or detect()
     known = [record for record in records if record.origins]
     unknown = [record for record in records if not record.origins]
-    found = extract(records)
+    found = extract(records, content=content)
     contents = inventory(records)
 
     lines = _masthead(theme, root, contents, len(known), len(unknown))
@@ -164,7 +165,7 @@ def render_text(
         lines.extend(_unknown(theme, unknown, root, limit))
 
     if identify:
-        lines.extend(_identifiers(theme, found))
+        lines.extend(_identifiers(theme, found, content=content))
 
     if cluster:
         lines.extend(_shared(theme, records))
@@ -216,28 +217,48 @@ _IDENTIFIER_COLOURS = {
 }
 
 
-def _identifiers(theme: Theme, found: list[Identifier]) -> list[str]:
-    """Every identifier the metadata carried, grouped by type.
+def _corpus(entry: Identifier) -> str:
+    """Which side of the file this value was found on, in one word."""
+    if entry.corpora == {METADATA, CONTENT}:
+        return "both"
+    return "text" if CONTENT in entry.corpora else "recorded"
+
+
+def _identifiers(theme: Theme, found: list[Identifier], *, content: bool = False) -> list[str]:
+    """Every identifier the scan read, grouped by type.
 
     Listed once each with a count rather than once per occurrence: the question
     an analyst asks of this section is "what is in here", and the same author
     address across forty files is one lead, not forty.
+
+    The corpus column appears only where there are two corpora to tell apart.
+    Without `--content` every value came from the same place and a column
+    saying so on every row would be noise.
     """
     if not found:
         return []
 
     lines = _heading(theme, "identifiers", len(found), noun="value")
-    width = min(max(len(entry.normalized) for entry in found), theme.width - 30)
+    tag = max(len(_corpus(entry)) for entry in found) if content else 0
+    width = min(max(len(entry.normalized) for entry in found), theme.width - 30 - tag)
 
     for entry in found:
         colour = _IDENTIFIER_COLOURS.get(entry.type, "self-reported")
         kind = theme.dim(entry.type.ljust(7))
         seen = theme.dim(f"{entry.count} in {entry.files}")
+        corpus = ""
+        if content:
+            word = _corpus(entry).ljust(tag)
+            # Painted as evidence rather than dimmed when the value is in the
+            # document *and* in how the file arrived. That is the answer this
+            # column exists to make findable in a long list.
+            linked = entry.acquired and CONTENT in entry.corpora
+            corpus = f"{theme.paint(word, 'recorded') if linked else theme.dim(word)}  "
 
         # An identifier is what somebody pivots on next, so it wraps like every
         # other value. Half an address is not a shorter address.
         parts = theme.wrap(entry.normalized, width)
-        lines.append(f"    {kind} {theme.paint(parts[0].ljust(width), colour)}  {seen}")
+        lines.append(f"    {kind} {theme.paint(parts[0].ljust(width), colour)}  {corpus}{seen}")
         lines.extend(f"    {' ' * 8}{theme.paint(part, colour)}" for part in parts[1:])
         # The place string carries a middot because that is the form `--json`
         # promises. A terminal that cannot print one gets the ASCII separator
@@ -1197,6 +1218,7 @@ def render_json(
     root: Path,
     *,
     identify: bool = False,
+    content: bool = False,
     cluster: bool = False,
     home: Path | None = None,
     unsearched: Unsearched | None = None,
@@ -1212,7 +1234,7 @@ def render_json(
     }
     payload["unsearched"] = (unsearched or Unsearched()).to_dict()
     if identify:
-        payload["identifiers"] = [entry.to_dict() for entry in extract(records)]
+        payload["identifiers"] = [entry.to_dict() for entry in extract(records, content=content)]
     if cluster:
         payload["shared_sources"] = [group.to_dict() for group in group_sources(records)]
 

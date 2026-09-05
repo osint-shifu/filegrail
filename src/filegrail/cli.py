@@ -142,6 +142,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Group the files by the authors and cameras more than one of them names.",
     )
     parser.add_argument(
+        "--content",
+        action="store_true",
+        help="Also read what the documents say, not only what they record "
+        "about themselves. Implies --identify.",
+    )
+    parser.add_argument(
         "--hash", action="store_true", dest="hash_files", help="Compute SHA-256 for each file."
     )
     parser.add_argument(
@@ -414,12 +420,18 @@ def _scan(rest: list[str]) -> int:
     base = root if root.is_dir() else root.parent
     theme = detect(colour=args.colour)
 
+    # `--content` without `--identify` would pay for every document to be
+    # opened and parsed and then print a count of what it found. Asking for the
+    # wider corpus is asking to be shown it.
+    listed = args.identify or args.content
+
     if args.json:
         print(
             render_json(
                 records,
                 base,
-                identify=args.identify,
+                identify=listed,
+                content=args.content,
                 cluster=args.cluster,
                 home=home,
                 unsearched=missed,
@@ -438,7 +450,8 @@ def _scan(rest: list[str]) -> int:
                 stats=stats,
                 theme=theme,
                 filtered=describe(args.families, args.extensions),
-                identify=args.identify,
+                identify=listed,
+                content=args.content,
                 cluster=args.cluster,
                 home=home,
                 unsearched=missed,

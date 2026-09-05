@@ -96,6 +96,12 @@ filegrail does more than extract:
 
 `--identify` extracts values from decoded metadata while preserving the file and field they came from: URLs, domains, email addresses, IPv4 addresses, coordinates, and hashes under their own algorithm (`md5`, `sha1`, `sha256`).
 
+`--content` widens the corpus from what files record about themselves to what they say — the body of a Word or OpenDocument file, a slide deck, a spreadsheet's strings, HTML, XML, a message body, plain text and data files. **No dependency is added for it**: those formats are zip archives of XML, and filegrail already opens them for their properties. PDF text is deliberately not read: pulling string literals out of a content stream produces readable text for perhaps half of real documents and mush for the rest, and in a tool that reports evidence a confident wrong answer is worse than an absent one. Source code and RTF are left out for reasons of the same kind, written down in `sources/content.py`.
+
+The two corpora are kept apart on every value, because prose is an order of magnitude noisier than a property field. That separation is also what makes the interesting answer visible:
+
+> **A value a document names, that the record of the file's arrival also names.** Either alone is ordinary. The two together were put there by separate acts, and only something that already read the arrival record can see it.
+
 ### Shared sources
 
 `--cluster` reduces a directory to the sources behind it, on three axes kept deliberately apart: a **camera body** (one physical device, by serial), a **camera model** (a product thousands of people own — not the same claim) and an **author** (a name, as somebody typed it).
@@ -189,6 +195,7 @@ filegrail ./evidence
 | `--brief` | Summarise each file instead of listing every field |
 | `--timeline` | One chronological line per event |
 | `--identify` | Extract investigation pivots from metadata |
+| `--content` | Also read what the documents say, not only what they record (implies `--identify`) |
 | `--cluster` | Group files by the sources more than one of them names |
 | `--unknown-only` | Only files nothing was found for |
 | `--hash` | Compute SHA-256 for each file |
@@ -257,8 +264,23 @@ filegrail ./case-files --unknown-only
 
 ```bash
 filegrail ./case-files --identify
+filegrail ./case-files --identify --content
 filegrail ./case-files --cluster
 filegrail ./case-files --timeline
+```
+
+With `--content`, each value says which side of the file it came from, and a value on both sides that also appears in how the file arrived is raised where a long report cannot bury it:
+
+```text
+  notable findings
+
+    1 identifier is named in a document and in how it arrived
+    8 unique identifiers extracted
+
+    domain  acme-legal.example                       both      3 in 1
+            invoice.docx · url
+    domain  innafirma.example                        text      1 in 1
+            notes.md · text
 ```
 
 ### Explain one result

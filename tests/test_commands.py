@@ -316,3 +316,28 @@ def test_clean_check_does_not_even_make_the_directory_it_would_write_to(tmp_path
 
     assert not out.exists()
     assert json.loads(capsys.readouterr().out)["destination"] == str(out)
+
+
+def test_content_lists_what_it_opened_every_document_to_find(tmp_path: Path, capsys):
+    """`--content` pays to open and parse every document. Asking for the wider
+    corpus is asking to be shown it, so it does not also need `--identify`."""
+    case = tmp_path / "case"
+    case.mkdir()
+    (case / "letter.txt").write_text("write to ann.shaw@acme-legal.example", encoding="utf-8")
+
+    assert main(["scan", str(case), "--content", "--json", "--home", str(tmp_path)]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    emails = [item["normalized"] for item in payload["identifiers"] if item["type"] == "email"]
+    assert emails == ["ann.shaw@acme-legal.example"]
+    assert payload["identifiers"][0]["corpora"] == ["content"]
+
+
+def test_a_scan_that_was_not_asked_for_content_does_not_read_any(tmp_path: Path, capsys):
+    case = tmp_path / "case"
+    case.mkdir()
+    (case / "letter.txt").write_text("write to ann.shaw@acme-legal.example", encoding="utf-8")
+
+    assert main(["scan", str(case), "--identify", "--json", "--home", str(tmp_path)]) == 0
+
+    assert json.loads(capsys.readouterr().out)["identifiers"] == []
