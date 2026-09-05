@@ -61,9 +61,16 @@ def test_a_windows_checkout_of_the_licence_is_the_same_licence(tmp_path: Path):
     happens to prefer, and the Windows runners rejected a licence that was
     letter perfect.
     """
+    # Normalise before converting. On a Windows runner the checkout already has
+    # CRLF, and doubling the carriage returns would build a file that is not
+    # any checkout of anything - which is how this test failed on the machines
+    # it was written for.
+    text = (ROOT / "LICENSE").read_bytes().replace(b"\r\n", b"\n")
     windows = tmp_path / "LICENSE"
-    windows.write_bytes((ROOT / "LICENSE").read_bytes().replace(b"\n", b"\r\n"))
+    windows.write_bytes(text.replace(b"\n", b"\r\n"))
 
+    assert b"\r\n" in windows.read_bytes()  # the fixture really is a Windows one
+    assert windows.read_bytes() != text  # and really differs from the other form
     assert _licence_digest(windows) == APACHE_2_0
 
 
