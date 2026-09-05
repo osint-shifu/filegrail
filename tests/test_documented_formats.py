@@ -195,13 +195,32 @@ def _counted(document: Path, phrase: str) -> int:
     return int(found.group(1))
 
 
-def test_the_documents_agree_with_the_readers_about_how_many_formats_there_are():
-    assert _counted(README, "file extensions") == len(_readable())
+def test_the_format_reference_agrees_with_the_readers_about_how_many_there_are():
     assert _counted(FORMATS, r"file extensions\*\*") == len(_readable())
 
 
-def test_the_readme_agrees_about_how_many_formats_are_read_as_text():
-    assert _counted(README, "extensions in all") == len(CONTENT_SUFFIXES)
+def _backticked(document: Path, heading: str, stop: str) -> set[str]:
+    """Every extension in the tables under one heading of a document."""
+    text = document.read_text(encoding="utf-8")
+    section = text[text.index(heading) : text.index(stop, text.index(heading))]
+    return set(_EXTENSION.findall(section))
+
+
+def test_the_readme_lists_exactly_what_content_reads():
+    """A count in prose can be checked; a list of extensions can be checked
+    against the reader itself, which is the stronger claim and the one the
+    readme actually makes."""
+    listed = _backticked(README, "## Content extraction", "## Analysis")
+
+    assert listed == CONTENT_SUFFIXES, sorted(listed ^ CONTENT_SUFFIXES)
+
+
+def test_the_readme_lists_exactly_what_clean_can_strip():
+    from filegrail.clean import _STRIPPERS
+
+    listed = _backticked(README, "### Cleanable formats", "Clean one file")
+
+    assert listed == set(_STRIPPERS), sorted(listed ^ set(_STRIPPERS))
 
 
 def test_the_badge_agrees_too():

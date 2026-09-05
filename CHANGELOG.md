@@ -5,6 +5,22 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.0 - 2026-09-05
+
+### Changed
+
+- The readme is a reference rather than a walkthrough. Tables of what the tool
+  reads, from where, and out of which formats, in place of prose and worked
+  examples: the question a reader arrives with is usually *does it read this*,
+  and a table answers it in one look. The header and the badges are unchanged.
+
+  Every extension in it is checked against the readers by a test, both ways -
+  the content table against what `--content` reads and the cleanable-format
+  table against what `clean` can strip - so a format added to either cannot be
+  left out of the page, and a format named on the page cannot be one nothing
+  reads. That is stronger than the count in prose it replaces, which could only
+  say how many there were.
+
 ## 0.5.2 - 2026-09-05
 
 ### Fixed
