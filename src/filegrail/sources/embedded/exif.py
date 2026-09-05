@@ -14,10 +14,16 @@ the single most consequential fact a file carries.
 
 from __future__ import annotations
 
+import mmap
 import struct
 from collections.abc import Iterator
 from pathlib import Path
 from typing import BinaryIO
+
+#: What the parser reads from: a block lifted out of a container, or a whole
+#: file mapped into memory. It only takes lengths, slices and packed fields,
+#: and both answer to all three.
+Raw = bytes | mmap.mmap
 
 JPEG_SUFFIXES = {".jpg", ".jpeg", ".jpe"}
 TIFF_SUFFIXES = {".tif", ".tiff", ".dng", ".nef", ".cr2", ".arw", ".orf", ".rw2"}
@@ -127,7 +133,7 @@ def read_exif(path: Path) -> Exif | None:
         if suffix in JPEG_SUFFIXES:
             raw = _jpeg_exif(path)
         elif suffix in TIFF_SUFFIXES:
-            raw = path.read_bytes()
+            return _tiff_exif(path)
         elif suffix in WEBP_SUFFIXES:
             raw = _webp_chunk(path, b"EXIF")
         elif suffix in HEIF_SUFFIXES:
@@ -146,6 +152,26 @@ def read_exif(path: Path) -> Exif | None:
 
 
 # --- containers --------------------------------------------------------------
+
+
+def _tiff_exif(path: Path) -> Exif | None:
+    """Parse a TIFF where it lies, instead of reading it in.
+
+    Here the container *is* the header, so unlike every other reader in this
+    module there is no small block to lift out - and the files are the largest
+    the tool sees. A raw frame from a camera runs from twenty-five megabytes to
+    past a hundred, the tags are a few hundred bytes of it, and a directory of
+    them is the ordinary case rather than an attack.
+
+    A window over the head would be wrong rather than merely smaller, because
+    an IFD offset may point anywhere in the file. Mapping hands the parser the
+    whole of it and leaves the pages to the operating system. An empty file
+    cannot be mapped, which raises `ValueError` and is caught by the caller
+    along with everything else that means "this is not one of these".
+    """
+    with path.open("rb") as handle:
+        with mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ) as mapped:
+            return _parse_tiff(mapped)
 
 
 def _jpeg_exif(path: Path) -> bytes:
@@ -224,7 +250,7 @@ def _heif_exif(path: Path) -> bytes:
 # --- TIFF --------------------------------------------------------------------
 
 
-def _parse_tiff(data: bytes) -> Exif | None:
+def _parse_tiff(data: Raw) -> Exif | None:
     if len(data) < 8:
         return None
     if data[:2] == b"II":
@@ -246,7 +272,7 @@ def _parse_tiff(data: bytes) -> Exif | None:
     return exif if (exif or exif.gps) else None
 
 
-def _read_ifd(data: bytes, offset: int, endian: str, into: dict, exif: Exif) -> None:
+def _read_ifd(data: Raw, offset: int, endian: str, into: dict, exif: Exif) -> None:
     if offset <= 0 or offset + 2 > len(data):
         return
     (count,) = struct.unpack_from(endian + "H", data, offset)
@@ -267,7 +293,7 @@ def _read_ifd(data: bytes, offset: int, endian: str, into: dict, exif: Exif) -> 
             into[tag] = value
 
 
-def _read_value(data: bytes, entry: int, endian: str, kind: int, length: int):
+def _read_value(data: Raw, entry: int, endian: str, kind: int, length: int):
     if kind == _ASCII:
         if length == 0 or length > _MAX_STRING:
             return None
@@ -323,7 +349,7 @@ def _read_value(data: bytes, entry: int, endian: str, kind: int, length: int):
     return None
 
 
-def _payload(data: bytes, entry: int, endian: str, size: int) -> bytes | None:
+def _payload(data: Raw, entry: int, endian: str, size: int) -> bytes | None:
     if size <= 4:
         return data[entry + 8 : entry + 8 + size]
     (offset,) = struct.unpack_from(endian + "I", data, entry + 8)

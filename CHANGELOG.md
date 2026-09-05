@@ -27,6 +27,20 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   `archive.read(`, because the thing to hold is the absence of a call and any
   test that lists today's sites would miss tomorrow's.
 
+- A TIFF is parsed where it lies instead of being read into memory. `.tif`,
+  `.tiff`, `.dng`, `.nef`, `.cr2`, `.arw`, `.orf` and `.rw2` all come through
+  the TIFF path, and it was the one reader in the tree without a bound of any
+  kind: a 419 MB file took 433 MB to answer with a few hundred bytes of tags,
+  and a directory of raw frames from a camera is the ordinary case rather than
+  an attack. It now takes 23 MB, which is the interpreter.
+
+  Mapping rather than a window over the head, because an IFD offset may point
+  anywhere in the file and a window would be wrong rather than merely smaller.
+  The reader gained a way to fail it did not have - an empty file cannot be
+  mapped, where reading one returned an empty string - so `read_exif` is now
+  tested directly for that case and not only through the dispatcher whose net
+  would have hidden it.
+
 - `clean` no longer loses files. Every copy was written straight into `--out`
   under the file's own name, so two folders each holding a `photo.jpg` produced
   one copy: the second replaced the first, and the report said two files had

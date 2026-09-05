@@ -2,6 +2,7 @@
 
 import json
 import struct
+import tracemalloc
 import zipfile
 import zlib
 from pathlib import Path
@@ -548,3 +549,60 @@ def test_wav_info_chunk_names_the_editor(tmp_path: Path):
 
     assert origin.tool == "Adobe Audition 3.0"
     assert origin.at == "2019-03-04T00:00:00Z"
+
+
+# --- how much of a file the TIFF path reads ----------------------------------
+
+
+#: Big enough that reading the file rather than mapping it is unmistakable in
+#: the numbers, and small enough that writing one costs nothing. Real raw files
+#: from a camera run from twenty-five megabytes to well past a hundred.
+_LARGE = 24 * 1024 * 1024
+
+
+def test_a_large_tiff_is_not_read_into_memory(tmp_path: Path):
+    """The tags sit in the first few hundred bytes of a file that may be huge.
+
+    `.dng`, `.nef`, `.cr2` and `.arw` all come through here, and a directory of
+    them is the ordinary case rather than an attack: reading each one whole
+    makes the peak the size of the largest file in the directory, for a few
+    hundred bytes of answer.
+    """
+    scan = tmp_path / "scan.tiff"
+    with scan.open("wb") as handle:
+        handle.write(_tiff([(0x0131, 2, "Nikon Scan 4.0")]))
+        handle.seek(_LARGE - 1)
+        handle.write(b"\0")
+
+    tracemalloc.start()
+    try:
+        origin = read_embedded_metadata(scan)
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+
+    assert origin is not None and origin.tool == "Nikon Scan 4.0"
+    assert peak < _LARGE // 4
+
+
+def test_an_empty_tiff_is_not_an_error(tmp_path: Path):
+    """A file with nothing in it cannot be mapped, and is ordinary here.
+
+    Asserted against `read_exif` and not only against the dispatcher above it.
+    Reading the bytes returned an empty string for this file and mapping it
+    raises, so the reader gained a way to fail that it did not have before, and
+    the net in `read_embedded_metadata` would hide that from a test that only
+    went through the front door.
+    """
+    empty = tmp_path / "truncated.tiff"
+    empty.write_bytes(b"")
+
+    assert read_exif(empty) is None
+    assert read_embedded_metadata(empty) is None
+
+
+def test_a_tiff_too_short_to_hold_a_header_is_not_an_error(tmp_path: Path):
+    stub = tmp_path / "stub.tiff"
+    stub.write_bytes(b"II*")
+
+    assert read_exif(stub) is None
