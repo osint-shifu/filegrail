@@ -537,8 +537,11 @@ def test_the_profile_is_written_the_same_way_as_the_target(monkeypatch, tmp_path
         for line in output.splitlines()
         if line.startswith("  target") or line.strip().startswith("profile")
     }
+    # Built from a `Path` rather than written out: `_display` keeps the `~/`
+    # prefix and then whatever separator the platform uses, so a POSIX literal
+    # here fails on Windows for a row that is perfectly correct there.
     assert rows["target"].endswith("~/case")
-    assert "~/image/ann" in rows["profile"]
+    assert f"~/{Path('image') / 'ann'}" in rows["profile"]
 
 
 def test_the_inventory_is_a_table_with_a_row_for_each_type():
