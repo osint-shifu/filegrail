@@ -1,6 +1,6 @@
 <div align="center">
 
-# FileGrail
+# filegrail
 
 ### Reconstruct how files arrived. Extract what they reveal.
 
@@ -14,7 +14,7 @@
 [![CI](https://github.com/osint-shifu/filegrail/actions/workflows/ci.yml/badge.svg)](https://github.com/osint-shifu/filegrail/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-Apache--2.0-8250df?style=flat-square)
 
-[Why FileGrail?](#why-filegrail) ·
+[Why filegrail?](#why-filegrail) ·
 [Features](#features) ·
 [Install](#installation) ·
 [Usage](#usage) ·
@@ -26,7 +26,7 @@
 
 ---
 
-## Why FileGrail?
+## Why filegrail?
 
 Metadata tools answer questions like:
 
@@ -36,10 +36,10 @@ During an investigation that is half the problem. You also need to know:
 
 > **How did this file reach the machine? Where was it downloaded from? Was it extracted from an archive, or listed in a torrent? What touched it afterwards? Do its own metadata blocks contradict each other? Is it related to another file in the same directory?**
 
-**FileGrail reads file metadata and surviving local provenance evidence in one pass, and keeps them apart.**
+**filegrail reads file metadata and surviving local provenance evidence in one pass, and keeps them apart.**
 
 > [!IMPORTANT]
-> FileGrail works **after the fact**. No monitoring agent, provenance database, browser extension or prior setup has to exist before the file appears.
+> filegrail works **after the fact**. No monitoring agent, provenance database, browser extension or prior setup has to exist before the file appears.
 
 ```text
 file
@@ -48,7 +48,7 @@ file
 └── interaction   what touched it after arrival
 ```
 
-Rather than flattening everything into one vague "origin" field, FileGrail keeps those classes separate and reports what each source actually supports.
+Rather than flattening everything into one vague "origin" field, filegrail keeps those classes separate and reports what each source actually supports.
 
 ---
 
@@ -83,7 +83,7 @@ Decoded fields stay visible rather than being narrowed to whichever one looks in
 
 ### Correlate and contradict
 
-FileGrail does more than extract:
+filegrail does more than extract:
 
 - corroboration between independent acquisition records, and conflicting origin URLs
 - size mismatches and filename-only matches
@@ -115,7 +115,7 @@ Removing the fields is removing the fields: pixels still carry sensor noise, an 
 
 ### Another user profile
 
-`--home` points the same readers at a copied or mounted profile. A Windows browser profile can be examined while FileGrail runs on Linux.
+`--home` points the same readers at a copied or mounted profile. A Windows browser profile can be examined while filegrail runs on Linux.
 
 ### Evidence coverage
 
@@ -303,7 +303,7 @@ filegrail . --redact --json > report.json
 
 ---
 
-## How FileGrail reasons about evidence
+## How filegrail reasons about evidence
 
 Every result is a claim from one source. A browser database, an EXIF block, a shell command, an XMP packet, a torrent and a recent-document record do not prove the same thing and are not presented as though they do.
 
@@ -316,7 +316,7 @@ Every result is a claim from one source. A browser database, an EXIF block, a sh
 Agreement between independent sources is reported as corroboration. Disagreement is reported as a conflict rather than resolved silently.
 
 > [!NOTE]
-> **A conflict is evidence too.** FileGrail shows the disagreement and the sources behind it instead of quietly printing the higher-scoring one.
+> **A conflict is evidence too.** filegrail shows the disagreement and the sources behind it instead of quietly printing the higher-scoring one.
 
 Confidence values rank competing claims of the same kind. They are **not probability scores and not forensic verdicts**.
 
@@ -347,7 +347,7 @@ Readers cover 68 file extensions across the major families.
 
 The readers define what is supported, not this table. The complete matrix is in [`docs/FORMATS.md`](docs/FORMATS.md), which is held against the code by a test and so cannot drift.
 
-A format FileGrail does not understand is reported as not understood — and still takes part in provenance analysis when local evidence about it exists.
+A format filegrail does not understand is reported as not understood — and still takes part in provenance analysis when local evidence about it exists.
 
 ---
 
@@ -369,7 +369,7 @@ It preserves file records, acquisition/intrinsic/interaction claims, decoded met
 
 ## Privacy and safety
 
-FileGrail runs locally, makes **no network requests** and does not modify what it inspects.
+filegrail runs locally, makes **no network requests** and does not modify what it inspects.
 
 Its output is another matter: local evidence can carry private URLs, credentials, tokens, paths and addresses.
 
@@ -392,7 +392,7 @@ filegrail explain statement.pdf --redact
 
 ## Limits
 
-FileGrail can only analyze evidence that still exists. Browser history gets cleared, extended attributes are lost in copies, shell history may carry no timestamps, and some files never had metadata.
+filegrail can only analyze evidence that still exists. Browser history gets cleared, extended attributes are lost in copies, shell history may carry no timestamps, and some files never had metadata.
 
 It is deliberately **not** proof, **not** chain of custody, **not** a disk-image forensic suite, **not** a monitoring agent.
 
@@ -434,7 +434,7 @@ Apache License 2.0. See [`LICENSE`](LICENSE).
 
 <div align="center">
 
-**FileGrail**
+**filegrail**
 
 *Reconstruct how files arrived. Extract what they reveal.*
 
