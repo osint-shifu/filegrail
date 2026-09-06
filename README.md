@@ -30,7 +30,7 @@ It combines three sources of information:
 
 1. **[Origin - what the machine recorded](#evidence-sources)** - browser download history, OS origin metadata, shell history, archives, torrents, recent-file records, sync folders and trash information. These traces can reveal where a file was downloaded from, which application handled it, when it appeared, where it was stored or whether it came from an archive or torrent.
 2. **[Metadata - what the file records about itself](#supported-formats)** - EXIF, XMP, IPTC, C2PA, document properties, media tags, email headers and other embedded data. Depending on the format, this can reveal the device, software, author, editor, timestamps, GPS coordinates, document history and other details.
-3. **[Content - what the file says inside](#document-content)** - with `--content`, the readable text of supported documents is scanned as well: the body of a letter, the notes on a slide, the cells of a spreadsheet, the decoded body of a message. The text is never printed or stored; what is kept is the identifiers found in it and where in the document each one was.
+3. **[Content - what the file says inside](#document-content)** - with `--content`, the readable text of supported documents is scanned as well: the body of a letter, the notes on a slide, the cells of a spreadsheet, the decoded body of a message. That text is run through the same **identifier extraction** as everything above - URLs, domains, email addresses, IP addresses, coordinates and MD5/SHA-1/SHA-256 values - so an address written in a letter can be matched against the address the file was fetched from. The text itself is never printed or stored; what is kept is each identifier and where in the document it was found.
 
 Those are the three places `filegrail` looks. What it finds there is filed under one of three categories, which is a different question - a shell command that fetched a file and a shell command that merely opened it come from the same place and say different things:
 
@@ -41,8 +41,6 @@ Those are the three places `filegrail` looks. What it finds there is filed under
 | **Activity** | What happened to the file here? | Recent Documents, Windows shortcuts, trash records, sync folders, filesystem times |
 
 Each record also carries **how it was matched to that file** - a recorded path, a file name, a name and exact size, membership of a container, or the file's own bytes. A record tied to a file by nothing but its name is reported as exactly that.
-
-`filegrail` does not say "acquisition" for a download. In digital forensics that word means the examiner taking custody of material - disk imaging, memory capture, a forensic copy - and it is not reused here for something else.
 
 Scanning is local, read-only and makes **no network requests**. `filegrail clean` is the only command that writes files, and it writes cleaned **copies** to a separate directory.
 
@@ -588,7 +586,7 @@ SCAN GAPS  ·  1 item
 · browser history  2 download records across 1 profile
 ```
 
-Counts first, then a row per file, then the records themselves grouped by the question each one answers. The counts in a heading are always of the rows underneath it. Files nothing explained get their own section at the end rather than being folded into the list.
+Counts first, then a row per file, then the records themselves grouped by the question each one answers. The counts in a heading are always of the rows underneath it. Files nothing explained get their own section at the end.
 
 </details>
 
@@ -729,7 +727,7 @@ EXIF  ·  8 fields
   GPSLongitude      11, 53, 6.46
 ```
 
-`explain` shows the material rather than a reading of it: what was found, where each record came from, how it was matched, and what correlation made of them. The prose assessment it used to print was this tool's opinion; it is still in `--json` for anyone who wants it.
+`explain` shows the material: what was found, where each record came from, how it was matched, and what correlation made of them. The prose assessment is in `--json`.
 
 </details>
 
@@ -825,7 +823,7 @@ SCAN GAPS  ·  1 item
 · browser history  2 download records across 1 profile
 ```
 
-One section per type, one row per place a value was seen, with the file, the source and the field it came from. A URL too long to sit beside those columns takes the line instead - broken across a table cell it could not be copied or opened. Values seen under more than one source get a section of their own at the end.
+One section per type, one row per place a value was seen, with the file, the source and the field it came from. A URL too long for those columns takes the line. Values seen under more than one source get a section of their own at the end.
 
 </details>
 
@@ -1007,7 +1005,7 @@ RESULTS  ·  4 files · 3 cleanable · 1 unsupported
   press/holiday.jpg  JPEG    EXIF                 would clean
 ```
 
-The summary prints the exit code, because that is what a pipeline acts on: `0` if every copy would come out clean, `1` if any would not. Anything the readers can still see in a copy gets its own section.
+The summary prints the exit code: `0` if every copy would come out clean, `1` if any would not. Anything the readers can still see in a copy gets its own section.
 
 </details>
 

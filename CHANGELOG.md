@@ -32,6 +32,16 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   and one that merely opened it come from the same place and say different
   things.
 
+- The third of those said what happens to the text and not what happens to
+  what is in it. It names the identifier extraction now, and the types, and
+  what the pairing is for: an address written in a letter matched against the
+  address the file was fetched from.
+
+- Five passages explained a design decision, compared the page with an earlier
+  version of itself, or commented on the tool instead of saying what it does.
+  A readme says what happens; why it happens that way belongs in
+  `docs/DESIGN.md`.
+
 ## 0.8.0 - 2026-09-06
 
 ### Changed
