@@ -58,7 +58,7 @@ When independent sources disagree, both values are preserved and the conflict is
 | **Metadata extraction** | Device, software, author, timestamps, GPS, revision data and other embedded fields |
 | **Evidence correlation** | Agreements and conflicts between independent sources |
 | **Timeline** | Origin, creation, editing and activity events in chronological order |
-| **Identifiers** | [Six types](#identifier-types) of investigation pivot with file, source and location |
+| **Identifiers** | [Supported types](#identifier-types) of investigation pivot with file, source and location |
 | **File relationships** | XMP document IDs and derivation chains between related files |
 | **Clusters** | Files grouped by shared camera serial, camera model or author |
 | **Comparison** | Metadata, provenance and timing differences between two files |
