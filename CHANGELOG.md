@@ -5,6 +5,33 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.1 - 2026-09-06
+
+### Fixed
+
+- The readme described a report the tool no longer prints. The eleven folded
+  views had been regenerated, but the sentence under each one still explained a
+  strength meter that no longer exists, a `FILES IN DETAIL` section, an
+  `EVIDENCE SOURCES` table, a corpus word beside every identifier, and an
+  assessment `explain` no longer writes. `compare` had no caption at all.
+
+- It listed `filegrail.scan/1` where the tool stamps `/2`. That is a contract a
+  consumer would have believed. The schema list is a table now: which version
+  each document is on, and what changed in it.
+
+- The table of match bases printed the prose form - `read from the file` -
+  where the report and `--json` both write `embedded`. A reader looking up what
+  they had just seen would not have found it. Those prose labels had no other
+  caller and are gone.
+
+- The opening said `filegrail` combines *two* sources of information and named
+  the machine's traces and the file's metadata. With `--content` it reads a
+  third: the text inside the document, which is where an address in a letter
+  comes from. Three now, named for what they are, with a sentence separating
+  them from the three categories below - a shell command that fetched a file
+  and one that merely opened it come from the same place and say different
+  things.
+
 ## 0.8.0 - 2026-09-06
 
 ### Changed

@@ -474,7 +474,7 @@ Below are examples of actual terminal output for the main workflows: scanning on
 <summary><strong>One file</strong> &nbsp;·&nbsp; <code>filegrail holiday.jpg</code></summary>
 
 ```text
-filegrail 0.8.0
+filegrail 0.8.1
 ────────────────────────────────────────────────────────────────────────
 target    ~/case/press/holiday.jpg · profile ~/home · external
 
@@ -482,7 +482,7 @@ FILE  ·  holiday.jpg · JPEG · 3.4 MB
 ────────────────────────────────────────────────────────────────────────
 
   path    /home/oryon/case/press/holiday.jpg
-  mtime   2026-09-06 00:40:40
+  mtime   2026-09-06 00:53:31
 
 ORIGIN  ·  1 record
 ────────────────────────────────────────────────────────────────────────
@@ -524,7 +524,7 @@ One section per question, and every record says how it was tied to this file - `
 <summary><strong>A whole directory, top to bottom</strong> &nbsp;·&nbsp; <code>filegrail ./case</code></summary>
 
 ```text
-filegrail 0.8.0
+filegrail 0.8.1
 ────────────────────────────────────────────────────────────────────────
 target    ~/case · profile ~/home · external
 
@@ -578,7 +578,7 @@ UNRESOLVED  ·  1 file
 
   file          type  size  last modified
   ────────────  ────  ────  ───────────────────
-· notes.md      MD    64 B  2026-09-06 00:40:40
+· notes.md      MD    64 B  2026-09-06 00:53:31
 
 SCAN GAPS  ·  1 item
 ────────────────────────────────────────────────────────────────────────
@@ -596,7 +596,7 @@ Counts first, then a row per file, then the records themselves grouped by the qu
 <summary><strong>Index only, for a large directory</strong> &nbsp;·&nbsp; <code>filegrail ./case --brief</code></summary>
 
 ```text
-filegrail 0.8.0 · brief
+filegrail 0.8.1 · brief
 ────────────────────────────────────────────────────────────────────────
 target    ~/case · profile ~/home · external
 
@@ -628,7 +628,7 @@ FILES  ·  4 files · 4 types · 3.4 MB
 <summary><strong>Two records that disagree</strong> &nbsp;·&nbsp; <code>filegrail ./contested</code></summary>
 
 ```text
-filegrail 0.8.0
+filegrail 0.8.1
 ────────────────────────────────────────────────────────────────────────
 target    ~/contested/statement.pdf · profile ~/home · external
 
@@ -636,7 +636,7 @@ FILE  ·  statement.pdf · PDF · 65 B
 ────────────────────────────────────────────────────────────────────────
 
   path    /home/oryon/contested/statement.pdf
-  mtime   2026-09-06 00:40:40
+  mtime   2026-09-06 00:53:31
 
 ORIGIN  ·  2 records
 ────────────────────────────────────────────────────────────────────────
@@ -685,7 +685,7 @@ Both records stay visible and neither is promoted. The disagreement is a row in 
 <summary><strong>Why a finding was produced</strong> &nbsp;·&nbsp; <code>filegrail explain holiday.jpg</code></summary>
 
 ```text
-filegrail 0.8.0 · explain
+filegrail 0.8.1 · explain
 ────────────────────────────────────────────────────────────────────────
 target    ~/case/press/holiday.jpg · profile ~/home · external
 
@@ -737,7 +737,7 @@ EXIF  ·  8 fields
 <summary><strong>Chronological events</strong> &nbsp;·&nbsp; <code>filegrail ./case --timeline</code></summary>
 
 ```text
-filegrail 0.8.0 · timeline
+filegrail 0.8.1 · timeline
 ────────────────────────────────────────────────────────────────────────
 target    ~/case · profile ~/home · external
 
@@ -815,7 +815,7 @@ UNRESOLVED  ·  1 file
 
   file          type  size  last modified
   ────────────  ────  ────  ───────────────────
-· notes.md      MD    64 B  2026-09-06 00:40:40
+· notes.md      MD    64 B  2026-09-06 00:53:31
 
 SCAN GAPS  ·  1 item
 ────────────────────────────────────────────────────────────────────────
@@ -856,7 +856,7 @@ Each cluster says which field it rests on. `EXIF · BodySerialNumber` is one phy
 <summary><strong>Two files against each other</strong> &nbsp;·&nbsp; <code>filegrail compare beach.jpg beach-edited.jpg</code></summary>
 
 ```text
-filegrail 0.8.0 · compare
+filegrail 0.8.1 · compare
 ────────────────────────────────────────────────────────────────────────
 left      /home/oryon/beach.jpg
 right     /home/oryon/beach-edited.jpg
@@ -915,7 +915,7 @@ RELATIONSHIPS  ·  1 relation
 <summary><strong>What this machine can answer at all</strong> &nbsp;·&nbsp; <code>filegrail doctor</code></summary>
 
 ```text
-filegrail 0.8.0 · doctor
+filegrail 0.8.1 · doctor
 ────────────────────────────────────────────────────────────────────────
 profile   ~/home · external
 
@@ -983,7 +983,7 @@ LIMITATIONS  ·  2 items
 <summary><strong>Checking before publishing</strong> &nbsp;·&nbsp; <code>filegrail clean ./case --check</code></summary>
 
 ```text
-filegrail 0.8.0 · clean --check
+filegrail 0.8.1 · clean --check
 ────────────────────────────────────────────────────────────────────────
 target    ~/case
 mode      check only · nothing written
