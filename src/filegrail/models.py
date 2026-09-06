@@ -79,21 +79,6 @@ MATCH_BASES = (
     SYNC_ROOT,
 )
 
-#: How each basis reads in a report. The point of printing it at all is that
-#: "matched by name" and "read out of the file" are different enough that a
-#: reader who cannot tell them apart cannot weigh anything.
-MATCH_LABELS: dict[str, str] = {
-    EMBEDDED: "read from the file",
-    FILE_ATTRIBUTE: "file attribute",
-    SIDECAR: "record beside the file",
-    RECORDED_PATH: "recorded path",
-    FILENAME: "file name",
-    NAME_AND_SIZE: "name and exact size",
-    CONTAINER_MEMBER: "container member",
-    SYNC_ROOT: "inside a sync folder",
-}
-
-
 # --- the sources ---------------------------------------------------------------
 
 #: Which of the three questions each source speaks to. Every source is listed;

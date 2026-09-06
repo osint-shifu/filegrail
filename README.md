@@ -248,16 +248,18 @@ It can report:
 
 Every record says how it came to be about the file it is reported under. A download row found by the path it was saved to and one found by a name that happens to be the same are not equally firm, and the report never leaves that to be guessed.
 
+These are the words the report prints in its `match` column and the values `--json` writes under `match.method`.
+
 | Basis | What it means | Where it comes from |
 |:---|:---|:---|
-| `read from the file` | Decoded out of the file's own bytes | EXIF, XMP, IPTC, document properties, Content Credentials, mail headers |
-| `file attribute` | Read from what the filesystem keeps for this exact file | `Zone.Identifier`, macOS where-from, XDG attributes, creation times |
-| `recorded path` | An external store names this exact path | Browser download history, Recent Documents |
-| `record beside the file` | A separate file written next to it and naming it | `yt-dlp` sidecar, freedesktop trash record |
-| `name and exact size` | Both agree; two files can share both, but not easily | Torrents, archive members, Windows shortcuts |
-| `file name` | The name is all that matched | A download record for a file that has since moved, a messenger naming pattern |
-| `container member` | Read from a member, or inherited from the container | Archives |
-| `inside a sync folder` | The file lies under a folder a client manages | Nextcloud, Dropbox, Syncthing, OneDrive |
+| `embedded` | Decoded out of the file's own bytes | EXIF, XMP, IPTC, document properties, Content Credentials, mail headers |
+| `file-attribute` | Read from what the filesystem keeps for this exact file | `Zone.Identifier`, macOS where-from, XDG attributes, creation times |
+| `recorded-path` | An external store names this exact path | Browser download history, Recent Documents |
+| `sidecar` | A separate file written next to it and naming it | `yt-dlp` sidecar, freedesktop trash record |
+| `name+size` | Both agree; two files can share both, but not easily | Torrents, archive members, Windows shortcuts |
+| `filename` | The name is all that matched | A download record for a file that has since moved, a messenger naming pattern |
+| `container-member` | Read from a member, or inherited from the container | Archives |
+| `sync-root` | The file lies under a folder a client manages | Nextcloud, Dropbox, Syncthing, OneDrive |
 
 `filegrail` does not put a number on how much a record is worth. There is no probability behind such a number and no forensic basis for one; what it reports instead is the category, the source and the basis of the match, which are facts.
 
@@ -514,7 +516,7 @@ EXIF  ·  8 fields
   GPSLongitude      11, 53, 6.46
 ```
 
-This view separates how the file arrived from what the file says about itself. The meter shows how directly each source supports the finding.
+One section per question, and every record says how it was tied to this file - `recorded-path` is a store naming this exact path, `embedded` is the file's own bytes. Each metadata block then gets a table of its own, field by field.
 
 </details>
 
@@ -586,7 +588,7 @@ SCAN GAPS  ·  1 item
 · browser history  2 download records across 1 profile
 ```
 
-A directory scan starts with a summary and file index, then shows detailed findings for each file and the evidence sources that produced them.
+Counts first, then a row per file, then the records themselves grouped by the question each one answers. The counts in a heading are always of the rows underneath it. Files nothing explained get their own section at the end rather than being folded into the list.
 
 </details>
 
@@ -618,7 +620,7 @@ FILES  ·  4 files · 4 types · 3.4 MB
   · no evidence found
 ```
 
-`--brief` keeps the scan to one row per file. Files with no provenance or metadata findings are still listed.
+`--brief` stops after the table of files. A file nothing was found for is still listed, marked `·`, because *no evidence found* is a result and not an omission.
 
 </details>
 
@@ -675,7 +677,7 @@ PDF INFO  ·  1 field
   Producer      LibreOffice 24.2
 ```
 
-When two independent records disagree, both remain visible and the report marks the conflict instead of choosing one automatically.
+Both records stay visible and neither is promoted. The disagreement is a row in `FINDINGS`, with the field it is about and the two values under it, and the file carries `!` in the table above - once, not in every section it appears in.
 
 </details>
 
@@ -727,7 +729,7 @@ EXIF  ·  8 fields
   GPSLongitude      11, 53, 6.46
 ```
 
-`explain` shows the assessment first, followed by the origin, metadata and activity records behind it.
+`explain` shows the material rather than a reading of it: what was found, where each record came from, how it was matched, and what correlation made of them. The prose assessment it used to print was this tool's opinion; it is still in `--json` for anyone who wants it.
 
 </details>
 
@@ -748,7 +750,7 @@ TIMELINE  ·  2 events · 1 file
   2026-08-31 10:49:33  press/holiday.jpg  Chromium download  downloaded
 ```
 
-`--timeline` places all available dated events on one chronological axis, whether they came from an origin record, from metadata or from later activity.
+Every dated record on one axis, each saying what happened: captured, downloaded, delivered, extracted, opened, deleted. A file nothing dated is not an event and does not appear - nothing happened at a time nobody recorded.
 
 </details>
 
@@ -823,7 +825,7 @@ SCAN GAPS  ·  1 item
 · browser history  2 download records across 1 profile
 ```
 
-Identifier results show their origin: `recorded` for metadata or provenance, `text` for document content and `both` when the same value appears in both.
+One section per type, one row per place a value was seen, with the file, the source and the field it came from. A URL too long to sit beside those columns takes the line instead - broken across a table cell it could not be copied or opened. Values seen under more than one source get a section of their own at the end.
 
 </details>
 
@@ -846,7 +848,7 @@ CLUSTERS  ·  2 groups · 3 files
   └ harbour.jpg
 ```
 
-A shared camera serial can point to the same physical device. A shared camera model only shows that the files name the same model.
+Each cluster says which field it rests on. `EXIF · BodySerialNumber` is one physical camera, because a serial is assigned per unit; `EXIF · Make + Model` is a product line thousands of people own, which is not the same claim.
 
 </details>
 
@@ -904,6 +906,8 @@ RELATIONSHIPS  ·  1 relation
   ────────────  ────────────────────────────  ────────────────────────
   same device   beach.jpg · beach-edited.jpg  BodySerialNumber 3001234
 ```
+
+`METADATA` shows the values side by side and decides nothing about them; `CORRELATION` says what follows. A relationship is what several fields agreeing amount to - one body serial in both files is one physical camera, which is a stronger statement than any single row above it.
 
 </details>
 
@@ -971,7 +975,7 @@ LIMITATIONS  ·  2 items
                           needs a crypto library
 ```
 
-`doctor` distinguishes between a source that was available but contained no matching record and a source that was not available to search at all.
+`available` here is the technical reach of a source, not a judgement about evidence: a source that was available and held nothing has answered, and one that was unavailable never got the question. `LIMITATIONS` says how far back the ones that answered can reach.
 
 </details>
 
@@ -1003,7 +1007,7 @@ RESULTS  ·  4 files · 3 cleanable · 1 unsupported
   press/holiday.jpg  JPEG    EXIF                 would clean
 ```
 
-Exit code `0` if every copy would come out clean, `1` if any would not.
+The summary prints the exit code, because that is what a pipeline acts on: `0` if every copy would come out clean, `1` if any would not. Anything the readers can still see in a copy gets its own section.
 
 </details>
 
@@ -1049,13 +1053,15 @@ Metadata removal is **not anonymization**. Image pixels, sensor patterns, codec 
 
 Use `--json` when results need to be processed by scripts, `jq`, notebooks, pipelines or other tools. All main commands support machine-readable output with command-specific schemas and exit codes.
 
-Schemas:
+Each document carries its own schema version. A number moves only when a field in *that* document changes meaning or leaves, so a consumer of `clean` is not sent to read a diff with nothing in it because the vocabulary around it changed.
 
-- `filegrail.scan/1`
-- `filegrail.explain/1`
-- `filegrail.compare/1`
-- `filegrail.doctor/1`
-- `filegrail.clean/1`
+| Schema | Since | What changed |
+|:---|:---|:---|
+| `filegrail.scan/2` | 0.8.0 | `files[].origins` became `files[].evidence`; every record carries `category` and `match`; `confidence` is gone; `reconciliation` is `correlation` |
+| `filegrail.explain/2` | 0.8.0 | the same file document, and `conclusion` became `assessment` |
+| `filegrail.compare/2` | 0.8.0 | `acquisition` became `origin` |
+| `filegrail.doctor/1` | 0.3.0 | |
+| `filegrail.clean/1` | 0.4.0 | |
 
 What a script gets back:
 
@@ -1065,17 +1071,7 @@ What a script gets back:
 | `1` | `clean` only: metadata survived in at least one copy, or would |
 | `2` | The command was asked for something it cannot do - a missing path, two arguments where one file was needed, an unknown option |
 
-JSON output preserves:
-
-- files and paths
-- origin, metadata and activity records
-- decoded metadata
-- evidence sources
-- the match basis behind every record
-- findings and conflicts
-- extracted identifiers
-- clusters of files sharing an attribute
-- file relationships
+A scan document holds `root`, `home`, `summary`, `files`, and - when asked for - `identifiers`, `shared_attributes` and `unsearched`. Each file holds `path`, `size`, `mtime`, `btime`, `sha256`, `links`, and `evidence`: one entry per record, each with its `category`, its `source`, the `match` that tied it to the file, and the fields the parser decoded. Correlation results ride on the file as `correlation`.
 
 ---
 
