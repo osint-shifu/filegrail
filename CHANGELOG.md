@@ -5,6 +5,20 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.2 - 2026-09-06
+
+### Changed
+
+- The readme is rewritten. The description in front of every table is shorter
+  and says what a reader gets. The capability table and the exit-code row say
+  the same things in fewer words. No format, source, option, match basis or
+  schema fact changed.
+
+- The eleven folded terminal views were removed from the readme.
+
+- The capability table no longer says how many identifier types there are. The
+  count goes stale as types are added, and nothing fails when it does.
+
 ## 0.8.1 - 2026-09-06
 
 ### Fixed
