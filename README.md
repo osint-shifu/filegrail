@@ -24,15 +24,15 @@
 
 ---
 
-`filegrail` helps determine **where a file came from, what it contains about its own history, what it says inside, and what happened to it on the machine**.
+`filegrail` helps determine **where a file came from, what it records about itself, what it contains, and what happened to it locally**.
 
-It combines three sources of information:
+It draws from three areas:
 
-1. **[Origin - what the machine recorded](#evidence-sources)** - browser download history, OS origin metadata, shell history, archives, torrents, recent-file records, sync folders and trash information. These traces can reveal where a file was downloaded from, which application handled it, when it appeared, where it was stored or whether it came from an archive or torrent.
-2. **[Metadata - what the file records about itself](#supported-formats)** - EXIF, XMP, IPTC, C2PA, document properties, media tags, email headers and other embedded data. Depending on the format, this can reveal the device, software, author, editor, timestamps, GPS coordinates, document history and other details.
-3. **[Content - what the file says inside](#document-content)** - with `--content`, the readable text of supported documents is scanned as well: the body of a letter, the notes on a slide, the cells of a spreadsheet, the decoded body of a message. That text is run through the same **identifier extraction** as everything above - URLs, domains, email addresses, IP addresses, coordinates and MD5/SHA-1/SHA-256 values - so an address written in a letter can be matched against the address the file was fetched from. The text itself is never printed or stored; what is kept is each identifier and where in the document it was found.
+1. **[Origin - what the machine recorded](#evidence-sources)** - browser history, OS origin metadata, shell history, archives, torrents, recent-file records, sync folders and trash. These traces can reveal where a file came from, how it arrived, when it appeared and where it was stored.
+2. **[Metadata - what the file records about itself](#supported-formats)** - EXIF, XMP, IPTC, C2PA, document properties, media tags, email headers and other embedded data. This can reveal devices, software, authors, timestamps, GPS coordinates and document history.
+3. **[Content - what the file says inside](#document-content)** - with `--content`, readable text from supported documents is scanned for URLs, domains, email addresses, IP addresses, coordinates and MD5/SHA-1/SHA-256 values. The text itself is not printed or stored - only extracted identifiers and their locations.
 
-Those are the three places `filegrail` looks. What it finds there is filed under one of three categories, which is a different question - a shell command that fetched a file and a shell command that merely opened it come from the same place and say different things:
+Where evidence was found and what that evidence means are kept separate:
 
 | Category | Question | Examples |
 |:---|:---|:---|
@@ -40,7 +40,7 @@ Those are the three places `filegrail` looks. What it finds there is filed under
 | **Metadata** | What does the file record about itself? | EXIF, XMP, IPTC, document properties, media tags, Content Credentials |
 | **Activity** | What happened to the file here? | Recent Documents, Windows shortcuts, trash records, sync folders, filesystem times |
 
-Each record also carries **how it was matched to that file** - a recorded path, a file name, a name and exact size, membership of a container, or the file's own bytes. A record tied to a file by nothing but its name is reported as exactly that.
+Every record also states **how it was matched to the file** - by exact path, file attribute, name and size, container membership, filename or the file's own bytes.
 
 Scanning is local, read-only and makes **no network requests**. `filegrail clean` is the only command that writes files, and it writes cleaned **copies** to a separate directory.
 
@@ -48,25 +48,25 @@ Scanning is local, read-only and makes **no network requests**. `filegrail clean
 
 ## What it does
 
-Give `filegrail` a file or directory and it checks all supported provenance traces and embedded metadata that apply. Results always show **where each piece of information came from**.
+Give `filegrail` a file or directory and it checks the provenance traces and embedded metadata that apply. Every result keeps its source visible.
 
-If two independent sources disagree - for example, browser history and an OS origin attribute point to different URLs - both are shown and the conflict is reported instead of being silently resolved.
+When independent sources disagree, both values are preserved and the conflict is reported rather than resolved automatically.
 
 | Capability | What you get |
 |:---|:---|
-| **File provenance** | Where a file came from and when: the address it was fetched from, the page that linked to it, the program that fetched it, the archive or torrent it came in - and which source said so |
-| **Metadata extraction** | What a file records about its own earlier life: camera and body serial, where and when it was taken, author and software, revision count - decoded field by field |
-| **Evidence correlation** | Agreement and conflicts between independent sources |
+| **File provenance** | Where and how a file arrived, when it appeared and which source recorded it |
+| **Metadata extraction** | Device, software, author, timestamps, GPS, revision data and other embedded fields |
+| **Evidence correlation** | Agreements and conflicts between independent sources |
 | **Timeline** | Origin, creation, editing and activity events in chronological order |
-| **Identifiers** | [Six types](#identifier-types) of pivot, each with the file, source and place it came from |
+| **Identifiers** | [Six types](#identifier-types) of investigation pivot with file, source and location |
 | **File relationships** | XMP document IDs and derivation chains between related files |
-| **Clusters** | Files grouped by camera serial, camera model or author, with the field each grouping rests on |
+| **Clusters** | Files grouped by shared camera serial, camera model or author |
 | **Comparison** | Metadata, provenance and timing differences between two files |
-| **Explanation** | Every source behind a finding for one file |
-| **Document text** | The same identifiers out of [document bodies](#document-content), with where in the document each one was |
-| **Metadata removal** | Cleaned copies of supported files, with verification of what remains |
+| **Explanation** | Evidence behind findings for one file |
+| **Document text** | Identifiers extracted from [document bodies](#document-content) with their locations |
+| **Metadata removal** | Cleaned copies of supported files with post-clean verification |
 | **JSON output** | Machine-readable results for scans and all commands |
-| **Evidence coverage** | `doctor` shows which local evidence sources are available and how far back they reach |
+| **Evidence coverage** | `doctor` shows available local evidence sources and their coverage |
 
 ---
 
@@ -74,9 +74,9 @@ If two independent sources disagree - for example, browser history and an OS ori
 
 ### Origin and activity traces
 
-These sources are **outside the analyzed file**. They are records left by the operating system, browser, shell and other applications while the file was downloaded, opened, copied, extracted, synchronized or deleted.
+These sources exist **outside the analyzed file**. They are records left by browsers, operating systems, shells and applications as files are downloaded, opened, extracted, synchronized or deleted.
 
-They can reveal URLs, referrers, download times, previous paths, archive or torrent membership and other information about how the file reached or moved through the machine. Availability depends on what data still exists on the system.
+They can reveal URLs, referrers, timestamps, previous paths and container membership. Availability depends on what evidence still exists on the system.
 
 | Source | What `filegrail` can read |
 |:---|:---|
@@ -95,15 +95,13 @@ They can reveal URLs, referrers, download times, previous paths, archive or torr
 | **Trash records** | Previous path and deletion time from the freedesktop trash |
 | **Messenger file names** | WhatsApp and Telegram Desktop filename patterns; treated as weak evidence only |
 
-Use:
+Check what is available on the current machine or profile:
 
 ```bash
 filegrail doctor
 ```
 
-to see which of these sources are actually available on the current machine or profile.
-
-For another user profile or a mounted copy:
+For another user profile or mounted copy:
 
 ```bash
 filegrail doctor --home /mnt/profile
@@ -116,9 +114,9 @@ filegrail /mnt/evidence --home /mnt/profile
 
 ### Embedded metadata
 
-These are metadata fields stored **inside the file itself**. Depending on the format, `filegrail` can extract camera and device information, GPS coordinates, timestamps, authors and editors, creating software, document properties, media tags and authenticity metadata.
+Metadata stored **inside the file** can reveal devices, GPS coordinates, timestamps, authors, editors, software, document properties, media tags and authenticity data.
 
-Field names are preserved as they appear in the original format, so the report shows the actual recorded metadata rather than simplified labels.
+Original field names are preserved in the report.
 
 | Metadata block | Extensions | Data extracted |
 |:---|:---|:---|
@@ -141,7 +139,7 @@ Field names are preserved as they appear in the original format, so the report s
 
 ### Cross-format metadata
 
-XMP, XMP history and IPTC can appear in several different file types. `filegrail` extracts them wherever those metadata blocks are supported, rather than treating them as belonging to one extension only.
+XMP, XMP history and IPTC can occur across multiple formats and are extracted wherever supported.
 
 | Block | Typical data |
 |:---|:---|
@@ -151,9 +149,7 @@ XMP, XMP history and IPTC can appear in several different file types. `filegrail
 
 ### Email
 
-For saved email messages, `filegrail` can reconstruct the recorded delivery path from `Received:` headers, including the servers and addresses involved in each hop.
-
-With `--content`, it can also inspect the readable message body in `text/plain` and `text/html` parts.
+Saved email messages can expose their delivery path through `Received:` headers. With `--content`, readable `text/plain` and `text/html` message bodies are also inspected.
 
 | Extension | Data extracted |
 |:---|:---|
@@ -162,9 +158,9 @@ With `--content`, it can also inspect the readable message body in `text/plain` 
 
 ### Archives
 
-`filegrail` can inspect supported files **inside archives without unpacking the whole archive into the scanned directory**.
+`filegrail` can inspect supported files **inside archives without unpacking the archive into the scanned directory**.
 
-It also records archive membership and can match an extracted file back to an archive entry using its name and uncompressed size. If the archive itself has provenance information, that can help explain how the extracted file reached the machine.
+Archive membership can also link an extracted file back to an entry by name and uncompressed size and, when available, inherit provenance from the archive itself.
 
 | Extensions | What is read |
 |:---|:---|
@@ -173,9 +169,9 @@ It also records archive membership and can match an extracted file back to an ar
 
 ### Torrents and sidecars
 
-Torrent data can link a file to a `.torrent` when both the **file name and exact size** match an entry in the torrent.
+Torrent membership is matched when both **file name and exact size** agree with an entry.
 
-For media downloaded with `yt-dlp`, a matching `<name>.info.json` sidecar can provide the original page URL, uploader or channel, publication date, extractor and download time.
+A matching `<name>.info.json` can recover provenance for media downloaded with `yt-dlp`.
 
 | File | Data extracted |
 |:---|:---|
@@ -184,9 +180,9 @@ For media downloaded with `yt-dlp`, a matching `<name>.info.json` sidecar can pr
 
 ### Document content
 
-`--content` extends the scan from metadata to the **actual text stored in supported documents**.
+`--content` also scans the **text stored inside supported documents**.
 
-The full document text is not added to the report. `filegrail` extracts only supported identifiers - such as URLs, domains, email addresses, IP addresses, coordinates and hashes - and records exactly where each value was found.
+The text itself is not added to the report. Only supported identifiers and their locations are retained.
 
 Content scanning is limited to 1 MB of text per file and 64 members of a packaged document.
 
@@ -206,7 +202,7 @@ PDF **metadata** is supported, but PDF body text is not extracted by `--content`
 
 ### Identifier types
 
-The same identifier detection is used for metadata and, with `--content`, document text. Filters remove common false positives such as software versions, file names that only look like domains and hexadecimal build identifiers.
+The same identifier detection is applied to metadata and, with `--content`, document text. Filters remove common false positives.
 
 | Type | Taken | Not taken |
 |:---|:---|:---|
@@ -217,7 +213,7 @@ The same identifier detection is used for metadata and, with `--content`, docume
 | `geo` | coordinates written with a hemisphere letter, a degree sign, a `geo:` URI, a map URL or an explicit latitude label | a bare pair of decimals, however many places it carries |
 | `md5` `sha1` `sha256` | 32, 40 and 64 hex digits | digests in a field naming software, which are build ids |
 
-Every extracted value includes the file, source and exact field or document location where it was found, so the result can be traced back to its context.
+Every value keeps its file, source and exact field or document location.
 
 For the complete format reference and edge cases, see [`docs/FORMATS.md`](docs/FORMATS.md).
 
@@ -227,7 +223,7 @@ For the complete format reference and edge cases, see [`docs/FORMATS.md`](docs/F
 
 ### Correlation and conflicts
 
-When several sources describe the same file, `filegrail` compares them instead of choosing one answer automatically. Matching records can reinforce a finding; disagreements are shown as conflicts.
+When multiple sources describe the same file, `filegrail` compares them rather than choosing one automatically.
 
 It can report:
 
@@ -244,9 +240,9 @@ It can report:
 
 ### How a record was matched to a file
 
-Every record says how it came to be about the file it is reported under. A download row found by the path it was saved to and one found by a name that happens to be the same are not equally firm, and the report never leaves that to be guessed.
+Every evidence record includes the basis of its association with the file. An exact recorded path and a filename-only match are therefore never presented as equivalent.
 
-These are the words the report prints in its `match` column and the values `--json` writes under `match.method`.
+These values appear in the report's `match` column and under `match.method` in JSON.
 
 | Basis | What it means | Where it comes from |
 |:---|:---|:---|
@@ -259,7 +255,7 @@ These are the words the report prints in its `match` column and the values `--js
 | `container-member` | Read from a member, or inherited from the container | Archives |
 | `sync-root` | The file lies under a folder a client manages | Nextcloud, Dropbox, Syncthing, OneDrive |
 
-`filegrail` does not put a number on how much a record is worth. There is no probability behind such a number and no forensic basis for one; what it reports instead is the category, the source and the basis of the match, which are facts.
+`filegrail` does not assign evidence confidence scores. Instead it reports the category, source and match basis directly.
 
 ### Extracting investigation pivots from metadata and content
 
@@ -268,11 +264,11 @@ filegrail ./case --identify      # out of metadata
 filegrail ./case --content       # out of metadata and document text
 ```
 
-`--identify` extracts the [supported identifier types](#identifier-types) from metadata and provenance records.
+`--identify` extracts [supported identifier types](#identifier-types) from metadata and provenance records.
 
-`--content` does the same for the body of [supported documents](#document-content) and automatically enables identifier extraction.
+`--content` extends the same extraction to [supported document bodies](#document-content) and automatically enables identifier detection.
 
-Values are grouped by type - urls, domains, emails, ip addresses, coordinates, hashes - one row per place a value was seen, with the file, the source and the field or location it came from. A value seen under more than one source gets a section of its own at the end: an address written in a document *and* recorded in how the file arrived is the pairing reading content exists to find.
+Results are grouped by type and retain the file, source and exact field or location. Values found across independent sources are highlighted separately.
 
 ### Clusters
 
@@ -280,11 +276,11 @@ Values are grouped by type - urls, domains, emails, ip addresses, coordinates, h
 filegrail ./photos --cluster
 ```
 
-Finds files that share an identifying value, and says which field the grouping rests on:
+Groups files by shared identifying values and reports the field behind each grouping:
 
-- **camera serial** - `EXIF · BodySerialNumber`. A serial is assigned per unit, so the same one is the same physical camera.
-- **camera model** - `EXIF · Make + Model`. A product line thousands of people own, which is not the same claim.
-- **author** - `OOXML · creator` or the equivalent. A name somebody typed.
+- **camera serial** - `EXIF · BodySerialNumber`: identifies the same physical camera.
+- **camera model** - `EXIF · Make + Model`: identifies the same model, not the same device.
+- **author** - `OOXML · creator` or equivalent: a recorded author value.
 
 ### Timeline
 
@@ -292,7 +288,7 @@ Finds files that share an identifying value, and says which field the grouping r
 filegrail ./case --timeline
 ```
 
-Combines available timestamps from origin records, embedded metadata and later activity into one chronological view.
+Combines available origin, metadata and activity timestamps into one chronological view.
 
 ### File relationships
 
@@ -303,7 +299,7 @@ XMP identifiers such as:
 - `xmpMM:OriginalDocumentID`
 - `xmpMM:DerivedFrom`
 
-can reveal relationships between files even after they have been renamed or exported. The scan can identify relationships such as derived-from, source-of, same-document and common-ancestor.
+can link files even after renaming or export. Relationships can include derived-from, source-of, same-document and common-ancestor.
 
 ---
 
@@ -358,13 +354,11 @@ Analyze the current directory:
 filegrail .
 ```
 
-Running `filegrail` with no arguments displays the command overview and does not start a scan.
+Running `filegrail` with no arguments displays the command overview without starting a scan.
 
 ### Commands
 
-`filegrail PATH` is the normal scan command. `filegrail scan PATH` does the same thing explicitly.
-
-Use `explain` when you want the evidence behind one file, `compare` for two files and `doctor` to check which provenance sources are available on the machine.
+`filegrail PATH` is the normal scan form. `filegrail scan PATH` is its explicit equivalent.
 
 | Command | Purpose |
 |:---|:---|
@@ -380,9 +374,9 @@ Use `explain` when you want the evidence behind one file, `compare` for two file
 
 ### Scan options
 
-A normal scan checks embedded metadata and available local provenance traces. Additional work such as document-content inspection, SHA-256 hashing and clustering is enabled only when requested.
+A normal scan checks embedded metadata and available local provenance traces. Content inspection, hashing and clustering run only when requested.
 
-`--home` lets the same analysis use another user profile, copied profile or mounted system image as the source of local evidence.
+`--home` uses another user profile, copied profile or mounted image as the source of local evidence.
 
 | Option | Purpose |
 |:---|:---|
@@ -409,7 +403,7 @@ A normal scan checks embedded metadata and available local provenance traces. Ad
 
 ### Clean options
 
-Use `--out DIR` to write cleaned copies to another directory. Use `--check` to see what would be removed and whether anything would remain, without writing files.
+Use `--out DIR` to write cleaned copies. Use `--check` to inspect what would be removed without writing anything.
 
 The output directory cannot be inside the directory being cleaned.
 
@@ -464,562 +458,11 @@ filegrail ./case --redact --json > report.json
 
 ---
 
-## Example views
-
-Below are examples of actual terminal output for the main workflows: scanning one file, scanning a directory, resolving conflicts, explaining evidence, building a timeline, extracting identifiers, clustering files, comparing files and checking evidence coverage.
-
-<details>
-<summary><strong>One file</strong> &nbsp;·&nbsp; <code>filegrail holiday.jpg</code></summary>
-
-```text
-filegrail 0.8.1
-────────────────────────────────────────────────────────────────────────
-target    ~/case/press/holiday.jpg · profile ~/home · external
-
-FILE  ·  holiday.jpg · JPEG · 3.4 MB
-────────────────────────────────────────────────────────────────────────
-
-  path    /home/oryon/case/press/holiday.jpg
-  mtime   2026-09-06 00:53:31
-
-ORIGIN  ·  1 record
-────────────────────────────────────────────────────────────────────────
-
-  source             match          time
-  ─────────────────  ─────────────  ───────────────────
-› Chromium download  recorded-path  2026-08-31 10:49:33
-  │ url       https://portal.example.org/press/2026/holiday-master.jpg
-  └ referrer  https://portal.example.org/press/
-
-METADATA  ·  1 source · 8 fields
-────────────────────────────────────────────────────────────────────────
-
-  source  summary
-  ──────  ──────────────────────────────────────────────────────────────
-› EXIF    NIKON COOLPIX P6000 · serial 3001234 · 43.467447, 11.885128 ·
-          2008-10-22 16:28:39
-
-EXIF  ·  8 fields
-────────────────────────────────────────────────────────────────────────
-
-  field             value
-  ────────────────  ───────────────────
-  Make              NIKON
-  Model             COOLPIX P6000
-  DateTimeOriginal  2008:10:22 16:28:39
-  BodySerialNumber  3001234
-  GPSLatitudeRef    N
-  GPSLatitude       43, 28, 2.81
-  GPSLongitudeRef   E
-  GPSLongitude      11, 53, 6.46
-```
-
-One section per question, and every record says how it was tied to this file - `recorded-path` is a store naming this exact path, `embedded` is the file's own bytes. Each metadata block then gets a table of its own, field by field.
-
-</details>
-
-<details>
-<summary><strong>A whole directory, top to bottom</strong> &nbsp;·&nbsp; <code>filegrail ./case</code></summary>
-
-```text
-filegrail 0.8.1
-────────────────────────────────────────────────────────────────────────
-target    ~/case · profile ~/home · external
-
-SUMMARY  ·  4 files · 4 types · 3.4 MB
-────────────────────────────────────────────────────────────────────────
-
-  with evidence      3
-  unresolved         1
-  origin records     2
-  metadata sources   3
-  activity records   0
-  findings           0
-
-FILES  ·  4 files · 4 types · 3.4 MB
-────────────────────────────────────────────────────────────────────────
-
-  file               type  size    origin             metadata
-  ─────────────────  ────  ──────  ─────────────────  ────────────────
-  press/holiday.jpg  JPEG  3.4 MB  Chromium download  EXIF
-  invoice.docx       DOCX  834 B   XDG attribute      OOXML properties
-  chart.png          PNG   88 B    —                  PNG text
-· notes.md           MD    64 B    —                  —
-
-  · no evidence found
-
-ORIGIN  ·  2 records · 2 files
-────────────────────────────────────────────────────────────────────────
-
-  file            source             match           time
-  ──────────────  ─────────────────  ──────────────  ───────────────────
-› press/holiday.  Chromium download  recorded-path   2026-08-31 10:49:33
-  jpg
-  │ url       https://portal.example.org/press/2026/holiday-master.jpg
-  └ referrer  https://portal.example.org/press/
-› invoice.docx    XDG attribute      file-attribute  —
-  └ url  https://acme-legal.example/portal/invoice.docx
-
-METADATA  ·  3 sources · 3 files
-────────────────────────────────────────────────────────────────────────
-
-  file               source            summary
-  ─────────────────  ────────────────  ─────────────────────────────────
-› press/holiday.jpg  EXIF              NIKON COOLPIX P6000 · serial
-                                       3001234 · 43.467447, 11.885128 ·
-                                       2008-10-22 16:28:39
-› invoice.docx       OOXML properties  Ann Shaw
-› chart.png          PNG text          GIMP 2.10
-
-UNRESOLVED  ·  1 file
-────────────────────────────────────────────────────────────────────────
-
-  file          type  size  last modified
-  ────────────  ────  ────  ───────────────────
-· notes.md      MD    64 B  2026-09-06 00:53:31
-
-SCAN GAPS  ·  1 item
-────────────────────────────────────────────────────────────────────────
-
-  what             detail
-  ───────────────  ───────────────────────────────────
-· browser history  2 download records across 1 profile
-```
-
-Counts first, then a row per file, then the records themselves grouped by the question each one answers. The counts in a heading are always of the rows underneath it. Files nothing explained get their own section at the end.
-
-</details>
-
-<details>
-<summary><strong>Index only, for a large directory</strong> &nbsp;·&nbsp; <code>filegrail ./case --brief</code></summary>
-
-```text
-filegrail 0.8.1 · brief
-────────────────────────────────────────────────────────────────────────
-target    ~/case · profile ~/home · external
-
-SUMMARY  ·  4 files · 4 types · 3.4 MB
-────────────────────────────────────────────────────────────────────────
-
-  with evidence   3
-  unresolved      1
-  needs review    0
-
-FILES  ·  4 files · 4 types · 3.4 MB
-────────────────────────────────────────────────────────────────────────
-
-  file               type  size    origin             metadata
-  ─────────────────  ────  ──────  ─────────────────  ────────────────
-  press/holiday.jpg  JPEG  3.4 MB  Chromium download  EXIF
-  invoice.docx       DOCX  834 B   XDG attribute      OOXML properties
-  chart.png          PNG   88 B    —                  PNG text
-· notes.md           MD    64 B    —                  —
-
-  · no evidence found
-```
-
-`--brief` stops after the table of files. A file nothing was found for is still listed, marked `·`, because *no evidence found* is a result and not an omission.
-
-</details>
-
-<details>
-<summary><strong>Two records that disagree</strong> &nbsp;·&nbsp; <code>filegrail ./contested</code></summary>
-
-```text
-filegrail 0.8.1
-────────────────────────────────────────────────────────────────────────
-target    ~/contested/statement.pdf · profile ~/home · external
-
-FILE  ·  statement.pdf · PDF · 65 B
-────────────────────────────────────────────────────────────────────────
-
-  path    /home/oryon/contested/statement.pdf
-  mtime   2026-09-06 00:53:31
-
-ORIGIN  ·  2 records
-────────────────────────────────────────────────────────────────────────
-
-  source             match           time
-  ─────────────────  ──────────────  ───────────────────
-› Chromium download  recorded-path   2026-08-31 10:49:33
-  │ url       https://documents.example.org/releases/statement.pdf
-  └ referrer  https://documents.example.org/releases/
-› XDG attribute      file-attribute  —
-  └ url  https://mail.example.net/attach/statement.pdf
-
-METADATA  ·  1 source · 1 field
-────────────────────────────────────────────────────────────────────────
-
-  source    summary
-  ────────  ────────────────
-› PDF Info  LibreOffice 24.2
-
-FINDINGS  ·  2 findings · 2 needs review
-────────────────────────────────────────────────────────────────────────
-
-  type             file           field       sources
-  ───────────────  ─────────────  ──────────  ───────
-! source conflict  statement.pdf  origin URL  —
-  └   browser download says
-      https://documents.example.org/releases/statement.pdf
-! source conflict  statement.pdf  origin URL  —
-  └   XDG attribute says https://mail.example.net/attach/statement.pdf
-
-  ! needs review
-
-PDF INFO  ·  1 field
-────────────────────────────────────────────────────────────────────────
-
-  field         value
-  ────────────  ────────────────
-  Producer      LibreOffice 24.2
-```
-
-Both records stay visible and neither is promoted. The disagreement is a row in `FINDINGS`, with the field it is about and the two values under it, and the file carries `!` in the table above - once, not in every section it appears in.
-
-</details>
-
-<details>
-<summary><strong>Why a finding was produced</strong> &nbsp;·&nbsp; <code>filegrail explain holiday.jpg</code></summary>
-
-```text
-filegrail 0.8.1 · explain
-────────────────────────────────────────────────────────────────────────
-target    ~/case/press/holiday.jpg · profile ~/home · external
-
-SUMMARY  ·  2 evidence records
-────────────────────────────────────────────────────────────────────────
-
-  origin records     1
-  metadata sources   1
-  activity records   0
-  correlation        0
-
-ORIGIN  ·  1 record
-────────────────────────────────────────────────────────────────────────
-
-  source             match          time
-  ─────────────────  ─────────────  ───────────────────
-› Chromium download  recorded-path  2026-08-31 10:49:33
-  │ url       https://portal.example.org/press/2026/holiday-master.jpg
-  └ referrer  https://portal.example.org/press/
-
-METADATA  ·  1 source · 8 fields
-────────────────────────────────────────────────────────────────────────
-
-  source  summary
-  ──────  ──────────────────────────────────────────────────────────────
-› EXIF    NIKON COOLPIX P6000 · serial 3001234 · 43.467447, 11.885128 ·
-          2008-10-22 16:28:39
-
-EXIF  ·  8 fields
-────────────────────────────────────────────────────────────────────────
-
-  field             value
-  ────────────────  ───────────────────
-  Make              NIKON
-  Model             COOLPIX P6000
-  DateTimeOriginal  2008:10:22 16:28:39
-  BodySerialNumber  3001234
-  GPSLatitudeRef    N
-  GPSLatitude       43, 28, 2.81
-  GPSLongitudeRef   E
-  GPSLongitude      11, 53, 6.46
-```
-
-`explain` shows the material: what was found, where each record came from, how it was matched, and what correlation made of them. The prose assessment is in `--json`.
-
-</details>
-
-<details>
-<summary><strong>Chronological events</strong> &nbsp;·&nbsp; <code>filegrail ./case --timeline</code></summary>
-
-```text
-filegrail 0.8.1 · timeline
-────────────────────────────────────────────────────────────────────────
-target    ~/case · profile ~/home · external
-
-TIMELINE  ·  2 events · 1 file
-────────────────────────────────────────────────────────────────────────
-
-  time                 file               source             event
-  ───────────────────  ─────────────────  ─────────────────  ──────────
-  2008-10-22 16:28:39  press/holiday.jpg  EXIF               captured
-  2026-08-31 10:49:33  press/holiday.jpg  Chromium download  downloaded
-```
-
-Every dated record on one axis, each saying what happened: captured, downloaded, delivered, extracted, opened, deleted. A file nothing dated is not an event and does not appear - nothing happened at a time nobody recorded.
-
-</details>
-
-<details>
-<summary><strong>Identifiers, including document content</strong> &nbsp;·&nbsp; <code>filegrail ./case --content</code></summary>
-
-```text
-IDENTIFIERS  ·  9 unique values · 11 occurrences · 1 cross-source
-────────────────────────────────────────────────────────────────────────
-
-URLS  ·  3 unique values · 3 occurrences
-────────────────────────────────────────────────────────────────────────
-
-› https://acme-legal.example/portal/invoice.docx
-  │ file    invoice.docx
-  │ source  XDG attribute
-  └ where   url
-› https://portal.example.org/press
-  │ file    holiday.jpg
-  │ source  browser download
-  └ where   referrer
-› https://portal.example.org/press/2026/holiday-master.jpg
-  │ file    holiday.jpg
-  │ source  browser download
-  └ where   url
-
-DOMAINS  ·  3 unique values · 5 occurrences
-────────────────────────────────────────────────────────────────────────
-
-  value               file          source            field / location
-  ──────────────────  ────────────  ────────────────  ────────────────
-  acme-legal.example  invoice.docx  XDG attribute     url
-  acme-legal.example  invoice.docx  content           body
-  portal.example.org  holiday.jpg   browser download  url
-  portal.example.org  holiday.jpg   browser download  referrer
-  innafirma.example   notes.md      content           line 1
-
-EMAILS  ·  2 unique values · 2 occurrences
-────────────────────────────────────────────────────────────────────────
-
-  value                        file          source   field / location
-  ───────────────────────────  ────────────  ───────  ────────────────
-  ann.shaw@acme-legal.example  invoice.docx  content  body
-  kontakt@innafirma.example    notes.md      content  line 1
-
-COORDINATES  ·  1 unique value · 1 occurrence
-────────────────────────────────────────────────────────────────────────
-
-  value              file         source           field / location
-  ─────────────────  ───────────  ───────────────  ────────────────
-  43.46745,11.88513  holiday.jpg  device metadata  geo
-
-CROSS-SOURCE MATCHES  ·  1 value
-────────────────────────────────────────────────────────────────────────
-
-  value               sources                  files
-  ──────────────────  ───────────────────────  ────────────
-  acme-legal.example  XDG attribute · content  invoice.docx
-
-UNRESOLVED  ·  1 file
-────────────────────────────────────────────────────────────────────────
-
-  file          type  size  last modified
-  ────────────  ────  ────  ───────────────────
-· notes.md      MD    64 B  2026-09-06 00:53:31
-
-SCAN GAPS  ·  1 item
-────────────────────────────────────────────────────────────────────────
-
-  what             detail
-  ───────────────  ───────────────────────────────────
-· browser history  2 download records across 1 profile
-```
-
-One section per type, one row per place a value was seen, with the file, the source and the field it came from. A URL too long for those columns takes the line. Values seen under more than one source get a section of their own at the end.
-
-</details>
-
-<details>
-<summary><strong>Files sharing a camera or an author</strong> &nbsp;·&nbsp; <code>filegrail ./shots --cluster</code></summary>
-
-```text
-CLUSTERS  ·  2 groups · 3 files
-────────────────────────────────────────────────────────────────────────
-
-  attribute      value                files  basis
-  ─────────────  ───────────────────  ─────  ───────────────────────
-› camera serial  3001234                  3  EXIF · BodySerialNumber
-  │ dune-01.jpg
-  │ dune-02.jpg
-  └ harbour.jpg
-› camera model   NIKON COOLPIX P6000      3  EXIF · Make + Model
-  │ dune-01.jpg
-  │ dune-02.jpg
-  └ harbour.jpg
-```
-
-Each cluster says which field it rests on. `EXIF · BodySerialNumber` is one physical camera, because a serial is assigned per unit; `EXIF · Make + Model` is a product line thousands of people own, which is not the same claim.
-
-</details>
-
-<details>
-<summary><strong>Two files against each other</strong> &nbsp;·&nbsp; <code>filegrail compare beach.jpg beach-edited.jpg</code></summary>
-
-```text
-filegrail 0.8.1 · compare
-────────────────────────────────────────────────────────────────────────
-left      /home/oryon/beach.jpg
-right     /home/oryon/beach-edited.jpg
-
-FILES  ·  2 files
-────────────────────────────────────────────────────────────────────────
-
-  field         beach.jpg  beach-edited.jpg
-  ────────────  ─────────  ────────────────
-  type          JPEG       JPEG
-  size          335 B      368 B
-
-METADATA  ·  4 compared fields
-────────────────────────────────────────────────────────────────────────
-
-  field             beach.jpg            beach-edited.jpg
-  ────────────────  ───────────────────  ────────────────────
-  Make              NIKON                NIKON
-  Model             COOLPIX P6000        COOLPIX P6000
-  BodySerialNumber  3001234              3001234
-  Software          NIKON COOLPIX P6000  Adobe Photoshop 26.1
-
-ORIGIN  ·  2 records
-────────────────────────────────────────────────────────────────────────
-
-  file              source
-  ────────────────  ────────────────
-  beach.jpg         no origin record
-  beach-edited.jpg  no origin record
-
-CORRELATION  ·  5 results
-────────────────────────────────────────────────────────────────────────
-
-  result      field             value
-  ──────────  ────────────────  ────────────────────────────────────────
-  match       Make              NIKON
-  match       Model             COOLPIX P6000
-  match       BodySerialNumber  3001234
-! difference  Software          NIKON COOLPIX P6000 ≠ Adobe Photoshop
-                                26.1
-  interval    created           0 seconds apart
-
-RELATIONSHIPS  ·  1 relation
-────────────────────────────────────────────────────────────────────────
-
-  relationship  files                         basis
-  ────────────  ────────────────────────────  ────────────────────────
-  same device   beach.jpg · beach-edited.jpg  BodySerialNumber 3001234
-```
-
-`METADATA` shows the values side by side and decides nothing about them; `CORRELATION` says what follows. A relationship is what several fields agreeing amount to - one body serial in both files is one physical camera, which is a stronger statement than any single row above it.
-
-</details>
-
-<details>
-<summary><strong>What this machine can answer at all</strong> &nbsp;·&nbsp; <code>filegrail doctor</code></summary>
-
-```text
-filegrail 0.8.1 · doctor
-────────────────────────────────────────────────────────────────────────
-profile   ~/home · external
-
-SUMMARY  ·  13 sources
-────────────────────────────────────────────────────────────────────────
-
-  available     4
-  partial       1
-  unavailable   8
-
-SOURCES  ·  13 sources · 4 available · 1 partial · 8 unavailable
-────────────────────────────────────────────────────────────────────────
-
-  source                     type        status       coverage / detail
-  ─────────────────────────  ──────────  ───────────  ──────────────────
-  Chromium family downloads  artifact    available    2 records across 1
-                                                      of 1 profile
-  Firefox downloads          artifact    unavailable  no profile found
-  XDG origin attribute       artifact    available    written by KDE
-                                                      tools and wget
-                                                      --xattr, but not
-                                                      by Firefox
-  Mounted Zone.Identifier    artifact    available    user.Zone.Identifi
-                                                      er on an NTFS
-                                                      mount
-  Shell history              artifact    unavailable  no history file
-                                                      found
-  Recent documents           artifact    unavailable  no list found
-  macOS quarantine database  artifact    unavailable  no database in
-                                                      this profile
-  Deleted files              artifact    unavailable  no trash directory
-  Windows Recent shortcuts   artifact    unavailable  no Recent folder
-                                                      in this profile
-  Torrent client stores      artifact    unavailable  no client store
-                                                      found
-  Sync client folders        artifact    unavailable  no client
-                                                      configuration
-                                                      found
-  Creation timestamps        filesystem  available    statx
-  C2PA signature check       parser      partial      manifests are read
-                                                      and their hash
-                                                      binding
-                                                      recomputed;
-                                                      validating the
-                                                      certificate chain
-                                                      needs a crypto
-                                                      library
-
-LIMITATIONS  ·  2 items
-────────────────────────────────────────────────────────────────────────
-
-  source                  limitation
-  ──────────────────────  ──────────────────────────────────────────────
-  Chromium family record  no record before 2026-08-31
-  C2PA signature check    manifests are read and their hash binding
-                          recomputed; validating the certificate chain
-                          needs a crypto library
-```
-
-`available` here is the technical reach of a source, not a judgement about evidence: a source that was available and held nothing has answered, and one that was unavailable never got the question. `LIMITATIONS` says how far back the ones that answered can reach.
-
-</details>
-
-<details>
-<summary><strong>Checking before publishing</strong> &nbsp;·&nbsp; <code>filegrail clean ./case --check</code></summary>
-
-```text
-filegrail 0.8.1 · clean --check
-────────────────────────────────────────────────────────────────────────
-target    ~/case
-mode      check only · nothing written
-
-SUMMARY  ·  4 files
-────────────────────────────────────────────────────────────────────────
-
-  cleanable      3
-  unsupported    1
-  would remain   0
-  exit           0
-
-RESULTS  ·  4 files · 3 cleanable · 1 unsupported
-────────────────────────────────────────────────────────────────────────
-
-  file               format  metadata             result
-  ─────────────────  ──────  ───────────────────  ───────────
-  chart.png          PNG     PNG text             would clean
-  invoice.docx       DOCX    document properties  would clean
-  notes.md           MD      —                    unsupported
-  press/holiday.jpg  JPEG    EXIF                 would clean
-```
-
-The summary prints the exit code: `0` if every copy would come out clean, `1` if any would not. Anything the readers can still see in a copy gets its own section.
-
-</details>
-
----
-
 ## Metadata removal
 
 `filegrail clean` removes supported metadata from **copies**. Originals are never modified.
 
 ### Cleanable formats
-
-Only the formats listed below can be cleaned. Unsupported files are left unchanged and reported as such.
-
-Cleaned files are written as separate copies. The originals are never modified.
 
 | Family | Extensions |
 |:---|:---|
@@ -1041,17 +484,17 @@ Check without writing:
 filegrail clean ./publish --check
 ```
 
-After cleaning, `filegrail` scans each copy again. If supported metadata is still detectable, it is reported instead of being treated as successfully removed.
+After cleaning, each copy is scanned again. Any supported metadata that remains is reported.
 
-Metadata removal is **not anonymization**. Image pixels, sensor patterns, codec fingerprints and document content can still identify a source.
+Metadata removal is **not anonymization**. Pixels, sensor patterns, codec fingerprints and document content may still identify a source.
 
 ---
 
 ## JSON and automation
 
-Use `--json` when results need to be processed by scripts, `jq`, notebooks, pipelines or other tools. All main commands support machine-readable output with command-specific schemas and exit codes.
+Use `--json` with scripts, `jq`, notebooks, pipelines or other tools. All main commands support machine-readable output with command-specific schemas and exit codes.
 
-Each document carries its own schema version. A number moves only when a field in *that* document changes meaning or leaves, so a consumer of `clean` is not sent to read a diff with nothing in it because the vocabulary around it changed.
+Schemas are versioned independently, so unrelated command changes do not force consumers to update.
 
 | Schema | Since | What changed |
 |:---|:---|:---|
@@ -1061,23 +504,25 @@ Each document carries its own schema version. A number moves only when a field i
 | `filegrail.doctor/1` | 0.3.0 | |
 | `filegrail.clean/1` | 0.4.0 | |
 
-What a script gets back:
+Exit codes:
 
 | Code | Meaning |
 |:---|:---|
 | `0` | The command ran. For `clean` and `clean --check`, every copy came out clean |
 | `1` | `clean` only: metadata survived in at least one copy, or would |
-| `2` | The command was asked for something it cannot do - a missing path, two arguments where one file was needed, an unknown option |
+| `2` | Invalid command input, such as a missing path, wrong argument count or unknown option |
 
-A scan document holds `root`, `home`, `summary`, `files`, and - when asked for - `identifiers`, `shared_attributes` and `unsearched`. Each file holds `path`, `size`, `mtime`, `btime`, `sha256`, `links`, and `evidence`: one entry per record, each with its `category`, its `source`, the `match` that tied it to the file, and the fields the parser decoded. Correlation results ride on the file as `correlation`.
+A scan document contains `root`, `home`, `summary`, `files`, and when requested, `identifiers`, `shared_attributes` and `unsearched`.
+
+Each file includes `path`, `size`, `mtime`, `btime`, `sha256`, `links` and `evidence`. Evidence records contain their `category`, `source`, `match` and decoded fields. Correlation results are stored under `correlation`.
 
 ---
 
 ## Privacy
 
-`filegrail` performs analysis locally and makes **no network requests**. The main privacy risk is therefore the report itself, which may contain sensitive information recovered from local files and system traces.
+`filegrail` runs locally and makes **no network requests**. The main privacy risk is the report itself.
 
-Reports can contain sensitive local data such as:
+Reports may contain:
 
 - private URLs
 - credentials or tokens embedded in URLs/commands
@@ -1086,7 +531,7 @@ Reports can contain sensitive local data such as:
 - IP addresses
 - GPS coordinates
 
-Use:
+Redact sensitive values before sharing output:
 
 ```bash
 filegrail ./case --redact
@@ -1098,9 +543,7 @@ or:
 filegrail ./case --redact --json
 ```
 
-before sharing output.
-
-Read a redacted report yourself before you publish it.
+Always review a redacted report before publishing it.
 
 ---
 
