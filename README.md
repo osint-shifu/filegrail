@@ -24,14 +24,15 @@
 
 ---
 
-`filegrail` helps determine **where a file came from, what it contains about its own history, and what happened to it on the machine**.
+`filegrail` helps determine **where a file came from, what it contains about its own history, what it says inside, and what happened to it on the machine**.
 
-It combines two sources of information:
+It combines three sources of information:
 
-1. **[Traces stored by the system and applications](#evidence-sources)** - browser download history, OS origin metadata, shell history, archives, torrents, recent-file records, sync folders and trash information. These traces can reveal where a file was downloaded from, which application handled it, when it appeared, where it was stored or whether it came from an archive or torrent.
-2. **[Metadata stored inside the file](#supported-formats)** - EXIF, XMP, IPTC, C2PA, document properties, media tags, email headers and other embedded data. Depending on the format, this can reveal the device, software, author, editor, timestamps, GPS coordinates, document history and other details.
+1. **[Origin - what the machine recorded](#evidence-sources)** - browser download history, OS origin metadata, shell history, archives, torrents, recent-file records, sync folders and trash information. These traces can reveal where a file was downloaded from, which application handled it, when it appeared, where it was stored or whether it came from an archive or torrent.
+2. **[Metadata - what the file records about itself](#supported-formats)** - EXIF, XMP, IPTC, C2PA, document properties, media tags, email headers and other embedded data. Depending on the format, this can reveal the device, software, author, editor, timestamps, GPS coordinates, document history and other details.
+3. **[Content - what the file says inside](#document-content)** - with `--content`, the readable text of supported documents is scanned as well: the body of a letter, the notes on a slide, the cells of a spreadsheet, the decoded body of a message. The text is never printed or stored; what is kept is the identifiers found in it and where in the document each one was.
 
-File provenance is the whole subject. Under it, every record `filegrail` produces belongs to one of three categories, and the report keeps them apart:
+Those are the three places `filegrail` looks. What it finds there is filed under one of three categories, which is a different question - a shell command that fetched a file and a shell command that merely opened it come from the same place and say different things:
 
 | Category | Question | Examples |
 |:---|:---|:---|
