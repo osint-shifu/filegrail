@@ -24,7 +24,7 @@ import os
 import plistlib
 from pathlib import Path
 
-from ..models import Origin
+from ..models import EvidenceRecord
 from ..util import read_xattr
 
 _LINUX_ORIGIN = "user.xdg.origin.url"
@@ -40,20 +40,20 @@ _MACOS_WHEREFROMS = "com.apple.metadata:kMDItemWhereFroms"
 _ZONE_XATTRS = ("user.Zone.Identifier", "user.DosStream.Zone.Identifier:$DATA")
 
 
-def read_file_attributes(path: Path) -> list[Origin]:
-    """Return origin claims carried by the file itself."""
-    origins: list[Origin] = []
+def read_file_attributes(path: Path) -> list[EvidenceRecord]:
+    """Return what the filesystem's own attributes say about where this came from."""
+    found: list[EvidenceRecord] = []
     for reader in (_read_zone_identifier, _read_macos_wherefroms, _read_xdg_xattrs):
         try:
-            origin = reader(path)
+            record = reader(path)
         except (OSError, ValueError):
             continue
-        if origin is not None:
-            origins.append(origin)
-    return origins
+        if record is not None:
+            found.append(record)
+    return found
 
 
-def _read_zone_identifier(path: Path) -> Origin | None:
+def _read_zone_identifier(path: Path) -> EvidenceRecord | None:
     """Read the NTFS Zone.Identifier stream, however this machine exposes it.
 
     Windows carries it as an alternate data stream on the file itself. Off
@@ -81,7 +81,7 @@ def _read_zone_identifier(path: Path) -> Origin | None:
         return None
 
     zone = section.get("ZoneId")
-    return Origin(
+    return EvidenceRecord(
         source="windows-zone-identifier",
         url=host,
         referrer=referrer,
@@ -109,7 +109,7 @@ def _zone_stream(path: Path) -> str | None:
     return None
 
 
-def _read_macos_wherefroms(path: Path) -> Origin | None:
+def _read_macos_wherefroms(path: Path) -> EvidenceRecord | None:
     """Read the macOS 'where from' metadata attribute.
 
     Under its own name on macOS, and under the `user.` namespace where a copy
@@ -125,10 +125,10 @@ def _read_macos_wherefroms(path: Path) -> Origin | None:
 
     url = values[0] or None
     referrer = values[1] if len(values) > 1 and values[1] else None
-    return Origin(source="macos-wherefroms", url=url, referrer=referrer)
+    return EvidenceRecord(source="macos-wherefroms", url=url, referrer=referrer)
 
 
-def _read_xdg_xattrs(path: Path) -> Origin | None:
+def _read_xdg_xattrs(path: Path) -> EvidenceRecord | None:
     """Read the freedesktop.org origin extended attributes."""
 
     def get(name: str) -> str | None:
@@ -139,4 +139,4 @@ def _read_xdg_xattrs(path: Path) -> Origin | None:
     referrer = get(_LINUX_REFERRER)
     if not url and not referrer:
         return None
-    return Origin(source="xdg-xattr", url=url, referrer=referrer)
+    return EvidenceRecord(source="xdg-xattr", url=url, referrer=referrer)

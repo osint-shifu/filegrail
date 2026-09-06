@@ -22,21 +22,35 @@ not an accident. A change that adds one has to earn it; so far everything,
 including the CBOR decoder needed for C2PA, has been reachable with the standard
 library.
 
-## Adding a source
+## Adding an evidence source
 
-A source answers "where did this file come from" from one kind of record. The
-bar for a new one:
+An evidence source produces one or more evidence records from an artifact, a
+metadata block, an application database, a filesystem attribute or another
+supported store. It does not have to answer "where did this come from" - EXIF
+and Recent Documents are sources too, and they answer different questions.
 
-1. **Report only what the source actually knows.** If a field is absent, leave
-   it absent rather than inferring it from somewhere else.
-2. **Carry a confidence that reflects reliability.** A cryptographically signed
-   manifest and a shell command that merely mentions a filename are not the same
-   kind of claim, and the report has to keep them distinguishable.
-3. **Fail quietly when absent.** A missing profile, an unreadable file or a
-   malformed container is ordinary, not an error. One bad file must never end a
-   scan.
-4. **Never write.** The tool reads. It does not modify files, profiles or
-   histories, and a live database is copied before being opened.
+Say five things about a new one, in code and in the tables it registers with:
+
+| | |
+|:---|:---|
+| **category** | `origin`, `metadata` or `activity`, in `models.SOURCE_CATEGORIES`. `category()` raises for a source that is in neither table, on purpose: the old default classified by forgetting. |
+| **source** | The artifact or block the record came from, named the way an analyst names it - `Chromium download history`, `Zone.Identifier`, `EXIF`. Not a person, a camera or a cluster key. |
+| **match basis** | How the record was tied to *this* file, in `models.SOURCE_MATCH` or on the record. A path, a name, a name and size, membership of a container, or the file's own bytes. Where the tie is not direct, the record carries it. |
+| **data produced** | The fields the record fills in, and nothing inferred from elsewhere. If a field is absent, leave it absent. |
+| **limitations** | What the record cannot establish. A sync folder does not say which way the bytes travelled; a file name in a messenger's pattern is an association with a naming convention. |
+
+Two more rules, unchanged:
+
+- **Fail quietly when absent.** A missing profile, an unreadable file or a
+  malformed container is ordinary, not an error. One bad file must never end a
+  scan.
+- **Never write.** The tool reads. It does not modify files, profiles or
+  histories, and a live database is copied before being opened.
+
+There is a presentation order in `models.SOURCE_PRIORITY`, used to decide which
+record a one-row summary shows. It is not a confidence, it is never printed and
+it is never exported. Do not reach for it to express how much a source is worth
+believing - that is what the category and the match basis are for.
 
 ## Adding a format
 

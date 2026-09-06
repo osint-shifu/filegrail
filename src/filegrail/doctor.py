@@ -7,7 +7,7 @@ attributes on this filesystem, a shell that keeps no timestamps - which is not a
 finding about the file at all.
 
 The report cannot tell those apart on its own, and a reader who assumes the
-first when the second is true has drawn a conclusion the tool never supported.
+first when the second is true has said something the tool never supported.
 So this says up front what could be searched, and how far back it reaches.
 """
 
@@ -65,11 +65,23 @@ HOME_SOURCES = {
 }
 
 
+#: What a check was looking at. An artifact is a store some other program
+#: wrote; the filesystem is what this one is mounted on; a parser is code in
+#: this tool. A row saying `unavailable` means something different in each
+#: case, and a reader who cannot tell them apart cannot act on any of them.
+ARTIFACT = "artifact"
+FILESYSTEM = "filesystem"
+PARSER = "parser"
+
+
 @dataclass(slots=True)
 class Check:
     name: str
     state: str
     detail: str = ""
+
+    #: One of `artifact`, `filesystem`, `parser`.
+    kind: str = ARTIFACT
 
 
 @dataclass(slots=True)
@@ -80,7 +92,8 @@ class Survey:
     def to_dict(self) -> dict[str, object]:
         return {
             "sources": [
-                {"name": c.name, "state": c.state, "detail": c.detail} for c in self.checks
+                {"name": c.name, "kind": c.kind, "state": c.state, "detail": c.detail}
+                for c in self.checks
             ],
             "horizon": [{"name": c.name, "detail": c.detail} for c in self.horizon],
         }
@@ -372,14 +385,18 @@ def _birth_times() -> Check:
     except OSError:
         found = None
     if found is None:
-        return Check("Creation timestamps", UNAVAILABLE, "filesystem does not record them")
-    return Check("Creation timestamps", AVAILABLE, "statx" if sys.platform == "linux" else "stat")
+        return Check(
+            "Creation timestamps", UNAVAILABLE, "filesystem does not record them", FILESYSTEM
+        )
+    detail = "statx" if sys.platform == "linux" else "stat"
+    return Check("Creation timestamps", AVAILABLE, detail, FILESYSTEM)
 
 
 def _c2pa() -> Check:
     return Check(
         "C2PA signature check",
-        UNAVAILABLE,
+        PARTIAL,
         "manifests are read and their hash binding recomputed; "
         "validating the certificate chain needs a crypto library",
+        PARSER,
     )

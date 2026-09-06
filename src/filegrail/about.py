@@ -26,13 +26,28 @@ from .theme import MIDDOT, Theme, detect
 
 #: Plain ASCII, so the wordmark survives a terminal that cannot print box
 #: drawing and never needs a second variant.
+#: The mark: two records converging on one file. It is the report's own
+#: notation drawn small - `●` is a thing the tool found, `─│┌┐└┬` are the rails
+#: that tie things together - so a reader meets the glyphs here and then meets
+#: them again meaning the same thing four lines later.
 WORDMARK = (
-    r"  __ _ _                   _ _ ",
-    r" / _(_) |___ __ _ _ _ __ _(_) |",
-    r"|  _| | / -_) _` | '_/ _` | | |",
-    r"|_| |_|_\___\__, |_| \__,_|_|_|",
-    r"            |___/              ",
+    " \u25cf\u2500\u2510 \u250c\u2500\u25cf",
+    "   \u2514\u252c\u2518  ",
+    "    \u25cf    ",
 )
+
+#: The same shape where no box drawing is available. Not a different mark: the
+#: same one, in the characters the terminal has.
+WORDMARK_ASCII = (
+    " o-+ +-o",
+    "   +++  ",
+    "    o   ",
+)
+
+
+def wordmark(theme: Theme) -> tuple[str, ...]:
+    return WORDMARK if theme.unicode else WORDMARK_ASCII
+
 
 #: The three things the tool is for, and enough of what is under each one that
 #: a reader recognises their own case instead of having to infer it. Not a
@@ -49,18 +64,55 @@ USAGE = (
     ("filegrail <command> [options]", ""),
 )
 
-#: Six ways in, ordered as a progression: one file, a directory, the two views
-#: that turn a scan into leads, the reasoning behind a finding, and what this
-#: machine can answer at all. Not eleven examples and not the whole option
-#: table - a landing screen exists to get somebody to their first command, and
-#: a reader who has to choose from eleven has been given the choosing to do.
+#: The two commands somebody types first.
 START = (
     ("filegrail suspicious.pdf", "analyze one file"),
     ("filegrail ~/Downloads", "analyze a directory"),
-    ("filegrail . --identify", "extract investigation pivots"),
-    ("filegrail . --timeline", "reconstruct recorded events"),
-    ("filegrail explain file.pdf", "inspect evidence behind findings"),
+)
+
+#: What to reach for once the first scan has run, grouped by what is being
+#: asked about rather than by which flag does it: a reader arrives knowing they
+#: have a file, a directory or a kind of file, and not knowing what the tool
+#: calls the thing they want.
+INVESTIGATE = (
+    (
+        "FILE",
+        (
+            ("filegrail evidence.pdf", "inspect file metadata and origin"),
+            ("filegrail explain evidence.pdf", "explain evidence behind findings"),
+            ("filegrail compare a.jpg b.jpg", "compare two files"),
+            ("filegrail evidence.pdf --hash", "compute SHA-256"),
+        ),
+    ),
+    (
+        "DIRECTORY",
+        (
+            ("filegrail ~/case --identify", "extract investigation pivots"),
+            ("filegrail ~/case --content", "inspect content and extract pivots"),
+            ("filegrail ~/case --cluster", "find files sharing authors or cameras"),
+            ("filegrail ~/case --timeline", "reconstruct recorded events"),
+            ("filegrail ~/case --unknown-only", "find files with no explained origin"),
+            ("filegrail ~/case --hash", "hash every file in the case"),
+            ("filegrail ~/case --home /mnt/profile", "correlate with another user profile"),
+        ),
+    ),
+    (
+        "FILE TYPE",
+        (
+            ("filegrail ~/case --type image", "analyze images only"),
+            ("filegrail ~/case --type document", "analyze documents only"),
+            ("filegrail ~/case --type video", "analyze videos only"),
+            ("filegrail ~/case --type mail", "analyze email files only"),
+            ("filegrail ~/case --ext jpg,pdf", "analyze selected extensions only"),
+        ),
+    ),
+)
+
+#: What to run before trusting a result, and before publishing one.
+VERIFY = (
     ("filegrail doctor", "check available local sources"),
+    ("filegrail clean image.jpg --check", "preview removable metadata"),
+    ("filegrail clean image.jpg --out clean/", "remove metadata from a copy"),
 )
 
 #: Named rather than described. What each one does is a sentence away in
@@ -74,8 +126,9 @@ _SIDE_BY_SIDE = 78
 #: Below this there is no room for a description beside a command.
 _MIN_DESCRIPTION = 14
 
-#: The label column, wide enough for the longest section name.
-_LABEL = 11
+#: The label column, wide enough for the longest section name and the two
+#: spaces that keep it from touching the body.
+_LABEL = 12
 
 
 def invocation() -> str:
@@ -100,14 +153,20 @@ def render(theme: Theme | None = None) -> str:
     if run != "filegrail":
         lines.extend(_install(theme, run))
 
+    # What the tool reads and what it can work out is the readme's job and the
+    # `doctor` command's: a landing screen listing formats and evidence classes
+    # is three blocks a reader has to get past before the first thing they can
+    # actually run.
+    #
     # The label column is the spine and stays fixed. The body column is sized
     # per section: forcing a seven-character command into the width of a
     # thirty-character example opens a gutter across half the screen and pushes
     # the descriptions into an ellipsis, which is the one thing this report does
     # not do anywhere else.
-    lines.extend(_areas(theme))
     lines.extend(_section(theme, "usage", USAGE))
     lines.extend(_section(theme, "start", START))
+    lines.extend(_grouped(theme, "investigate", INVESTIGATE))
+    lines.extend(_section(theme, "verify", VERIFY))
     lines.extend(_listed(theme, "commands", COMMANDS))
 
     lines.append(_row(theme, "help", "filegrail help <command>"))
@@ -156,15 +215,72 @@ def _row(
     *,
     emphasise: bool = False,
 ) -> str:
-    """One line of the two-column spine that runs the length of the screen."""
+    """One line of the two-column spine that runs the length of the screen.
+
+    A body too wide for the window wraps under itself rather than being cut:
+    a command a reader cannot copy whole is a command they cannot run.
+    """
     prefix = f"  {theme.label(label.ljust(_LABEL))} "
+    blank = " " * (_LABEL + 3)
     room = theme.width - _LABEL - 5
 
     if not detail or len(body) > column:
-        return f"{prefix}{theme.paint(theme.clip(body, room), 'body')}"
+        parts = theme.wrap(body, room)
+        head = f"{prefix}{theme.paint(parts[0], 'body')}"
+        return "\n".join([head, *(f"{blank}{theme.paint(part, 'body')}" for part in parts[1:])])
 
     text = theme.bold(body.ljust(column)) if emphasise else theme.paint(body.ljust(column), "body")
-    return f"{prefix}{text}  {theme.dim(theme.clip(detail, room - column - 2))}"
+    said = theme.wrap(detail, max(8, room - column - 2))[0]
+    return f"{prefix}{text}  {theme.dim(said)}"
+
+
+def _column(theme: Theme) -> int:
+    """One width for every command on the screen.
+
+    Sized once, from the longest command anywhere on it, so the descriptions
+    form a single column down the page instead of a new one per block.
+    """
+    commands = [
+        body for rows in (START, VERIFY, *(group for _, group in INVESTIGATE)) for body, _ in rows
+    ]
+    return min(max(len(body) for body in commands), theme.width - _LABEL - 20)
+
+
+def _grouped(
+    theme: Theme,
+    label: str,
+    groups: tuple[tuple[str, tuple[tuple[str, str], ...]], ...],
+) -> list[str]:
+    """A labelled block whose rows come in named groups.
+
+    The group names sit in the body column rather than the label column: they
+    name what is being asked about, which is a different question from what the
+    block is for, and putting both in one column would say they were the same.
+    """
+    column = _column(theme)
+    lines: list[str] = []
+    for index, (name, group) in enumerate(groups):
+        if index:
+            lines.append("")
+        lines.append(_row(theme, label if index == 0 else "", name, "", column))
+        for body, said in group:
+            lines.extend(_wrapped_row(theme, body, said, column))
+    return [*lines, ""]
+
+
+def _wrapped_row(theme: Theme, body: str, said: str, column: int) -> list[str]:
+    """A command and its description, the description wrapping where it must.
+
+    Never clipped. A description cut off at an ellipsis is the one thing this
+    screen has in common with the reports, and neither of them does it.
+    """
+    room = theme.width - _LABEL - 5 - column - 2
+    if room < _MIN_DESCRIPTION:
+        return [_row(theme, "", body, "", column)]
+    parts = theme.wrap(said, room)
+    lines = [_row(theme, "", body, parts[0], column)]
+    lines.extend(_row(theme, "", " " * column, part, column) for part in parts[1:])
+    return lines
 
 
 def _section(
@@ -179,23 +295,18 @@ def _section(
     Above would cost a line and a blank one per section, and the label column is
     already carrying that job everywhere else on the screen.
     """
-    column = max(len(body) for body, _ in rows)
-
-    # On a narrow terminal the description gives way rather than the command:
-    # a command you cannot read is useless, a command with no gloss beside it
-    # is merely terse.
-    room = theme.width - _LABEL - 7 - column
-    lines = [
-        _row(
-            theme,
-            label if index == 0 else "",
-            body,
-            detail if room >= _MIN_DESCRIPTION else "",
-            column,
-            emphasise=emphasise,
-        )
-        for index, (body, detail) in enumerate(rows)
-    ]
+    # One column for every command on the screen, so the descriptions line up
+    # down the page instead of stepping in and out block by block.
+    column = _column(theme) if any(detail for _, detail in rows) else 0
+    lines: list[str] = []
+    for index, (body, detail) in enumerate(rows):
+        head = label if index == 0 else ""
+        if not detail:
+            lines.append(_row(theme, head, body, "", column, emphasise=emphasise))
+            continue
+        wrapped = _wrapped_row(theme, body, detail, column)
+        lines.append(_row(theme, head, body, detail, column, emphasise=emphasise))
+        lines.extend(wrapped[1:])
     lines.append("")
     return lines
 
@@ -218,47 +329,24 @@ def _rows() -> tuple[tuple[str, str], ...]:
 
 
 def _head(theme: Theme) -> list[str]:
-    """Wordmark with the tagline under it, and the attributes beside it.
+    """The mark, and beside it what the tool is, what it is for and where it lives.
 
-    The tagline sits where the trail motif used to. The trail said something
-    true about the notation, but a landing screen has one line in which to say
-    what the tool is for, and that line was spending itself on decoration.
+    Three lines and three facts: a landing screen has about that much of a
+    reader's attention, and the option tables are a `filegrail help` away.
     """
-    mark = [theme.paint(line, "recorded") for line in WORDMARK]
-    tagline = f"  {theme.dim(theme.clip(TAGLINE, theme.width - 4))}"
-    rows = _rows()
-    width = max(len(name) for name, _ in rows)
-
-    if theme.width < _SIDE_BY_SIDE:
-        room = theme.width - width - 6
-        return [
-            *(f"  {line}".rstrip() for line in mark),
-            tagline,
-            "",
-            *(
-                f"  {theme.dim(name.ljust(width))}  {theme.paint(theme.clip(v, room), 'body')}"
-                for name, v in rows
-            ),
-        ]
-
-    gutter = len(WORDMARK[0]) + 5
-    room = theme.width - gutter - width - 2
-
-    right = [
-        "",
-        *(
-            f"{theme.dim(name.ljust(width))}  {theme.paint(theme.clip(value, room), 'body')}"
-            for name, value in rows
-        ),
+    mark = [theme.paint(line, "origin") for line in wordmark(theme)]
+    beside = [
+        f"{theme.bold('filegrail')} {__version__}",
+        theme.dim(TAGLINE),
+        theme.dim(REPOSITORY.split("//", 1)[-1]),
     ]
-    left = [*(f"  {line}".rstrip() for line in mark), tagline]
+    gutter = max(len(line) for line in wordmark(theme)) + 3
 
     out = []
-    for index in range(max(len(left), len(right))):
-        prefix = left[index] if index < len(left) else ""
-        pad = max(1, gutter - _visible(prefix))
-        column = right[index] if index < len(right) else ""
-        out.append((f"{prefix}{' ' * pad}{column}").rstrip())
+    for index in range(len(mark)):
+        left = f" {mark[index]}"
+        pad = max(1, gutter - _visible(left))
+        out.append(f"{left}{' ' * pad}{beside[index]}".rstrip())
     return out
 
 

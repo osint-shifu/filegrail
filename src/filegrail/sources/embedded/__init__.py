@@ -7,7 +7,7 @@ because it survives copying, renaming, moving between machines and the expiry of
 every browser history on the system.
 
 Each reader lives in its own module and knows one family of containers. This
-module chooses between them and turns whatever they find into an `Origin`.
+module chooses between them and turns whatever they find into an `EvidenceRecord`.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ...models import Origin
+from ...models import EvidenceRecord
 from . import containers, documents, exif, id3, isobmff, matroska, ole, png, riff, vorbis
 
 #: A malformed container is ordinary: truncated downloads, Office lock files and
@@ -52,7 +52,7 @@ SUFFIXES = (
 )
 
 
-def read_embedded_metadata(path: Path) -> Origin | None:
+def read_embedded_metadata(path: Path) -> EvidenceRecord | None:
     """Return what the file says about its own creation, if anything."""
     suffix = path.suffix.lower()
     if suffix not in SUFFIXES:
@@ -82,7 +82,7 @@ def read_embedded_metadata(path: Path) -> Origin | None:
 # --- per family --------------------------------------------------------------
 
 
-def _from_documents(path: Path, suffix: str) -> Origin | None:
+def _from_documents(path: Path, suffix: str) -> EvidenceRecord | None:
     if suffix in documents.PDF_SUFFIXES:
         return documents.read_pdf(path)
     if suffix in documents.OOXML_SUFFIXES:
@@ -90,7 +90,7 @@ def _from_documents(path: Path, suffix: str) -> Origin | None:
     return None
 
 
-def _from_exif(path: Path, suffix: str) -> Origin | None:
+def _from_exif(path: Path, suffix: str) -> EvidenceRecord | None:
     if suffix not in exif.SUFFIXES:
         return None
     tags = exif.read_exif(path)
@@ -150,7 +150,7 @@ def _plain(value: object) -> str:
     return str(value)
 
 
-def _from_movie(path: Path, suffix: str) -> Origin | None:
+def _from_movie(path: Path, suffix: str) -> EvidenceRecord | None:
     if suffix not in isobmff.SUFFIXES:
         return None
     movie = isobmff.read_movie(path)
@@ -182,7 +182,7 @@ def _from_movie(path: Path, suffix: str) -> Origin | None:
     )
 
 
-def _from_png(path: Path, suffix: str) -> Origin | None:
+def _from_png(path: Path, suffix: str) -> EvidenceRecord | None:
     if suffix not in png.SUFFIXES:
         return None
     text = png.read_png_text(path)
@@ -215,7 +215,7 @@ def _from_png(path: Path, suffix: str) -> Origin | None:
     )
 
 
-def _from_container(path: Path, suffix: str) -> Origin | None:
+def _from_container(path: Path, suffix: str) -> EvidenceRecord | None:
     if suffix not in containers.SUFFIXES:
         return None
     found = containers.read_container(path)
@@ -238,7 +238,7 @@ def _from_container(path: Path, suffix: str) -> Origin | None:
     )
 
 
-def _from_compound(path: Path, suffix: str) -> Origin | None:
+def _from_compound(path: Path, suffix: str) -> EvidenceRecord | None:
     if suffix not in ole.SUFFIXES:
         return None
     found = ole.read_ole(path)
@@ -276,7 +276,7 @@ def _from_compound(path: Path, suffix: str) -> Origin | None:
     )
 
 
-def _from_riff(path: Path, suffix: str) -> Origin | None:
+def _from_riff(path: Path, suffix: str) -> EvidenceRecord | None:
     if suffix not in riff.SUFFIXES:
         return None
     found = riff.read_riff(path)
@@ -318,7 +318,7 @@ def _from_riff(path: Path, suffix: str) -> Origin | None:
     )
 
 
-def _from_matroska(path: Path, suffix: str) -> Origin | None:
+def _from_matroska(path: Path, suffix: str) -> EvidenceRecord | None:
     if suffix not in matroska.SUFFIXES:
         return None
     found = matroska.read_matroska(path)
@@ -345,7 +345,7 @@ def _from_matroska(path: Path, suffix: str) -> Origin | None:
     )
 
 
-def _from_vorbis(path: Path, suffix: str) -> Origin | None:
+def _from_vorbis(path: Path, suffix: str) -> EvidenceRecord | None:
     if suffix not in vorbis.SUFFIXES:
         return None
     found = vorbis.read_comments(path)
@@ -372,7 +372,7 @@ def _from_vorbis(path: Path, suffix: str) -> Origin | None:
     )
 
 
-def _from_audio(path: Path, suffix: str) -> Origin | None:
+def _from_audio(path: Path, suffix: str) -> EvidenceRecord | None:
     if suffix not in id3.SUFFIXES:
         return None
     frames = id3.read_id3(path)
@@ -405,7 +405,7 @@ def _origin(
     geo: str | None = None,
     note: str | None = None,
     fields: dict[str, str] | None = None,
-) -> Origin | None:
+) -> EvidenceRecord | None:
     """Build a claim, or None when the reader found nothing worth reporting.
 
     `fields` alone is not enough: a file whose only decoded tags are resolution
@@ -414,7 +414,7 @@ def _origin(
     """
     if not any((tool, at, geo, note)):
         return None
-    return Origin(
+    return EvidenceRecord(
         source=source, block=block, tool=tool, at=at, geo=geo, note=note, fields=fields or {}
     )
 

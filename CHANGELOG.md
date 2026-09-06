@@ -5,6 +5,124 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.0 - 2026-09-06
+
+### Changed
+
+- **Every report is rebuilt around one grammar.** A heading in capitals with
+  its own counts beside it, a table with named columns and a rule the width of
+  each one, `›` opening a record whose fields hang underneath it on `│` and
+  `└`. `!` means one thing - this wants a second look - and `·` means one
+  thing - nothing was found here. Eleven views that had grown their own shapes
+  now read the same way, and a section with nothing in it is not printed.
+
+- **A scan reads: summary, files, origin, metadata, activity, findings,
+  relationships, unresolved.** The tally of what was read and the list of
+  parsers that returned something are gone; every count in a heading is now of
+  rows a reader can see underneath it. `INVENTORY` is gone with them - the type
+  is a column in the table of files, where it can be compared.
+
+- **The files nothing explained are `UNRESOLVED`,** a section of their own with
+  the size and the last modification of each. They used to be a capped list at
+  the end of the index.
+
+- **`explain` shows the material rather than a reading of it.** The prose
+  assessment was this tool's opinion; the command exists to show what an
+  opinion would rest on. The sentences are still in `--json`.
+
+- **`--timeline` drops the files nothing dated.** Nothing happened at a time
+  nobody recorded, and a row for it was a date invented to fill a column. Each
+  event now names what happened: captured, downloaded, delivered, extracted,
+  opened, deleted.
+
+- **Identifiers are grouped by type** - urls, domains, emails, ip addresses,
+  coordinates, hashes - one row per place a value was seen, with the file, the
+  source and the field it came from. Values seen under more than one source get
+  a section of their own. A value too long to sit beside its columns takes the
+  line instead of being wrapped into slivers.
+
+- **The landing screen is the mark, and then things to type.** Twenty-three
+  examples grouped by what is being asked about - a file, a directory, a kind
+  of file - and the format and evidence-source lists it used to carry are in
+  the readme and in `doctor`, where the question has been asked.
+
+### Changed
+
+- **The vocabulary is the industry's rather than this project's.** `filegrail`
+  described a file's history in words it had defined for itself, and two of them
+  collided with settled meanings. `acquisition` in digital forensics is the
+  examiner taking custody of material - disk imaging, memory capture, a forensic
+  copy - and using it for "a browser downloaded this" put the tool at odds with
+  every reader who already knew the word. Provenance is now the subject, and
+  under it a record answers one of three questions: **origin**, **metadata**,
+  **activity**.
+
+- **The central record is `EvidenceRecord`, not `Origin`.** One class carried a
+  download row, a camera's EXIF and a trash record alike, and `FileRecord.origins`
+  said all three were statements about where the file came from. They are
+  `FileRecord.evidence` now, and each one carries its own `category`.
+
+- **Every record says how it was matched to its file.** A download row found by
+  path and one found by a name that happened to be the same are not equally
+  firm, and the difference used to live in an English sentence that correlation
+  had to read back with a substring search. It is a field: `recorded path`,
+  `file name`, `name+size`, `container member`, `sidecar`, `file attribute`,
+  `read from the file`, `inside a sync folder`. The size comparison behind a
+  name match is now made against the file on disk rather than inferred from
+  prose.
+
+- **The confidence number is gone from everything a reader or a consumer sees.**
+  There was never a statistical basis for `55`, and printing it as a five-block
+  meter put "a browser wrote this down as it happened" and "a camera described
+  itself" on one scale as more and less of the same thing. What remains is
+  `SOURCE_PRIORITY`, which decides which record a one-row summary shows, is
+  never printed and is never exported. Where the meter used to sit, the report
+  prints the match basis.
+
+- **`recorded / inherited / credentialed / self-reported / circumstantial /
+  faint` is gone too.** Those six words described six unrelated properties - how
+  a record was made, what it inherited, which standard signed it, what kind of
+  inference it rests on - and stacking them as levels of one strength said they
+  were comparable. Colour is now keyed by category, so it says which question a
+  record answers and nothing about how much it is worth.
+
+- **`Verdict` is `CorrelationResult` and `reconcile()` is `correlate()`.** The
+  code deliberately does not decide which record is true, so it should not
+  return something called a verdict. `conclusion` is `assessment` for the same
+  reason.
+
+- **`finding` means the result of an analysis.** A conflict, a corroboration, an
+  impossible ordering. The presence of EXIF is not a finding, so the section
+  that counted those is `SUMMARY`, `overview.findings()` is `overview.summary()`,
+  and a file nothing was found for is reported as `no evidence found` rather
+  than `no findings` - which never meant the file has no provenance, only that
+  the supported sources held nothing that explains it.
+
+- **Two sources were classified wrongly and are reclassified.** `filesystem`
+  timestamps were `acquisition`, so every unexplained file looked as though
+  something had explained how it arrived; they are `activity`. `email-relay`
+  describes the transport of a message rather than the origin of the file, and
+  is read as `metadata` alongside the other headers.
+
+- Camera bodies, models and authors are `SHARED ATTRIBUTES` rather than
+  `shared sources`: a source is an artifact or a parser, not a person or a
+  device.
+
+### Breaking
+
+- `--json` documents change shape. `scan`, `explain` and `compare` are stamped
+  `filegrail.scan/2`, `filegrail.explain/2` and `filegrail.compare/2`; `doctor`
+  and `clean` did not change and keep `/1`.
+
+  | was | is |
+  |:---|:---|
+  | `files[].origins` | `files[].evidence` |
+  | `origins[].confidence` | gone; `evidence[].category` and `evidence[].match` |
+  | `reconciliation` | `correlation` |
+  | `conclusion` (explain) | `assessment` |
+  | `acquisition` (compare) | `origin` |
+  | `shared_sources` | `shared_attributes` |
+
 ## 0.7.0 - 2026-09-05
 
 ### Changed

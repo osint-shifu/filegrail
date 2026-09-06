@@ -2,7 +2,7 @@
 
 `yt-dlp --write-info-json` writes `<name>.info.json` next to `<name>.<ext>`,
 and that file names the page the media came from, who published it and when
-the fetch happened. It is an acquisition record in the ordinary sense - a
+the fetch happened. It is an origin record in the plainest sense - a
 program wrote down where it got the bytes - and unlike a browser database it
 travels with the file.
 
@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from filegrail.models import ACQUISITION, kind
+from filegrail.models import ORIGIN, category
 from filegrail.scan import scan
 from filegrail.sources.sidecar import read_sidecar
 
@@ -88,7 +88,7 @@ def test_a_sidecar_that_is_not_json_is_not_an_error(tmp_path: Path):
 
 def test_a_sidecar_with_no_address_says_nothing(tmp_path: Path):
     """Without a URL the document says who published a video, not where this
-    file came from, and an acquisition claim with no address is not one."""
+    file came from, and an origin record with no address is not one."""
     media = tmp_path / "film.mp4"
     media.write_bytes(b"\x00")
     media.with_suffix(".info.json").write_text('{"uploader": "A Studio"}', encoding="utf-8")
@@ -103,8 +103,8 @@ def test_the_claim_says_how_the_file_arrived(tmp_path: Path):
 
     origin = read_sidecar(media)
 
-    assert kind(origin) == ACQUISITION
-    assert origin.confidence > 0
+    assert category(origin) == ORIGIN
+    assert origin.priority > 0
 
 
 def test_a_scan_attaches_it(tmp_path: Path):
@@ -114,6 +114,6 @@ def test_a_scan_attaches_it(tmp_path: Path):
 
     record = next(r for r in scan(tmp_path, use_shell_history=False) if r.path.endswith(".mp4"))
 
-    assert [o.url for o in record.origins if o.source == "ytdlp-sidecar"] == [
+    assert [o.url for o in record.evidence if o.source == "ytdlp-sidecar"] == [
         "https://www.example.org/watch?v=aqz-KE-bpKQ"
     ]

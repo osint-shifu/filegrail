@@ -217,7 +217,7 @@ def _ask_folder(
     candidate = Path(raw).expanduser()
     if not candidate.exists():
         write("")
-        write(f"  {theme.paint('no such file or directory:', 'circumstantial')} {raw}")
+        write(f"  {theme.paint('no such file or directory:', 'warning')} {raw}")
         write("")
         return None
     return candidate.resolve()

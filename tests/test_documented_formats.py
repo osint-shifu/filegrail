@@ -1,6 +1,6 @@
 """`docs/FORMATS.md` is held against the readers, so it cannot quietly go stale.
 
-A list of formats in prose is the one kind of documentation guaranteed to rot:
+A list of formats in prose is the one category of documentation guaranteed to rot:
 `CONTRIBUTING.md` asks for new readers, every new reader is a line somebody has
 to remember to add, and nothing notices when they do not. Two years of that and
 the file is a liability - it reads like a promise and is not one.
@@ -86,7 +86,7 @@ def _readable() -> set[str]:
 
 
 def _declared_blocks() -> set[str]:
-    """Every block name the source tree actually passes to an `Origin`."""
+    """Every block name the source tree actually passes to an `EvidenceRecord`."""
     found = set(BLOCK_LABELS)
     for path in (Path(__file__).resolve().parent.parent / "src" / "filegrail").rglob("*.py"):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):

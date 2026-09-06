@@ -22,7 +22,7 @@ from typing import Any
 from urllib.parse import quote
 
 from ..bencode import BencodeError, loads, value_span
-from ..models import Origin
+from ..models import EvidenceRecord
 
 SUFFIX = ".torrent"
 
@@ -59,7 +59,7 @@ _MAX_BYTES = 32 * 1024 * 1024
 class Torrent:
     """What one torrent claims, and which files it would explain."""
 
-    origin: Origin
+    record: EvidenceRecord
 
     #: {member base name: every size listed for it}, the same shape the archive
     #: reader produces, because the pairing that follows is the same pairing.
@@ -111,7 +111,7 @@ def read_torrent(path: Path) -> Torrent | None:
     if not members:
         return None
 
-    return Torrent(origin=_origin(raw, document, info), members=members)
+    return Torrent(record=_record(raw, document, info), members=members)
 
 
 def _members(info: dict[bytes, Any]) -> dict[str, set[int]]:
@@ -137,7 +137,7 @@ def _members(info: dict[bytes, Any]) -> dict[str, set[int]]:
     return {name: sizes for name, sizes in members.items() if name}
 
 
-def _origin(raw: bytes, document: dict[bytes, Any], info: dict[bytes, Any]) -> Origin:
+def _record(raw: bytes, document: dict[bytes, Any], info: dict[bytes, Any]) -> EvidenceRecord:
     name = _text(info.get(b"name"))
     fields: dict[str, str] = {}
     if name:
@@ -154,7 +154,7 @@ def _origin(raw: bytes, document: dict[bytes, Any], info: dict[bytes, Any]) -> O
     if comment:
         fields["comment"] = comment
 
-    return Origin(
+    return EvidenceRecord(
         source="torrent",
         url=_magnet(raw, name),
         tool=_text(document.get(b"created by")),

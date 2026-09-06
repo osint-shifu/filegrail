@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from filegrail.models import FileRecord, Origin
+from filegrail.models import EvidenceRecord, FileRecord
 from filegrail.report import render_json, render_text
 from filegrail.theme import Theme
 
@@ -28,8 +28,8 @@ FIELDS = {
 
 def _record(fields: dict[str, str] | None = None) -> FileRecord:
     record = FileRecord(path="/case/holiday.jpg", size=4096, mtime="2026-08-24T19:00:00Z")
-    record.origins.append(
-        Origin(
+    record.evidence.append(
+        EvidenceRecord(
             source="device-metadata",
             tool="NIKON COOLPIX P6000",
             at="2008-10-22T16:38:20Z",
@@ -43,7 +43,7 @@ def test_fields_reach_the_json_without_a_flag():
     """Machine-readable output is where the full record belongs by default."""
     payload = json.loads(render_json([_record()], Path("/case")))
 
-    fields = payload["files"][0]["origins"][0]["fields"]
+    fields = payload["files"][0]["evidence"][0]["fields"]
     assert fields["BodySerialNumber"] == "3001234"
     assert fields["GPSDateStamp"] == "2008:10:22"
 
@@ -83,13 +83,13 @@ def test_redaction_sweeps_the_fields():
     redacted = record.redacted()
 
     assert "sk-live-9f2b7c4e1d8a6350f4a1" not in json.dumps(redacted.to_dict())
-    assert redacted.origins[0].fields["Model"] == "COOLPIX P6000"
+    assert redacted.evidence[0].fields["Model"] == "COOLPIX P6000"
 
 
 def test_an_origin_without_fields_serialises_cleanly():
     record = FileRecord(path="/case/a.txt", size=1, mtime="2026-08-24T19:00:00Z")
-    record.origins.append(Origin(source="filesystem"))
+    record.evidence.append(EvidenceRecord(source="filesystem"))
 
     payload = json.loads(render_json([record], Path("/case")))
 
-    assert "fields" not in payload["files"][0]["origins"][0]
+    assert "fields" not in payload["files"][0]["evidence"][0]

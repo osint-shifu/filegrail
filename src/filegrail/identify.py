@@ -41,24 +41,26 @@ from pathlib import Path
 from typing import NamedTuple
 from urllib.parse import urlsplit
 
-from .models import ACQUISITION, FileRecord, kind
+from .models import ORIGIN, FileRecord, category
+from .models import label as source_label
 
 #: What files record about themselves: the corpus this has always read, and the
 #: one the detectors were tuned for. Short structured strings, where a match is
 #: nearly always a real identifier.
-METADATA = "metadata"
+IN_METADATA = "metadata"
 
 #: What files say. Read only when asked, and kept as its own corpus rather than
 #: merged into the one above: prose is an order of magnitude noisier - a
 #: citation, a file name, an abbreviation with a dot in it all match something -
 #: and letting that into the metadata list would drown the half that is reliable.
-CONTENT = "content"
+IN_CONTENT = "content"
 
 
 class _Text(NamedTuple):
     """One string to search, with everything needed to say where it came from."""
 
     file: str
+    source: str
     where: str
     text: str
     corpus: str
@@ -77,6 +79,11 @@ MAX_SAMPLES = 20
 #: rather than a literal in two places - and the report re-renders the
 #: separator with whatever the terminal can actually print.
 PLACE = " · "
+
+#: What the `source` of a value found in a document body is called. The text of
+#: a file is not one of the evidence sources - nothing wrote it down about the
+#: file - so it is named for what it is.
+CONTENT_SOURCE = "content"
 
 EMAIL_RE = re.compile(
     r"\b[A-Za-z0-9._%+\-]+@([A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?"
@@ -343,29 +350,30 @@ def _texts(records: list[FileRecord], *, content: bool = False) -> Iterator[_Tex
         from .sources.content import read_passages
     for record in records:
         name = Path(record.path).name
-        for origin in record.origins:
-            arrival = kind(origin) == ACQUISITION
+        for found in record.evidence:
+            arrival = category(found) == ORIGIN
+            source = source_label(found)
             for label, value in (
-                ("url", origin.url),
-                ("referrer", origin.referrer),
-                ("command", origin.command),
-                ("tool", origin.tool),
-                ("note", origin.note),
-                ("geo", origin.geo),
-                ("location", origin.location),
+                ("url", found.url),
+                ("referrer", found.referrer),
+                ("command", found.command),
+                ("tool", found.tool),
+                ("note", found.note),
+                ("geo", found.geo),
+                ("location", found.location),
             ):
                 if value:
-                    yield _Text(name, label, value, METADATA, arrival)
-            for label, value in origin.fields.items():
+                    yield _Text(name, source, label, value, IN_METADATA, arrival)
+            for label, value in found.fields.items():
                 if value:
-                    yield _Text(name, label, str(value), METADATA, arrival)
+                    yield _Text(name, source, label, str(value), IN_METADATA, arrival)
         if content:
             # One yield per passage rather than one per file. Scanning them
             # apart is what lets a value carry the line, slide or chapter it
             # was on, and it costs about a fifth more than scanning the
             # document as one string.
             for passage in read_passages(Path(record.path)) or ():
-                yield _Text(name, passage.place, passage.text, CONTENT, False)
+                yield _Text(name, CONTENT_SOURCE, passage.place, passage.text, IN_CONTENT, False)
 
 
 def extract(records: list[FileRecord], *, content: bool = False) -> list[Identifier]:
@@ -379,7 +387,7 @@ def extract(records: list[FileRecord], *, content: bool = False) -> list[Identif
     found: dict[tuple[str, str], Identifier] = {}
 
     for source in _texts(records, content=content):
-        origin = f"{source.file}{PLACE}{source.where}"
+        place = f"{source.file}{PLACE}{source.source}{PLACE}{source.where}"
         for family, raw, normalized, private in _scan(source.text, source.where):
             key = (family, normalized)
             entry = found.get(key)
@@ -389,9 +397,9 @@ def extract(records: list[FileRecord], *, content: bool = False) -> list[Identif
             entry.count += 1
             entry.corpora.add(source.corpus)
             entry.acquired = entry.acquired or source.acquired
-            if origin not in entry.where:
+            if place not in entry.where:
                 if len(entry.where) < MAX_SAMPLES:
-                    entry.where.append(origin)
+                    entry.where.append(place)
 
     for entry in found.values():
         entry.files = len({place.split(PLACE, 1)[0] for place in entry.where})

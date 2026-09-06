@@ -155,7 +155,7 @@ def test_the_database_keeps_its_own_epoch(carved: Path, tmp_path: Path):
     """The attribute counts from 1970 and the database counts from 2001.
 
     Reading either with the other's epoch puts the download decades away, which
-    is the kind of error a timeline would then be built on.
+    is the category of error a timeline would then be built on.
     """
     _database(tmp_path, [_row()])
 
@@ -190,7 +190,7 @@ def test_a_download_is_matched_by_name_where_the_attribute_did_not_survive(
     found = read_quarantine(carved / "evidence.zip", collect_quarantine_events(tmp_path))
 
     assert found[0].url == "https://cdn.example.org/evidence.zip"
-    assert "matched by file name" in found[0].note
+    assert found[0].matched_by == "filename"
 
 
 def test_a_name_that_matches_nothing_in_the_database_is_left_alone(carved: Path, tmp_path: Path):
@@ -220,7 +220,7 @@ def test_a_scan_reaches_the_quarantine_record(carved: Path, tmp_path: Path):
 
     record = scan(carved, home=tmp_path, use_shell_history=False)[0]
 
-    claims = [origin for origin in record.origins if origin.source == "macos-quarantine"]
+    claims = [origin for origin in record.evidence if origin.source == "macos-quarantine"]
     assert len(claims) == 1
     assert claims[0].url == "https://cdn.example.org/evidence.zip"
 
@@ -237,6 +237,4 @@ def test_the_name_match_says_what_it_was_matched_against(carved: Path, tmp_path:
 
     found = read_quarantine(carved / "evidence.zip", collect_quarantine_events(tmp_path))
 
-    assert found[0].note == (
-        "matched by file name; the database recorded the URL and no path to match instead"
-    )
+    assert found[0].match_note == ("the database recorded the URL and no path to match instead")

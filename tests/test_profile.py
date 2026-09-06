@@ -20,9 +20,9 @@ from pathlib import Path
 import pytest
 
 from filegrail.cli import main
-from filegrail.explain import conclusion
+from filegrail.correlate import correlate
+from filegrail.explain import assessment
 from filegrail.models import FileRecord
-from filegrail.reconcile import reconcile
 from filegrail.util import basename
 
 CHROMIUM_SCHEMA = """
@@ -133,7 +133,7 @@ def test_a_scan_reads_the_profile_it_is_given(carved: Path, mounted: Path, capsy
     """
     payload = _json(capsys, "scan", str(carved), "--home", str(mounted))
 
-    origins = payload["files"][0]["origins"]
+    origins = payload["files"][0]["evidence"]
     assert any(origin["url"] == "https://cdn.example.org/evidence.zip" for origin in origins)
 
 
@@ -141,19 +141,22 @@ def test_without_the_flag_the_same_scan_finds_nothing(carved: Path, mounted: Pat
     """Proof that the fixture is not leaking in by some other route."""
     payload = _json(capsys, "scan", str(carved))
 
-    assert payload["files"][0]["origins"] == []
+    assert payload["files"][0]["evidence"] == []
 
 
-def test_the_match_says_it_was_made_by_name(carved: Path, mounted: Path, capsys):
+def test_the_match_basis_says_a_path_was_not_what_matched(carved: Path, mounted: Path, capsys):
     """A record kept under a Windows path cannot match by path here.
 
-    It matched on the file name, and the report has always said so; under a
-    foreign profile that is the usual case rather than the exception.
+    It matched on the name, and the size the record kept agrees - which the
+    document says as `name+size` rather than leaving a consumer to read a
+    sentence. Under a foreign profile this is the usual case, not the
+    exception, so the basis is the field that carries the difference.
     """
     payload = _json(capsys, "scan", str(carved), "--home", str(mounted))
 
-    origin = payload["files"][0]["origins"][0]
-    assert "matched by file name" in origin["note"]
+    found = payload["files"][0]["evidence"][0]
+    assert found["match"]["method"] == "name+size"
+    assert "moved or renamed" in found["match"]["note"]
 
 
 def test_the_document_records_which_profile_was_read(carved: Path, mounted: Path, capsys):
@@ -171,7 +174,7 @@ def test_explain_reads_the_profile_it_is_given(carved: Path, mounted: Path, caps
     payload = _json(capsys, "explain", str(carved / "evidence.zip"), "--home", str(mounted))
 
     assert payload["home"] == str(mounted)
-    assert payload["file"]["origins"]
+    assert payload["file"]["evidence"]
 
 
 def test_compare_reads_the_profile_it_is_given(carved: Path, mounted: Path, capsys):
@@ -187,7 +190,7 @@ def test_compare_reads_the_profile_it_is_given(carved: Path, mounted: Path, caps
     )
 
     assert payload["home"] == str(mounted)
-    assert payload["acquisition"]
+    assert payload["origin"]
 
 
 def test_doctor_surveys_the_profile_it_is_given(mounted: Path, capsys):
@@ -217,8 +220,8 @@ def test_the_explanation_does_not_claim_the_file_reached_this_machine(
     assert main(argv) == 0
 
     out = capsys.readouterr().out
-    assert "this machine" not in out
-    assert "that machine" in out
+    assert "reached this machine" not in out
+    assert "external" in out
 
 
 def test_the_scan_report_names_the_profile_it_read(carved: Path, mounted: Path, capsys):
@@ -229,7 +232,7 @@ def test_the_scan_report_names_the_profile_it_read(carved: Path, mounted: Path, 
     """
     assert main(["scan", str(carved), "--home", str(mounted), "--no-color"]) == 0
 
-    assert "another machine" in capsys.readouterr().out
+    assert "external" in capsys.readouterr().out
 
 
 def test_the_timeline_names_the_profile_it_read(carved: Path, mounted: Path, capsys):
@@ -240,26 +243,26 @@ def test_the_timeline_names_the_profile_it_read(carved: Path, mounted: Path, cap
     """
     assert main(["scan", str(carved), "--home", str(mounted), "--timeline", "--no-color"]) == 0
 
-    assert "another machine" in capsys.readouterr().out
+    assert "external" in capsys.readouterr().out
 
 
 def test_a_timeline_of_this_machine_stays_one_line_per_event(carved: Path, capsys):
     assert main(["scan", str(carved), "--timeline", "--no-color"]) == 0
 
-    assert "another machine" not in capsys.readouterr().out
+    assert "reached this machine" not in capsys.readouterr().out
 
 
 def test_a_scan_of_this_machine_announces_no_profile(carved: Path, capsys):
     """The word `profile` appears in the source notes; the announcement must not."""
     assert main(["scan", str(carved), "--no-color"]) == 0
 
-    assert "another machine" not in capsys.readouterr().out
+    assert "reached this machine" not in capsys.readouterr().out
 
 
 def test_the_explanation_still_says_this_machine_when_it_is_this_machine(carved: Path, capsys):
     assert main(["explain", str(carved / "evidence.zip"), "--no-color"]) == 0
 
-    assert "this machine" in capsys.readouterr().out
+    assert "target" in capsys.readouterr().out
 
 
 def test_an_empty_profile_points_the_reader_at_the_right_doctor(carved: Path, tmp_path: Path):
@@ -273,7 +276,7 @@ def test_an_empty_profile_points_the_reader_at_the_right_doctor(carved: Path, tm
     bare.mkdir()
     record = FileRecord(path=str(carved / "evidence.zip"), size=5, mtime="2026-08-24T19:00:00Z")
 
-    said = conclusion(record, reconcile(record), bare)
+    said = assessment(record, correlate(record), bare)
 
     assert f"filegrail doctor --home {bare}" in said[0]
 
@@ -281,7 +284,7 @@ def test_an_empty_profile_points_the_reader_at_the_right_doctor(carved: Path, tm
 def test_the_same_advice_on_this_machine_names_no_profile(carved: Path):
     record = FileRecord(path=str(carved / "evidence.zip"), size=5, mtime="2026-08-24T19:00:00Z")
 
-    said = conclusion(record, reconcile(record))
+    said = assessment(record, correlate(record))
 
     assert "`filegrail doctor`" in said[0]
     assert "--home" not in said[0]
@@ -292,16 +295,16 @@ def test_the_explanation_names_the_profile_it_read(carved: Path, mounted: Path, 
     argv = ["explain", str(carved / "evidence.zip"), "--home", str(mounted), "--no-color"]
     assert main(argv) == 0
 
-    assert "another machine" in capsys.readouterr().out
+    assert "external" in capsys.readouterr().out
 
 
 def test_the_survey_names_the_profile_it_read(mounted: Path, capsys):
     assert main(["doctor", "--home", str(mounted), "--no-color"]) == 0
 
-    assert "another machine" in capsys.readouterr().out
+    assert "external" in capsys.readouterr().out
 
 
 def test_a_survey_of_this_machine_announces_no_profile(capsys):
     assert main(["doctor", "--no-color"]) == 0
 
-    assert "another machine" not in capsys.readouterr().out
+    assert "reached this machine" not in capsys.readouterr().out

@@ -6,84 +6,211 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:  # a Link is attached by `lineage`, which imports this module
     from .lineage import Link
 
-# How much a source is trusted when several disagree. Higher wins.
-CONFIDENCE: dict[str, int] = {
+# --- what a record is about ---------------------------------------------------
+
+#: How or from where the file reached the environment being examined. Another
+#: system wrote this down: a browser's download history, an attribute the
+#: operating system attached, the sidecar a fetching tool left beside the file.
+#:
+#: Deliberately not `acquisition`. In digital forensics that word means the
+#: examiner taking custody of material - disk imaging, memory capture, a
+#: forensic copy - and using it for "a browser downloaded this" would collide
+#: with the one meaning every examiner already has for it.
+ORIGIN = "origin"
+
+#: What the file itself carries: the author, device, software, timestamps,
+#: identifiers, document properties and editing history written into its own
+#: structure. It travels with the bytes through copying and renaming.
+METADATA = "metadata"
+
+#: A local trace that the file was handled here - opened, listed, moved,
+#: synchronized, deleted, named in a shell. It establishes contact and says
+#: nothing about where the bytes came from, which is the distinction the old
+#: single "origin" collection destroyed by holding both.
+ACTIVITY = "activity"
+
+#: Every category there is, so consumers can enumerate them and tests can hold
+#: the source table against them.
+CATEGORIES = (ORIGIN, METADATA, ACTIVITY)
+
+
+# --- how a record came to be about this file ----------------------------------
+
+#: Read out of the file's own bytes.
+EMBEDDED = "embedded"
+
+#: Read from what the filesystem keeps beside the bytes for this exact file -
+#: an extended attribute, an alternate data stream, the inode's own stamps.
+FILE_ATTRIBUTE = "file-attribute"
+
+#: A separate file written beside this one and naming it: a `yt-dlp` sidecar,
+#: the trash's own `.trashinfo` record.
+SIDECAR = "sidecar"
+
+#: An external store recorded this exact path for the file.
+RECORDED_PATH = "recorded-path"
+
+#: An external store naming a file by this name, and nothing more. It survives
+#: the file being moved, which is why it is tried - and it matches any other
+#: file that happens to share the name, which is why it is recorded as what it
+#: is rather than presented as a path match.
+FILENAME = "filename"
+
+#: The name *and* the exact byte count agree. Two files can still share both,
+#: but not nearly as easily as they share a name.
+NAME_AND_SIZE = "name+size"
+
+#: The file is a member of a container - an archive, a torrent - or the record
+#: was read from one member and restated about the container.
+CONTAINER_MEMBER = "container-member"
+
+#: The file lies under a directory a sync client manages. Containment is the
+#: whole of the match; it says nothing about which way the bytes travelled.
+SYNC_ROOT = "sync-root"
+
+MATCH_BASES = (
+    EMBEDDED,
+    FILE_ATTRIBUTE,
+    SIDECAR,
+    RECORDED_PATH,
+    FILENAME,
+    NAME_AND_SIZE,
+    CONTAINER_MEMBER,
+    SYNC_ROOT,
+)
+
+#: How each basis reads in a report. The point of printing it at all is that
+#: "matched by name" and "read out of the file" are different enough that a
+#: reader who cannot tell them apart cannot weigh anything.
+MATCH_LABELS: dict[str, str] = {
+    EMBEDDED: "read from the file",
+    FILE_ATTRIBUTE: "file attribute",
+    SIDECAR: "record beside the file",
+    RECORDED_PATH: "recorded path",
+    FILENAME: "file name",
+    NAME_AND_SIZE: "name and exact size",
+    CONTAINER_MEMBER: "container member",
+    SYNC_ROOT: "inside a sync folder",
+}
+
+
+# --- the sources ---------------------------------------------------------------
+
+#: Which of the three questions each source speaks to. Every source is listed;
+#: a source missing from here is a source nobody classified, and `category()`
+#: raises rather than guessing, because guessing is how EXIF ended up in a
+#: collection named `origins`.
+SOURCE_CATEGORIES: dict[str, str] = {
+    "browser-download": ORIGIN,
+    "windows-zone-identifier": ORIGIN,
+    "macos-wherefroms": ORIGIN,
+    "macos-quarantine": ORIGIN,
+    "xdg-xattr": ORIGIN,
+    "ytdlp-sidecar": ORIGIN,
+    # The hop the recipient's own mail server wrote as the message arrived.
+    # That is how this file reached the machine.
+    "email-delivery": ORIGIN,
+    # The archive's own origin, inherited by a file that came out of it.
+    "archive-member": ORIGIN,
+    "torrent": ORIGIN,
+    # A file name in the shape a messenger writes. It is an association with a
+    # naming convention, and the match basis on every one of these records says
+    # so: nothing here was matched by anything but a name.
+    "messenger-name": ORIGIN,
+    # Decided per record rather than per source: `curl -o` fetched the bytes,
+    # `cat` merely read them. See `category`.
+    "shell-history": ORIGIN,
+    "c2pa": METADATA,
+    "device-metadata": METADATA,
+    "xmp": METADATA,
+    "xmp-history": METADATA,
+    "iptc": METADATA,
+    "document-metadata": METADATA,
+    # Metadata read from a member and restated as a fact about the container.
+    # Still metadata: it is what some file wrote about itself.
+    "archive-content": METADATA,
+    "email-header": METADATA,
+    # A hop some machine wrote into the message before it was sent. It is a
+    # header the file carries - transport of the message, not the origin of the
+    # file - so it is read as metadata and never as an origin record.
+    "email-relay": METADATA,
+    "recent-documents": ACTIVITY,
+    "windows-recent": ACTIVITY,
+    "sync-folder": ACTIVITY,
+    "freedesktop-trash": ACTIVITY,
+    # Times and paths the filesystem keeps. They say what happened to the file
+    # here; they do not say where it came from, and classifying them as origin
+    # made every unexplained file look as though something had explained it.
+    "filesystem": ACTIVITY,
+}
+
+#: The ordinary way each source is tied to the file it describes. A reader that
+#: knows better for a particular record overrides it on the record itself.
+SOURCE_MATCH: dict[str, str] = {
+    "browser-download": RECORDED_PATH,
+    "windows-zone-identifier": FILE_ATTRIBUTE,
+    "macos-wherefroms": FILE_ATTRIBUTE,
+    "macos-quarantine": FILENAME,
+    "xdg-xattr": FILE_ATTRIBUTE,
+    "ytdlp-sidecar": SIDECAR,
+    "email-delivery": EMBEDDED,
+    "email-relay": EMBEDDED,
+    "email-header": EMBEDDED,
+    "archive-member": CONTAINER_MEMBER,
+    "archive-content": CONTAINER_MEMBER,
+    "torrent": NAME_AND_SIZE,
+    "messenger-name": FILENAME,
+    "shell-history": FILENAME,
+    "c2pa": EMBEDDED,
+    "device-metadata": EMBEDDED,
+    "xmp": EMBEDDED,
+    "xmp-history": EMBEDDED,
+    "iptc": EMBEDDED,
+    "document-metadata": EMBEDDED,
+    "recent-documents": RECORDED_PATH,
+    "windows-recent": NAME_AND_SIZE,
+    "sync-folder": SYNC_ROOT,
+    "freedesktop-trash": SIDECAR,
+    "filesystem": FILE_ATTRIBUTE,
+}
+
+#: Which source is shown first where several describe the same thing, and which
+#: one a summary counts when a file needs one row. Presentation order and
+#: nothing else: these are not probabilities, they are not scores, and they are
+#: never printed or exported. A source that records the arrival as it happens
+#: sorts above one matched to the file afterwards; a file describing itself
+#: sorts below both, because it is the one account with no independent witness.
+SOURCE_PRIORITY: dict[str, int] = {
     "browser-download": 90,
-    # A mail server on the recipient's side wrote this down as the message
-    # arrived. Independent of the sender, like a download record - and unlike
-    # one it travels inside the file it describes, which is why it sits below
-    # the attributes an operating system keeps outside the bytes.
-    "email-delivery": 78,
     "windows-zone-identifier": 85,
     "macos-wherefroms": 85,
-    # Written by LaunchServices at download time, the same authority as a
-    # where-from attribute and recorded beside it rather than instead of it.
     "macos-quarantine": 85,
     "xdg-xattr": 80,
-    # Written by the program that fetched the bytes, and it names the page
-    # they came from. Below the attributes an operating system attaches to the
-    # file itself, because a sidecar is a separate file paired to the media by
-    # name alone: a copy that brings one and not the other, or a rename, breaks
-    # that pairing in a way an extended attribute cannot be broken.
+    "email-delivery": 78,
     "ytdlp-sidecar": 75,
     "archive-member": 70,
-    # A torrent lists its members by name and exact size, and a file matching
-    # both was very likely one of them. The same strength of inference as an
-    # archive member, and the same way of being wrong: two files can share a
-    # name and a size without being the same file.
     "torrent": 70,
-    # A purpose-built provenance standard, but the signature is not verified here.
     "c2pa": 60,
     "device-metadata": 55,
-    # Structured and purpose-built for editing history, but free text an editor
-    # writes about itself: weaker than a camera naming its own model, stronger
-    # than a bare document property.
     "xmp": 52,
     "xmp-history": 52,
-    # The same kind of self-description as XMP and the older of the two. Modern
-    # tools maintain XMP and leave the IIM block as it was, so a byline here is
-    # often a record of an earlier state rather than the current one.
     "iptc": 51,
     "document-metadata": 50,
-    # Metadata read from a file inside an archive, restated as a claim about
-    # the archive. One number is a simplification: what was read is as strong
-    # as it would be on disk - a camera naming itself is a camera naming
-    # itself - but what it establishes here is only what the container holds.
     "archive-content": 50,
-    # A hop the sender may have written in full before sending. Recorded by
-    # something, but not by anything the recipient has reason to trust.
     "email-relay": 45,
-    # A file inside a folder a client keeps in step with an account. The
-    # containment is a fact and the configuration is authoritative about it;
-    # what it implies about origin is nothing, because sync runs both ways.
-    "sync-folder": 38,
-    # The trash wrote this down as it moved the bytes, and it wrote it beside
-    # them: the record is the trash's own bookkeeping for this exact file
-    # rather than something matched to it by name afterwards. That pairing is
-    # what puts it above every other source of its kind - and it is still only
-    # a claim about a path this machine held, which is why it stays well below
-    # anything that knows how the file arrived.
     "freedesktop-trash": 45,
     "shell-history": 40,
-    # A file name, and nothing else. Both clients write a fixed pattern and a
-    # file carrying one usually did come through that client - but a name is
-    # typed as easily as it is written, survives no scrutiny on its own, and is
-    # lost the moment somebody renames the file. Below an application having
-    # opened it, which at least happened.
-    "messenger-name": 25,
-    # An application opening a file proves contact, not acquisition.
-    # A Windows shortcut says the same thing and records the size of what it
-    # pointed at, which is one check more than the desktop list offers.
+    "sync-folder": 38,
     "windows-recent": 36,
     "recent-documents": 35,
-    # The weakest self-description there is: forging a From line takes nothing
-    # but typing it.
     "email-header": 30,
+    "messenger-name": 25,
     "filesystem": 10,
 }
 
+
 #: How each source reads in prose. Data about sources, so it lives beside the
-#: confidence table rather than in the renderer - reconciliation needs to name a
+#: tables above rather than in the renderer - correlation needs to name a
 #: source too, and importing the renderer to do it would be a cycle.
 SOURCE_LABELS: dict[str, str] = {
     "browser-download": "browser download",
@@ -97,7 +224,7 @@ SOURCE_LABELS: dict[str, str] = {
     "ytdlp-sidecar": "yt-dlp sidecar",
     "archive-member": "archive member",
     "torrent": "torrent",
-    "c2pa": "content credentials",
+    "c2pa": "Content Credentials",
     "device-metadata": "device metadata",
     "xmp": "XMP",
     "xmp-history": "XMP history",
@@ -106,19 +233,19 @@ SOURCE_LABELS: dict[str, str] = {
     "archive-content": "archive content",
     "shell-history": "shell history",
     "messenger-name": "messenger file name",
-    "recent-documents": "recent documents",
+    "recent-documents": "Recent Documents",
     "sync-folder": "sync folder",
     "freedesktop-trash": "trash record",
-    "windows-recent": "recent shortcut",
+    "windows-recent": "Windows shortcut",
     "filesystem": "filesystem",
 }
 
-#: How each block reads in prose, where naming it says more than the source
-#: does. Only a `document-metadata` claim is renamed by it: that source names a
-#: category rather than a thing - nine readers answer to it - so a reader told
-#: only that has been told the claim is self-reported and nothing else. Every
-#: other source already names something specific, and a camera naming its own
-#: model is `device metadata`, which says more than `EXIF`.
+#: How each metadata block reads in prose, where naming it says more than the
+#: source does. Only a `document-metadata` record is renamed by it: that source
+#: names a category rather than a thing - nine parsers answer to it - so a
+#: reader told only that has been told nothing about which standard applies.
+#: Every other source already names something specific, and a camera naming its
+#: own model is `device metadata`, which says more than `EXIF`.
 BLOCK_LABELS: dict[str, str] = {
     "pdf-info": "PDF Info",
     "ooxml-properties": "OOXML properties",
@@ -138,16 +265,16 @@ BLOCK_LABELS: dict[str, str] = {
 }
 
 
-def label(origin: Origin) -> str:
-    """What to call the source of this claim, in the words the report uses."""
-    if origin.source == "document-metadata" and origin.block in BLOCK_LABELS:
-        return BLOCK_LABELS[origin.block]
-    return SOURCE_LABELS.get(origin.source, origin.source)
+def label(record: EvidenceRecord) -> str:
+    """What to call the source of this record, in the words the report uses."""
+    if record.source == "document-metadata" and record.block in BLOCK_LABELS:
+        return BLOCK_LABELS[record.block]
+    return SOURCE_LABELS.get(record.source, record.source)
 
 
 #: Commands that plausibly fetch a file. Kept here rather than in the shell
-#: reader because deciding what kind of claim an origin makes is a question
-#: about sources, and the reader imports this module rather than the reverse.
+#: reader because deciding what a record is about is a question about sources,
+#: and the reader imports this module rather than the reverse.
 FETCH_TOOLS = frozenset(
     {
         "curl",
@@ -168,75 +295,55 @@ FETCH_TOOLS = frozenset(
     }
 )
 
-#: How the file reached this machine. Another system wrote it down at the time.
-ACQUISITION = "acquisition"
 
-#: Something on this machine handled the file afterwards. It proves contact and
-#: says nothing about where the bytes came from - an application opening a file
-#: did not put it there, and presenting the two as one kind of claim invites
-#: exactly that misreading.
-INTERACTION = "interaction"
-
-#: What the file records about its own earlier life: who made it, with what,
-#: when and where. It travelled with the bytes.
-INTRINSIC = "intrinsic"
-
-_KINDS = {
-    "browser-download": ACQUISITION,
-    "windows-zone-identifier": ACQUISITION,
-    "macos-wherefroms": ACQUISITION,
-    "macos-quarantine": ACQUISITION,
-    "xdg-xattr": ACQUISITION,
-    "ytdlp-sidecar": ACQUISITION,
-    "email-delivery": ACQUISITION,
-    "email-relay": ACQUISITION,
-    "archive-member": ACQUISITION,
-    "torrent": ACQUISITION,
-    "messenger-name": ACQUISITION,
-    "filesystem": ACQUISITION,
-    "freedesktop-trash": INTERACTION,
-    "recent-documents": INTERACTION,
-    "sync-folder": INTERACTION,
-    "windows-recent": INTERACTION,
-    "c2pa": INTRINSIC,
-    "device-metadata": INTRINSIC,
-    "xmp": INTRINSIC,
-    "xmp-history": INTRINSIC,
-    "iptc": INTRINSIC,
-    "email-header": INTRINSIC,
-    "document-metadata": INTRINSIC,
-    "archive-content": INTRINSIC,
-}
-
-
-def kind(origin: Origin) -> str:
-    """Which of the three questions this claim answers.
+def category(record: EvidenceRecord) -> str:
+    """Which of the three questions this record speaks to.
 
     Shell history is the one source that answers either, and which one is
-    already in the record: `curl -o` fetched the bytes, `cat` merely touched
-    them. Deciding per origin rather than per source keeps a `cat` from being
+    already in the record: `curl -o` fetched the bytes, `cat` merely read them.
+    Deciding per record rather than per source keeps a `cat` from being
     reported as though it explained where a file came from.
     """
-    if origin.source == "shell-history":
-        return ACQUISITION if (origin.tool or "") in FETCH_TOOLS else INTERACTION
-    return _KINDS.get(origin.source, INTERACTION)
+    if record.source == "shell-history":
+        return ORIGIN if (record.tool or "") in FETCH_TOOLS else ACTIVITY
+    try:
+        return SOURCE_CATEGORIES[record.source]
+    except KeyError:  # pragma: no cover - a test enumerates every source
+        raise KeyError(
+            f"{record.source!r} has no evidence category; add it to SOURCE_CATEGORIES"
+        ) from None
 
 
 @dataclass(slots=True)
-class Origin:
-    """One claim about where a file came from, made by one source."""
+class EvidenceRecord:
+    """One observation about a file, from one source.
+
+    Deliberately neutral about what it observes: the same shape carries a
+    download row, an EXIF block and a trash record, and `category` says which
+    of the three it is. The predecessor was called `Origin`, which made a
+    camera's own tags a statement about where the file came from every time
+    anybody read the collection's name.
+    """
 
     source: str
 
     #: The metadata block these values were decoded from: `pdf-info`, `exif`,
-    #: `png-text`. `source` names what the reader *found* - a camera, a bare
-    #: document - which is the axis confidence and colour turn on, and one
-    #: reader answers it two ways depending on what the file happened to hold.
-    #: This names what it *read*, which is the axis a mirrored self-description
-    #: turns on: whether IIM or a PDF Info dictionary applies is a question
-    #: about the standard. A record that decoded no metadata block leaves it
-    #: unset rather than naming one nobody read.
+    #: `png-text`. `source` names what the parser *found* - a camera, a bare
+    #: document - and one parser answers that two ways depending on what the
+    #: file happened to hold. This names what it *read*, which is the axis a
+    #: mirrored self-description turns on: whether IIM or a PDF Info dictionary
+    #: applies is a question about the standard. A record that decoded no
+    #: metadata block leaves it unset rather than naming one nobody read.
     block: str | None = None
+
+    #: How this record came to be about this file, where the source's ordinary
+    #: basis is not what happened - a download row found by name after the file
+    #: moved, an archive member. Unset means the basis in `SOURCE_MATCH`.
+    match: str | None = None
+
+    #: What else is worth saying about the match, in prose: why a name was all
+    #: there was, or that a recorded size disagrees with the file on disk.
+    match_note: str | None = None
 
     url: str | None = None
     referrer: str | None = None
@@ -245,7 +352,8 @@ class Origin:
     at: str | None = None
 
     #: Where the file says it comes from, written as a place: "Firenze, Italy".
-    #: A newsroom types this by hand, so it is a claim like any other text.
+    #: A newsroom types this by hand, so it is as much a statement by whoever
+    #: wrote it as any other text.
     location: str | None = None
 
     #: A latitude/longitude pair this tool decoded itself, from EXIF or an ISO
@@ -258,16 +366,26 @@ class Origin:
     sha256: str | None = None
     note: str | None = None
 
-    #: Everything the reader decoded, named rather than numbered, beyond the
+    #: Everything the parser decoded, named rather than numbered, beyond the
     #: handful of fields the report summarises. An investigation cannot know in
     #: advance which one matters, so nothing decoded is thrown away.
     fields: dict[str, str] = field(default_factory=dict)
 
     @property
-    def confidence(self) -> int:
-        return CONFIDENCE.get(self.source, 0)
+    def category(self) -> str:
+        return category(self)
 
-    def redacted(self) -> Origin:
+    @property
+    def matched_by(self) -> str:
+        """How this record was tied to this file."""
+        return self.match or SOURCE_MATCH.get(self.source, RECORDED_PATH)
+
+    @property
+    def priority(self) -> int:
+        """Presentation order only. Never printed, never exported."""
+        return SOURCE_PRIORITY.get(self.source, 0)
+
+    def redacted(self) -> EvidenceRecord:
         """Return a copy with credentials removed from every free-text field."""
         from .redact import redact_text, redact_url
 
@@ -287,8 +405,12 @@ class Origin:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        data = {k: v for k, v in asdict(self).items() if v}
-        data["confidence"] = self.confidence
+        data = {k: v for k, v in asdict(self).items() if v and k not in ("match", "match_note")}
+        data["category"] = self.category
+        match: dict[str, Any] = {"method": self.matched_by}
+        if self.match_note:
+            match["note"] = self.match_note
+        data["match"] = match
         return data
 
 
@@ -301,53 +423,54 @@ class FileRecord:
     mtime: str
     btime: str | None = None
     sha256: str | None = None
-    origins: list[Origin] = field(default_factory=list)
+    evidence: list[EvidenceRecord] = field(default_factory=list)
 
     #: How this file relates to the others in the same scan, from the
-    #: identifiers XMP carries for it. Not an origin: an origin is one source's
-    #: claim about where this file came from, and a link is a relation between
-    #: two records that only exists because both were scanned together.
+    #: identifiers XMP carries for it. Not an evidence record: a record is one
+    #: source's observation about this file, and a link is a relation between
+    #: two files that only exists because both were scanned together.
     links: list[Link] = field(default_factory=list)
 
     @property
-    def best(self) -> Origin | None:
-        """The single strongest claim, whatever kind it is.
+    def primary(self) -> EvidenceRecord | None:
+        """One record for a file that needs one row, by presentation order.
 
-        Used for grouping and counting, where one file needs one answer. It is
-        not what the report prints: see `acquisition` and `intrinsic`.
+        Used for grouping and counting. It is not a statement about which
+        record is true, and it is not what an entry prints: see `origin`,
+        `metadata` and `activity`, which are kept apart on purpose.
         """
-        if not self.origins:
+        if not self.evidence:
             return None
-        return max(self.origins, key=lambda o: (o.confidence, o.at or ""))
+        return max(self.evidence, key=lambda r: (r.priority, r.at or ""))
 
     @property
-    def acquisition(self) -> Origin | None:
-        """The strongest claim about how the file got here."""
-        return self._strongest(ACQUISITION)
+    def origin(self) -> EvidenceRecord | None:
+        """The leading record of how the file reached this environment."""
+        return self._leading(ORIGIN)
 
     @property
-    def interaction(self) -> Origin | None:
-        """The strongest claim that something here handled the file."""
-        return self._strongest(INTERACTION)
+    def activity(self) -> EvidenceRecord | None:
+        """The leading record that something here handled the file."""
+        return self._leading(ACTIVITY)
 
     @property
-    def intrinsic(self) -> Origin | None:
-        """The strongest claim the file makes about its own earlier life.
+    def metadata(self) -> EvidenceRecord | None:
+        """The leading record of what the file says about itself.
 
-        Kept apart from `acquisition` because they answer different questions.
-        Ranking them against each other lets a download record delete a camera's
+        Kept apart from `origin` because they answer different questions.
+        Ranking them against each other lets a download row displace a camera's
         GPS fix, which is the more valuable of the two far more often than not.
         """
-        return self._strongest(INTRINSIC)
+        return self._leading(METADATA)
 
-    def _strongest(self, wanted: str) -> Origin | None:
-        candidates = [origin for origin in self.origins if kind(origin) == wanted]
+    def _leading(self, wanted: str) -> EvidenceRecord | None:
+        candidates = [record for record in self.evidence if record.category == wanted]
         if not candidates:
             return None
-        return max(candidates, key=lambda o: (o.confidence, o.at or ""))
+        return max(candidates, key=lambda r: (r.priority, r.at or ""))
 
     def redacted(self) -> FileRecord:
-        return replace(self, origins=[origin.redacted() for origin in self.origins])
+        return replace(self, evidence=[record.redacted() for record in self.evidence])
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -356,6 +479,6 @@ class FileRecord:
             "mtime": self.mtime,
             "btime": self.btime,
             "sha256": self.sha256,
-            "origins": [o.to_dict() for o in self.origins],
+            "evidence": [record.to_dict() for record in self.evidence],
             "links": [link.to_dict() for link in self.links],
         }

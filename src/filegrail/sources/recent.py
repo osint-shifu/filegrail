@@ -7,7 +7,7 @@ the same kind of question at the same kind of strength: something on this
 machine handled this file at this time.
 
 It is not a download record. An application opening a file proves contact, not
-acquisition - the file may have been opened after arriving by any route at all -
+origin - the file may have been opened after arriving by any route at all -
 so it is ranked below shell history, which at least sometimes carries the
 command that fetched the bytes.
 
@@ -21,7 +21,7 @@ import xml.etree.ElementTree as ElementTree
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from ..models import Origin
+from ..models import EvidenceRecord
 
 RECENT_FILES = [
     ".local/share/recently-used.xbel",
@@ -35,10 +35,10 @@ _BOOKMARK_NS = "http://www.freedesktop.org/standards/desktop-bookmarks"
 _MAX_BOOKMARKS = 20_000
 
 
-def collect_recent_files(home: Path | None = None) -> dict[str, list[Origin]]:
+def collect_recent_files(home: Path | None = None) -> dict[str, list[EvidenceRecord]]:
     """Map absolute path -> what the desktop recorded about opening it."""
     home = home or Path.home()
-    found: dict[str, list[Origin]] = {}
+    found: dict[str, list[EvidenceRecord]] = {}
 
     for relative in RECENT_FILES:
         path = home / relative
@@ -55,7 +55,7 @@ def collect_recent_files(home: Path | None = None) -> dict[str, list[Origin]]:
             target = _path(bookmark.get("href"))
             if target is None:
                 continue
-            origin = _origin(bookmark)
+            origin = _record(bookmark)
             if origin is not None:
                 found.setdefault(target, []).append(origin)
     return found
@@ -67,7 +67,7 @@ def _path(href: str | None) -> str | None:
     return unquote(urlparse(href).path) or None
 
 
-def _origin(bookmark: ElementTree.Element) -> Origin | None:
+def _record(bookmark: ElementTree.Element) -> EvidenceRecord | None:
     applications = [
         name
         for element in bookmark.iter(f"{{{_BOOKMARK_NS}}}application")
@@ -79,7 +79,7 @@ def _origin(bookmark: ElementTree.Element) -> Origin | None:
         return None
 
     who = ", ".join(dict.fromkeys(applications)) or "an application"
-    return Origin(
+    return EvidenceRecord(
         source="recent-documents",
         tool=applications[0] if applications else None,
         at=added,

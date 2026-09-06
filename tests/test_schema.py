@@ -66,15 +66,15 @@ def _run(capsys, name: str, case: Path) -> dict:
 
 
 def test_a_scan_says_which_shape_it_is(case: Path, capsys):
-    assert _run(capsys, "scan", case)["schema"] == "filegrail.scan/1"
+    assert _run(capsys, "scan", case)["schema"] == "filegrail.scan/2"
 
 
 def test_an_explanation_says_which_shape_it_is(case: Path, capsys):
-    assert _run(capsys, "explain", case)["schema"] == "filegrail.explain/1"
+    assert _run(capsys, "explain", case)["schema"] == "filegrail.explain/2"
 
 
 def test_a_comparison_says_which_shape_it_is(case: Path, capsys):
-    assert _run(capsys, "compare", case)["schema"] == "filegrail.compare/1"
+    assert _run(capsys, "compare", case)["schema"] == "filegrail.compare/2"
 
 
 def test_a_survey_says_which_shape_it_is(case: Path, capsys):
@@ -83,6 +83,17 @@ def test_a_survey_says_which_shape_it_is(case: Path, capsys):
 
 def test_a_cleaning_run_says_which_shape_it_is(case: Path, capsys):
     assert _run(capsys, "clean", case)["schema"] == "filegrail.clean/1"
+
+
+def test_a_document_whose_shape_did_not_change_kept_its_number():
+    """The vocabulary refactor renamed fields in three of the five documents.
+    Bumping the other two as well would send every consumer of `clean` and
+    `doctor` to read a diff with nothing in it."""
+    from filegrail.report import SCHEMAS
+
+    assert SCHEMAS["clean"] == 1
+    assert SCHEMAS["doctor"] == 1
+    assert {SCHEMAS["scan"], SCHEMAS["explain"], SCHEMAS["compare"]} == {2}
 
 
 def test_every_document_names_the_release_that_wrote_it(case: Path, capsys):
@@ -105,8 +116,8 @@ def test_the_stamp_comes_before_the_content(case: Path, capsys):
 def test_stamping_left_the_documents_otherwise_alone(case: Path, capsys):
     """The envelope is added around what was already there, not instead of it."""
     assert {"root", "files", "summary"} <= set(_run(capsys, "scan", case))
-    assert {"file", "reconciliation", "conclusion"} <= set(_run(capsys, "explain", case))
-    assert {"assessment", "acquisition"} <= set(_run(capsys, "compare", case))
+    assert {"file", "correlation", "assessment"} <= set(_run(capsys, "explain", case))
+    assert {"assessment", "origin"} <= set(_run(capsys, "compare", case))
     assert {"sources", "horizon"} <= set(_run(capsys, "doctor", case))
 
 

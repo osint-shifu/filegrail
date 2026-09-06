@@ -16,7 +16,7 @@ import tarfile
 import zipfile
 from pathlib import Path
 
-from filegrail.models import INTRINSIC, Origin, kind
+from filegrail.models import METADATA, EvidenceRecord, category
 from filegrail.scan import scan
 from filegrail.sources.archives import _about_the_archive, read_contents
 from tests.photo import jpeg_with_exif
@@ -67,8 +67,8 @@ def test_the_archive_is_not_dated_by_what_is_inside_it(tmp_path: Path):
 def test_it_is_a_claim_about_the_container(tmp_path: Path):
     origin = read_contents(_zip_of(tmp_path))[0]
 
-    assert kind(origin) == INTRINSIC
-    assert origin.confidence > 0
+    assert category(origin) == METADATA
+    assert origin.priority > 0
 
 
 def test_a_tar_is_read_the_same_way(tmp_path: Path):
@@ -112,7 +112,7 @@ def test_a_packet_belonging_to_a_member_is_not_the_archives_own(tmp_path: Path):
         bundle.write(photo, "holiday.jpg", compress_type=zipfile.ZIP_STORED)
 
     record = next(iter(scan(case, use_shell_history=False)))
-    sources = {origin.source for origin in record.origins}
+    sources = {origin.source for origin in record.evidence}
 
     assert "archive-content" in sources
     assert not sources & {"xmp", "iptc"}
@@ -122,7 +122,7 @@ def test_a_members_fix_is_not_the_archives_location():
     """Where the member carried coordinates, they are the member's. Left on the
     restated claim they would read as a place the archive was, and a zip has
     never been anywhere. They keep saying what they say, in the fields."""
-    member = Origin(
+    member = EvidenceRecord(
         source="device-metadata",
         block="exif",
         at="2008-10-22T16:28:39Z",

@@ -3,7 +3,7 @@
 The synthetic fixtures elsewhere in this suite are built from the spec. That is
 exactly what they cannot catch: a reader that agrees with the spec but disagrees
 with what encoders actually write. Both defects fixed in `test_formats.py` were
-of that kind, and both survived a fully green suite.
+of that category, and both survived a fully green suite.
 
 `test-data/` is not committed - it holds whatever real files the developer has
 put there. These tests read it when it exists and skip when it does not, so the
@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
+from filegrail.correlate import ATTRIBUTION_CONFLICT, MIRRORS, correlate
 from filegrail.models import FileRecord
-from filegrail.reconcile import ATTRIBUTION_CONFLICT, MIRRORS, reconcile
 from filegrail.sources import iptc as iptc_reader
 from filegrail.sources import xmp as xmp_reader
 from filegrail.sources.embedded import exif as exif_reader
@@ -227,8 +227,8 @@ def _self_descriptions(path: Path) -> FileRecord:
     record = FileRecord(path=str(path), size=path.stat().st_size, mtime="")
     for reader in (read_embedded_metadata, iptc_reader.read_iptc):
         if (claim := reader(path)) is not None:
-            record.origins.append(claim)
-    record.origins.extend(xmp_reader.read_xmp(path))
+            record.evidence.append(claim)
+    record.evidence.extend(xmp_reader.read_xmp(path))
     return record
 
 
@@ -256,13 +256,13 @@ def test_two_spellings_of_one_fact_are_not_reported_as_a_conflict(path: Path):
     record = _self_descriptions(path)
     reported = {
         finding.text.split(":", 1)[0]
-        for finding in reconcile(record).findings
+        for finding in correlate(record).findings
         if finding.kind == ATTRIBUTION_CONFLICT
     }
 
     for mirror in MIRRORS:
-        left = next((o for o in record.origins if o.block == mirror.left), None)
-        right = next((o for o in record.origins if o.block == mirror.right), None)
+        left = next((o for o in record.evidence if o.block == mirror.left), None)
+        right = next((o for o in record.evidence if o.block == mirror.right), None)
         if left is None or right is None:
             continue
         theirs = {name.lower(): value for name, value in left.fields.items()}

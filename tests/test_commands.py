@@ -28,7 +28,7 @@ def test_a_bare_path_still_scans(tmp_path: Path, capsys):
 
     assert main([str(tmp_path), "--no-color"]) == 0
 
-    assert "analyzed" in capsys.readouterr().out
+    assert "FILE" in capsys.readouterr().out
 
 
 def test_scan_can_be_named_explicitly(tmp_path: Path, capsys):
@@ -36,7 +36,7 @@ def test_scan_can_be_named_explicitly(tmp_path: Path, capsys):
 
     assert main(["scan", str(tmp_path), "--no-color"]) == 0
 
-    assert "analyzed" in capsys.readouterr().out
+    assert "FILE" in capsys.readouterr().out
 
 
 def test_help_lists_a_command(capsys):
@@ -59,7 +59,7 @@ def test_explain_takes_one_file(two, capsys):
 
     assert main(["explain", str(left), "--no-color"]) == 0
 
-    assert "CONCLUSION" in capsys.readouterr().out
+    assert "SUMMARY" in capsys.readouterr().out
 
 
 def test_explain_refuses_a_directory(tmp_path: Path, capsys):
@@ -73,7 +73,7 @@ def test_compare_takes_two_files(two, capsys):
 
     assert main(["compare", str(left), str(right), "--no-color"]) == 0
 
-    assert "ASSESSMENT" in capsys.readouterr().out
+    assert "FILES" in capsys.readouterr().out
 
 
 def test_compare_refuses_a_missing_file(two, capsys):
@@ -91,7 +91,7 @@ def test_compare_is_machine_readable(two, capsys):
 
     payload = json.loads(capsys.readouterr().out)
     assert "assessment" in payload
-    assert "acquisition" in payload
+    assert "origin" in payload
 
 
 def test_explain_is_machine_readable(two, capsys):
@@ -100,7 +100,7 @@ def test_explain_is_machine_readable(two, capsys):
     assert main(["explain", str(left), "--json"]) == 0
 
     payload = json.loads(capsys.readouterr().out)
-    assert {"file", "reconciliation", "conclusion"} <= set(payload)
+    assert {"file", "correlation", "assessment"} <= set(payload)
 
 
 def test_a_path_named_like_a_command_still_needs_the_command_form(tmp_path: Path, capsys):
@@ -109,7 +109,7 @@ def test_a_path_named_like_a_command_still_needs_the_command_form(tmp_path: Path
     reader of the usage line expects."""
     assert main(["scan", "--no-color", "--limit", "0"]) == 0
 
-    assert "analyzed" in capsys.readouterr().out
+    assert "FILE" in capsys.readouterr().out
 
 
 def test_short_flags_work(tmp_path: Path, capsys):
@@ -123,13 +123,13 @@ def test_short_flags_work(tmp_path: Path, capsys):
 def test_compare_ignores_what_merely_opened_a_file(tmp_path: Path, capsys):
     """An application that opened a file is not software that made it."""
     from filegrail.compare import compare
-    from filegrail.models import FileRecord, Origin
+    from filegrail.models import EvidenceRecord, FileRecord
 
     def _rec(name: str, tool: str) -> FileRecord:
         record = FileRecord(path=f"/case/{name}", size=1, mtime="2026-08-24T19:00:00Z")
-        record.origins.append(Origin(source="device-metadata", tool="Canon EOS R5"))
-        record.origins.append(
-            Origin(source="recent-documents", tool=tool, note=f"opened by {tool}")
+        record.evidence.append(EvidenceRecord(source="device-metadata", tool="Canon EOS R5"))
+        record.evidence.append(
+            EvidenceRecord(source="recent-documents", tool=tool, note=f"opened by {tool}")
         )
         return record
 
@@ -298,7 +298,7 @@ def test_the_check_report_says_that_nothing_was_written(tmp_path: Path, capsys, 
 
     printed = " ".join(capsys.readouterr().out.split())
     assert "nothing written" in printed
-    assert "1 would be cleaned" in printed
+    assert "cleanable" in printed
 
 
 def test_the_clean_report_names_a_block_the_way_the_rest_of_the_report_does(

@@ -5,7 +5,7 @@ interesting case. They can share an *earlier life* - the same camera body, the
 same authoring software, capture times seconds apart - and they can have reached
 this machine by the *same route* or by different ones.
 
-The combination that matters is shared earlier life with different acquisition:
+The combination that matters is a shared earlier life with different origins:
 one photograph out of a camera arriving by two paths says something about how it
 travelled that neither file says alone.
 
@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from .models import INTRINSIC, SOURCE_LABELS, FileRecord, kind
+from .models import METADATA, SOURCE_LABELS, FileRecord, category
 
 #: Fields that identify a device or an author rather than describing a picture.
 #: An identical `ExposureTime` means two photographs used the same shutter speed,
@@ -51,7 +51,7 @@ _NEARBY_SECONDS = 300
 class Comparison:
     shared: list[tuple[str, str]] = field(default_factory=list)
     differing: list[tuple[str, str, str]] = field(default_factory=list)
-    acquisition: list[tuple[str, str]] = field(default_factory=list)
+    origin: list[tuple[str, str]] = field(default_factory=list)
     interval: str | None = None
     assessment: str = ""
 
@@ -62,7 +62,7 @@ class Comparison:
                 {"field": name, "left": left, "right": right}
                 for name, left, right in self.differing
             ],
-            "acquisition": [{"file": name, "route": route} for name, route in self.acquisition],
+            "origin": [{"file": name, "route": route} for name, route in self.origin],
             "interval": self.interval,
             "assessment": self.assessment,
         }
@@ -81,7 +81,7 @@ def compare(left: FileRecord, right: FileRecord) -> Comparison:
             else:
                 found.differing.append((name, one, other))
 
-    found.acquisition = [(Path(r.path).name, _route(r)) for r in (left, right)]
+    found.origin = [(Path(r.path).name, _route(r)) for r in (left, right)]
     found.interval = _interval(left, right)
     found.assessment = _assess(found)
     return found
@@ -91,26 +91,26 @@ def _fields(record: FileRecord) -> dict[str, str]:
     """Every decoded field from the file's own metadata, flattened.
 
     Intrinsic claims only. An application that opened the file is not software
-    that made it, and letting an interaction record supply `Software` produced
+    that made it, and letting an activity record supply `Software` produced
     the nonsense of comparing a camera against a chat client.
     """
     merged: dict[str, str] = {}
-    for origin in record.origins:
-        if kind(origin) != INTRINSIC:
+    for found in record.evidence:
+        if category(found) != METADATA:
             continue
-        for name, value in origin.fields.items():
+        for name, value in found.fields.items():
             merged.setdefault(name, str(value))
-        if origin.tool:
-            merged.setdefault("Software", origin.tool)
+        if found.tool:
+            merged.setdefault("Software", found.tool)
     return merged
 
 
 def _route(record: FileRecord) -> str:
-    origin = record.acquisition
-    if origin is None:
-        return "no acquisition record"
-    label = SOURCE_LABELS.get(origin.source, origin.source)
-    where = origin.url or origin.command or origin.tool
+    arrived = record.origin
+    if arrived is None:
+        return "no origin record"
+    label = SOURCE_LABELS.get(arrived.source, arrived.source)
+    where = arrived.url or arrived.command or arrived.tool
     return f"{label}: {where}" if where else label
 
 
@@ -129,19 +129,19 @@ def _interval(left: FileRecord, right: FileRecord) -> str | None:
 
 
 def _created(record: FileRecord) -> datetime | None:
-    origin = record.intrinsic
-    if origin is None or not origin.at:
+    said = record.metadata
+    if said is None or not said.at:
         return None
     try:
-        return datetime.fromisoformat(origin.at.replace("Z", "+00:00"))
+        return datetime.fromisoformat(said.at.replace("Z", "+00:00"))
     except ValueError:
         return None
 
 
 def _assess(found: Comparison) -> str:
     """The reading, in one sentence, and never stronger than the evidence."""
-    routes = {route for _name, route in found.acquisition}
-    same_route = len(routes) == 1 and "no acquisition record" not in routes
+    routes = {route for _name, route in found.origin}
+    same_route = len(routes) == 1 and "no origin record" not in routes
 
     if not found.shared:
         if found.differing:
@@ -159,7 +159,7 @@ def _assess(found: Comparison) -> str:
     if not same_route and len(routes) > 1:
         return (
             f"Both files agree on {named}, but they arrived by different routes. Files that "
-            "share an earlier life and not an acquisition path travelled separately, which is "
+            "share an earlier life and not an arrival path travelled separately, which is "
             "usually the more interesting of the two findings."
         )
     return f"Both files agree on {named}. How each one arrived is not established here."

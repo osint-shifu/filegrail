@@ -188,10 +188,10 @@ def _identifiers(record: FileRecord) -> dict[str, str]:
     Writers disagree about the case of `stRef:documentID`, so the lookup does
     not depend on it.
     """
-    for origin in record.origins:
-        if origin.source != "xmp":
+    for found in record.evidence:
+        if found.source != "xmp":
             continue
-        stated = {name.lower(): value.strip() for name, value in origin.fields.items()}
+        stated = {name.lower(): value.strip() for name, value in found.fields.items()}
         return {
             name: value for name in _WANTED if _meaningful(value := stated.get(name.lower(), ""))
         }

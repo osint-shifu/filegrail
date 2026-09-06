@@ -52,7 +52,7 @@ def test_reads_chromium_download(tmp_path: Path):
     assert origin.tool == "chromium"
     assert origin.bytes == 30209
     assert origin.at == "2026-08-31T10:49:33Z"
-    assert origin.confidence == 90
+    assert origin.priority == 90
 
 
 def test_interrupted_download_is_flagged(tmp_path: Path):

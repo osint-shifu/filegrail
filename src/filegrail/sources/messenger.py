@@ -21,7 +21,7 @@ import re
 from datetime import date
 from pathlib import Path
 
-from ..models import Origin
+from ..models import EvidenceRecord
 
 #: `IMG-20240115-WA0001.jpg`. WhatsApp prefixes by kind, then the day it was
 #: sent, then a counter within that day. The prefixes are its own vocabulary.
@@ -47,12 +47,12 @@ _TELEGRAM = re.compile(
 )
 
 
-def read_messenger_name(path: Path) -> Origin | None:
+def read_messenger_name(path: Path) -> EvidenceRecord | None:
     """What the file's own name says about the client that saved it."""
     return _whatsapp(path.name) or _telegram(path.name)
 
 
-def _whatsapp(name: str) -> Origin | None:
+def _whatsapp(name: str) -> EvidenceRecord | None:
     found = _WHATSAPP.match(name)
     if not found:
         return None
@@ -64,7 +64,7 @@ def _whatsapp(name: str) -> Origin | None:
     return _named("WhatsApp", f"the name is WhatsApp's for {what}", day)
 
 
-def _telegram(name: str) -> Origin | None:
+def _telegram(name: str) -> EvidenceRecord | None:
     found = _TELEGRAM.match(name)
     if not found:
         return None
@@ -77,7 +77,7 @@ def _telegram(name: str) -> Origin | None:
     return _named("Telegram", f"the name is Telegram Desktop's for a saved {what}", day, fields)
 
 
-def _named(tool: str, note: str, day: str, extra: dict[str, str] | None = None) -> Origin:
+def _named(tool: str, note: str, day: str, extra: dict[str, str] | None = None) -> EvidenceRecord:
     """One claim, deliberately undated.
 
     The name carries a day, and for Telegram a clock with no zone attached.
@@ -85,7 +85,7 @@ def _named(tool: str, note: str, day: str, extra: dict[str, str] | None = None) 
     half nobody wrote down, so the day is reported as what it is - something
     the name says - and the claim itself stays undated.
     """
-    return Origin(
+    return EvidenceRecord(
         source="messenger-name",
         tool=tool,
         note=note,

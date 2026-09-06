@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ElementTree
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..models import Origin
+from ..models import EvidenceRecord
 from .embedded import png
 
 _RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -120,7 +120,7 @@ _MAX_DEPTH = 6
 _MAX_ENTRIES = 3
 
 
-def read_xmp(path: Path) -> list[Origin]:
+def read_xmp(path: Path) -> list[EvidenceRecord]:
     """Return what the file's XMP packet claims, or an empty list."""
     packet = _packet(path)
     if not packet:
@@ -149,7 +149,7 @@ def read_xmp(path: Path) -> list[Origin]:
 
     shown = dated[:_MAX_EDITS]
     return [
-        Origin(
+        EvidenceRecord(
             source="xmp",
             block="xmp",
             tool=_first(properties, ("xmp:CreatorTool",)),
@@ -276,8 +276,8 @@ def _history(root: ElementTree.Element) -> list[dict[str, str]]:
     return steps
 
 
-def _edit(step: dict[str, str]) -> Origin:
-    return Origin(
+def _edit(step: dict[str, str]) -> EvidenceRecord:
+    return EvidenceRecord(
         source="xmp-history",
         block="xmp-history",
         tool=_first(step, ("stEvt:softwareAgent",)),

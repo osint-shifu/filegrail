@@ -171,7 +171,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         metavar="N",
-        help="Cap the list of files with no findings; 0 for all "
+        help="Cap the list of files with no evidence found; 0 for all "
         f"(default: all, or {BRIEF_LIMIT} under --brief).",
     )
     parser.add_argument(
@@ -187,7 +187,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-shell-history", action="store_true", help="Skip shell history correlation."
     )
     parser.add_argument(
-        "--no-archives", action="store_true", help="Do not inherit origins from archives."
+        "--no-archives",
+        action="store_true",
+        help="Do not give an archive's origin to the files inside it.",
     )
     parser.add_argument("--version", action="version", version=f"filegrail {__version__}")
     return parser
@@ -197,7 +199,7 @@ def _explain_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="filegrail explain",
         parents=[_common(), _profile(), _redaction()],
-        description="Explain why filegrail reached a conclusion about one file.",
+        description="Show the evidence behind what filegrail says about one file.",
     )
     parser.add_argument("path", type=Path, help="The file to explain.")
     return parser
@@ -348,7 +350,7 @@ BRIEF_LIMIT = 25
 
 
 def _limit(args: argparse.Namespace) -> int:
-    """How much of the `no findings` list to print.
+    """How much of the `no evidence found` list to print.
 
     All of it, unless asked otherwise. A report that hides part of a list it
     already has makes somebody run the tool twice for data it had the first
@@ -413,7 +415,7 @@ def _scan(rest: list[str]) -> int:
     )
 
     if args.unknown_only:
-        records = [record for record in records if not record.origins]
+        records = [record for record in records if not record.evidence]
     if args.redact:
         records = [record.redacted() for record in records]
 

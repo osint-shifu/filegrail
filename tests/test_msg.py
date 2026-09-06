@@ -148,7 +148,7 @@ def test_a_scan_reaches_the_delivery_chain(tmp_path: Path):
 
     record = scan(case, home=tmp_path / "empty", use_shell_history=False)[0]
 
-    assert "email-delivery" in {origin.source for origin in record.origins}
+    assert "email-delivery" in {origin.source for origin in record.evidence}
 
 
 def test_the_unicode_spelling_wins_where_a_message_carries_both(tmp_path: Path):

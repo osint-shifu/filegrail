@@ -19,19 +19,19 @@ def _ifd(entries: list[tuple[int, int, object]], base: int) -> tuple[bytes, byte
     values = b""
     value_base = base + 2 + len(entries) * 12 + 4
 
-    for tag, kind, value in entries:
-        if kind == 2:
+    for tag, category, value in entries:
+        if category == 2:
             raw = value.encode("ascii") + b"\x00"
             count = len(raw)
-        elif kind == 5:
+        elif category == 5:
             raw = b"".join(struct.pack(">II", n, d) for n, d in value)
             count = len(value)
         else:
             raw = struct.pack(">I", value)
             count = 1
 
-        directory += struct.pack(">HHI", tag, kind, count)
-        if kind == 4 or len(raw) <= 4:
+        directory += struct.pack(">HHI", tag, category, count)
+        if category == 4 or len(raw) <= 4:
             directory += raw.ljust(4, b"\x00")[:4]
         else:
             directory += struct.pack(">I", value_base + len(values))
@@ -181,17 +181,17 @@ def test_webp_exif_chunk(tmp_path: Path):
 
 
 def _png(chunks: list[tuple[bytes, bytes]]) -> bytes:
-    def chunk(kind: bytes, payload: bytes) -> bytes:
+    def chunk(category: bytes, payload: bytes) -> bytes:
         return (
             struct.pack(">I", len(payload))
-            + kind
+            + category
             + payload
-            + struct.pack(">I", zlib.crc32(kind + payload))
+            + struct.pack(">I", zlib.crc32(category + payload))
         )
 
     out = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0))
-    for kind, payload in chunks:
-        out += chunk(kind, payload)
+    for category, payload in chunks:
+        out += chunk(category, payload)
     return out + chunk(b"IDAT", b"\x00") + chunk(b"IEND", b"")
 
 
@@ -222,14 +222,14 @@ def test_png_compressed_text_chunk(tmp_path: Path):
 # --- ISO base media ----------------------------------------------------------
 
 
-def _atom(kind: bytes, payload: bytes) -> bytes:
-    return struct.pack(">I", len(payload) + 8) + kind + payload
+def _atom(category: bytes, payload: bytes) -> bytes:
+    return struct.pack(">I", len(payload) + 8) + category + payload
 
 
-def _itunes_text(kind: bytes, text: str) -> bytes:
+def _itunes_text(category: bytes, text: str) -> bytes:
     raw = text.encode("utf-8")
     data = _atom(b"data", struct.pack(">II", 1, 0) + raw)
-    return _atom(kind, data)
+    return _atom(category, data)
 
 
 def test_mp4_encoder_and_location(tmp_path: Path):
@@ -504,7 +504,7 @@ def test_png_text_chunks_do_not_repeat_the_raw_xmp_packet(tmp_path: Path):
 def test_decoded_coordinates_land_in_geo_not_location(tmp_path: Path):
     """`location` has to be free to hold a place written as a name - IPTC says
     "Firenze, Italy" and means it. A decoded latitude/longitude pair is a
-    different kind of fact and gets a field that only ever means that."""
+    different category of fact and gets a field that only ever means that."""
     photo = tmp_path / "geotagged.jpg"
     photo.write_bytes(_jpeg(_tiff(NIKON, FLORENCE_GPS)))
 

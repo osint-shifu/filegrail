@@ -25,7 +25,7 @@ from dataclasses import replace
 from functools import partial
 from pathlib import Path
 
-from ..models import Origin
+from ..models import CONTAINER_MEMBER, EvidenceRecord
 from .c2pa import read_c2pa_manifest
 from .embedded import SUFFIXES, read_embedded_metadata
 from .iptc import read_iptc
@@ -95,7 +95,7 @@ _MAX_READ = 25
 _MAX_MEMBER_BYTES = 64 * 1024 * 1024
 
 
-def read_contents(path: Path) -> list[Origin]:
+def read_contents(path: Path) -> list[EvidenceRecord]:
     """Metadata from the files inside the archive, without unpacking it.
 
     Each member a reader claims is copied out one at a time and read exactly as
@@ -106,7 +106,7 @@ def read_contents(path: Path) -> list[Origin]:
     does not date the zip, and its fix is not the zip's location; both stay in
     the fields, where they say whose they are.
     """
-    found: list[Origin] = []
+    found: list[EvidenceRecord] = []
     try:
         with _opened(path) as archive:
             if archive is None:
@@ -156,7 +156,7 @@ def _tar_bytes(bundle: tarfile.TarFile, entry: tarfile.TarInfo) -> bytes:
     return handle.read() if handle is not None else b""
 
 
-def _read_member(name: str, extract: Callable[[], bytes]) -> list[Origin]:
+def _read_member(name: str, extract: Callable[[], bytes]) -> list[EvidenceRecord]:
     """Run the ordinary readers over one member, copied out to a temporary file."""
     suffix = Path(name).suffix.lower()
     if suffix not in SUFFIXES:
@@ -178,15 +178,22 @@ def _read_member(name: str, extract: Callable[[], bytes]) -> list[Origin]:
         return [_about_the_archive(claim, name) for claim in found]
 
 
-def _about_the_archive(origin: Origin, member: str) -> Origin:
-    """Restate a member's claim as one about the archive that holds it."""
-    fields = dict(origin.fields)
-    if origin.geo:
-        fields.setdefault("location", origin.geo)
-    said = f"{member}: {origin.note}" if origin.note else member
+def _about_the_archive(record: EvidenceRecord, member: str) -> EvidenceRecord:
+    """Restate what a member says about itself as a fact about the container.
+
+    Still metadata - it is what some file wrote about itself - but about the
+    archive rather than about the member, and matched to it by nothing more
+    than membership. Both of those are on the record.
+    """
+    fields = dict(record.fields)
+    if record.geo:
+        fields.setdefault("location", record.geo)
+    said = f"{member}: {record.note}" if record.note else member
     return replace(
-        origin,
+        record,
         source="archive-content",
+        match=CONTAINER_MEMBER,
+        match_note=f"read from {member}",
         at=None,
         geo=None,
         bytes=None,
@@ -196,14 +203,21 @@ def _about_the_archive(origin: Origin, member: str) -> Origin:
     )
 
 
-def inherited_origin(origin: Origin, archive_name: str) -> Origin:
-    """Rewrite an archive's origin as an origin for one of its members."""
+def inherited_origin(record: EvidenceRecord, archive_name: str) -> EvidenceRecord:
+    """Rewrite an archive's own origin as one for a file that came out of it.
+
+    The member did not arrive the way the archive did; it arrived *inside* the
+    thing that arrived that way. The match basis is what keeps the difference
+    visible, because the URL on the record is the archive's and not the file's.
+    """
     note = f"extracted from {archive_name}"
     return replace(
-        origin,
+        record,
         source="archive-member",
+        match=CONTAINER_MEMBER,
+        match_note=f"member of {archive_name}, matched by name and exact size",
         bytes=None,
         mime=None,
         sha256=None,
-        note=f"{origin.note}; {note}" if origin.note else note,
+        note=f"{record.note}; {note}" if record.note else note,
     )

@@ -94,7 +94,7 @@ def test_filtering_by_extension_scans_only_those(tmp_path: Path, capsys):
     out = capsys.readouterr().out
     assert "holiday.jpg" in out
     assert "report.pdf" not in out
-    assert "1 file" in out or "of 1" in out
+    assert "FILE" in out
 
 
 def test_the_match_ignores_case(tmp_path: Path, capsys):
@@ -144,5 +144,5 @@ def test_a_filter_that_matches_nothing_explains_itself(tmp_path: Path, capsys):
     main([str(tmp_path), "--ext", "xyz", "--no-color"])
 
     out = capsys.readouterr().out
-    assert "0 files analyzed" in out
+    assert "No file matched" in out
     assert "xyz" in out

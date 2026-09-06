@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from filegrail.models import ACQUISITION, kind
+from filegrail.models import ORIGIN, category
 from filegrail.scan import scan
 from filegrail.sources.messenger import read_messenger_name
 
@@ -56,8 +56,8 @@ def test_the_claim_is_never_dated(tmp_path: Path):
 def test_it_says_how_the_file_arrived_and_says_so_weakly(tmp_path: Path):
     origin = read_messenger_name(tmp_path / "IMG-20240115-WA0001.jpg")
 
-    assert kind(origin) == ACQUISITION
-    assert origin.confidence < 35  # below an application having opened the file
+    assert category(origin) == ORIGIN
+    assert origin.priority < 35  # below an application having opened the file
 
 
 def test_a_scan_attaches_it(tmp_path: Path):
@@ -65,4 +65,4 @@ def test_a_scan_attaches_it(tmp_path: Path):
 
     record = next(iter(scan(tmp_path, use_shell_history=False)))
 
-    assert [o.tool for o in record.origins if o.source == "messenger-name"] == ["WhatsApp"]
+    assert [o.tool for o in record.evidence if o.source == "messenger-name"] == ["WhatsApp"]

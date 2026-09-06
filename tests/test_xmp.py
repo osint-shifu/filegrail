@@ -2,7 +2,7 @@ import struct
 import zlib
 from pathlib import Path
 
-from filegrail.models import CONFIDENCE, INTRINSIC, SOURCE_LABELS, kind
+from filegrail.models import METADATA, SOURCE_LABELS, SOURCE_PRIORITY, category
 from filegrail.scan import scan
 from filegrail.sources.xmp import read_xmp
 
@@ -136,7 +136,7 @@ def test_reads_array_valued_properties(tmp_path: Path):
     assert packet.fields["dc:title"] == "Harbour at dusk"
 
 
-def test_xmp_is_intrinsic_evidence_ranked_between_document_and_device(tmp_path: Path):
+def test_xmp_is_metadata_ranked_between_document_and_device(tmp_path: Path):
     """An editor writing its own name is a weaker claim than a camera's model,
     and a stronger one than a bare document property."""
     photo = tmp_path / "ranked.jpg"
@@ -152,10 +152,12 @@ def test_xmp_is_intrinsic_evidence_ranked_between_document_and_device(tmp_path: 
 
     packet, step = read_xmp(photo)[:2]
 
-    assert kind(packet) == INTRINSIC
-    assert kind(step) == INTRINSIC
-    assert packet.confidence == step.confidence == 52
-    assert CONFIDENCE["document-metadata"] < packet.confidence < CONFIDENCE["device-metadata"]
+    assert category(packet) == METADATA
+    assert category(step) == METADATA
+    assert packet.priority == step.priority == 52
+    assert (
+        SOURCE_PRIORITY["document-metadata"] < packet.priority < SOURCE_PRIORITY["device-metadata"]
+    )
     assert SOURCE_LABELS["xmp"] == "XMP"
     assert SOURCE_LABELS["xmp-history"] == "XMP history"
 
@@ -371,7 +373,7 @@ def test_a_scan_surfaces_xmp_beside_the_other_evidence(tmp_path: Path):
 
     record = scan(case, home=home, use_shell_history=False)[0]
 
-    assert [origin.source for origin in record.origins if origin.source.startswith("xmp")] == [
+    assert [origin.source for origin in record.evidence if origin.source.startswith("xmp")] == [
         "xmp",
         "xmp-history",
         "xmp-history",
@@ -468,7 +470,7 @@ def test_one_hostile_file_does_not_end_a_scan(tmp_path: Path):
     records = scan(case, home=home, use_shell_history=False)
 
     assert len(records) == 2
-    assert any(origin.tool == "darktable 4.6.1" for origin in records[1].origins)
+    assert any(origin.tool == "darktable 4.6.1" for origin in records[1].evidence)
 
 
 def test_a_packet_carrying_an_xml_declaration_is_still_read(tmp_path: Path):

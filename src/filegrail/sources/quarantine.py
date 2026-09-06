@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from ..models import Origin
+from ..models import EvidenceRecord
 from ..util import iso, read_xattr
 
 QUARANTINE_DB = "Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2"
@@ -72,8 +72,8 @@ class Events:
     extended attributes.
     """
 
-    by_uuid: dict[str, Origin] = field(default_factory=dict)
-    by_name: dict[str, list[Origin]] = field(default_factory=dict)
+    by_uuid: dict[str, EvidenceRecord] = field(default_factory=dict)
+    by_name: dict[str, list[EvidenceRecord]] = field(default_factory=dict)
 
 
 def collect_quarantine_events(home: Path | None = None) -> Events:
@@ -90,7 +90,7 @@ def collect_quarantine_events(home: Path | None = None) -> Events:
         return found
 
     for identifier, stamp, agent, url, origin_url in rows:
-        claim = Origin(
+        claim = EvidenceRecord(
             source="macos-quarantine",
             url=url or None,
             referrer=origin_url or None,
@@ -104,7 +104,7 @@ def collect_quarantine_events(home: Path | None = None) -> Events:
     return found
 
 
-def read_quarantine(path: Path, events: Events) -> list[Origin]:
+def read_quarantine(path: Path, events: Events) -> list[EvidenceRecord]:
     """Return what macOS recorded about this file arriving, as one claim."""
     tagged = _attribute(path)
     if tagged is None:
@@ -113,7 +113,7 @@ def read_quarantine(path: Path, events: Events) -> list[Origin]:
     stamp, agent, identifier = tagged
     known = events.by_uuid.get(identifier.upper()) if identifier else None
     return [
-        Origin(
+        EvidenceRecord(
             source="macos-quarantine",
             # The database holds the URL; the attribute never does. Where both
             # name the application the attribute is preferred, because it was
@@ -130,7 +130,7 @@ def read_quarantine(path: Path, events: Events) -> list[Origin]:
     ]
 
 
-def _by_name(path: Path, events: Events) -> list[Origin]:
+def _by_name(path: Path, events: Events) -> list[EvidenceRecord]:
     """A file whose attribute did not survive, matched on the recorded URL.
 
     The same fallback a browser download already gets and marked the same way,

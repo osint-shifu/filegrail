@@ -16,7 +16,7 @@ import hashlib
 from pathlib import Path
 
 from filegrail.doctor import AVAILABLE, survey
-from filegrail.models import ACQUISITION, kind
+from filegrail.models import ORIGIN, category
 from filegrail.scan import scan
 from filegrail.sources.torrent import collect_torrents, is_torrent, read_torrent
 
@@ -83,14 +83,14 @@ def test_the_content_is_named_by_its_info_hash(tmp_path: Path):
     info = _torrent(path, _single())
     expected = hashlib.sha1(info).hexdigest()  # noqa: S324 - the protocol says SHA-1
 
-    assert read_torrent(path).origin.url == f"magnet:?xt=urn:btih:{expected}&dn=film.mkv"
+    assert read_torrent(path).record.url == f"magnet:?xt=urn:btih:{expected}&dn=film.mkv"
 
 
 def test_the_trackers_are_reported(tmp_path: Path):
     path = tmp_path / "a.torrent"
     _torrent(path, _single(), **{"announce-list": [["http://second.example.net/announce"]]})
 
-    fields = read_torrent(path).origin.fields
+    fields = read_torrent(path).record.fields
 
     assert "tracker.example.org" in fields["trackers"]
     assert "second.example.net" in fields["trackers"]
@@ -102,7 +102,7 @@ def test_the_claim_is_not_dated_by_the_torrent_being_made(tmp_path: Path):
     path = tmp_path / "a.torrent"
     _torrent(path, _single(), **{"creation date": 1415628355, "created by": "mktorrent 1.1"})
 
-    origin = read_torrent(path).origin
+    origin = read_torrent(path).record
 
     assert origin.at is None
     assert origin.fields["created"] == "2014-11-10T14:05:55Z"
@@ -126,11 +126,11 @@ def test_a_scan_gives_a_matching_file_its_torrent(tmp_path: Path):
     _torrent(tmp_path / "a.torrent", _single())
 
     record = next(r for r in scan(tmp_path, use_shell_history=False) if r.path.endswith(".mkv"))
-    found = [o for o in record.origins if o.source == "torrent"]
+    found = [o for o in record.evidence if o.source == "torrent"]
 
     assert len(found) == 1
-    assert kind(found[0]) == ACQUISITION
-    assert found[0].confidence > 0
+    assert category(found[0]) == ORIGIN
+    assert found[0].priority > 0
 
 
 def test_a_file_whose_size_disagrees_is_not_claimed(tmp_path: Path):
@@ -141,7 +141,7 @@ def test_a_file_whose_size_disagrees_is_not_claimed(tmp_path: Path):
 
     record = next(r for r in scan(tmp_path, use_shell_history=False) if r.path.endswith(".mkv"))
 
-    assert not [o for o in record.origins if o.source == "torrent"]
+    assert not [o for o in record.evidence if o.source == "torrent"]
 
 
 # --- the copy the client keeps ----------------------------------------------
@@ -171,7 +171,7 @@ def test_a_scan_pairs_against_the_clients_store(tmp_path: Path):
 
     record = next(iter(scan(tree, use_shell_history=False, home=home)))
 
-    assert [o.source for o in record.origins] == ["torrent"]
+    assert [o.source for o in record.evidence] == ["torrent"]
 
 
 def test_the_survey_reports_a_client_store(tmp_path: Path):

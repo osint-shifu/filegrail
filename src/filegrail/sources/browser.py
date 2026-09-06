@@ -15,7 +15,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from ..models import Origin
+from ..models import EvidenceRecord
 from ..util import chrome_time, firefox_time
 
 CHROMIUM_PROFILE_GLOBS = [
@@ -65,7 +65,7 @@ def _open_readonly(database: Path) -> tuple[sqlite3.Connection, Path]:
     return sqlite3.connect(f"file:{copy}?mode=ro", uri=True), temp_dir
 
 
-def _chromium_downloads(database: Path) -> Iterator[tuple[str, Origin]]:
+def _chromium_downloads(database: Path) -> Iterator[tuple[str, EvidenceRecord]]:
     connection, temp_dir = _open_readonly(database)
     try:
         rows = connection.execute(
@@ -88,7 +88,7 @@ def _chromium_downloads(database: Path) -> Iterator[tuple[str, Origin]]:
             note = None if state == _CHROMIUM_COMPLETE else f"download state {state}"
             yield (
                 target,
-                Origin(
+                EvidenceRecord(
                     source="browser-download",
                     url=chains.get(download_id) or tab_url or None,
                     referrer=referrer or None,
@@ -104,7 +104,7 @@ def _chromium_downloads(database: Path) -> Iterator[tuple[str, Origin]]:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def _firefox_downloads(database: Path) -> Iterator[tuple[str, Origin]]:
+def _firefox_downloads(database: Path) -> Iterator[tuple[str, EvidenceRecord]]:
     connection, temp_dir = _open_readonly(database)
     try:
         rows = connection.execute(
@@ -137,7 +137,7 @@ def _firefox_downloads(database: Path) -> Iterator[tuple[str, Origin]]:
                     size = None
             yield (
                 target,
-                Origin(
+                EvidenceRecord(
                     source="browser-download",
                     url=url or None,
                     tool="firefox",
@@ -173,7 +173,7 @@ def _browser_name(database: Path) -> str:
 
 def collect_browser_downloads(
     home: Path | None = None, stats: dict[str, int] | None = None
-) -> dict[str, list[Origin]]:
+) -> dict[str, list[EvidenceRecord]]:
     """Map absolute target path -> origins recorded by any local browser.
 
     When `stats` is given it is filled with how many profiles were readable and
@@ -181,7 +181,7 @@ def collect_browser_downloads(
     result instead of just reporting nothing.
     """
     home = home or Path.home()
-    found: dict[str, list[Origin]] = {}
+    found: dict[str, list[EvidenceRecord]] = {}
     profiles_read = 0
     records = 0
 

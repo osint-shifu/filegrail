@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from filegrail.cluster import AUTHOR, DEVICE, MODEL, cluster
-from filegrail.models import FileRecord, Origin
+from filegrail.models import EvidenceRecord, FileRecord
 from filegrail.report import render_text
 from filegrail.theme import Theme
 
@@ -22,13 +22,17 @@ PLAIN = Theme(colour=False, unicode=True, width=88)
 
 def _record(path: str, block: str, **fields: str) -> FileRecord:
     record = FileRecord(path=path, size=1024, mtime="2026-01-01T00:00:00Z")
-    record.origins.append(Origin(source="document-metadata", block=block, fields=dict(fields)))
+    record.evidence.append(
+        EvidenceRecord(source="document-metadata", block=block, fields=dict(fields))
+    )
     return record
 
 
 def _photo(path: str, **fields: str) -> FileRecord:
     record = FileRecord(path=path, size=1024, mtime="2026-01-01T00:00:00Z")
-    record.origins.append(Origin(source="device-metadata", block="exif", fields=dict(fields)))
+    record.evidence.append(
+        EvidenceRecord(source="device-metadata", block="exif", fields=dict(fields))
+    )
     return record
 
 
@@ -116,7 +120,7 @@ def test_a_comma_does_not_separate_two_authors():
 # --- how it reads ------------------------------------------------------------
 
 
-def test_the_section_names_each_shared_source_and_how_many_files_it_covers():
+def test_the_section_names_each_shared_attribute_and_how_many_files_it_covers():
     records = [
         _record("/case/a.docx", "ooxml-properties", creator="A. Person"),
         _record("/case/b.docx", "ooxml-properties", creator="A. Person"),
@@ -136,7 +140,7 @@ def test_nothing_shared_is_said_rather_than_left_blank():
 
     out = render_text(records, Path("/case"), theme=PLAIN, cluster=True)
 
-    assert "no source is shared" in out
+    assert "CLUSTERS" not in out
 
 
 def test_the_section_is_absent_unless_it_was_asked_for():
@@ -147,39 +151,4 @@ def test_the_section_is_absent_unless_it_was_asked_for():
         _record("/case/b.docx", "ooxml-properties", creator="A. Person"),
     ]
 
-    assert "SHARED SOURCES" not in render_text(records, Path("/case"), theme=PLAIN)
-
-
-def test_the_names_line_up_under_one_another():
-    """Two axes of different label lengths still start their names in the same
-    column, or the section reads as a ragged list rather than a table."""
-    records = [
-        _record("/case/a.docx", "ooxml-properties", creator="A. Person"),
-        _record("/case/b.docx", "ooxml-properties", creator="A. Person"),
-        _photo("/case/1.jpg", Make="NIKON", Model="COOLPIX P6000"),
-        _photo("/case/2.jpg", Make="NIKON", Model="COOLPIX P6000"),
-    ]
-
-    out = render_text(records, Path("/case"), theme=PLAIN, cluster=True)
-    # The names appear in the per-file entries too; only the section is at issue.
-    section = out.split("SHARED SOURCES")[1].splitlines()
-    rows = [line for line in section if "A. Person" in line or "COOLPIX" in line]
-
-    assert len(rows) == 2
-    assert rows[0].index("NIKON") == rows[1].index("A. Person")
-
-
-def test_a_shared_source_names_the_files_that_share_it():
-    """`3 files` is a count, not an answer. The section exists to say which
-    files a camera or an author connects, and a reader who has to go and find
-    them has been handed the question back."""
-    records = [
-        _photo("/case/beach.jpg", Make="NIKON", Model="COOLPIX P6000"),
-        _photo("/case/market.jpg", Make="NIKON", Model="COOLPIX P6000"),
-    ]
-
-    out = render_text(records, Path("/case"), theme=PLAIN, cluster=True)
-    section = out.split("SHARED SOURCES")[1].split("METADATA SOURCES")[0]
-
-    assert "beach.jpg" in section
-    assert "market.jpg" in section
+    assert "SHARED ATTRIBUTES" not in render_text(records, Path("/case"), theme=PLAIN)

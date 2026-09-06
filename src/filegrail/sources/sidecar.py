@@ -2,7 +2,7 @@
 
 `yt-dlp --write-info-json` writes `<name>.info.json` next to `<name>.<ext>`,
 and that document names the page the media came from, who published it, and
-the moment the fetch ran. It is an acquisition record in the plainest sense:
+the moment the fetch ran. It is an origin record in the plainest sense:
 the program that got the bytes wrote down where it got them.
 
 It is trusted less than the attribute an operating system attaches to the file
@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..models import Origin
+from ..models import EvidenceRecord
 
 #: What yt-dlp appends to the output name, whatever the media extension is.
 SUFFIX = ".info.json"
@@ -53,7 +53,7 @@ _KEPT = (
 )
 
 
-def read_sidecar(path: Path) -> Origin | None:
+def read_sidecar(path: Path) -> EvidenceRecord | None:
     """What a download tool recorded beside this file, if anything did."""
     beside = path.with_suffix(SUFFIX)
     try:
@@ -71,7 +71,7 @@ def read_sidecar(path: Path) -> Origin | None:
 
     fields = {name: value for name in _KEPT if (value := _text(document.get(name)))}
     site = _text(document.get("extractor"))
-    return Origin(
+    return EvidenceRecord(
         source="ytdlp-sidecar",
         url=url,
         tool=_tool(document),
@@ -95,7 +95,7 @@ def _fetched(document: dict[str, Any]) -> str | None:
     file reached this machine. `upload_date` and `timestamp` say when the video
     became available, which can be years earlier and is a fact about the video
     rather than about its arrival here. This claim is about the arrival, so
-    reading the publication date into it would date the acquisition wrongly and
+    reading the publication date into it would date the arrival wrongly and
     put the file on the timeline before it existed on this machine.
     """
     epoch = document.get("epoch")

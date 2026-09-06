@@ -1,10 +1,10 @@
-"""The desktop's recently-used list, as circumstantial acquisition evidence."""
+"""The desktop's recently-used list: activity, not origin."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from filegrail.models import CONFIDENCE, INTERACTION, Origin, kind
+from filegrail.models import ACTIVITY, SOURCE_PRIORITY, EvidenceRecord, category
 from filegrail.sources.recent import collect_recent_files
 
 XBEL = """<?xml version="1.0" encoding="UTF-8"?>
@@ -60,11 +60,11 @@ def test_a_corrupt_list_is_not_an_error(tmp_path: Path):
 
 
 def test_it_ranks_below_shell_history():
-    """Opening a file proves contact, not acquisition."""
-    assert CONFIDENCE["recent-documents"] < CONFIDENCE["shell-history"]
+    """Opening a file proves contact, not origin."""
+    assert SOURCE_PRIORITY["recent-documents"] < SOURCE_PRIORITY["shell-history"]
 
 
-def test_it_is_interaction_and_not_acquisition():
+def test_it_is_activity_and_not_origin():
     """An application opening a file did not put it there, and a report that
-    files it under acquisition says it did."""
-    assert kind(Origin(source="recent-documents", tool="GIMP")) == INTERACTION
+    files it under origin says it did."""
+    assert category(EvidenceRecord(source="recent-documents", tool="GIMP")) == ACTIVITY

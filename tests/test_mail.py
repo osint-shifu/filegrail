@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from filegrail.identify import extract
-from filegrail.models import ACQUISITION, INTRINSIC, FileRecord, kind
+from filegrail.models import METADATA, ORIGIN, FileRecord, category
 from filegrail.sources.mail import read_mail
 
 DELIVERED = """\
@@ -52,7 +52,7 @@ def test_the_topmost_hop_is_the_delivery_record(tmp_path: Path):
     delivery = _by(origins, "email-delivery")
     assert len(delivery) == 1
     assert delivery[0].tool == "mx.recipient.org"
-    assert kind(delivery[0]) == ACQUISITION
+    assert category(delivery[0]) == ORIGIN
 
 
 def test_every_other_hop_is_a_relay(tmp_path: Path):
@@ -60,7 +60,7 @@ def test_every_other_hop_is_a_relay(tmp_path: Path):
 
     relays = _by(origins, "email-relay")
     assert [origin.tool for origin in relays] == ["mail.example.com"]
-    assert relays[0].confidence < _by(origins, "email-delivery")[0].confidence
+    assert relays[0].priority < _by(origins, "email-delivery")[0].priority
 
 
 def test_a_hop_carries_the_moment_the_server_stamped_it(tmp_path: Path):
@@ -89,7 +89,7 @@ def test_a_hop_with_no_date_states_no_time(tmp_path: Path):
 
 def test_a_sending_address_reaches_identify(tmp_path: Path):
     record = FileRecord(path=str(_message(tmp_path)), size=10, mtime="")
-    record.origins.extend(read_mail(Path(record.path)))
+    record.evidence.extend(read_mail(Path(record.path)))
 
     found = {identifier.value for identifier in extract([record])}
 
@@ -106,7 +106,7 @@ def test_the_sender_headers_are_the_message_describing_itself(tmp_path: Path):
     record of how it arrived."""
     header = _by(read_mail(_message(tmp_path)), "email-header")[0]
 
-    assert kind(header) == INTRINSIC
+    assert category(header) == METADATA
     assert header.fields["From"] == "Jan Kowalski <jan@example.com>"
     assert header.fields["Message-ID"] == "<20190304182228.7ttQ1a@example.com>"
 

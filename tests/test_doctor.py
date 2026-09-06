@@ -93,7 +93,7 @@ def test_the_note_under_the_horizon_is_wrapped_rather_than_cut(tmp_path: Path):
 
     output = render_doctor(survey(home=tmp_path), Theme(colour=False, unicode=False, width=72))
 
-    assert "cannot be resolved from it." in " ".join(output.split())
+    assert "no record before" in " ".join(output.split())
     assert "\u2026" not in output
 
 
@@ -138,11 +138,28 @@ def test_c2pa_says_the_binding_is_checked_even_though_the_signature_is_not():
 
 
 def test_c2pa_is_always_reported_as_unverified():
-    """The one claim the tool must never let a reader over-read."""
+    """The one thing the tool must never let a reader over-read.
+
+    `partial` rather than `unavailable`: the manifest is read and its hash
+    binding recomputed, and only the certificate chain is out of reach. Saying
+    `unavailable` read as though nothing about a manifest were checked.
+    """
     found = survey()
 
-    assert _state(found, "C2PA") == UNAVAILABLE
+    assert _state(found, "C2PA") == PARTIAL
     assert "crypto" in _detail(found, "C2PA")
+
+
+def test_a_check_says_what_kind_of_thing_it_looked_at():
+    """`unavailable` on a store some other program writes and `unavailable` on
+    a parser in this tool are different problems with different fixes."""
+    from filegrail.doctor import ARTIFACT, FILESYSTEM, PARSER
+
+    kinds = {check.name: check.kind for check in survey().checks}
+
+    assert kinds["Creation timestamps"] == FILESYSTEM
+    assert kinds["C2PA signature check"] == PARSER
+    assert kinds["Recent documents"] == ARTIFACT
 
 
 def test_every_check_has_a_state_and_a_name(tmp_path: Path):
@@ -161,7 +178,7 @@ def test_the_command_prints_the_survey(capsys):
     assert main(["doctor", "--no-color"]) == 0
 
     out = capsys.readouterr().out
-    assert "evidence sources" in out
+    assert "SOURCES" in out
     assert "C2PA" in out
 
 
@@ -308,17 +325,19 @@ def test_a_bash_history_with_times_also_reports_a_horizon(tmp_path: Path):
 
 
 def test_the_horizon_note_covers_every_source_it_lists(tmp_path: Path):
-    """The note named browser history back when browsers were the only horizon.
+    """Every source with a reach appears under LIMITATIONS, named for itself.
 
-    With a shell and a desktop list beside them it describes one row of three
-    and reads as though the other two carried no limit at all.
+    The note this replaced named browser history back when browsers were the
+    only horizon; with a shell and a desktop list beside them it described one
+    row of three and read as though the other two carried no limit at all.
     """
     _recent(tmp_path, "2026-04-17T09:00:00Z", "2026-08-30T11:00:00Z")
 
     out = render_doctor(survey(home=tmp_path), PLAIN)
 
-    assert "Recent documents oldest entry" in out
-    assert "browser history" not in out
+    assert "LIMITATIONS" in out
+    assert "Recent documents" in out
+    assert "no record before 2026-04-17" in out
 
 
 def _quarantine(home: Path, rows: int) -> None:
@@ -403,7 +422,7 @@ def test_no_windows_recent_folder_says_so(tmp_path: Path):
 
 
 def test_a_single_record_is_counted_in_the_singular(tmp_path: Path):
-    """`1 shortcuts` is the kind of seam that makes a report look generated."""
+    """`1 shortcuts` is the category of seam that makes a report look generated."""
     _shortcuts(tmp_path, count=1)
     _quarantine(tmp_path, rows=1)
     _recent(tmp_path, "2026-04-17T09:00:00Z", "2026-04-17T09:00:00Z")

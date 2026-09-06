@@ -3,7 +3,7 @@
 A `.lnk` under `AppData/Roaming/Microsoft/Windows/Recent` is the counterpart of
 a `recently-used.xbel` entry, and it answers the same question at the same
 strength: something on that machine handled this file. Opening a file proves
-contact and not acquisition - the file may have arrived by any route at all
+contact and not origin - the file may have arrived by any route at all
 beforehand - so the claim is ranked with the desktop's list rather than with a
 download record.
 
@@ -24,7 +24,7 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-from ..models import Origin
+from ..models import EvidenceRecord
 from ..util import basename, iso
 
 RECENT_LINKS = "AppData/Roaming/Microsoft/Windows/Recent"
@@ -68,7 +68,7 @@ _MAX_LINKS = 20_000
 _MAX_LINK = 1024 * 1024
 
 
-def collect_windows_recent(home: Path | None = None) -> dict[str, list[Origin]]:
+def collect_windows_recent(home: Path | None = None) -> dict[str, list[EvidenceRecord]]:
     """Map the file name a shortcut points at -> what it recorded about opening it.
 
     Indexed by name rather than by path because the path in the shortcut was
@@ -80,7 +80,7 @@ def collect_windows_recent(home: Path | None = None) -> dict[str, list[Origin]]:
     if not folder.is_dir():
         return {}
 
-    found: dict[str, list[Origin]] = {}
+    found: dict[str, list[EvidenceRecord]] = {}
     for index, path in enumerate(sorted(folder.iterdir())):
         if index >= _MAX_LINKS:
             break
@@ -103,7 +103,9 @@ def collect_windows_recent(home: Path | None = None) -> dict[str, list[Origin]]:
     return found
 
 
-def read_shortcuts(path: Path, size: int, shortcuts: dict[str, list[Origin]]) -> list[Origin]:
+def read_shortcuts(
+    path: Path, size: int, shortcuts: dict[str, list[EvidenceRecord]]
+) -> list[EvidenceRecord]:
     """Attach whichever shortcuts point at this file.
 
     An exact path match is taken as one; anything else is a name match and is
@@ -124,7 +126,7 @@ def read_shortcuts(path: Path, size: int, shortcuts: dict[str, list[Origin]]) ->
     return found
 
 
-def read_link(raw: bytes, opened: str | None = None) -> Origin | None:
+def read_link(raw: bytes, opened: str | None = None) -> EvidenceRecord | None:
     """Return what one shell link recorded, or None if it is not one."""
     if len(raw) < _HEADER_SIZE:
         return None
@@ -165,7 +167,7 @@ def read_link(raw: bytes, opened: str | None = None) -> Origin | None:
     if tracked := _tracker(raw):
         fields["MachineID"] = tracked
 
-    return Origin(
+    return EvidenceRecord(
         source="windows-recent",
         at=opened,
         bytes=target_size or None,

@@ -1,7 +1,7 @@
 """Which metadata block a claim was decoded from.
 
 `source` names what the reader found - a camera, a bare document - which is the
-axis confidence and colour turn on. Two files can hand the same reader different
+axis the category and the colour turn on. Two files can hand the same parser different
 answers there: a photograph from a camera and a rendering with nothing but a
 `Software` tag are both EXIF, and only one of them is `device-metadata`.
 
@@ -116,11 +116,11 @@ def _image(path: Path) -> Path:
 
 
 def _movie(path: Path) -> Path:
-    def atom(kind: bytes, payload: bytes) -> bytes:
-        return struct.pack(">I", len(payload) + 8) + kind + payload
+    def atom(category: bytes, payload: bytes) -> bytes:
+        return struct.pack(">I", len(payload) + 8) + category + payload
 
-    def itunes(kind: bytes, text: str) -> bytes:
-        return atom(kind, atom(b"data", struct.pack(">II", 1, 0) + text.encode("utf-8")))
+    def itunes(category: bytes, text: str) -> bytes:
+        return atom(category, atom(b"data", struct.pack(">II", 1, 0) + text.encode("utf-8")))
 
     meta = atom(b"meta", b"\x00" * 4 + atom(b"ilst", itunes(b"\xa9too", "HandBrake 1.7.3")))
     path.write_bytes(atom(b"ftyp", b"isom") + atom(b"moov", atom(b"udta", meta)))
@@ -238,9 +238,9 @@ def test_a_content_credential_names_its_own_block(tmp_path: Path):
 def test_a_claim_that_read_no_block_does_not_invent_one():
     """`block` records what a reader decoded. A download record read no metadata
     block at all, and naming one for it would be a claim nobody made."""
-    from filegrail.models import Origin
+    from filegrail.models import EvidenceRecord
 
-    assert Origin(source="browser-download", url="https://example.org/a.pdf").block is None
+    assert EvidenceRecord(source="browser-download", url="https://example.org/a.pdf").block is None
 
 
 # --- what the report calls it ------------------------------------------------
@@ -249,10 +249,10 @@ def test_a_claim_that_read_no_block_does_not_invent_one():
 def test_a_block_is_named_where_the_source_would_only_say_document():
     """`document metadata` names a category rather than a thing: nine readers
     answer to it, and a reader told only that has been told the claim is
-    self-reported and nothing else."""
-    from filegrail.models import Origin, label
+    a self-description and nothing else."""
+    from filegrail.models import EvidenceRecord, label
 
-    pdf = Origin(source="document-metadata", block="pdf-info", tool="LibreOffice 25.2")
+    pdf = EvidenceRecord(source="document-metadata", block="pdf-info", tool="LibreOffice 25.2")
 
     assert label(pdf) == "PDF Info"
 
@@ -261,29 +261,29 @@ def test_a_camera_keeps_the_name_that_says_a_camera_made_the_claim():
     """`device metadata` says more than `EXIF`: it says the block held a make
     and a model, which is why it outranks a bare document property. Replacing
     it with the name of the standard would throw that away."""
-    from filegrail.models import Origin, label
+    from filegrail.models import EvidenceRecord, label
 
-    camera = Origin(source="device-metadata", block="exif", tool="NIKON COOLPIX P6000")
+    camera = EvidenceRecord(source="device-metadata", block="exif", tool="NIKON COOLPIX P6000")
 
     assert label(camera) == "device metadata"
 
 
 def test_a_record_that_read_no_block_is_named_by_its_source():
-    from filegrail.models import Origin, label
+    from filegrail.models import EvidenceRecord, label
 
-    assert label(Origin(source="browser-download", url="https://example.org/a.pdf")) == (
+    assert label(EvidenceRecord(source="browser-download", url="https://example.org/a.pdf")) == (
         "browser download"
     )
 
 
 def test_the_report_calls_a_pdf_claim_by_the_block_it_read(tmp_path: Path):
-    from filegrail.models import FileRecord, Origin
+    from filegrail.models import EvidenceRecord, FileRecord
     from filegrail.report import render_text
     from filegrail.theme import Theme
 
     record = FileRecord(path="/case/paper.pdf", size=4096, mtime="2026-08-24T19:00:00Z")
-    record.origins.append(
-        Origin(source="document-metadata", block="pdf-info", tool="Adobe PDF Library 15.0")
+    record.evidence.append(
+        EvidenceRecord(source="document-metadata", block="pdf-info", tool="Adobe PDF Library 15.0")
     )
 
     output = render_text([record], Path("/case"), theme=Theme(colour=False, unicode=True, width=88))

@@ -1,8 +1,8 @@
-"""Do the acquisition records agree with each other?
+"""Do the origin records agree with each other?
 
 One record is a claim. Two records that agree are corroboration. Two that
 disagree are a finding in their own right - a file downloaded twice, a file
-copied after acquisition, or origin metadata that was replaced - and a report
+copied after it arrived, or origin metadata that was replaced - and a report
 that silently prints the higher-scoring one has destroyed the finding.
 """
 
@@ -10,8 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from filegrail.models import FileRecord, Origin
-from filegrail.reconcile import (
+from filegrail.correlate import (
     AGREEMENT,
     ATTRIBUTION_CONFLICT,
     CONFLICT,
@@ -19,46 +18,47 @@ from filegrail.reconcile import (
     PARTIAL,
     SELF_CONTRADICTORY,
     SINGLE,
-    reconcile,
+    correlate,
 )
+from filegrail.models import FILENAME, EvidenceRecord, FileRecord
 from filegrail.report import render_text
 from filegrail.theme import Theme
 
 PLAIN = Theme(colour=False, unicode=True, width=88)
 
 
-def _record(*origins: Origin, mtime: str = "2026-08-24T19:00:00Z") -> FileRecord:
+def _record(*origins: EvidenceRecord, mtime: str = "2026-08-24T19:00:00Z") -> FileRecord:
     record = FileRecord(path="/case/a.pdf", size=4096, mtime=mtime)
-    record.origins.extend(origins)
+    record.evidence.extend(origins)
     return record
 
 
-def _download(url: str, **extra) -> Origin:
-    return Origin(source="browser-download", url=url, tool="firefox", **extra)
+def _download(url: str, **extra) -> EvidenceRecord:
+    return EvidenceRecord(source="browser-download", url=url, tool="firefox", **extra)
 
 
-def _zone(url: str, **extra) -> Origin:
-    return Origin(source="windows-zone-identifier", url=url, **extra)
+def _zone(url: str, **extra) -> EvidenceRecord:
+    return EvidenceRecord(source="windows-zone-identifier", url=url, **extra)
 
 
 # --- the verdict -------------------------------------------------------------
 
 
-def test_no_acquisition_record_at_all():
-    verdict = reconcile(_record(Origin(source="device-metadata", tool="Canon")))
+def test_no_origin_record_at_all():
+    verdict = correlate(_record(EvidenceRecord(source="device-metadata", tool="Canon")))
 
     assert verdict.state == NONE
 
 
 def test_one_record_is_not_corroboration():
     """A single source is the ordinary case, and not a finding either way."""
-    verdict = reconcile(_record(_download("https://example.org/a.pdf")))
+    verdict = correlate(_record(_download("https://example.org/a.pdf")))
 
     assert verdict.state == SINGLE
 
 
 def test_two_records_naming_the_same_url_agree():
-    verdict = reconcile(
+    verdict = correlate(
         _record(_download("https://example.org/a.pdf"), _zone("https://example.org/a.pdf"))
     )
 
@@ -68,7 +68,7 @@ def test_two_records_naming_the_same_url_agree():
 
 def test_trivial_url_differences_still_agree():
     """A trailing slash and a capitalised host are the same address."""
-    verdict = reconcile(
+    verdict = correlate(
         _record(_download("https://Example.ORG/a.pdf"), _zone("https://example.org/a.pdf/"))
     )
 
@@ -76,7 +76,7 @@ def test_trivial_url_differences_still_agree():
 
 
 def test_the_same_host_by_a_different_path_is_partial():
-    verdict = reconcile(
+    verdict = correlate(
         _record(_download("https://example.org/a.pdf"), _zone("https://example.org/copy/a.pdf"))
     )
 
@@ -85,7 +85,7 @@ def test_the_same_host_by_a_different_path_is_partial():
 
 
 def test_different_hosts_conflict():
-    verdict = reconcile(
+    verdict = correlate(
         _record(_download("https://example.com/a.pdf"), _zone("https://mirror.example.net/a.pdf"))
     )
 
@@ -97,10 +97,10 @@ def test_different_hosts_conflict():
 
 def test_a_file_claiming_to_predate_nothing_is_unremarkable():
     """Created before it was downloaded is the normal order of events."""
-    verdict = reconcile(
+    verdict = correlate(
         _record(
             _download("https://example.org/a.pdf", at="2026-08-24T19:02:11Z"),
-            Origin(source="document-metadata", tool="Word", at="2026-08-01T10:00:00Z"),
+            EvidenceRecord(source="document-metadata", tool="Word", at="2026-08-01T10:00:00Z"),
         )
     )
 
@@ -110,10 +110,10 @@ def test_a_file_claiming_to_predate_nothing_is_unremarkable():
 
 def test_a_file_claiming_to_postdate_its_download_is_flagged():
     """The bytes cannot have been authored after they arrived."""
-    verdict = reconcile(
+    verdict = correlate(
         _record(
             _download("https://example.org/a.pdf", at="2026-08-01T10:00:00Z"),
-            Origin(source="document-metadata", tool="Word", at="2026-08-24T19:02:11Z"),
+            EvidenceRecord(source="document-metadata", tool="Word", at="2026-08-24T19:02:11Z"),
         )
     )
 
@@ -122,9 +122,10 @@ def test_a_file_claiming_to_postdate_its_download_is_flagged():
 
 def test_a_name_only_match_is_called_out():
     origin = _download("https://example.org/a.pdf")
-    origin.note = "matched by file name; the file was moved or renamed since download"
+    origin.match = FILENAME
+    origin.match_note = "the file was moved or renamed since download"
 
-    verdict = reconcile(_record(origin))
+    verdict = correlate(_record(origin))
 
     assert any("name" in reason for reason in verdict.reasons)
 
@@ -169,26 +170,26 @@ def test_agreement_is_reported_too():
 
     output = render_text([record], Path("/case"), theme=PLAIN)
 
-    assert "agreement" in output
+    assert "corroboration" in output
 
 
 # --- what the file says about itself, said twice ------------------------------
 
 
-def _iptc(**fields: str) -> Origin:
-    return Origin(source="iptc", block="iptc", fields=dict(fields))
+def _iptc(**fields: str) -> EvidenceRecord:
+    return EvidenceRecord(source="iptc", block="iptc", fields=dict(fields))
 
 
-def _xmp(**fields: str) -> Origin:
-    return Origin(
+def _xmp(**fields: str) -> EvidenceRecord:
+    return EvidenceRecord(
         source="xmp",
         block="xmp",
         fields={name.replace("_", ":"): v for name, v in fields.items()},
     )
 
 
-def _exif(**fields: str) -> Origin:
-    return Origin(source="device-metadata", block="exif", fields=dict(fields))
+def _exif(**fields: str) -> EvidenceRecord:
+    return EvidenceRecord(source="device-metadata", block="exif", fields=dict(fields))
 
 
 def test_a_camera_and_its_xmp_mirror_naming_different_models_is_a_finding():
@@ -200,7 +201,7 @@ def test_a_camera_and_its_xmp_mirror_naming_different_models_is_a_finding():
         _xmp(tiff_Make="NIKON CORPORATION", tiff_Model="NIKON D700"),
     )
 
-    findings = reconcile(record).findings
+    findings = correlate(record).findings
 
     assert [f.kind for f in findings] == [ATTRIBUTION_CONFLICT, ATTRIBUTION_CONFLICT]
     assert "device metadata says Canon" in findings[0].text
@@ -213,7 +214,7 @@ def test_a_camera_agreeing_with_its_mirror_says_nothing():
         _xmp(tiff_Make="Canon", tiff_Model="Canon PowerShot G9"),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
 def test_a_zoneless_tag_agrees_with_its_zoned_mirror():
@@ -225,7 +226,7 @@ def test_a_zoneless_tag_agrees_with_its_zoned_mirror():
         _xmp(exif_DateTimeOriginal="2004-08-27T13:52:55+02:00"),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
 def test_a_capture_time_moved_to_another_day_is_a_finding():
@@ -234,7 +235,7 @@ def test_a_capture_time_moved_to_another_day_is_a_finding():
         _xmp(exif_DateTimeOriginal="2004-08-28T13:52:55+02:00"),
     )
 
-    assert [f.kind for f in reconcile(record).findings] == [ATTRIBUTION_CONFLICT]
+    assert [f.kind for f in correlate(record).findings] == [ATTRIBUTION_CONFLICT]
 
 
 def test_a_bare_iim_day_agrees_with_a_full_xmp_stamp():
@@ -246,7 +247,7 @@ def test_a_bare_iim_day_agrees_with_a_full_xmp_stamp():
         _xmp(photoshop_DateCreated="2019-03-04T10:22:31+01:00"),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
 def test_exposure_settings_are_left_out_of_the_comparison():
@@ -258,7 +259,7 @@ def test_exposure_settings_are_left_out_of_the_comparison():
         _xmp(exif_FNumber="f/5,6", exif_ExposureTime="1/500 sec.", exif_FocalLength="105,0 mm"),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
 def test_two_self_descriptions_disagreeing_about_the_byline_is_a_finding():
@@ -271,7 +272,7 @@ def test_two_self_descriptions_disagreeing_about_the_byline_is_a_finding():
         _xmp(dc_creator="Marta Nowak", photoshop_Credit="Agencja Wschod"),
     )
 
-    findings = reconcile(record).findings
+    findings = correlate(record).findings
 
     assert [f.kind for f in findings] == [ATTRIBUTION_CONFLICT, ATTRIBUTION_CONFLICT]
     assert "IPTC says Francisco Gonzalez" in findings[0].text
@@ -288,11 +289,11 @@ def test_two_self_descriptions_that_agree_are_not_a_finding():
         _xmp(dc_creator="ansel  adams", photoshop_Credit="Magnum"),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
-def _info(**fields: str) -> Origin:
-    return Origin(source="document-metadata", block="pdf-info", fields=dict(fields))
+def _info(**fields: str) -> EvidenceRecord:
+    return EvidenceRecord(source="document-metadata", block="pdf-info", fields=dict(fields))
 
 
 def test_an_info_dictionary_and_its_xmp_naming_different_applications_is_a_finding():
@@ -304,7 +305,7 @@ def test_an_info_dictionary_and_its_xmp_naming_different_applications_is_a_findi
         _xmp(xmp_CreatorTool="Adobe Illustrator CC 22.0 (Macintosh)"),
     )
 
-    findings = reconcile(record).findings
+    findings = correlate(record).findings
 
     assert [f.kind for f in findings] == [ATTRIBUTION_CONFLICT]
     assert "Creator: PDF Info says Adobe InDesign CC 13.1 (Macintosh)" in findings[0].text
@@ -317,7 +318,7 @@ def test_an_info_dictionary_and_its_xmp_disagreeing_about_the_title_is_a_finding
         _xmp(dc_title="OSINT360 - potencjalni klienci", dc_creator="OSINT360"),
     )
 
-    findings = reconcile(record).findings
+    findings = correlate(record).findings
 
     assert [f.kind for f in findings] == [ATTRIBUTION_CONFLICT]
     assert "Title" in findings[0].text
@@ -345,7 +346,7 @@ def test_an_info_dictionary_agreeing_with_its_xmp_says_nothing():
         ),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
 def test_an_info_dictionary_dated_months_from_its_xmp_is_a_finding():
@@ -357,7 +358,7 @@ def test_an_info_dictionary_dated_months_from_its_xmp_is_a_finding():
         _xmp(xmp_CreateDate="2018-02-28T13:44:18-05:00"),
     )
 
-    findings = reconcile(record).findings
+    findings = correlate(record).findings
 
     assert [f.kind for f in findings] == [ATTRIBUTION_CONFLICT]
     assert "CreationDate" in findings[0].text
@@ -372,7 +373,7 @@ def test_an_info_dictionary_dated_with_its_xmp_says_nothing():
         ),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
 def test_a_modification_date_moved_away_from_its_xmp_is_a_finding():
@@ -385,7 +386,7 @@ def test_a_modification_date_moved_away_from_its_xmp_is_a_finding():
         _xmp(xmp_ModifyDate="2018-04-05T17:19:03-04:00"),
     )
 
-    assert [f.kind for f in reconcile(record).findings] == [ATTRIBUTION_CONFLICT]
+    assert [f.kind for f in correlate(record).findings] == [ATTRIBUTION_CONFLICT]
 
 
 def test_a_pdf_stamp_without_punctuation_still_reads_as_a_moment():
@@ -398,7 +399,7 @@ def test_a_pdf_stamp_without_punctuation_still_reads_as_a_moment():
         _xmp(xmp_CreateDate="2026-07-07T08:02:05Z"),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
 def test_one_instant_written_in_two_zones_is_not_a_disagreement():
@@ -411,7 +412,7 @@ def test_one_instant_written_in_two_zones_is_not_a_disagreement():
         _xmp(xmp_CreateDate="2018-05-11T13:37:20-05:00"),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
 def test_one_reading_in_two_zones_is_a_disagreement():
@@ -422,7 +423,7 @@ def test_one_reading_in_two_zones_is_a_disagreement():
         _xmp(xmp_CreateDate="2018-05-11T14:37:20-05:00"),
     )
 
-    assert [f.kind for f in reconcile(record).findings] == [ATTRIBUTION_CONFLICT]
+    assert [f.kind for f in correlate(record).findings] == [ATTRIBUTION_CONFLICT]
 
 
 def test_a_zone_can_carry_a_stamp_across_midnight():
@@ -434,7 +435,7 @@ def test_a_zone_can_carry_a_stamp_across_midnight():
         _xmp(xmp_CreateDate="2018-05-12T00:37:20-03:00"),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
 def test_the_producer_string_is_left_out_of_the_comparison():
@@ -448,11 +449,11 @@ def test_the_producer_string_is_left_out_of_the_comparison():
         _xmp(pdf_Producer="Adobe PDF library 15.00"),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
-def _text_chunks(**fields: str) -> Origin:
-    return Origin(
+def _text_chunks(**fields: str) -> EvidenceRecord:
+    return EvidenceRecord(
         source="document-metadata",
         block="png-text",
         fields={name.replace("_", " "): value for name, value in fields.items()},
@@ -468,7 +469,7 @@ def test_png_text_chunks_naming_a_different_application_than_the_xmp_is_a_findin
         _xmp(xmp_CreatorTool="Adobe Photoshop 25.0"),
     )
 
-    findings = reconcile(record).findings
+    findings = correlate(record).findings
 
     assert [f.kind for f in findings] == [ATTRIBUTION_CONFLICT]
     assert "Software: PNG text says matplotlib 3.9.0" in findings[0].text
@@ -492,7 +493,7 @@ def test_png_text_chunks_agreeing_with_the_xmp_say_nothing():
         ),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
 def test_a_png_creation_time_is_compared_against_the_xmp():
@@ -501,7 +502,7 @@ def test_a_png_creation_time_is_compared_against_the_xmp():
         _xmp(xmp_CreateDate="2019-01-15T09:00:00Z"),
     )
 
-    assert [f.kind for f in reconcile(record).findings] == [ATTRIBUTION_CONFLICT]
+    assert [f.kind for f in correlate(record).findings] == [ATTRIBUTION_CONFLICT]
 
 
 def test_a_png_creation_time_in_the_format_the_specification_asks_for_is_skipped():
@@ -515,7 +516,7 @@ def test_a_png_creation_time_in_the_format_the_specification_asks_for_is_skipped
         _xmp(xmp_CreateDate="2019-01-15T09:00:00Z"),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
 def test_a_camera_software_tag_is_not_paired_with_the_creating_application():
@@ -530,7 +531,7 @@ def test_a_camera_software_tag_is_not_paired_with_the_creating_application():
         _xmp(xmp_CreatorTool="Adobe Photoshop Elements 3.0"),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
 def test_a_riff_software_field_is_not_read_as_a_tiff_tag():
@@ -540,21 +541,21 @@ def test_a_riff_software_field_is_not_read_as_a_tiff_tag():
     two standards, not between two words. Both claims are `document-metadata`,
     so a mirror keyed on the source cannot tell them apart."""
     record = _record(
-        Origin(
+        EvidenceRecord(
             source="document-metadata",
             block="riff",
             fields={"Software": "Audacity 3.4.2"},
         ),
-        Origin(source="xmp", block="xmp", fields={"tiff:Software": "Adobe Audition 24.0"}),
+        EvidenceRecord(source="xmp", block="xmp", fields={"tiff:Software": "Adobe Audition 24.0"}),
     )
 
-    assert reconcile(record).findings == []
+    assert correlate(record).findings == []
 
 
-def test_a_contested_attribution_is_not_labelled_by_the_acquisition_state():
-    """`state` describes how the acquisition records relate. Printing it over a
+def test_a_contested_attribution_is_not_labelled_by_the_origin_state():
+    """`state` describes how the origin records relate. Printing it over a
     finding that came from somewhere else labels one thing with the name of
-    another - and "no acquisition record", in the colour of good news, is a
+    another - and "no origin record", in the colour of good news, is a
     strange headline for two photographers contradicting each other."""
     record = _record(
         _iptc(**{"By-line": "Francisco Gonzalez"}),
@@ -563,14 +564,14 @@ def test_a_contested_attribution_is_not_labelled_by_the_acquisition_state():
 
     output = render_text([record], Path("/case"), theme=PLAIN)
 
-    assert "contested attribution" in output
-    assert "no acquisition record" not in output
+    assert "attribution conflict" in output
+    assert "ORIGIN" not in output
 
 
 def test_a_contested_attribution_brings_both_self_descriptions_on_screen():
-    """The report shows one intrinsic claim, the strongest. A finding that names
+    """The report shows one metadata record, the leading one. A finding that names
     IPTC while the report prints only the XMP is a verdict about evidence the
-    reader cannot see - the same reason a conflicting acquisition record is
+    reader cannot see - the same reason a conflicting origin record is
     brought forward."""
     iptc = _iptc(**{"By-line": "Francisco Gonzalez"})
     iptc.tool = "Adobe Photoshop 7.0"
@@ -591,33 +592,33 @@ def test_a_contested_attribution_brings_both_self_descriptions_on_screen():
 def test_a_pdf_modified_before_it_was_created_is_a_contradiction():
     """Not a surprising order of events. An impossible one."""
     record = _record(
-        Origin(
+        EvidenceRecord(
             source="document-metadata",
             block="pdf-info",
             fields={"CreationDate": "D:20260824190000Z", "ModDate": "D:20260101120000Z"},
         )
     )
 
-    verdict = reconcile(record)
+    verdict = correlate(record)
 
     assert [f for f in verdict.findings if "before it was created" in f.text]
 
 
 def test_an_office_document_modified_before_it_was_created():
     record = _record(
-        Origin(
+        EvidenceRecord(
             source="document-metadata",
             block="ooxml-properties",
             fields={"created": "2026-08-24T19:00:00Z", "modified": "2026-01-01T12:00:00Z"},
         )
     )
 
-    assert [f for f in reconcile(record).findings if "before it was created" in f.text]
+    assert [f for f in correlate(record).findings if "before it was created" in f.text]
 
 
 def test_xmp_modified_before_it_was_created():
     record = _record(
-        Origin(
+        EvidenceRecord(
             source="xmp",
             block="xmp",
             fields={
@@ -627,53 +628,53 @@ def test_xmp_modified_before_it_was_created():
         )
     )
 
-    assert [f for f in reconcile(record).findings if "before it was created" in f.text]
+    assert [f for f in correlate(record).findings if "before it was created" in f.text]
 
 
 def test_the_ordinary_order_is_not_a_finding():
     """Created, then modified later. The normal life of a document."""
     record = _record(
-        Origin(
+        EvidenceRecord(
             source="document-metadata",
             block="pdf-info",
             fields={"CreationDate": "D:20260101120000Z", "ModDate": "D:20260824190000Z"},
         )
     )
 
-    assert not reconcile(record).findings
+    assert not correlate(record).findings
 
 
 def test_two_stamps_that_cannot_be_ranked_are_left_alone():
     """One writer said which zone it was in and the other did not, on the same
     day. Ranking them would be inventing the missing half."""
     record = _record(
-        Origin(
+        EvidenceRecord(
             source="document-metadata",
             block="pdf-info",
             fields={"CreationDate": "D:20260824190000Z", "ModDate": "D:20260824120000"},
         )
     )
 
-    assert not reconcile(record).findings
+    assert not correlate(record).findings
 
 
-def test_a_self_contradiction_is_not_headlined_as_an_acquisition_state():
-    """`state` describes the acquisition records. A file whose own dates run
-    backwards has said nothing about acquisition, and heading that finding
-    "no acquisition record" labels one thing with the name of another."""
+def test_a_self_contradiction_is_not_headlined_as_an_origin_state():
+    """`state` describes the origin records. A file whose own dates run
+    backwards has said nothing about its origin, and heading that finding
+    "no origin record" labels one thing with the name of another."""
     record = _record(
-        Origin(
+        EvidenceRecord(
             source="document-metadata",
             block="pdf-info",
             fields={"CreationDate": "D:20260824190000Z", "ModDate": "D:20260101120000Z"},
         )
     )
 
-    assert reconcile(record).headline == SELF_CONTRADICTORY
+    assert correlate(record).headline == SELF_CONTRADICTORY
 
 
-def _edit(when: str | None, said: str = "saved") -> Origin:
-    return Origin(source="xmp-history", block="xmp-history", at=when, note=said)
+def _edit(when: str | None, said: str = "saved") -> EvidenceRecord:
+    return EvidenceRecord(source="xmp-history", block="xmp-history", at=when, note=said)
 
 
 def test_an_editing_history_that_runs_backwards_is_a_contradiction():
@@ -684,7 +685,7 @@ def test_an_editing_history_that_runs_backwards_is_a_contradiction():
         _edit("2026-01-01T12:00:00Z", "exported"),
     )
 
-    assert [f for f in reconcile(record).findings if "runs backwards" in f.text]
+    assert [f for f in correlate(record).findings if "runs backwards" in f.text]
 
 
 def test_an_editing_history_in_order_is_not_a_finding():
@@ -693,7 +694,7 @@ def test_an_editing_history_in_order_is_not_a_finding():
         _edit("2026-08-24T19:00:00Z", "exported"),
     )
 
-    assert not reconcile(record).findings
+    assert not correlate(record).findings
 
 
 def test_two_steps_at_the_same_moment_are_not_backwards():
@@ -704,4 +705,4 @@ def test_two_steps_at_the_same_moment_are_not_backwards():
         _edit("2026-01-01T12:00:00Z", "exported"),
     )
 
-    assert not reconcile(record).findings
+    assert not correlate(record).findings

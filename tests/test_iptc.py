@@ -3,7 +3,7 @@
 import struct
 from pathlib import Path
 
-from filegrail.models import CONFIDENCE, INTRINSIC, SOURCE_LABELS, kind
+from filegrail.models import METADATA, SOURCE_LABELS, SOURCE_PRIORITY, category
 from filegrail.scan import scan
 from filegrail.sources.iptc import read_iptc
 
@@ -148,7 +148,7 @@ def test_an_extended_length_dataset_is_read(tmp_path: Path):
     assert claim.fields["By-line"] == "Ansel Adams"
 
 
-def test_iptc_is_intrinsic_evidence_ranked_below_xmp(tmp_path: Path):
+def test_iptc_is_metadata_ranked_below_xmp(tmp_path: Path):
     """Modern tools maintain XMP and leave the IIM block untouched, so a byline
     here is the older of the two accounts and often the staler - but it is still
     purpose-built for attribution, which a bare document property is not."""
@@ -157,9 +157,9 @@ def test_iptc_is_intrinsic_evidence_ranked_below_xmp(tmp_path: Path):
 
     claim = read_iptc(photo)
 
-    assert kind(claim) == INTRINSIC
-    assert claim.confidence == 51
-    assert CONFIDENCE["document-metadata"] < claim.confidence < CONFIDENCE["xmp"]
+    assert category(claim) == METADATA
+    assert claim.priority == 51
+    assert SOURCE_PRIORITY["document-metadata"] < claim.priority < SOURCE_PRIORITY["xmp"]
     assert SOURCE_LABELS["iptc"] == "IPTC"
 
 
@@ -174,7 +174,7 @@ def test_a_scan_surfaces_the_iptc_claim(tmp_path: Path):
 
     record = scan(case, home=home, use_shell_history=False)[0]
 
-    assert [origin.source for origin in record.origins if origin.source == "iptc"] == ["iptc"]
+    assert [origin.source for origin in record.evidence if origin.source == "iptc"] == ["iptc"]
 
 
 def test_the_record_version_reads_as_a_number_not_a_control_character(tmp_path: Path):
@@ -264,7 +264,7 @@ def test_one_broken_block_does_not_end_a_scan(tmp_path: Path):
     records = scan(case, home=home, use_shell_history=False)
 
     assert len(records) == 2
-    assert any(origin.fields.get("By-line") == "Robert Capa" for origin in records[1].origins)
+    assert any(origin.fields.get("By-line") == "Robert Capa" for origin in records[1].evidence)
 
 
 def test_reads_a_raw_iim_datastream_from_tiff_tag_33723(tmp_path: Path):

@@ -1,4 +1,4 @@
-"""Origin evidence carried inside the file itself.
+"""Metadata the file carries inside itself.
 
 A download record says where a file came from. Embedded metadata answers a
 different question - what produced it, who authored it and when - and it is
@@ -24,7 +24,7 @@ import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ...models import Origin
+from ...models import EvidenceRecord
 from .parts import read_part
 
 PDF_SUFFIXES = {".pdf"}
@@ -55,12 +55,12 @@ _COREPROPS = "http://schemas.openxmlformats.org/package/2006/metadata/core-prope
 _EXTPROPS = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
 
 
-def read_pdf(path: Path) -> Origin | None:
+def read_pdf(path: Path) -> EvidenceRecord | None:
     """Return what a PDF says about its own creation."""
     return _read_pdf(path)
 
 
-def read_ooxml(path: Path) -> Origin | None:
+def read_ooxml(path: Path) -> EvidenceRecord | None:
     """Return what an Office Open XML document says about its own creation."""
     return _read_ooxml(path)
 
@@ -71,10 +71,10 @@ def _origin(
     at: str | None,
     note: str | None,
     fields: dict[str, str] | None = None,
-) -> Origin | None:
+) -> EvidenceRecord | None:
     if not tool and not at and not note:
         return None
-    return Origin(
+    return EvidenceRecord(
         source="document-metadata",
         block=block,
         tool=tool,
@@ -84,7 +84,7 @@ def _origin(
     )
 
 
-def _read_pdf(path: Path) -> Origin | None:
+def _read_pdf(path: Path) -> EvidenceRecord | None:
     with path.open("rb") as handle:
         head = handle.read(_PDF_SCAN_BYTES)
         if handle.seek(0, 2) > _PDF_SCAN_BYTES * 2:
@@ -183,7 +183,7 @@ def _parse_pdf_date(value: str | None) -> str | None:
     return stamp.isoformat().replace("+00:00", "Z")
 
 
-def _read_ooxml(path: Path) -> Origin | None:
+def _read_ooxml(path: Path) -> EvidenceRecord | None:
     with zipfile.ZipFile(path) as archive:
         names = set(archive.namelist())
         core = _parse_xml(archive, names, "docProps/core.xml")

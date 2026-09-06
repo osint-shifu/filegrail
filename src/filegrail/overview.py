@@ -7,7 +7,7 @@ and which of them wants a second look.
 
 Nothing here decides anything. Every count is read back off the records the
 scan already produced, through the same family table `--type` filters on and
-the same reconciliation the entries print, so a number in the overview and the
+the same correlation the entries print, so a number in the overview and the
 entry it refers to cannot disagree.
 """
 
@@ -17,10 +17,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from .correlate import correlate
 from .filters import FAMILIES
-from .identify import CONTENT, Identifier
-from .models import ACQUISITION, INTERACTION, INTRINSIC, FileRecord, kind
-from .reconcile import reconcile
+from .identify import IN_CONTENT, Identifier
+from .models import ACTIVITY, METADATA, ORIGIN, FileRecord, category
 
 #: Which family a file is counted under when more than one claims it. `.msg` is
 #: in `document` and in `mail`, because either filter should select it; an
@@ -109,7 +109,13 @@ class Inventory:
 
 @dataclass(frozen=True, slots=True)
 class Tally:
-    """One row of the findings table: what was found, in how many files."""
+    """One row of the summary: what was read, in how many files.
+
+    Not a finding. A finding is what correlation produced - a conflict, a
+    corroboration, an impossible order; this counts how many files carried a
+    kind of evidence at all, which is a different question and was being asked
+    under the same name.
+    """
 
     name: str
     files: int
@@ -147,7 +153,7 @@ def inventory(records: list[FileRecord]) -> Inventory:
 
     for record in records:
         suffix = Path(record.path).suffix.lower()
-        entry = counted.setdefault(_format(record.path, suffix), [0, 0])
+        entry = counted.setdefault(format_of(record.path, suffix), [0, 0])
         entry[0] += 1
         entry[1] += record.size
 
@@ -167,7 +173,7 @@ def inventory(records: list[FileRecord]) -> Inventory:
     )
 
 
-def _format(path: str, suffix: str) -> str:
+def format_of(path: str, suffix: str) -> str:
     """What an analyst would call this file's format.
 
     The family is still decided by the extension the file actually has, so a
@@ -193,40 +199,40 @@ def _family(suffix: str) -> str:
 # --- what was found ----------------------------------------------------------
 
 
-def _acquired(record: FileRecord) -> bool:
-    return any(kind(origin) == ACQUISITION for origin in record.origins)
+def _has_origin(record: FileRecord) -> bool:
+    return any(category(found) == ORIGIN for found in record.evidence)
 
 
-def _handled(record: FileRecord) -> bool:
-    return any(kind(origin) == INTERACTION for origin in record.origins)
+def _has_activity(record: FileRecord) -> bool:
+    return any(category(found) == ACTIVITY for found in record.evidence)
 
 
 def _tooled(record: FileRecord) -> bool:
-    return any(origin.tool for origin in record.origins)
+    return any(found.tool for found in record.evidence)
 
 
 def _from_a_device(record: FileRecord) -> bool:
-    return any(origin.source == "device-metadata" for origin in record.origins)
+    return any(found.source == "device-metadata" for found in record.evidence)
 
 
-def _credentialed(record: FileRecord) -> bool:
-    return any(origin.source == "c2pa" for origin in record.origins)
+def _content_credentials(record: FileRecord) -> bool:
+    return any(found.source == "c2pa" for found in record.evidence)
 
 
 def _placed(record: FileRecord) -> bool:
-    return any(origin.geo for origin in record.origins)
+    return any(found.geo for found in record.evidence)
 
 
 def _named_place(record: FileRecord) -> bool:
-    return any(origin.location for origin in record.origins)
+    return any(found.location for found in record.evidence)
 
 
 def _edited(record: FileRecord) -> bool:
-    return any(origin.source == "xmp-history" for origin in record.origins)
+    return any(found.source == "xmp-history" for found in record.evidence)
 
 
 def _dated(record: FileRecord) -> bool:
-    return any(origin.at for origin in record.origins)
+    return any(found.at for found in record.evidence)
 
 
 def _related(record: FileRecord) -> bool:
@@ -234,18 +240,18 @@ def _related(record: FileRecord) -> bool:
 
 
 def _contested(record: FileRecord) -> bool:
-    return reconcile(record).contested
+    return correlate(record).contested
 
 
 def _described(record: FileRecord) -> bool:
-    return any(kind(origin) == INTRINSIC for origin in record.origins)
+    return any(category(found) == METADATA for found in record.evidence)
 
 
 def _authored(record: FileRecord) -> bool:
     return any(
-        name in origin.fields
-        for origin in record.origins
-        for name in AUTHOR_FIELDS.get(origin.block or "", ())
+        name in found.fields
+        for found in record.evidence
+        for name in AUTHOR_FIELDS.get(found.block or "", ())
     )
 
 
@@ -262,12 +268,12 @@ def _authored(record: FileRecord) -> bool:
 #: first.
 TALLIES: tuple[tuple[str, Callable[[FileRecord], bool]], ...] = (
     ("metadata", _described),
-    ("acquisition evidence", _acquired),
-    ("interaction records", _handled),
+    ("origin evidence", _has_origin),
+    ("activity records", _has_activity),
     ("authors / creators", _authored),
     ("creating software", _tooled),
     ("device information", _from_a_device),
-    ("content credentials", _credentialed),
+    ("Content Credentials", _content_credentials),
     ("coordinates", _placed),
     ("named locations", _named_place),
     ("edit history", _edited),
@@ -280,11 +286,11 @@ TALLIES: tuple[tuple[str, Callable[[FileRecord], bool]], ...] = (
 #: about itself and what the machine recorded about its arrival - and a scan
 #: that read a great deal of the first and none of the second has found that
 #: out. Leaving the row off would make the absence look like an omission.
-ALWAYS: frozenset[str] = frozenset({"metadata", "acquisition evidence"})
+ALWAYS: frozenset[str] = frozenset({"metadata", "origin evidence"})
 
 
-def findings(records: list[FileRecord]) -> list[Tally]:
-    """How many files each kind of finding turned up in.
+def summary(records: list[FileRecord]) -> list[Tally]:
+    """How many files each kind of evidence was read from.
 
     A row nothing matched is left out rather than printed as a zero: a column
     of zeroes reads as a list of the things the tool could not do, which is a
@@ -301,7 +307,7 @@ def findings(records: list[FileRecord]) -> list[Tally]:
 # --- what wants a second look ------------------------------------------------
 
 
-def attention(
+def notable(
     records: list[FileRecord],
     identifiers: list[Identifier],
     *,
@@ -328,14 +334,14 @@ def attention(
 
     for matches, verb, what in (
         (_placed, CONTAIN, "coordinates"),
-        (_credentialed, CONTAIN, "Content Credentials"),
+        (_content_credentials, CONTAIN, "Content Credentials"),
         (_related, ("references", "reference"), "other files in this scan"),
     ):
         count = sum(1 for record in records if matches(record))
         if count:
             raised.append(Alert(text=_said(count, verb, what)))
 
-    linked = [entry for entry in identifiers if entry.acquired and CONTENT in entry.corpora]
+    linked = [entry for entry in identifiers if entry.acquired and IN_CONTENT in entry.corpora]
     if linked:
         # The one thing reading document text is for. A name inside a document
         # is a lead; a name inside a document that the record of the file's

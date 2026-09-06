@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from filegrail.models import CONFIDENCE, FileRecord, Origin
+from filegrail.models import EvidenceRecord, FileRecord
 from filegrail.report import render_text
 from filegrail.theme import ARCHIVE_WIDTH, EVIDENCE, Theme, detect
 
@@ -18,8 +18,8 @@ class _Stream:
 
 def _record() -> FileRecord:
     record = FileRecord(path="/case/a.txt", size=1, mtime="2026-08-24T19:00:00Z")
-    record.origins.append(
-        Origin(
+    record.evidence.append(
+        EvidenceRecord(
             source="browser-download", url="https://example.org/a.txt", at="2026-08-24T19:00:00Z"
         )
     )
@@ -87,11 +87,14 @@ def test_ascii_fallback_avoids_box_drawing():
     assert output.isascii()
 
 
-def test_confidence_meter_scales_with_the_score():
+def test_the_run_progress_meter_is_the_only_meter_left():
+    """The evidence meter drew one number as five blocks and read as a
+    strength; the coverage bar counts files done out of files found, which is
+    arithmetic about the run rather than a rating of anything."""
     theme = Theme(colour=False, unicode=False, width=88)
 
-    assert theme.bar(90).count("#") > theme.bar(40).count("#")
-    assert len(theme.bar(90)) == len(theme.bar(10)) == 5
+    assert not hasattr(theme, "meter")
+    assert theme.coverage(6, 12).count("#") == 6
 
 
 def test_width_is_clamped_to_a_readable_range(monkeypatch):
@@ -102,10 +105,16 @@ def test_width_is_clamped_to_a_readable_range(monkeypatch):
     assert detect(_Stream(tty=True)).width >= 48
 
 
-def test_every_ranked_source_has_an_evidence_colour():
-    """A source absent from the palette is painted faint, which the legend reads
-    as "filesystem timestamps only" - a silent demotion of real evidence."""
-    assert set(CONFIDENCE) <= set(EVIDENCE)
+def test_every_source_is_painted_by_its_category():
+    """One table decides what a source is about; the palette follows it, so a
+    source cannot be coloured as one thing and reported as another."""
+    from filegrail.models import SOURCE_CATEGORIES
+
+    theme = Theme(colour=True, unicode=True, width=88)
+
+    assert set(SOURCE_CATEGORIES.values()) <= set(EVIDENCE)
+    for source, expected in SOURCE_CATEGORIES.items():
+        assert theme.evidence(source) == expected, source
 
 
 # --- the width a report that outlives its terminal is laid out to -------------

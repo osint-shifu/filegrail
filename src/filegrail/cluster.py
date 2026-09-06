@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-from .models import FileRecord
+from .models import BLOCK_LABELS, FileRecord, label
 from .overview import AUTHOR_FIELDS
 
 #: A name in a field meant for one: text a person or a program wrote down.
@@ -52,6 +52,9 @@ _AUTHOR_SEPARATOR = ";"
 #: The make and the model, which are one answer written in two fields.
 _MAKE, _MODEL = "Make", "Model"
 
+#: How a basis joins the block to the field inside it.
+_BASIS = " \u00b7 "
+
 
 @dataclass(slots=True)
 class Group:
@@ -61,19 +64,28 @@ class Group:
     name: str
     paths: list[str]
 
+    #: The block and field the value was read from - `EXIF · BodySerialNumber`.
+    #: A cluster without it says four files share a serial and leaves a reader
+    #: to guess which tag that was, which is the first thing anybody checks.
+    basis: str = ""
+
     def to_dict(self) -> dict[str, object]:
-        return {"axis": self.axis, "name": self.name, "paths": self.paths}
+        return {"axis": self.axis, "name": self.name, "basis": self.basis, "paths": self.paths}
 
 
 def cluster(records: list[FileRecord]) -> list[Group]:
     """Group the scanned files by every identifying value they share."""
     found: dict[tuple[str, str], list[str]] = {}
+    bases: dict[tuple[str, str], str] = {}
     for record in records:
-        for axis, name in _names(record):
+        for axis, name, basis in _names(record):
             paths = found.setdefault((axis, name), [])
+            bases.setdefault((axis, name), basis)
             if record.path not in paths:
                 paths.append(record.path)
-    groups = [Group(axis, name, paths) for (axis, name), paths in found.items()]
+    groups = [
+        Group(axis, name, paths, bases[(axis, name)]) for (axis, name), paths in found.items()
+    ]
     groups.sort(key=lambda group: (AXES.index(group.axis), -len(group.paths), group.name))
     return groups
 
@@ -94,20 +106,23 @@ def _model(fields: dict[str, str]) -> str | None:
     return model
 
 
-def _names(record: FileRecord) -> Iterator[tuple[str, str]]:
-    """Every identifying value this file carries, with the axis it sits on."""
-    for origin in record.origins:
-        for field in AUTHOR_FIELDS.get(origin.block or "", ()):
-            for name in (origin.fields.get(field) or "").split(_AUTHOR_SEPARATOR):
+def _names(record: FileRecord) -> Iterator[tuple[str, str, str]]:
+    """Every identifying value this file carries, the axis it sits on, and the
+    field it was read from."""
+    for found in record.evidence:
+        block = BLOCK_LABELS.get(found.block or "", label(found))
+        for field in AUTHOR_FIELDS.get(found.block or "", ()):
+            for name in (found.fields.get(field) or "").split(_AUTHOR_SEPARATOR):
                 if name.strip():
-                    yield AUTHOR, name.strip()
+                    yield AUTHOR, name.strip(), f"{block}{_BASIS}{field}"
 
         for field in _SERIAL_FIELDS:
-            serial = (origin.fields.get(field) or "").strip()
+            serial = (found.fields.get(field) or "").strip()
             if serial:
-                yield DEVICE, serial
+                yield DEVICE, serial, f"{block}{_BASIS}{field}"
                 break
 
-        model = _model(origin.fields)
+        model = _model(found.fields)
         if model:
-            yield MODEL, model
+            named = _MODEL if _MAKE not in found.fields else f"{_MAKE} + {_MODEL}"
+            yield MODEL, model, f"{block}{_BASIS}{named}"

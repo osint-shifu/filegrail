@@ -12,30 +12,31 @@ saying which class of source made a claim.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
-from functools import partial
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from . import TAGLINE, __version__
-from .about import WORDMARK
+from . import __version__
 from .clean import Cleaned
 from .cluster import cluster as group_sources
-from .explain import conclusion, grouped, questions
-from .identify import CONTENT, METADATA, PLACE, Identifier, extract
+from .correlate import (
+    CONFLICTS,
+    CorrelationResult,
+    correlate,
+)
+from .explain import assessment
+from .identify import PLACE, Identifier, extract
 from .models import (
-    ACQUISITION,
+    ACTIVITY,
     BLOCK_LABELS,
-    INTERACTION,
-    INTRINSIC,
-    SOURCE_LABELS,
+    METADATA,
+    ORIGIN,
+    EvidenceRecord,
     FileRecord,
-    Origin,
-    kind,
+    category,
     label,
 )
-from .overview import Alert, Inventory, Tally, attention, findings, inventory
-from .reconcile import ATTRIBUTION_CONFLICT, CONFLICT, KINDS, PARTIAL, Verdict, reconcile
+from .overview import Inventory, format_of, inventory
 from .scan import Unsearched
 
 if TYPE_CHECKING:  # both are imported where they are used, to keep startup light
@@ -43,23 +44,34 @@ if TYPE_CHECKING:  # both are imported where they are used, to keep startup ligh
     from .doctor import Survey
 from .theme import (
     ARROW,
-    BRANCH,
-    BULLET,
-    EVIDENCE_HEADINGS,
     FLAG,
     LAST,
     MIDDOT,
+    NOT_EQUAL,
     RAIL,
+    RECORD,
     RULE,
-    STRENGTH,
     Theme,
     detect,
 )
 
-#: The version of the machine-readable documents. It is a promise to whatever
-#: consumes them, so it changes only when a field changes meaning or leaves -
-#: adding one is not a break, and neither is a release.
-SCHEMA = 1
+#: The version of each machine-readable document. It is a promise to whatever
+#: consumes them, so a number moves only when a field in *that* document
+#: changes meaning or leaves - adding one is not a break, and neither is a
+#: release. Per document rather than one number for all of them: `clean` did
+#: not change because the vocabulary around it did, and bumping it would tell
+#: every consumer of `clean` to go and look at nothing.
+SCHEMAS: dict[str, int] = {
+    # `origins` became `evidence`, every record carries `category` and `match`,
+    # `confidence` is gone, and `reconciliation` is `correlation`.
+    "scan": 2,
+    # The same file document, plus `conclusion` renamed to `assessment`.
+    "explain": 2,
+    # `acquisition` became `origin`.
+    "compare": 2,
+    "doctor": 1,
+    "clean": 1,
+}
 
 #: Sources describing what a file says about itself, rather than where it came from.
 SELF_REPORTED = frozenset(
@@ -91,16 +103,6 @@ _INDENT = 4
 #: Past this the column is eating the terminal; a longer name is not truncated,
 #: it takes a line of its own.
 _FIELD_NAME = 24
-
-
-def _gutter(theme: Theme) -> int:
-    """How wide the gutter column is for this theme.
-
-    Unicode glyphs are all one column, but the ASCII arrow is `<-`, two. Padding
-    every glyph to the widest keeps the left edge straight in both, which is the
-    whole point of having a gutter.
-    """
-    return 2 + len(theme.glyph(ARROW)) + 1
 
 
 def _mark(theme: Theme, symbol: str, colour: str | None = None) -> str:
@@ -136,6 +138,587 @@ def _row(
     return f"{prefix}{painted}{' ' * gap}{right}"
 
 
+# --- the shape every view is built from ----------------------------------------
+
+#: A mark and the space after it. Every line in a section starts with one, so a
+#: marked row and an unmarked row sit in the same column and a reader's eye
+#: never has to shift left and right down a table.
+_GUTTER = 2
+
+#: How wide the labels in the opening block are: `target`, `left`, `right`.
+_CHROME_LABEL = 10
+
+#: Between two columns. Two spaces read as a gap; one reads as a wrapped word.
+_GAP = 2
+
+#: The narrowest a column carrying a value is ever made. Below this a value
+#: wraps into unreadable slivers, so the table gives up a column instead.
+_FLEX_FLOOR = 12
+
+
+def _chrome(theme: Theme, mode: str, rows: list[tuple[str, str]]) -> list[str]:
+    """The lines every view opens with.
+
+    `filegrail 0.7.0 · scan`, a rule, and the facts about this run: what was
+    looked at, and whose traces were read if they were not this machine's. One
+    fact per line, wrapped rather than clipped - half a path is not a path.
+    """
+    said = f"{theme.bold('filegrail')} {__version__}"
+    if mode:
+        said += f" {theme.dim(theme.glyph(MIDDOT))} {theme.dim(mode)}"
+    lines = [said, theme.rule(theme.width)]
+    for name, value in rows:
+        if not value:
+            continue
+        for index, part in enumerate(theme.wrap(value, theme.width - _CHROME_LABEL)):
+            head = theme.dim(name.ljust(_CHROME_LABEL)) if index == 0 else " " * _CHROME_LABEL
+            lines.append(f"{head}{part}")
+    return lines
+
+
+def _section(theme: Theme, name: str, *counts: str) -> list[str]:
+    """`ORIGIN  ·  2 records · 2 files`, and the rule under it.
+
+    The counts are of the section's own contents, said once here so nothing
+    below repeats them. Every one of them must be of something a reader can go
+    and count in the rows underneath, or it is a number to keep in agreement
+    with another number.
+    """
+    middot = theme.glyph(MIDDOT)
+    kept = [count for count in counts if count]
+    said = theme.label(name.upper())
+    # A count that does not fit is dropped rather than wrapped: the heading is
+    # one line by construction, and the numbers are all counts of rows a reader
+    # can see for themselves a moment later.
+    while kept:
+        joined = f"  {middot}  {f' {middot} '.join(kept)}"
+        if len(name) + len(joined) <= theme.width:
+            said += f"  {theme.dim(middot)}  {theme.dim(f' {middot} '.join(kept))}"
+            break
+        kept.pop()
+    return ["", said, theme.rule(theme.width), ""]
+
+
+def _laid_out(
+    theme: Theme,
+    head: tuple[str, ...],
+    rows: Sequence[tuple[str, ...]],
+    *,
+    marks: list[str] | None = None,
+    align: str = "",
+    keep: int = 2,
+    flex: int = 0,
+    drop: tuple[int, ...] = (),
+) -> tuple[list[str], list[list[str]]]:
+    """A header in lower case, a rule the width of each column, then the rows.
+
+    Columns give way when the window is too narrow for all of them, down to
+    `keep`: from the right by default, or in the order `drop` names where the
+    rightmost column is not the one that matters least. Whatever width is left
+    then goes to the `flex` column - the one carrying the value a reader came
+    for, which is the file in most tables and the summary where a table has
+    one - and its cells wrap
+    rather than being cut. Nothing here truncates: a URL with an ellipsis in it
+    cannot be copied, opened or grepped for, which is most of what anybody
+    wants a value in a report for.
+    """
+    if not rows:
+        return [], []
+    align = (align or "l" * len(head)).ljust(len(head), "l")
+    widths = [
+        max(len(head[index]), max(len(row[index]) for row in rows)) for index in range(len(head))
+    ]
+
+    # Which columns are still being printed, in the order they are printed.
+    shown = list(range(len(head)))
+    # `drop` names the columns that matter least, in order. Anything it does
+    # not name still gives way rather than running off the edge - it just goes
+    # last, from the right.
+    order = [*drop, *(index for index in reversed(range(len(head))) if index not in drop)]
+
+    def fixed() -> int:
+        return sum(
+            _GAP * bool(place) + widths[index] for place, index in enumerate(shown) if index != flex
+        )
+
+    # `keep` is what the table would like to keep, not a floor: a window too
+    # narrow for that many columns gets fewer rather than a row that runs off
+    # the edge, and the flex column is the last one standing.
+    for wanted in (keep, 1):
+        for index in order:
+            if len(shown) <= wanted:
+                break
+            if _GUTTER + fixed() + _GAP + _FLEX_FLOOR <= theme.width:
+                break
+            if index != flex and index in shown:
+                shown.remove(index)
+        if _GUTTER + fixed() + _GAP + _FLEX_FLOOR <= theme.width:
+            break
+    room = theme.width - _GUTTER - fixed() - (_GAP if shown.index(flex) else 0)
+    widths[flex] = max(_FLEX_FLOOR, min(widths[flex], room))
+
+    def laid(cells: tuple[str, ...]) -> str:
+        out = ""
+        for place, index in enumerate(shown):
+            value = cells[index]
+            if place:
+                out += " " * _GAP
+            out += value.rjust(widths[index]) if align[index] == "r" else value.ljust(widths[index])
+        return out.rstrip()
+
+    # The rule under a header is the width of its column, not of its name: it
+    # is what says how far the column reaches, which is exactly the question a
+    # reader has when the values in it are short.
+    bar = theme.glyph(RULE)
+    # The header wraps like any other row: its own words can outgrow a column
+    # that had to give way, and a heading running off the edge is the same bug
+    # as a value doing it.
+    named = list(head)
+    named[flex] = theme.wrap(head[flex], widths[flex])[0]
+    header = [
+        theme.dim(f"{' ' * _GUTTER}{laid(tuple(named))}"),
+        theme.dim(f"{' ' * _GUTTER}{laid(tuple(bar * width for width in widths))}"),
+    ]
+    # A value too long for its column continues under itself, aligned to the
+    # column it belongs to rather than to the edge of the screen.
+    indent = _GUTTER + sum(widths[index] + _GAP for index in shown[: shown.index(flex)])
+    body = []
+    for index, row in enumerate(rows):
+        mark = (marks[index] if marks else " ") or " "
+        parts = theme.wrap(row[flex], widths[flex])
+        cells = list(row)
+        cells[flex] = parts[0]
+        group = [f"{mark} {laid(tuple(cells))}".rstrip()]
+        group.extend(f"{' ' * indent}{part}" for part in parts[1:])
+        body.append(group)
+    return header, body
+
+
+def _table(*args: Any, **kwargs: Any) -> list[str]:
+    """`_laid_out`, flattened, for a table whose rows carry nothing under them."""
+    header, body = _laid_out(*args, **kwargs)
+    return [*header, *(line for group in body for line in group)]
+
+
+def _details(theme: Theme, pairs: list[tuple[str, str]], colour: str = "body") -> list[str]:
+    """The fields hanging off a record, the last of them on `└`.
+
+    A label column of its own, so values line up under one another, and a value
+    that outgrows the line continues under itself rather than being cut.
+    """
+    kept = [(name, value) for name, value in pairs if value]
+    if not kept:
+        return []
+    width = max(len(name) for name, _ in kept)
+    indent = _GUTTER + 2 + width + _GAP
+    lines = []
+    for index, (name, value) in enumerate(kept):
+        rail = theme.glyph(LAST if index == len(kept) - 1 else RAIL)
+        head = f"{' ' * _GUTTER}{theme.dim(rail)} {theme.dim(name.ljust(width))}{' ' * _GAP}"
+        for part_index, part in enumerate(theme.wrap(value, theme.width - indent)):
+            start = head if part_index == 0 else " " * indent
+            lines.append(f"{start}{theme.paint(part, colour)}")
+    return lines
+
+
+#: What a file nothing was found for is marked with, and what a file that wants
+#: a second look is marked with. Nothing else in a table carries a mark: an
+#: ordinary row is the ordinary case and does not need announcing.
+NOTHING, REVIEW = MIDDOT, FLAG
+
+#: What an empty cell reads as. A dash rather than a blank, because a blank in
+#: a column reads as a value somebody forgot to print.
+EMPTY = "—"
+
+
+def _blank(theme: Theme) -> str:
+    return EMPTY if theme.unicode else "-"
+
+
+def _named(record: EvidenceRecord) -> str:
+    """What to call this record's source in a column.
+
+    The most specific true name, in three steps. A metadata record names the
+    block it was decoded from - `EXIF`, not `device metadata`, because the
+    reader is about to go and read that block's own table. A browser download
+    names the browser: four of them write the same kind of database, and
+    `browser download` on every row leaves a reader to open the JSON to find
+    out which. Everything else already has one specific name.
+    """
+    if record.block and record.block in BLOCK_LABELS:
+        return BLOCK_LABELS[record.block]
+    if record.source == "browser-download" and record.tool:
+        return f"{record.tool.capitalize()} download"
+    return label(record)
+
+
+def _stamp(moment: str | None) -> str:
+    """`2026-08-31 10:49:33` - the same instant, without the machine grammar."""
+    return moment[:19].replace("T", " ").replace("Z", "") if moment else ""
+
+
+def _format(path: str) -> str:
+    """`JPEG`, not `JPG`: the format has one name and the file has many."""
+    return format_of(path, Path(path).suffix.lower())
+
+
+def _counts(theme: Theme, rows: list[tuple[str, str]]) -> list[str]:
+    """The summary block: one fact a line, the label in a column of its own."""
+    width = max(len(name) for name, _ in rows)
+    return [f"{' ' * _GUTTER}{theme.dim(name.ljust(width))}   {value}" for name, value in rows]
+
+
+def _legend(theme: Theme, marks: list[str]) -> list[str]:
+    """What the marks above mean. Printed only for the marks actually used."""
+    said = []
+    if theme.glyph(REVIEW) in marks:
+        said.append(f"{theme.glyph(REVIEW)} needs review")
+    if theme.glyph(NOTHING) in marks:
+        said.append(f"{theme.glyph(NOTHING)} no evidence found")
+    return ["", f"{' ' * _GUTTER}{theme.dim('   '.join(said))}"] if said else []
+
+
+def _summarise(theme: Theme, record: EvidenceRecord) -> str:
+    """One line of what a metadata record holds, in the order it is looked for.
+
+    What made it, then what identifies that one machine, then who is named,
+    then whether there is a fix on a map, then when it says it was made.
+    Everything else is in the block's own table below; this is the line that
+    says whether to go and read it.
+    """
+    said: list[str] = []
+    if record.tool:
+        said.append(record.tool)
+    for name in ("BodySerialNumber", "SerialNumber", "InternalSerialNumber"):
+        if serial := record.fields.get(name):
+            said.append(f"serial {serial}")
+            break
+    for name in ("creator", "author", "Author", "By-line", "dc:creator"):
+        if who := record.fields.get(name):
+            said.append(who)
+            break
+    if record.geo:
+        said.append(record.geo)
+    if record.location:
+        said.append(record.location)
+    if moment := _stamp(shown(record.at)):
+        said.append(moment)
+    return _facts_line(theme, said) if said else label(record)
+
+
+def _of(
+    records: list[FileRecord], wanted: str, theme: Theme | None = None
+) -> list[tuple[FileRecord, EvidenceRecord]]:
+    """Every record of one category, with the file it belongs to.
+
+    In the order the index put the files in, so that a reader working down the
+    report meets them the same way twice.
+    """
+    ordered = _reading_order(theme, records) if theme else records
+    return [
+        (record, found)
+        for record in ordered
+        for found in record.evidence
+        if category(found) == wanted
+    ]
+
+
+def _files_section(
+    theme: Theme, records: list[FileRecord], root: Path, contents: Inventory
+) -> list[str]:
+    """One row a file: what it is, and what was found under each category."""
+    blank = _blank(theme)
+    rows: list[tuple[str, ...]] = []
+    marks: list[str] = []
+    for record in _reading_order(theme, records):
+        rows.append(
+            (
+                _relative(record.path, root),
+                _format(record.path),
+                _size(record.size),
+                _named(record.origin) if record.origin else blank,
+                _named(record.metadata) if record.metadata else blank,
+                _named(record.activity) if record.activity else blank,
+            )
+        )
+        marks.append(_mark_for(theme, record))
+
+    lines = _section(theme, "files", *_scale(contents))
+    lines.extend(
+        _table(theme, ("file", "type", "size", "origin", "metadata", "activity"), rows, marks=marks)
+    )
+    lines.extend(_legend(theme, marks))
+    return lines
+
+
+def _reading_order(theme: Theme, records: list[FileRecord]) -> list[FileRecord]:
+    """What to open first, then the rest by size.
+
+    A table sorted by path is a directory listing, which the shell already
+    prints. The question this one answers is which file to read, and that has
+    an order of its own: anything wanting a second look, then everything that
+    was explained, then the files nothing was found for.
+    """
+    rank = {FLAG: 0, " ": 1, MIDDOT: 2}
+
+    def order(record: FileRecord) -> tuple[int, int, str]:
+        mark = _mark_for(theme, record)
+        plain = {theme.glyph(FLAG): FLAG, theme.glyph(MIDDOT): MIDDOT}.get(mark, " ")
+        return (rank[plain], -record.size, record.path)
+
+    return sorted(records, key=order)
+
+
+def _mark_for(theme: Theme, record: FileRecord) -> str:
+    if not record.evidence:
+        return theme.glyph(NOTHING)
+    return theme.glyph(REVIEW) if correlate(record).contested else " "
+
+
+def _scale(contents: Inventory) -> tuple[str, ...]:
+    """`4 files · 4 types · 3.4 MB`, the size of what a section holds."""
+    return (
+        _plural(contents.files, "file"),
+        _plural(len(contents.types), "type"),
+        _size(contents.size),
+    )
+
+
+def _origin_section(
+    theme: Theme, records: list[FileRecord], root: Path, *, named: bool
+) -> list[str]:
+    """Where each file came from, and what the record that says so holds."""
+    found = _of(records, ORIGIN, theme)
+    if not found:
+        return []
+    blank = _blank(theme)
+    rows = []
+    for record, one in found:
+        cells: tuple[str, ...] = (_named(one), one.matched_by, _stamp(shown(one.at)) or blank)
+        rows.append((_relative(record.path, root), *cells) if named else cells)
+    head: tuple[str, ...] = ("source", "match", "time")
+    if named:
+        head = ("file", *head)
+
+    lines = _section(
+        theme,
+        "origin",
+        _plural(len(found), "record"),
+        _plural(len({record.path for record, _ in found}), "file") if named else "",
+    )
+    lines.extend(
+        _threaded(
+            theme,
+            head,
+            rows,
+            [
+                [
+                    ("url", one.url or ""),
+                    ("referrer", one.referrer or ""),
+                    ("command", one.command or ""),
+                    ("note", one.note or ""),
+                    ("match", one.match_note or ""),
+                ]
+                for _, one in found
+            ],
+        )
+    )
+    return lines
+
+
+def _metadata_section(
+    theme: Theme, records: list[FileRecord], root: Path, *, named: bool
+) -> list[str]:
+    """What each file records about itself, one line each."""
+    found = _of(records, METADATA, theme)
+    if not found:
+        return []
+    rows = []
+    for record, one in found:
+        cells: tuple[str, ...] = (_named(one), _summarise(theme, one))
+        rows.append((_relative(record.path, root), *cells) if named else cells)
+    head: tuple[str, ...] = ("source", "summary")
+    if named:
+        head = ("file", *head)
+
+    fields = sum(len(one.fields) for _, one in found)
+    lines = _section(
+        theme,
+        "metadata",
+        _plural(len(found), "source"),
+        _plural(len({record.path for record, _ in found}), "file") if named else "",
+        # Only where the fields themselves follow, which is the single-file
+        # view: a count of something the reader cannot see under the heading is
+        # a number to be taken on trust.
+        "" if named else _plural(fields, "field"),
+    )
+    lines.extend(
+        _table(
+            theme,
+            head,
+            rows,
+            marks=[theme.glyph(RECORD)] * len(rows),
+            keep=len(head),
+            flex=len(head) - 1,
+        )
+    )
+    return lines
+
+
+def _activity_section(
+    theme: Theme, records: list[FileRecord], root: Path, *, named: bool
+) -> list[str]:
+    """What handled the file here, after it arrived."""
+    found = _of(records, ACTIVITY, theme)
+    if not found:
+        return []
+    blank = _blank(theme)
+    rows = []
+    for record, one in found:
+        cells: tuple[str, ...] = (_named(one), one.matched_by, _stamp(shown(one.at)) or blank)
+        rows.append((_relative(record.path, root), *cells) if named else cells)
+    head: tuple[str, ...] = ("source", "match", "time")
+    if named:
+        head = ("file", *head)
+
+    lines = _section(
+        theme,
+        "activity",
+        _plural(len(found), "record"),
+        _plural(len({record.path for record, _ in found}), "file") if named else "",
+    )
+    lines.extend(
+        _threaded(
+            theme,
+            head,
+            rows,
+            [[("note", one.note or ""), ("tool", one.tool or "")] for _, one in found],
+        )
+    )
+    return lines
+
+
+def _threaded(
+    theme: Theme,
+    head: tuple[str, ...],
+    rows: Sequence[tuple[str, ...]],
+    details: Sequence[list[tuple[str, str]]],
+) -> list[str]:
+    """A table whose rows each carry their own fields underneath them.
+
+    Laid out as one table first, so the columns line up down the section, and
+    the fields threaded back in afterwards.
+    """
+    header, body = _laid_out(theme, head, rows, marks=[theme.glyph(RECORD)] * len(rows), flex=0)
+    lines = list(header)
+    for group, pairs in zip(body, details, strict=True):
+        lines.extend(group)
+        lines.extend(_details(theme, pairs))
+    return lines
+
+
+def _findings_section(theme: Theme, records: list[FileRecord], root: Path) -> list[str]:
+    """What correlation made of the records: conflicts, corroboration, order."""
+    found = [(record, finding) for record in records for finding in correlate(record).findings]
+    if not found:
+        return []
+    blank = _blank(theme)
+    rows, marks, details = [], [], []
+    for record, finding in found:
+        rows.append(
+            (
+                finding.kind.replace("_", " "),
+                _relative(record.path, root),
+                finding.field or blank,
+                " · ".join(name for name in (finding.sources or ()) if name) or blank,
+            )
+        )
+        marks.append(theme.glyph(REVIEW) if finding.kind in CONFLICTS else " ")
+        pairs = []
+        if finding.values and finding.sources:
+            pairs = [
+                (finding.sources[0] or "left", finding.values[0]),
+                (finding.sources[1] or "right", finding.values[1]),
+            ]
+        elif not finding.values:
+            pairs = [("", finding.text)]
+        details.append(pairs)
+
+    review = sum(1 for mark in marks if mark == theme.glyph(REVIEW))
+    lines = _section(
+        theme,
+        "findings",
+        _plural(len(found), "finding"),
+        f"{review} needs review" if review else "",
+    )
+    header, body = _laid_out(theme, ("type", "file", "field", "sources"), rows, marks=marks, flex=1)
+    lines.extend(header)
+    for group, pairs in zip(body, details, strict=True):
+        lines.extend(group)
+        lines.extend(_details(theme, pairs))
+    lines.extend(_legend(theme, marks))
+    return lines
+
+
+def _relationships_section(theme: Theme, records: list[FileRecord], root: Path) -> list[str]:
+    """How the scanned files stand to one another.
+
+    Not evidence about any one file: a link exists only because both files were
+    scanned together, and it says something neither record says alone. Kept in
+    its own section for that reason rather than hung off either file.
+    """
+    rows = [
+        (
+            link.kind,
+            _relative(record.path, root),
+            " · ".join(_relative(path, root) for path in link.others)
+            or _plural(link.count, "file"),
+        )
+        for record in records
+        for link in record.links
+    ]
+    if not rows:
+        return []
+    lines = _section(
+        theme,
+        "relationships",
+        _plural(len(rows), "relation"),
+        _plural(len({row[1] for row in rows}), "file"),
+    )
+    lines.extend(_table(theme, ("relationship", "file", "related"), rows, keep=3, flex=2))
+    return lines
+
+
+def _unresolved_section(theme: Theme, records: list[FileRecord], root: Path) -> list[str]:
+    """The files no supported source said anything about.
+
+    Not a list of failures. It says the sources this machine has were searched
+    and held nothing that explains these files, which is a finding of its own
+    and the one a reader is most likely to act on next.
+    """
+    if not records:
+        return []
+    rows = [
+        (
+            _relative(record.path, root),
+            _format(record.path),
+            _size(record.size),
+            _stamp(shown(record.btime or record.mtime)),
+        )
+        for record in records
+    ]
+    lines = _section(theme, "unresolved", _plural(len(records), "file"))
+    lines.extend(
+        _table(
+            theme,
+            ("file", "type", "size", "last modified"),
+            rows,
+            marks=[theme.glyph(NOTHING)] * len(rows),
+        )
+    )
+    return lines
+
+
 def render_text(
     records: list[FileRecord],
     root: Path,
@@ -152,90 +735,223 @@ def render_text(
     home: Path | None = None,
     unsearched: Unsearched | None = None,
 ) -> str:
+    """A scan, read from the whole directory down to the single record.
+
+    What is here, what was found in it, then the records themselves grouped by
+    the question each one answers, and last the files nothing explained. A
+    section with nothing in it is not printed: an empty heading is a promise
+    the scan did not keep.
+    """
     theme = theme or detect()
-    known = [record for record in records if record.origins]
-    unknown = [record for record in records if not record.origins]
+    known = [record for record in records if record.evidence]
+    unknown = [record for record in records if not record.evidence]
     found = extract(records, content=content)
     contents = inventory(records)
+    named = len(records) > 1
 
-    lines = _masthead(theme, root, contents, len(known), len(unknown), home)
+    # A single file is its own target: the directory it happens to sit in is
+    # not what was asked about.
+    target = Path(records[0].path) if len(records) == 1 and not root.is_file() else root
+    lines = _chrome(theme, "brief" if brief else "", [("target", _where(theme, target, home))])
 
-    # A directory is answered from the top down: what is in it, what was found
-    # in it, what wants a second look, and only then one file at a time. A
-    # single file has none of those questions - there is nothing to inventory
-    # but itself - so it goes straight to the answer.
-    if len(records) > 1:
-        lines.extend(_inventory(theme, contents))
-        lines.extend(_findings(theme, findings(records)))
-        lines.extend(_attention(theme, attention(records, found, listed=identify), root))
+    if named:
+        lines.extend(_section(theme, "summary", *_scale(contents)))
+        lines.extend(_counts(theme, _tally(theme, records, known, unknown, brief=brief)))
+        lines.extend(_files_section(theme, records, root, contents))
+    else:
+        lines.extend(_one_file(theme, records[0], root) if records else [])
 
-    # The index first, then the same files in full. `--brief` is the index and
-    # what leads to it: a mode meant for a large directory that then prints an
-    # entry per file is not a mode, it is the report with the fields taken out.
-    lines.extend(_index(theme, records, root, limit))
     if not brief:
-        if known:
-            lines.extend(_heading(theme, "files in detail", len(known)))
-        lines.extend(_sections(theme, known, root, verbose=verbose, brief=brief))
+        lines.extend(_origin_section(theme, records, root, named=named))
+        lines.extend(_metadata_section(theme, records, root, named=named))
+        lines.extend(_activity_section(theme, records, root, named=named))
+        lines.extend(_findings_section(theme, records, root))
+        lines.extend(_relationships_section(theme, records, root))
+        if not named and records:
+            lines.extend(_block_sections(theme, records[0]))
+        if identify:
+            lines.extend(_identifiers(theme, found, content=content))
+        if cluster:
+            lines.extend(_clusters(theme, records, root))
+        if named:
+            lines.extend(_unresolved_section(theme, unknown, root))
 
-    if identify:
-        lines.extend(_identifiers(theme, found, content=content))
-
-    if cluster:
-        lines.extend(_shared(theme, records, root))
-
-    lines.extend(_summary(theme, records, known, unknown, stats, filtered, root, unsearched))
+    if not brief:
+        lines.extend(_gaps(theme, records, stats, filtered, root, unsearched))
     return "\n".join(lines)
 
 
-#: What each axis is called where the section names it. The word says what the
+def _where(theme: Theme, root: Path, home: Path | None) -> str:
+    """The target, and whose traces were read when they were not this machine's."""
+    said = [_display(root)]
+    if home:
+        said.extend([f"profile {_display(home)}", "external"])
+    return _facts_line(theme, said)
+
+
+def _tally(
+    theme: Theme,
+    records: list[FileRecord],
+    known: list[FileRecord],
+    unknown: list[FileRecord],
+    *,
+    brief: bool,
+) -> list[tuple[str, str]]:
+    """The counts under `SUMMARY`, each of something countable further down."""
+    review = sum(1 for record in records if _mark_for(theme, record) == theme.glyph(REVIEW))
+    if brief:
+        return [
+            ("with evidence", str(len(known))),
+            ("unresolved", str(len(unknown))),
+            ("needs review", str(review)),
+        ]
+    findings = sum(len(correlate(record).findings) for record in records)
+    said = str(findings)
+    if review:
+        said = _facts_line(theme, [said, f"{review} needs review"])
+    return [
+        ("with evidence", str(len(known))),
+        ("unresolved", str(len(unknown))),
+        ("origin records", str(len(_of(records, ORIGIN)))),
+        ("metadata sources", str(len(_of(records, METADATA)))),
+        ("activity records", str(len(_of(records, ACTIVITY)))),
+        ("findings", said),
+    ]
+
+
+def _one_file(theme: Theme, record: FileRecord, root: Path) -> list[str]:
+    """The head of a single-file report: what the file is and where it lies."""
+    lines = _section(
+        theme,
+        "file",
+        _relative(record.path, root),
+        _format(record.path),
+        _size(record.size),
+    )
+    lines.extend(
+        _counts(
+            theme,
+            [("path", record.path), ("mtime", _stamp(shown(record.btime or record.mtime)))],
+        )
+    )
+    return lines
+
+
+def _block_sections(theme: Theme, record: FileRecord) -> list[str]:
+    """Every metadata block this file carries, field by field.
+
+    One section per block rather than one long table: `EXIF` and `XMP` are
+    different standards with different field names, and a reader looking for a
+    tag knows which of the two it belongs to.
+    """
+    lines: list[str] = []
+    for found in record.evidence:
+        if category(found) != METADATA or not found.fields:
+            continue
+        rows = [(name, str(value)) for name, value in found.fields.items()]
+        lines.extend(_section(theme, _named(found), _plural(len(rows), "field")))
+        lines.extend(_table(theme, ("field", "value"), rows))
+    return lines
+
+
+def _listing(theme: Theme, values: list[str]) -> list[str]:
+    """Bare lines hanging off a record, the last on `└`. No label column: these
+    are all the same kind of thing, and a column of identical labels is noise."""
+    lines = []
+    for index, value in enumerate(values):
+        rail = theme.glyph(LAST if index == len(values) - 1 else RAIL)
+        for part_index, part in enumerate(theme.wrap(value, theme.width - _GUTTER - 2)):
+            head = f"{' ' * _GUTTER}{theme.dim(rail)} " if part_index == 0 else " " * (_GUTTER + 2)
+            lines.append(f"{head}{theme.dim(part)}")
+    return lines
+
+
+#: What each axis is called where a cluster names it. The word says what the
 #: shared value identifies, because the three do not identify equally well and
-#: one label for all of them would flatten that away.
-_AXIS_LABELS = {"device": "camera body", "model": "camera model", "author": "author"}
+#: one label for all of them would flatten that away: a body serial is one
+#: machine, a model is a product line, an author is a name somebody typed.
+_AXIS_LABELS = {"device": "camera serial", "model": "camera model", "author": "author"}
 
 
-def _shared(theme: Theme, records: list[FileRecord], root: Path) -> list[str]:
-    """The sources more than one scanned file names, and which files those are.
+def _clusters(theme: Theme, records: list[FileRecord], root: Path) -> list[str]:
+    """Values more than one scanned file shares, and which files share them.
 
     A group of one is left out: it says a file has an author, which the file
-    already said. What this section is for is the second file, and the picture
-    of a directory that appears once the repeats are counted.
-
-    A block, in the same language the identifiers use. As two columns the value
-    and the file names sat in one column with nothing to tell them apart - a
-    camera serial and a file name look alike, and a reader had to work out
-    which was which. The gutter says it instead: the value is the entry, the
-    lines under it are what it connects.
+    already said. What this is for is the second file, and the shape of a
+    directory that appears once the repeats are counted.
     """
     groups = [group for group in group_sources(records) if len(group.paths) > 1]
-    lines = _heading(theme, "shared sources", len(groups), "source")
-
     if not groups:
-        return [*lines, f"    {theme.dim('no source is shared by more than one file')}", ""]
+        return []
 
-    indent = _gutter(theme)
-    for group in groups:
-        said = _AXIS_LABELS.get(group.axis, group.axis)
-        right = theme.dim(f"{said} {theme.glyph(MIDDOT)} {_plural(len(group.paths), 'file')}")
-        parts = theme.wrap(group.name, theme.width - indent - _visible(right) - 2)
-        lines.append(
-            _row(
-                theme,
-                f"  {_mark(theme, BULLET, 'self-reported')} ",
-                parts[0],
-                right,
-                wrap=False,
-                paint=partial(theme.paint, name="self-reported"),
-            )
+    rows = [
+        (
+            _AXIS_LABELS.get(group.axis, group.axis),
+            group.name,
+            str(len(group.paths)),
+            group.basis,
         )
-        rail = _mark(theme, RAIL)
-        lines.extend(f"  {rail} {theme.paint(part, 'self-reported')}" for part in parts[1:])
-        # One a line rather than joined: a path may hold anything, including
-        # whatever would have separated them.
-        for path in group.paths:
-            for part in theme.wrap(_relative(path, root), theme.width - indent):
-                lines.append(f"  {rail} {theme.dim(part)}")
-        lines.append("")
+        for group in groups
+    ]
+    covered = len({path for group in groups for path in group.paths})
+    lines = _section(theme, "clusters", _plural(len(groups), "group"), _plural(covered, "file"))
+    header, body = _laid_out(
+        theme,
+        ("attribute", "value", "files", "basis"),
+        rows,
+        marks=[theme.glyph(RECORD)] * len(rows),
+        align="llrl",
+        keep=3,
+        flex=1,
+    )
+    lines.extend(header)
+    for lines_of_row, group in zip(body, groups, strict=True):
+        lines.extend(lines_of_row)
+        lines.extend(_listing(theme, [_relative(path, root) for path in group.paths]))
+    return lines
+
+
+def _gaps(
+    theme: Theme,
+    records: list[FileRecord],
+    stats: dict[str, int] | None,
+    filtered: str,
+    root: Path | None,
+    unsearched: Unsearched | None,
+) -> list[str]:
+    """What the scan could not look at, and how far back what it did look at reaches.
+
+    A directory that could not be read is a hole in the evidence rather than a
+    file with nothing in it, and the two must never be reported as one thing. A
+    browser history that was pruned is the same kind of hole: files older than
+    it cannot be resolved from it however long anybody stares at the report.
+    """
+    rows: list[tuple[str, ...]] = []
+    if unsearched:
+        for path in unsearched.unreadable:
+            rows.append((_relative(path, root) if root else path, "could not be read"))
+        for path in unsearched.by_name:
+            rows.append((_relative(path, root) if root else path, "skipped by name"))
+    # The reach of the browser history is a gap only where something went
+    # unresolved. On a scan that explained everything it is a fact about a
+    # store nobody needed, which is not worth a section.
+    unresolved = any(not record.evidence for record in records)
+    if stats and stats.get("browser_profiles") and unresolved:
+        reach = _plural(stats.get("browser_records", 0), "download record")
+        across = _plural(stats["browser_profiles"], "profile")
+        rows.append(("browser history", f"{reach} across {across}"))
+    elif stats is not None and unresolved and not stats.get("browser_profiles"):
+        rows.append(("browser history", "no profile could be read"))
+
+    lines: list[str] = []
+    if rows:
+        lines.extend(_section(theme, "scan gaps", _plural(len(rows), "item")))
+        lines.extend(
+            _table(theme, ("what", "detail"), rows, marks=[theme.glyph(NOTHING)] * len(rows))
+        )
+    if filtered:
+        said = "No file matched" if not records else "Limited to"
+        lines.extend(["", f"{' ' * _GUTTER}{theme.dim(f'{said} {filtered}.')}"])
     return lines
 
 
@@ -243,93 +959,259 @@ def _shared(theme: Theme, records: list[FileRecord], root: Path) -> list[str]:
 #: one that becomes a marker on a map, so it keeps the colour the report already
 #: uses for a location.
 _IDENTIFIER_COLOURS = {
-    "geo": "circumstantial",
+    "geo": "activity",
     "email": "recorded",
     "domain": "inherited",
     "url": "inherited",
-    "ipv4": "credentialed",
+    "ipv4": "origin",
 }
 
 
-def _corpus(entry: Identifier) -> str:
-    """Which side of the file this value was found on, in one word."""
-    if entry.corpora == {METADATA, CONTENT}:
-        return "both"
-    return "text" if CONTENT in entry.corpora else "recorded"
+#: What each identifier type is called where it heads its own table. Plural,
+#: because the heading is over a list.
+_TYPE_SECTIONS = {
+    "url": "urls",
+    "domain": "domains",
+    "email": "emails",
+    "ipv4": "ip addresses",
+    "geo": "coordinates",
+    "md5": "md5",
+    "sha1": "sha1",
+    "sha256": "sha256",
+}
+
+
+def _places(entry: Identifier) -> list[tuple[str, str, str]]:
+    """Each place a value was seen, split back into file, source and field."""
+    found = []
+    for place in entry.where:
+        parts = place.split(PLACE)
+        while len(parts) < 3:
+            parts.append("")
+        found.append((parts[0], parts[1], PLACE.join(parts[2:])))
+    return found
+
+
+def _values(theme: Theme, rows: Sequence[tuple[str, ...]]) -> list[str]:
+    """One value and everywhere it was seen, as a table or as blocks.
+
+    A table while the values are short enough to sit in a column beside the
+    places. A URL is usually not: at seventy-two columns a table leaves it
+    about half a line, and a URL broken across two lines cannot be copied,
+    opened or grepped for - which is most of what anybody wants one for. Where
+    that happens the value takes the line and the places hang underneath it,
+    which is the same shape the rest of the report uses for a record.
+    """
+    head = ("value", "file", "source", "field / location")
+    beside = (
+        theme.width
+        - _GUTTER
+        - sum(
+            _GAP + max(len(name), max((len(row[index]) for row in rows), default=0))
+            for index, name in enumerate(head)
+            if index
+        )
+    )
+    if max(len(row[0]) for row in rows) <= beside:
+        return _table(theme, head, rows, keep=3, flex=0)
+
+    lines = []
+    for value, file, source, field in rows:
+        wrapped = theme.wrap(value, theme.width - _GUTTER)
+        lines.append(f"{theme.glyph(RECORD)} {theme.paint(wrapped[0], 'metadata')}")
+        for part in wrapped[1:]:
+            lines.append(f"{' ' * _GUTTER}{theme.paint(part, 'metadata')}")
+        lines.extend(
+            _details(theme, [("file", file), ("source", source), ("where", field)], "body")
+        )
+    return lines
 
 
 def _identifiers(theme: Theme, found: list[Identifier], *, content: bool = False) -> list[str]:
-    """Every identifier the scan read, a block each.
+    """Every value the scan can be pivoted on, grouped by what kind it is.
 
-    Listed once each with a count rather than once per occurrence: the question
-    an analyst asks of this section is "what is in here", and the same author
-    address across forty files is one lead, not forty.
-
-    A block rather than a row, in the language the rest of the report already
-    speaks. As a table it repeated the type down a column, said `2 in 1` where
-    it meant two occurrences in one file, and squeezed the value into a third
-    of the width - so a URL, the thing most likely to be pivoted on, was broken
-    inside itself. Here the value gets the line, and every place it was seen
-    gets a line of its own rather than only the first one.
-
-    The corpus is named only where there are two corpora to tell apart. Without
-    `--content` every value came from the same place, and saying so on every
-    block would be noise.
+    One row per place rather than per value: an address in a download record
+    and the same address in the body of the document are two facts, and the
+    pairing of them is the thing reading content exists to find. The last
+    section names those pairings on their own, because a reader scanning for
+    them should not have to compare two tables by eye.
     """
     if not found:
         return []
 
-    lines = _heading(theme, "identifiers", len(found), noun="value")
-    indent = _gutter(theme)
+    occurrences = sum(entry.count for entry in found)
+    crossed = [entry for entry in found if len({source for _, source, _ in _places(entry)}) > 1]
+    # No trailing blank: the type sections open with one of their own, and two
+    # in a row read as something missing between them.
+    lines = _section(
+        theme,
+        "identifiers",
+        _plural(len(found), "unique value"),
+        _plural(occurrences, "occurrence"),
+        _plural(len(crossed), "cross-source") if crossed else "",
+    )[:-1]
 
-    for entry in found:
-        colour = _IDENTIFIER_COLOURS.get(entry.type, "self-reported")
-        said = entry.type
-        if content:
-            # Painted as evidence rather than dimmed when the value is in the
-            # document *and* in how the file arrived. That pairing is the thing
-            # reading content exists to make findable.
-            said += f" {theme.glyph(MIDDOT)} {_corpus(entry)}"
-            if entry.acquired and CONTENT in entry.corpora:
-                colour = "recorded"
-        right = theme.dim(said)
-        rail = _mark(theme, RAIL)
-
-        # The value gets the line before anything else does. A URL is what this
-        # section exists to be pivoted on, and one broken inside a path segment
-        # to make room for the word `url` beside it cannot be copied out of a
-        # terminal at all - so when both will not fit, the type goes down into
-        # the gutter with the rest of what is said about the value.
-        beside = theme.width - indent - _visible(right) - 2
-        alone = len(entry.normalized) > beside
-        parts = theme.wrap(entry.normalized, theme.width - indent if alone else beside)
-        lines.append(
-            _row(
+    for kind, heading in _TYPE_SECTIONS.items():
+        entries = [entry for entry in found if entry.type == kind]
+        if not entries:
+            continue
+        seen_at: list[tuple[str, ...]] = [
+            (entry.normalized, file, source, field)
+            for entry in entries
+            for file, source, field in _places(entry)
+        ]
+        seen = sum(entry.count for entry in entries)
+        lines.extend(
+            _section(
                 theme,
-                f"  {_mark(theme, BULLET, colour)} ",
-                parts[0],
-                "" if alone else right,
-                wrap=False,
-                paint=partial(theme.paint, name=colour),
-            ).rstrip()
+                heading,
+                _plural(len(entries), "unique value"),
+                _plural(seen, "occurrence"),
+            )
         )
-        lines.extend(f"  {rail} {theme.paint(part, colour)}" for part in parts[1:])
-        if alone:
-            lines.append(f"  {rail} {theme.dim('kind'.ljust(5))}  {right}")
+        lines.extend(_values(theme, seen_at))
 
-        seen = f"{_plural(entry.count, 'occurrence')} in {_plural(entry.files, 'file')}"
-        lines.append(f"  {rail} {theme.dim('seen'.ljust(5))}  {theme.dim(seen)}")
-        label = "where"
-        for place in entry.where:
-            # The place carries a middot because that is the form `--json`
-            # promises. A terminal that cannot print one gets the ASCII
-            # separator this report uses everywhere else.
-            shown_place = place.replace(PLACE, f" {theme.glyph(MIDDOT)} ")
-            for part in theme.wrap(shown_place, theme.width - indent - 8):
-                lines.append(f"  {rail} {theme.dim(label.ljust(5))}  {theme.dim(part)}")
-                label = ""
-        lines.append("")
+    if crossed:
+        rows: list[tuple[str, ...]] = []
+        for entry in crossed:
+            sources = sorted({source for _, source, _ in _places(entry)})
+            files = sorted({file for file, _, _ in _places(entry)})
+            rows.append((entry.normalized, " · ".join(sources), " · ".join(files)))
+        lines.extend(_section(theme, "cross-source matches", _plural(len(rows), "value")))
+        lines.extend(_table(theme, ("value", "sources", "files"), rows, keep=3, flex=0))
     return lines
+
+
+#: What each source's records read as on a timeline. The verb is what happened
+#: to the file, not what the tool did: `downloaded` is an event in the file's
+#: life and `read the history` is not.
+_EVENTS = {
+    "browser-download": "downloaded",
+    "windows-zone-identifier": "downloaded",
+    "macos-wherefroms": "downloaded",
+    "macos-quarantine": "downloaded",
+    "xdg-xattr": "downloaded",
+    "ytdlp-sidecar": "downloaded",
+    "email-delivery": "delivered",
+    "archive-member": "extracted",
+    "torrent": "downloaded",
+    "shell-history": "handled",
+    "device-metadata": "captured",
+    "c2pa": "produced",
+    "xmp-history": "edited",
+    "recent-documents": "opened",
+    "windows-recent": "opened",
+    "freedesktop-trash": "deleted",
+    "sync-folder": "synchronized",
+}
+
+#: What a record of each category reads as when its own source has no verb.
+_CATEGORY_EVENTS = {ORIGIN: "recorded", METADATA: "written", ACTIVITY: "handled"}
+
+
+def render_timeline(
+    records: list[FileRecord],
+    root: Path,
+    *,
+    theme: Theme | None = None,
+    home: Path | None = None,
+) -> str:
+    """Every dated record in the scan, on one axis.
+
+    A file nothing said anything about has no place here. It is a real finding
+    and the scan reports it, but it is not an event: nothing happened at a time
+    nobody recorded, and a row for it would be a date invented to fill a column.
+    """
+    theme = theme or detect()
+    events = [
+        (found.at, record, found) for record in records for found in record.evidence if found.at
+    ]
+    events.sort(key=lambda event: event[0])
+
+    lines = _chrome(theme, "timeline", [("target", _where(theme, root, home))])
+    if not events:
+        lines.extend(_section(theme, "timeline", "no dated record"))
+        return "\n".join(lines)
+
+    rows: list[tuple[str, ...]] = [
+        (
+            _stamp(shown(at)),
+            category(found),
+            _relative(record.path, root),
+            _named(found),
+            _EVENTS.get(found.source, _CATEGORY_EVENTS[category(found)]),
+        )
+        for at, record, found in events
+    ]
+    lines.extend(
+        _section(
+            theme,
+            "timeline",
+            _plural(len(rows), "event"),
+            _plural(len({record.path for _, record, _ in events}), "file"),
+        )
+    )
+    lines.extend(
+        _table(
+            theme,
+            ("time", "category", "file", "source", "event"),
+            rows,
+            keep=3,
+            flex=2,
+            # What gives way first is the category: the colour already carries
+            # it and the source name implies it, while the verb is the one
+            # column that says what actually happened.
+            drop=(1, 3, 4),
+        )
+    )
+    return "\n".join(lines)
+
+
+def _relative(path: str, root: Path) -> str:
+    try:
+        return str(Path(path).relative_to(root))
+    except ValueError:
+        return path
+
+
+def _size(value: int) -> str:
+    for unit, threshold in (("GB", 1 << 30), ("MB", 1 << 20), ("KB", 1 << 10)):
+        if value >= threshold:
+            return f"{value / threshold:.1f} {unit}"
+    return f"{value} B"
+
+
+def _display(root: Path) -> str:
+    try:
+        return "~/" + str(root.relative_to(Path.home()))
+    except ValueError:
+        return str(root)
+
+
+def _visible(text: str) -> int:
+    """Length of `text` as printed, ignoring escape sequences."""
+    length = 0
+    index = 0
+    while index < len(text):
+        if text[index] == "\x1b":
+            terminator = text.find("m", index)
+            index = len(text) if terminator < 0 else terminator + 1
+            continue
+        length += 1
+        index += 1
+    return length
+
+
+def _moment(value: str | None) -> str:
+    """A timestamp trimmed to the second.
+
+    Filesystem times carry microseconds, which are noise in a column meant to be
+    compared by eye and never precise enough to be evidence on their own.
+    """
+    if not value:
+        return ""
+    head = value[:19]
+    return f"{head}Z" if value.endswith("Z") else head
 
 
 def _plural(count: int, noun: str, plural: str | None = None) -> str:
@@ -354,66 +1236,6 @@ _VERSION_BESIDE = 52
 _VERSION_LINE = 2
 
 
-def _masthead(
-    theme: Theme,
-    root: Path,
-    found: Inventory,
-    known: int,
-    unknown: int,
-    home: Path | None = None,
-) -> list[str]:
-    """The report's own letterhead: what wrote this, and what it was pointed at.
-
-    A report is redirected to a file more often than it is read on screen, and
-    a file that does not say what produced it is a wall of text somebody has to
-    identify from memory. The wordmark is the landing screen's, so the two are
-    recognisably the same tool; everything that belongs to a front door - the
-    repository, the licence, the usage - is not here, because a report is not
-    an introduction.
-
-    The scale and the yield are separate rows because they answer separate
-    questions: what is in here, and how much of it answered. It used to read
-    `73 of 105 traced` over a count of files carrying an origin of any kind,
-    and a PDF with an Info dictionary has not been traced anywhere - it has
-    described itself.
-    """
-    stamp = theme.label(f"filegrail {__version__}")
-    beside = theme.width >= _VERSION_BESIDE
-    gutter = len(WORDMARK[0]) + 5
-
-    lines = [""]
-    for index, line in enumerate(WORDMARK):
-        mark = f"  {theme.paint(line, 'recorded')}"
-        if beside and index == _VERSION_LINE:
-            lines.append(f"{mark}{' ' * max(1, gutter - len(line) - 2)}{stamp}".rstrip())
-        else:
-            lines.append(mark.rstrip())
-    if not beside:
-        lines.append(f"  {stamp}")
-
-    lines.append("")
-    lines.extend(_wrapped(theme, TAGLINE, "  ", theme.dim))
-    lines.append("")
-
-    scale = [_plural(found.files, "file")]
-    if found.files > 1:
-        scale.append(_plural(len(found.types), "type"))
-    scale.append(_size(found.size))
-
-    rows = [("target", _display(root)), ("scanned", _facts_line(theme, scale))]
-    if found.files > 1:
-        rows.append(
-            ("findings", _facts_line(theme, [f"{known} files", f"{unknown} without findings"]))
-        )
-    lines.extend(_labelled(theme, "target", _display(root)))
-    lines.extend(_whose_machine(theme, home))
-    for name, value in rows[1:]:
-        lines.extend(_labelled(theme, name, value))
-
-    lines.extend(["", f"  {theme.rule(theme.width - 2)}", ""])
-    return lines
-
-
 def _labelled(theme: Theme, name: str, value: str) -> list[str]:
     """One banner row: a fixed label column, and a value that wraps under it.
 
@@ -435,761 +1257,24 @@ def _wrapped(theme: Theme, text: str, indent: str, paint: Callable[[str], str]) 
     return [f"{indent}{paint(part)}" for part in theme.wrap(text, theme.width - len(indent) - 2)]
 
 
-def _columns(theme: Theme, names: list[str], widths: list[int], align: str) -> list[str]:
-    """A header row and the thin rule under it, for a table of equal rows.
-
-    Two lines, and both of them earn their keep: without colour a label has
-    only its case and its position to tell it from the rows below, and the rule
-    is what says how far each column reaches. It is drawn to the column rather
-    than across the section, which is a different mark meaning a different
-    thing.
-    """
-    head, bar = "", ""
-    for name, width, side in zip(names, widths, align, strict=True):
-        head += name.rjust(width) if side == "r" else name.ljust(width)
-        bar += (
-            (theme.glyph(RULE) * len(name)).rjust(width)
-            if side == "r"
-            else (theme.glyph(RULE) * width)
-        )
-        head += "  "
-        bar += "  "
-    return [
-        f"{' ' * _INDENT}{theme.dim(head.rstrip())}",
-        f"{' ' * _INDENT}{theme.dim(bar.rstrip())}",
-    ]
-
-
-#: What the reader table calls its three columns, and the shorter name the
-#: middle one answers to in a window too narrow for the long one.
-_READER_HEAD = ("reader", "how directly it knows", "files")
-_READER_SHORT = "how it knows"
-
-#: How many slots `theme.meter` draws, and the gap between it and its word.
-_METER = 5 + 2
+#: What the table of sources calls its three columns. `category` rather than a
+#: strength: what a source is about is a fact, and how much it is worth is the
+#: reader's judgement rather than this tool's arithmetic.
+_SOURCE_HEAD = ("source", "category", "files")
 
 #: What the inventory grid calls its three columns.
 _TYPE_HEAD = ("type", "files", "size")
 
 
-def _inventory(theme: Theme, found: Inventory) -> list[str]:
-    """Every type present, how many of each, and how much of the scan it is.
-
-    A table, a row to a type. Three entries packed across a line - each of them
-    three figures - was a jumble however the columns were headed: the reader had
-    to work out where one entry ended before reading any of it. A row costs
-    vertical space and gives back the thing a table is for.
-
-    One table rather than two. Counts and sizes answer the same question - what
-    is this directory made of - and splitting them makes the reader hold half
-    the answer while they find the other half.
-    """
-    if not found.types:
-        return []
-
-    sizes = {entry.name: _size(entry.size) for entry in found.types}
-    counts = max(max(len(str(entry.count)) for entry in found.types), len(_TYPE_HEAD[1]))
-    span = max(max(len(value) for value in sizes.values()), len(_TYPE_HEAD[2]))
-    # The name column is bounded by what still leaves the figures inside the
-    # terminal. An extension wider than that is not shortened - it takes lines
-    # of its own underneath, because an extension is data and this is a layout.
-    room = theme.width - _INDENT
-    column = min(
-        max(max(len(entry.name) for entry in found.types), len(_TYPE_HEAD[0])),
-        max(4, room - counts - span - 4),
-    )
-
-    lines = _heading(theme, "inventory", len(found.types), noun="type")
-    # A thin rule under each label, not across the section. Without colour the
-    # labels have only their case and their position to tell them from the rows
-    # below, and a line drawn to the width of each column says which figures
-    # each one names.
-    lines.append(
-        f"{' ' * _INDENT}{theme.dim(_TYPE_HEAD[0].ljust(column))}"
-        f"{theme.dim(_TYPE_HEAD[1].rjust(counts + 2))}"
-        f"{theme.dim(_TYPE_HEAD[2].rjust(span + 2))}"
-    )
-    lines.append(
-        f"{' ' * _INDENT}{theme.dim(theme.glyph(RULE) * len(_TYPE_HEAD[0])).ljust(column)}"
-        f"{theme.dim(theme.glyph(RULE) * counts).rjust(counts + 2)}"
-        f"{theme.dim(theme.glyph(RULE) * span).rjust(span + 2)}"
-    )
-    for entry in found.types:
-        figures = theme.label(str(entry.count).rjust(counts + 2)) + theme.dim(
-            sizes[entry.name].rjust(span + 2)
-        )
-        if len(entry.name) <= column:
-            lines.append(f"{' ' * _INDENT}{theme.paint(entry.name.ljust(column), 'body')}{figures}")
-            continue
-        for part in theme.wrap(entry.name, room):
-            lines.append(f"{' ' * _INDENT}{theme.paint(part, 'body')}")
-        lines.append(f"{' ' * _INDENT}{' ' * column}{figures}")
-
-    if found.families:
-        # One line, not a table. It answers a different question from the table
-        # above - what kinds of file, not which extensions - and there are half
-        # a dozen of them at most, each a word and a number. A grid around that
-        # is scaffolding holding up nothing.
-        said = _facts_line(theme, [_plural(count, family) for family, count in found.families])
-        lines.append("")
-        lines.extend(
-            f"{' ' * _INDENT}{theme.dim(part)}"
-            for part in theme.wrap(said, theme.width - _INDENT - 2)
-        )
-    lines.append("")
-    return lines
-
-
 #: What the findings table calls its two columns. The count used to carry the
 #: word `files` on every row, which is the column name said eight times.
-_FINDING_HEAD = ("what was found", "files")
-
-
-def _findings(theme: Theme, tallies: list[Tally]) -> list[str]:
-    """What was found, in the words of what it is rather than what read it.
-
-    `which readers returned results` is a real question and it has its own
-    table at the end of the report. It is not this one: an analyst reading down
-    a list of parser names still has to work out what any of it means.
-    """
-    if not tallies:
-        return []
-
-    width = max(len(tally.name) for tally in tallies)
-    # The digits line up, not the phrases: `1 file` and `66 files` right-aligned
-    # as whole phrases puts the 1 under the s of files, which is a column of
-    # nothing.
-    digits = max(len(str(tally.files)) for tally in tallies)
-
-    width = max(width, len(_FINDING_HEAD[0]))
-    digits = max(digits, len(_FINDING_HEAD[1]))
-
-    lines = _heading(theme, "findings")
-    lines.extend(_columns(theme, list(_FINDING_HEAD), [width, digits], "lr"))
-    for tally in tallies:
-        lines.append(
-            f"{' ' * _INDENT}{theme.paint(tally.name.ljust(width), 'body')}"
-            f"  {theme.label(str(tally.files).rjust(digits))}"
-        )
-    lines.append("")
-    return lines
-
-
-def _attention(theme: Theme, raised: list[Alert], root: Path) -> list[str]:
-    """The few things a long report would otherwise bury.
-
-    Not an alarm panel: coordinates and Content Credentials are findings, not
-    problems, and the heading says so. No colour is spent beyond the one the
-    palette already has for evidence that disagrees with itself - these lines
-    are counts, not claims, and painting a count by how alarming it is would be
-    the one thing this interface never does with colour.
-    """
-    if not raised:
-        return []
-
-    lines = _heading(theme, "notable findings")
-    for alert in raised:
-        colour = "warning" if alert.contested else None
-        # `●` means "this is a file" everywhere else in the report, and a count
-        # line is not a file. Only the contested flag keeps a glyph; the rest
-        # are indented to the same column and left unmarked, which is quieter
-        # and does not spend a symbol the gutter is already using.
-        glyph = _mark(theme, FLAG, colour) if alert.contested else _mark(theme, " ")
-        for index, part in enumerate(theme.wrap(alert.text, theme.width - _gutter(theme) - 2)):
-            gutter = glyph if index == 0 else _mark(theme, RAIL)
-            lines.append(f"  {gutter} {theme.paint(part, colour or 'body')}")
-
-        for path in alert.files:
-            for part in theme.wrap(_relative(path, root), theme.width - _gutter(theme) - 4):
-                lines.append(f"  {_mark(theme, RAIL)}   {theme.dim(part)}")
-        if alert.hidden:
-            more = f"and {alert.hidden} more, each marked in the report below"
-            lines.append(f"  {_mark(theme, RAIL)}   {theme.dim(more)}")
-    lines.append("")
-    return lines
-
-
-#: How much of the index a name may take before the columns beside it give way.
-#: A name shorter than this is unreadable, and the columns are a summary of what
-#: the entries below say in full - so they are what goes, in the order below.
-_INDEX_NAME = 14
-
-#: What the index calls its four columns, and what its three marks mean. Both
-#: are printed: an analyst should be able to read the table without being told
-#: how, and a glyph nobody explained is a thing to be worked out rather than a
-#: thing to be read.
-_INDEX_HEAD = ("file", "size", "how it arrived", "what it says")
-
-
-def _legend(theme: Theme) -> list[str]:
-    """What the three marks mean, on as few lines as the terminal allows."""
-    marks = (
-        (BULLET, "evidence found"),
-        (FLAG, "needs a second look"),
-        (MIDDOT, "nothing found"),
-    )
-    said = [f"{theme.glyph(mark)}  {meaning}" for mark, meaning in marks]
-    joined = "      ".join(said)
-    if _INDENT + len(joined) <= theme.width:
-        return [f"{' ' * _INDENT}{theme.dim(joined)}"]
-    return [f"{' ' * _INDENT}{theme.dim(part)}" for part in said]
-
-
-def _index(theme: Theme, records: list[FileRecord], root: Path, limit: int) -> list[str]:
-    """One line a file: the report's own table of contents.
-
-    Without it a reader learns which files are worth opening by scrolling the
-    whole report, which on a case directory is hundreds of lines. This answers
-    it first, and it is allowed to abbreviate precisely because it is an index:
-    every one of these files is written out in full below, so a column that
-    gives way here loses nothing.
-
-    Everything in it is named the way a person would name it rather than the
-    way `--json` does - `EXIF`, not `exif`; `sources disagree`, not a count of
-    them - because the question this table answers is *which of these do I
-    open*, and an answer that has to be decoded first has not been given.
-    """
-    if not records:
-        return []
-
-    # Whatever needs a second look first, then the rest in the order they were
-    # walked. An index sorted by path is a directory listing; the question it
-    # is here to answer is which file to open, and that has an order of its own.
-    flag, bullet = theme.glyph(FLAG), theme.glyph(BULLET)
-    order = {flag: 0, bullet: 1}
-    rows = [_index_row(theme, record, root) for record in records]
-    rows.sort(key=lambda row: order.get(row[0], 2))
-
-    unexplained = [index for index, record in enumerate(records) if not record.origins]
-    hidden = 0
-    if limit > 0 and len(unexplained) > limit:
-        keep = [row for row in rows if row[0] != theme.glyph(MIDDOT)]
-        rest = [row for row in rows if row[0] == theme.glyph(MIDDOT)]
-        hidden = len(rest) - limit
-        rows = keep + rest[:limit]
-
-    # Size, then how it arrived, then what it says of itself. Each asks for
-    # exactly what it holds; the name gets what is left, and a column gives way
-    # from the right once the name would be too short to read.
-    widths = [
-        max(max(len(row[column]) for row in rows), len(_INDEX_HEAD[column - 1]))
-        for column in (2, 3, 4)
-    ]
-
-    def room() -> int:
-        return theme.width - 4 - widths[0] - 2 - sum(2 + width for width in widths[1:])
-
-    while len(widths) > 1 and room() < _INDEX_NAME:
-        widths.pop()
-    name_width = room()
-
-    def laid(cells: list[str]) -> str:
-        """A row's columns, built once so the header cannot drift from them."""
-        out = cells[0].rjust(widths[0] + 2)
-        for column, value in enumerate(cells[1 : len(widths)], start=1):
-            out += "  " + value.ljust(widths[column])
-        return out.rstrip()
-
-    lines = _heading(theme, "files", len(records))
-    lines[2:2] = _legend(theme)
-    # The header and its rule are laid out by the same function as a row, so
-    # the three cannot drift apart. Painted once, at the end: padding a string
-    # that already carries an escape sequence pads the escape sequence.
-    names = list(_INDEX_HEAD[: len(widths) + 1])
-    bars = [theme.glyph(RULE) * len(name) for name in names]
-    for cells, first in ((names, names[0]), (bars, bars[0])):
-        plain = f"    {first.ljust(name_width)}{laid(cells[1:])}".rstrip()
-        lines.append(theme.dim(plain))
-    for mark, name, *cells in rows:
-        tail = laid(cells)
-        paint = theme.dim if mark == theme.glyph(MIDDOT) else str
-
-        if len(name) <= name_width:
-            lines.append(paint(f"  {mark} {name.ljust(name_width)}{tail}".rstrip()))
-            continue
-
-        # Nothing here is truncated. A name too long for its column takes the
-        # width it needs and the columns follow it, which is what the list of
-        # unexplained files did before this replaced it: cutting a name in half
-        # to keep a size company is the layout winning an argument it should
-        # not have had.
-        parts = theme.wrap(name, theme.width - 4)
-        for index, part in enumerate(parts[:-1]):
-            lines.append(paint(f"  {mark if index == 0 else ' '} {part}"))
-        last = parts[-1]
-        if len(last) <= name_width:
-            lines.append(paint(f"    {last.ljust(name_width)}{tail}".rstrip()))
-        else:
-            lines.append(paint(f"    {last}"))
-            lines.append(paint(f"    {' ' * name_width}{tail}".rstrip()))
-
-    if hidden:
-        note = f"... and {hidden} more (--limit 0 for all, --json for each)"
-        if _INDENT + len(note) > theme.width:
-            note = f"... and {hidden} more (--limit 0)"
-        lines.append(theme.dim(f"{' ' * _INDENT}{note}"))
-    lines.append("")
-    return lines
-
-
-def _index_row(theme: Theme, record: FileRecord, root: Path) -> tuple[str, str, str, str, str]:
-    """The mark, the name, the size, how it arrived and what it says of itself."""
-    if not record.origins:
-        return (
-            theme.glyph(MIDDOT),
-            _relative(record.path, root),
-            _size(record.size),
-            "\u2014" if theme.unicode else "-",
-            f"last changed {_moment(record.btime or record.mtime)[:10]}",
-        )
-
-    verdict = reconcile(record)
-    arrivals = [origin for origin in record.origins if kind(origin) == ACQUISITION]
-    if verdict.state == CONFLICT and len(arrivals) > 1:
-        # What happened, not how many. `2 sources` reads as two were found.
-        arrival = "sources disagree"
-    else:
-        arrival = label(arrivals[0]) if arrivals else ("\u2014" if theme.unicode else "-")
-
-    said = record.intrinsic
-    return (
-        _file_mark(theme, verdict),
-        _relative(record.path, root),
-        _size(record.size),
-        arrival,
-        _block_label(said) if said else ("\u2014" if theme.unicode else "-"),
-    )
-
-
-def _file_mark(theme: Theme, verdict: Verdict) -> str:
-    """The one mark a file carries, wherever the report prints it.
-
-    The index explains its marks in a legend, and a file that is flagged there
-    and bulleted over its own entry has contradicted that legend two screens
-    later. One rule, in one place, so the two cannot drift.
-    """
-    contested = verdict.state in (PARTIAL, CONFLICT) or verdict.notable
-    return theme.glyph(FLAG) if contested else theme.glyph(BULLET)
-
-
-def _block_label(origin: Origin) -> str:
-    """What a person calls this block: `EXIF`, not `exif`.
-
-    The raw value is what `--json` carries and what a filter takes. It is not
-    what a table read by eye should show, and showing it was a decision made
-    for the wrong reader.
-    """
-    if origin.block:
-        return BLOCK_LABELS.get(origin.block, origin.block)
-    return SOURCE_LABELS.get(origin.source, origin.source)
-
-
-def _sections(
-    theme: Theme, known: list[FileRecord], root: Path, *, verbose: bool, brief: bool
-) -> list[str]:
-    """Every entry, strongest class of evidence first.
-
-    That ordering is free and it puts the trustworthy findings where the eye
-    lands. It used to carry a heading per class as well, which was a substitute
-    for an index - a way of telling the reader where in a long report they were.
-    There is an index now, so the headings were a second grouping stacked under
-    the first, in a second vocabulary, immediately above the class names inside
-    each entry. The order is the part that was doing the work; it stays.
-    """
-    grouped: dict[str, list[FileRecord]] = {}
-    for record in known:
-        source = record.best.source if record.best else "filesystem"
-        grouped.setdefault(theme.evidence(source), []).append(record)
-
-    lines: list[str] = []
-    for key, _heading_name in EVIDENCE_HEADINGS:
-        for record in grouped.pop(key, []):
-            lines.extend(_entry(theme, record, root, verbose=verbose, brief=brief))
-
-    for members in grouped.values():  # any class the table above did not name
-        for record in members:
-            lines.extend(_entry(theme, record, root, verbose=verbose, brief=brief))
-    return lines
-
-
-def _heading(theme: Theme, text: str, count: int | None = None, noun: str = "file") -> list[str]:
-    """A section name and its rule, with what it holds on the right.
-
-    The count is optional: a section whose rows each carry their own count has
-    nothing to put up there that is not already below it.
-
-    Upper case, and not as decoration. `theme.bold` and `theme.paint` both hand
-    the text back untouched when colour is off, and colour is off in exactly
-    the case that matters most - a report redirected to a file, read months
-    later by somebody who was not there. Case and position are then the only
-    emphasis left, so a heading has to carry it in the letters themselves.
-    """
-    head = f"  {theme.label(text.upper())}"
-    if count is not None:
-        # Beside the name rather than at the right edge. The count used to be
-        # pushed to the far side of the terminal, so the eye crossed fifty
-        # columns of nothing for two digits - eighty on a wide one - and the
-        # heading looked different at every width. The middot is the separator
-        # the banner already uses between facts.
-        head += f"  {theme.dim(theme.glyph(MIDDOT))}  {theme.dim(_plural(count, noun))}"
-    return [
-        head,
-        f"  {theme.rule(theme.width - 2)}",
-        "",
-    ]
-
-
-def _entry(
-    theme: Theme, record: FileRecord, root: Path, *, verbose: bool, brief: bool
-) -> list[str]:
-    colour = theme.evidence(record.best.source if record.best else "filesystem")
-    indent = _gutter(theme)
-    # Both halves, always, and never ranked against each other. "How did this
-    # get here" and "what does it say about its earlier life" are different
-    # questions; letting a download record outrank a camera's EXIF meant a
-    # geotagged photograph that had been downloaded reported no GPS at all.
-    verdict = reconcile(record)
-    bullet = _mark(theme, _file_mark(theme, verdict), colour)
-    size = theme.dim(_size(record.size))
-    name = _relative(record.path, root)
-
-    room = theme.width - indent - _visible(size) - 2
-    wrapped = theme.wrap(name, room)
-    lines = [
-        _row(theme, f"  {bullet} ", wrapped[0], size, wrap=False, paint=theme.bold),
-        *(f"{' ' * indent}{theme.bold(part)}" for part in wrapped[1:]),
-    ]
-
-    if verbose:
-        claims: list[Origin | None] = list(record.origins)
-    elif verdict.state in (PARTIAL, CONFLICT):
-        # A verdict that refers to evidence the report hid is not a verdict, so
-        # a disagreement brings every acquisition record on screen with it.
-        acquisition = [o for o in record.origins if kind(o) == ACQUISITION and o.url]
-        claims = [*acquisition, *_self_descriptions(record, verdict), record.interaction]
-    else:
-        # Strongest first, and interaction last: it is the weakest of the three
-        # and putting it above intrinsic would bury a camera's GPS under the
-        # fact that something opened the file.
-        claims = [record.acquisition, *_self_descriptions(record, verdict), record.interaction]
-
-    # The class of each claim, named - but only where there is more than one to
-    # tell apart. A file whose whole story is its own metadata does not need a
-    # heading saying so; that is relabelling rather than grouping, and it is
-    # the same rule the sections above this one follow.
-    shown = [claim for claim in claims if claim is not None]
-    named = {kind(origin) for origin in shown}
-    glosses = dict(questions())
-
-    for index, origin in enumerate(shown):
-        if len(named) > 1 and (index == 0 or kind(shown[index - 1]) != kind(origin)):
-            head = f"  {theme.label(kind(origin).upper())}"
-            room = theme.width - len(kind(origin)) - 6
-            if room >= 12:
-                head += f"  {theme.dim(theme.clip(glosses[kind(origin)], room))}"
-            lines.extend(["" if index else "", head])
-        elif index:
-            lines.append(f"  {_mark(theme, RAIL)}".rstrip())
-        lines.extend(_origin(theme, origin, record, brief=brief))
-
-    if verdict.notable:
-        lines.extend(_verdict(theme, verdict))
-    lines.extend(_links(theme, record, root))
-    lines.append("")
-    return lines
-
-
-def _links(theme: Theme, record: FileRecord, root: Path) -> list[str]:
-    """How this file relates to the others that were scanned with it.
-
-    Last in the entry because it is the one part that points outward: everything
-    above is about this file, and this says where else to look.
-    """
-    lines = []
-    for link in record.links:
-        named = ", ".join(_relative(path, root) for path in link.others)
-        said = named or f"{link.count} other files in this scan"
-        room = theme.width - _gutter(theme) - len(link.kind) - 4
-        wrapped = theme.wrap(said, room)
-        lines.append(f"  {_mark(theme, BRANCH)} {theme.dim(link.kind)}  {wrapped[0]}")
-        for part in wrapped[1:]:
-            lines.append(f"  {_mark(theme, RAIL)}   {' ' * len(link.kind)}{part}")
-    return lines
-
-
-def _self_descriptions(record: FileRecord, verdict: Verdict) -> list[Origin | None]:
-    """What the file says about itself: the strongest claim, or all of them when
-    they contradict each other.
-
-    A finding that names a source the report did not print is a verdict about
-    evidence the reader cannot see - the same reason a conflicting acquisition
-    record is brought forward rather than ranked away.
-    """
-    if any(finding.kind == ATTRIBUTION_CONFLICT for finding in verdict.findings):
-        return [origin for origin in record.origins if kind(origin) == INTRINSIC]
-    return [record.intrinsic]
-
-
-def _verdict(theme: Theme, verdict: Verdict) -> list[str]:
-    """The reconciliation, in the gutter, so it reads as part of the entry."""
-    colour = "warning" if verdict.contested else "recorded"
-    indent = _gutter(theme)
-    headline = theme.paint(verdict.headline, colour)
-
-    lines = [f"  {_mark(theme, FLAG, colour)} {headline}"]
-    for reason in verdict.reasons:
-        for part in theme.wrap(reason, theme.width - indent - 2):
-            lines.append(f"  {_mark(theme, RAIL)}   {theme.dim(part)}")
-    return lines
-
-
-def _origin(theme: Theme, origin: Origin, record: FileRecord, *, brief: bool = False) -> list[str]:
-    colour = theme.evidence(origin.source)
-    indent = _gutter(theme)
-    arrow = _mark(theme, ARROW, colour)
-    rail = _mark(theme, RAIL)
-
-    claim = _headline(origin, record)
-    wrapped = theme.wrap(claim, theme.width - indent)
-    lines = [f"  {arrow} {theme.paint(wrapped[0], colour)}"]
-    lines.extend(f"  {rail} {theme.paint(part, colour)}" for part in wrapped[1:])
-
-    facts = [label(origin)]
-    if origin.tool and origin.tool not in claim:
-        facts.append(origin.tool)
-    stamp = shown(origin.at if origin.source in SELF_REPORTED else (origin.at or record.btime))
-    if stamp:
-        facts.append(stamp)
-    detail = theme.glyph(MIDDOT).join(f" {fact} " for fact in facts).strip()
-
-    # The meter keeps the first line's right edge; anything that does not fit
-    # beside it continues underneath rather than being cut off.
-    meter = f"{theme.meter(origin.confidence, colour)} {theme.dim(STRENGTH.get(colour, colour))}"
-    room = theme.width - indent - _visible(meter) - 2
-    for index, part in enumerate(theme.wrap(detail, room)):
-        if index == 0:
-            lines.append(_row(theme, f"  {rail} ", part, meter, wrap=False, paint=theme.label))
-        else:
-            lines.append(f"  {rail} {theme.label(part)}")
-
-    for name, value, paint in _facts(origin):
-        for index, part in enumerate(theme.wrap(value, theme.width - indent - _LABEL)):
-            head = theme.dim(name.ljust(_LABEL)) if index == 0 else " " * _LABEL
-            painted = theme.paint(part, paint) if paint else theme.dim(part)
-            lines.append(f"  {rail} {head}{painted}")
-
-    if not brief and origin.fields:
-        lines.extend(_fields_block(theme, origin.fields, indent))
-    return lines
-
-
-def _fields_block(theme: Theme, fields: dict[str, str], indent: int) -> list[str]:
-    """Every decoded field, as a tree hanging off the claim above it.
-
-    Shown by default rather than behind a flag. A report is read to find things
-    out, and a reader who has to run the command a second time with `--full` has
-    already been told less than the tool knew.
-
-    The label column is sized to the names actually present: EXIF names run to
-    seventeen characters and a fixed column would either waste width on every
-    other reader or wrap on this one.
-    """
-    width = min(max(len(name) for name in fields), _FIELD_NAME)
-    room = theme.width - indent - width - 2
-    items = list(fields.items())
-
-    out = [f"  {_mark(theme, RAIL)}".rstrip()]
-    for index, (name, value) in enumerate(items):
-        last = index == len(items) - 1
-        branch = _mark(theme, LAST if last else BRANCH)
-        spacer = " " * len(theme.glyph(ARROW)) if last else _mark(theme, RAIL)
-
-        rows: list[str] = []
-        if len(name) > width:
-            # A name too long for the column takes lines of its own and the
-            # value follows underneath. Cutting it instead left four XMP fields
-            # printed as `xmpMM:DerivedFrom/stRef…` - four rows nobody can tell
-            # apart, and four values nobody can attribute to a field.
-            rows.extend(theme.dim(part) for part in theme.wrap(name, theme.width - indent - 2))
-            rows.extend(
-                f"{' ' * width}  {theme.paint(part, 'body')}"
-                for part in theme.wrap(str(value), room)
-            )
-        else:
-            head = theme.dim(name.ljust(width))
-            rows.extend(
-                f"{head if line == 0 else ' ' * width}  {theme.paint(part, 'body')}"
-                for line, part in enumerate(theme.wrap(str(value), room))
-            )
-
-        out.extend(f"  {branch if line == 0 else spacer} {text}" for line, text in enumerate(rows))
-    return out
-
-
-def _facts(origin: Origin) -> list[tuple[str, str, str | None]]:
-    """The labelled lines under a claim, in a fixed order."""
-    found: list[tuple[str, str, str | None]] = []
-    if origin.geo:
-        found.append(("geo", origin.geo, "circumstantial"))
-    if origin.location:
-        found.append(("location", origin.location, "circumstantial"))
-    if origin.referrer:
-        found.append(("referrer", origin.referrer, None))
-    if origin.note:
-        found.append(("note", origin.note, None))
-    return found
-
-
-def _headline(origin: Origin, record: FileRecord) -> str:
-    if origin.source in SELF_REPORTED:
-        # An edit step records what an application did to a file it did not
-        # create. "made by Photoshop" would turn a save into an origin, and the
-        # action alone would leave the timeline with an event to attribute to
-        # nobody, so the line names both.
-        if origin.source == "xmp-history":
-            if origin.note and origin.tool:
-                return f"{origin.note} in {origin.tool}"
-            return origin.note or origin.tool or "recorded edit"
-        if origin.tool:
-            return f"made by {origin.tool}"
-        if origin.geo or origin.location:
-            return "self-reported location"
-        if origin.at:
-            same = origin.at == record.mtime
-            return "self-reported creation date" + (
-                "" if same else ", which the filesystem does not show"
-            )
-        return "self-reported metadata"
-    return origin.url or origin.command or origin.tool or "(no detail)"
-
-
-def _summary(
-    theme: Theme,
-    records: list[FileRecord],
-    known: list[FileRecord],
-    unknown: list[FileRecord],
-    stats: dict[str, int] | None,
-    filtered: str = "",
-    root: Path | None = None,
-    unsearched: Unsearched | None = None,
-) -> list[str]:
-    """Which readers produced results, and the one line that closes the report.
-
-    This table answers a technical question - what ran and what came back - so
-    it sits at the end, after the evidence it is describing. It is not the
-    findings section and must not stand in for it: a reader working down a list
-    of parser names still has to work out what any of it meant.
-    """
-    # Tallied by the name the entries above were printed under, not by the
-    # source behind it: one report calling the same claim `PDF Info` in the body
-    # and `document metadata` in the summary reads as two kinds of evidence.
-    counts: dict[str, int] = {}
-    behind: dict[str, tuple[str, int]] = {}
-    for record in known:
-        if record.best:
-            name = label(record.best)
-            counts[name] = counts.get(name, 0) + 1
-            behind[name] = (record.best.source, record.best.confidence)
-
-    lines: list[str] = []
-    if counts:
-        ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
-        widest = max(max(len(name) for name, _ in ordered), len(_READER_HEAD[0]))
-        digits = max(max(len(str(count)) for _, count in ordered), len(_READER_HEAD[2]))
-        classes = {name: theme.evidence(behind[name][0]) for name, _ in ordered}
-        word = max(len(STRENGTH.get(colour, colour)) for colour in classes.values())
-
-        # What gives way in a narrow window, and in which order. The column's
-        # own name goes first: the rows below still read under a shorter
-        # heading. Then the meter, because five blocks are a shape and the word
-        # beside them is what the shape means - so the shape is what a narrow
-        # terminal loses, and the meaning is the last thing standing.
-        head, meter = _READER_HEAD[1], True
-        for head, meter in ((_READER_HEAD[1], True), (_READER_SHORT, True), (_READER_SHORT, False)):
-            strength = max(word + (_METER if meter else 0), len(head))
-            if _INDENT + widest + 2 + strength + 2 + digits <= theme.width:
-                break
-
-        lines.extend(_heading(theme, "metadata sources", len(ordered), noun="source"))
-        names = [_READER_HEAD[0], head, _READER_HEAD[2]]
-        lines.extend(_columns(theme, names, [widest, strength, digits], "llr"))
-        for name, count in ordered:
-            colour = classes[name]
-            painted = theme.paint(name.ljust(widest), colour)
-            # The meter never appears without the word beside it.
-            said = theme.dim(STRENGTH.get(colour, colour))
-            if meter:
-                said = f"{theme.meter(behind[name][1], colour)}  {said}"
-            pad = " " * max(1, strength - _visible(said) + 2)
-            lines.append(f"    {painted}  {said}{pad}{theme.dim(str(count).rjust(digits))}")
-        lines.append("")
-
-    lines.append(f"  {theme.rule(theme.width - 2)}")
-
-    closing = _facts_line(
-        theme,
-        [
-            f"{_plural(len(records), 'file')} analyzed",
-            f"{len(known)} with findings",
-            f"{len(unknown)} with no findings",
-        ],
-    )
-    lines.extend(_wrapped(theme, closing, " " * _INDENT, theme.bold))
-
-    if unsearched:
-        lines.extend(_unsearched(theme, unsearched, root))
-
-    if filtered:
-        # An empty report after a filter has to name the filter. Otherwise it
-        # reads as "this folder holds nothing", which is a different finding.
-        scope = "No file matched" if not records else "Limited to"
-        lines.append("")
-        lines.append(theme.dim(f"    {scope} {theme.clip(filtered, theme.width - 24)}."))
-    elif not known and records:
-        lines.extend(explain_empty_result(stats, theme))
-    lines.append("")
-    return lines
+_SUMMARY_HEAD = ("what was read", "files")
 
 
 #: How many directories are named before the rest become a count. A tree of
 #: source repositories can hold hundreds of skipped names, and a report that
 #: spends a page on them buries what it found.
 _NAMED_DIRECTORIES = 8
-
-
-def _unsearched(theme: Theme, missed: Unsearched, root: Path | None) -> list[str]:
-    """The directories nothing in this report is about.
-
-    Kept in two groups because they answer differently. One could not be read,
-    which is a hole in the evidence and the thing this tool exists to be honest
-    about; the other was skipped on purpose, which is a default the reader can
-    turn off. Reported in that order: the hole first.
-    """
-    lines: list[str] = []
-    for paths, sentence in (
-        (
-            missed.unreadable,
-            "{count} could not be read. Nothing in this report is about {them}.",
-        ),
-        (missed.by_name, "{count} skipped by name; --no-skip reads {them} too."),
-    ):
-        if not paths:
-            continue
-        said = sentence.format(
-            count=_plural(len(paths), "directory", "directories"),
-            them="it" if len(paths) == 1 else "them",
-        )
-        lines.append("")
-        lines.extend(_wrapped(theme, said, " " * _INDENT, theme.dim))
-        for path in paths[:_NAMED_DIRECTORIES]:
-            shown = _relative(path, root) if root else path
-            lines.append(f"{' ' * (_INDENT + 2)}{theme.dim(shown)}")
-        hidden = len(paths) - _NAMED_DIRECTORIES
-        if hidden > 0:
-            lines.append(
-                f"{' ' * (_INDENT + 2)}{theme.dim(f'... and {hidden} more (--json for each)')}"
-            )
-    return lines
 
 
 def explain_empty_result(stats: dict[str, int] | None, theme: Theme | None = None) -> list[str]:
@@ -1218,256 +1303,357 @@ def explain_empty_result(stats: dict[str, int] | None, theme: Theme | None = Non
 
 
 def _file_json(record: FileRecord) -> dict[str, object]:
-    """One file, with the reconciliation attached when it says anything."""
+    """One file, with the correlation attached when it says anything."""
     data = record.to_dict()
-    verdict = reconcile(record)
-    if verdict.notable:
-        data["reconciliation"] = verdict.to_dict()
+    result = correlate(record)
+    if result.notable:
+        data["correlation"] = result.to_dict()
     return data
 
 
-def render_doctor(found: Survey, theme: Theme | None = None, home: Path | None = None) -> str:
-    """What could be searched, and how far back it reaches."""
-    theme = theme or detect()
-    rule = f"  {theme.rule(theme.width - 2)}"
-    width = max(len(check.name) for check in found.checks)
-
-    lines = ["", f"  {theme.bold('filegrail')}  {theme.dim('evidence sources')}", rule, ""]
-    if home:
-        lines.extend([*_whose_machine(theme, home), ""])
-
-    for check in found.checks:
-        colour = {
-            "available": "recorded",
-            "partial": "circumstantial",
-        }.get(check.state, "warning")
-        painted = theme.paint(check.name.ljust(width), "body")
-        state = theme.paint(check.state, colour)
-        lines.append(f"  {painted}  {state}")
-        for part in theme.wrap(check.detail, theme.width - width - 8):
-            lines.append(f"  {' ' * width}    {theme.dim(part)}")
-
-    if found.horizon:
-        lines.extend(["", rule, "", f"  {theme.label('HOW FAR BACK THE RECORDS REACH')}", ""])
-        edge = max(len(check.name) for check in found.horizon)
-        for check in found.horizon:
-            lines.append(
-                f"  {theme.paint(check.name.ljust(edge), 'body')}  {theme.dim(check.detail)}"
-            )
-        lines.append("")
-        lines.extend(
-            _wrapped(
-                theme,
-                "A file older than a source's oldest record cannot be resolved from it.",
-                "  ",
-                theme.dim,
-            )
-        )
-
-    lines.append("")
-    return "\n".join(lines)
-
-
-def _whose_machine(theme: Theme, home: Path | None, said: str = "") -> list[str]:
-    """Say whose traces these are, when they are not this machine's.
-
-    A labelled row rather than a sentence. This is the one line in the report
-    saying the evidence did not come from the machine the report was run on,
-    and it used to float under the rule with no label on it, reading as a note
-    somebody had left behind. It is a fact about the scan, so it is shaped like
-    the other facts about the scan.
-
-    Wrapped rather than clipped, for the reason every path here is: half a
-    mount path still looks like a path, and a reader who cannot see which
-    profile was read cannot check anything below it.
-    """
-    if not home:
-        return []
-    # "another machine" rather than "not this machine": the report is careful
-    # never to say `this machine` when the traces came from somewhere else, and
-    # a guard against that phrase should not have to make an exception here.
-    return _labelled(
-        theme, "profile", _facts_line(theme, [_display(home), said or "another machine"])
-    )
-
-
 def render_explain(record: FileRecord, theme: Theme | None = None, home: Path | None = None) -> str:
-    """Why the tool says what it says: the answer, then what it rests on.
+    """Everything one file rests on, and what comparing it against itself found.
 
-    The reading comes first. This command exists to be asked *why*, and an
-    answer printed under everything it depends on is one the reader has to go
-    looking for. What follows it is the material, grouped by the question each
-    claim answers, and the reconciliation last - it is a note about the
-    evidence above rather than a step towards the conclusion above that.
+    The same sections a scan prints, for one file and without the index: what
+    was found, where each record came from, how it was tied to this file, and
+    last what correlation made of them. There is no prose reading of it here -
+    an assessment written in sentences is this tool's opinion, and the command
+    exists to show the material the opinion would rest on.
     """
     theme = theme or detect()
-    rule = f"  {theme.rule(theme.width - 2)}"
-    verdict = reconcile(record)
+    result = correlate(record)
+    root = Path(record.path).parent
 
-    name = Path(record.path).name
-    lines = ["", f"  {theme.bold('filegrail')}  {theme.dim('explain')}  {theme.bold(name)}", rule]
-    if home:
-        lines.extend(["", *_whose_machine(theme, home)])
+    lines = _chrome(theme, "explain", [("target", _where(theme, Path(record.path), home))])
+    origins = _of([record], ORIGIN)
+    said = _of([record], METADATA)
+    handled = _of([record], ACTIVITY)
 
-    lines.extend(["", f"  {theme.label('CONCLUSION')}", ""])
-    for sentence in conclusion(record, verdict, home):
-        for part in theme.wrap(sentence, theme.width - 6):
-            lines.append(f"    {theme.paint(part, 'body')}")
-        lines.append("")
-
-    lines.extend([f"  {theme.label('EVIDENCE STATE')}", "", *_state(theme, record, verdict), ""])
-
-    for name_of_kind, question, claims in grouped(record, home):
-        head = f"  {theme.label(name_of_kind.upper())}"
-        room = theme.width - len(name_of_kind) - 6
-        if room >= 12:
-            head += f"  {theme.dim(theme.clip(question, room))}"
-        lines.extend([rule, "", head, ""])
-        for origin in claims:
-            lines.extend(_explained(theme, origin))
-
+    lines.extend(_section(theme, "summary", _plural(len(record.evidence), "evidence record")))
     lines.extend(
-        [rule, "", f"  {theme.label('RECONCILIATION')}  {theme.dim(verdict.headline)}", ""]
+        _counts(
+            theme,
+            [
+                ("origin records", str(len(origins))),
+                ("metadata sources", str(len(said))),
+                ("activity records", str(len(handled))),
+                ("correlation", str(len(result.findings))),
+            ],
+        )
     )
-    # Wide enough for the longest kind there is. Clipping it would leave two
-    # findings sharing a prefix and no way to tell which is which - and this
-    # report does not truncate what it was asked to show.
-    tag_width = max(len(kind) for kind in KINDS)
-    for finding in verdict.findings:
-        for index, part in enumerate(theme.wrap(finding.text, theme.width - 6 - tag_width)):
-            tag = theme.dim(theme.clip(finding.kind, tag_width).ljust(tag_width))
-            lines.append(
-                f"    {tag if index == 0 else ' ' * tag_width} {theme.paint(part, 'body')}"
-            )
-    if not verdict.findings:
-        lines.append(f"    {theme.dim('nothing to reconcile')}")
-    lines.append("")
+    lines.extend(_origin_section(theme, [record], root, named=False))
+    lines.extend(_metadata_section(theme, [record], root, named=False))
+    lines.extend(_activity_section(theme, [record], root, named=False))
+    lines.extend(_correlation_section(theme, result))
+    lines.extend(_block_sections(theme, record))
     return "\n".join(lines)
 
 
-def _state(theme: Theme, record: FileRecord, verdict: Verdict) -> list[str]:
-    """One line per class of evidence, whether or not the file has any.
+def _correlation_section(theme: Theme, result: CorrelationResult) -> list[str]:
+    """What comparing the records against each other produced.
 
-    An absent class is a fact about the file rather than a gap in the report:
-    a photograph nothing recorded the arrival of is a different thing from one
-    whose arrival record disagrees with itself, and a section that simply does
-    not appear cannot tell those apart.
+    Every row is something two records jointly say, or fail to say. A file with
+    one record of each kind has nothing to correlate and gets no section: an
+    empty table under this heading would read as a check that came back clean,
+    which is a different statement from one that was never possible.
     """
-    width = max(len(kind_name) for kind_name in (ACQUISITION, INTRINSIC, INTERACTION))
-    lines = []
-    for kind_name in (ACQUISITION, INTRINSIC, INTERACTION):
-        claims = [origin for origin in record.origins if kind(origin) == kind_name]
-        said = _plural(len(claims), "record") if claims else "none"
-        if kind_name == ACQUISITION and claims:
-            said += f" {theme.glyph(MIDDOT)} {verdict.headline}"
-        lines.append(f"    {theme.dim(kind_name.ljust(width))}  {theme.paint(said, 'body')}")
-    return lines
-
-
-def _explained(theme: Theme, origin: Origin) -> list[str]:
-    """One claim: what it is and how strong, then what it said, a field a line.
-
-    The value used to share its line with the source name and the strength,
-    which left it about a third of the width. Anything longer broke inside a
-    token, so a URL in this report was an address nobody could open, copy or
-    grep for - the one thing an investigator is most likely to want out of it.
-    A field to a line gives the value the page instead.
-    """
-    colour = theme.evidence(origin.source)
-    # The same meter the scan prints, so the two reports say strength one way.
-    meter = f"{theme.meter(origin.confidence, colour)} {theme.dim(STRENGTH.get(colour, colour))}"
-    fields = [
-        (name, value)
-        for name, value in (
-            ("url", origin.url),
-            ("referrer", origin.referrer),
-            ("command", origin.command),
-            ("tool", origin.tool),
-            ("at", shown(origin.at)),
-            ("geo", origin.geo),
-            ("place", origin.location),
-            ("note", origin.note),
+    if not result.findings:
+        return []
+    blank = _blank(theme)
+    rows = []
+    marks = []
+    for finding in result.findings:
+        value = ""
+        if finding.values:
+            value = (
+                f"{finding.values[0]} {theme.glyph(NOT_EQUAL)} {finding.values[1]}"
+                if finding.kind in CONFLICTS
+                else finding.values[0]
+            )
+        rows.append(
+            (
+                finding.kind.replace("_", " "),
+                finding.field or blank,
+                " · ".join(name for name in (finding.sources or ()) if name) or blank,
+                value or finding.text,
+            )
         )
-        if value
-    ]
+        marks.append(theme.glyph(REVIEW) if finding.kind in CONFLICTS else " ")
 
-    indent = _gutter(theme)
-    lines = [
-        _row(
+    review = sum(1 for mark in marks if mark != " ")
+    lines = _section(
+        theme,
+        "correlation",
+        _plural(len(rows), "result"),
+        f"{review} needs review" if review else "",
+    )
+    lines.extend(
+        _table(
             theme,
-            f"  {_mark(theme, ARROW, colour)} ",
-            label(origin),
-            meter,
-            paint=lambda text: theme.paint(text, colour),
-        ).rstrip()
-    ]
-
-    width = max((len(name) for name, _ in fields), default=0)
-    room = max(8, theme.width - indent - width - 2)
-    for name, value in fields:
-        for index, part in enumerate(theme.wrap(value, room)):
-            tag = theme.dim(name.ljust(width)) if index == 0 else " " * width
-            lines.append(f"  {_mark(theme, RAIL)} {tag}  {theme.paint(part, 'body')}".rstrip())
-    if not fields:
-        lines.append(f"  {_mark(theme, RAIL)} {theme.dim('(no detail)')}")
-    lines.append("")
+            ("result", "field", "sources", "value"),
+            rows,
+            marks=marks,
+            keep=4,
+            flex=3,
+        )
+    )
+    lines.extend(_legend(theme, marks))
     return lines
+
+
+#: Which shared field means which relation between two files. A body serial is
+#: one physical machine; a document id is one document however many times it
+#: was exported; a name in an author field is a name somebody typed.
+_RELATIONS = {
+    "BodySerialNumber": "same device",
+    "SerialNumber": "same device",
+    "InternalSerialNumber": "same device",
+    "xmpMM:DocumentID": "same document",
+    "xmpMM:OriginalDocumentID": "common ancestor",
+    "creator": "same author",
+    "Author": "same author",
+    "dc:creator": "same author",
+}
 
 
 def render_compare(
-    left: FileRecord, right: FileRecord, found: Comparison, theme: Theme | None = None
+    left: FileRecord,
+    right: FileRecord,
+    found: Comparison,
+    theme: Theme | None = None,
 ) -> str:
-    """What two files share, where they differ, and how each one arrived."""
+    """Two files against each other: what they are, what they say, what follows.
+
+    The fields come first as two columns with nothing decided about them, and
+    what follows from them is a section of its own. A `result` column beside
+    the values would say the same thing twice on one screen.
+    """
     theme = theme or detect()
-    rule = f"  {theme.rule(theme.width - 2)}"
-    names = [Path(record.path).name for record in (left, right)]
+    names = (Path(left.path).name, Path(right.path).name)
+    blank = _blank(theme)
 
-    lines = [
-        "",
-        f"  {theme.bold('filegrail')}  {theme.dim('compare')}  "
-        f"{theme.bold(names[0])} {theme.dim(theme.glyph(MIDDOT))} {theme.bold(names[1])}",
-        rule,
-    ]
+    lines = _chrome(theme, "compare", [("left", left.path), ("right", right.path)])
 
-    width = max(
-        [len(name) for name, _ in found.shared]
-        + [len(name) for name, _, _ in found.differing]
-        + [len(name) for name, _ in found.acquisition]
-        + [8]
+    lines.extend(_section(theme, "files", _plural(2, "file")))
+    lines.extend(
+        _table(
+            theme,
+            ("field", *names),
+            [
+                ("type", _format(left.path), _format(right.path)),
+                ("size", _size(left.size), _size(right.size)),
+            ],
+            keep=3,
+        )
     )
 
-    if found.shared:
-        lines.extend(["", f"  {theme.label('IDENTICAL')}", ""])
-        for name, value in found.shared:
-            lines.extend(_pair(theme, name, value, width, "recorded"))
+    compared = [(name, value, value) for name, value in found.shared]
+    compared += [(name, one, other) for name, one, other in found.differing]
+    if compared:
+        lines.extend(_section(theme, "metadata", _plural(len(compared), "compared field")))
+        lines.extend(_table(theme, ("field", *names), compared, keep=3, flex=1))
 
-    if found.differing:
-        lines.extend(["", f"  {theme.label('DIFFERING')}", ""])
-        for name, one, other in found.differing:
-            lines.extend(_pair(theme, name, f"{one}  vs  {other}", width, "warning"))
+    lines.extend(_section(theme, "origin", _plural(len(found.origin), "record")))
+    lines.extend(
+        _table(
+            theme,
+            ("file", "source"),
+            [(name, route) for name, route in found.origin] or [(names[0], blank)],
+            keep=2,
+            flex=1,
+        )
+    )
 
-    lines.extend(["", f"  {theme.label('ARRIVED BY')}", ""])
-    for name, route in found.acquisition:
-        lines.extend(_pair(theme, name, route, width, "inherited"))
-
+    results: list[tuple[str, ...]] = [("match", name, value) for name, value in found.shared]
+    results += [
+        ("difference", name, f"{one} {theme.glyph(NOT_EQUAL)} {other}")
+        for name, one, other in found.differing
+    ]
     if found.interval:
-        lines.extend(["", f"  {theme.label('CREATED')}", ""])
-        lines.extend(_pair(theme, "apart", found.interval, width, "body"))
+        results.append(("interval", "created", f"{found.interval} apart"))
+    if results:
+        lines.extend(_section(theme, "correlation", _plural(len(results), "result")))
+        lines.extend(
+            _table(
+                theme,
+                ("result", "field", "value"),
+                results,
+                marks=[
+                    theme.glyph(REVIEW) if kind == "difference" else " " for kind, _, _ in results
+                ],
+                keep=3,
+                flex=2,
+            )
+        )
 
-    lines.extend(["", rule, "", f"  {theme.label('ASSESSMENT')}", ""])
-    for part in theme.wrap(found.assessment, theme.width - 6):
-        lines.append(f"    {theme.paint(part, 'body')}")
-    lines.append("")
+    relations = [
+        (_RELATIONS[name], f"{names[0]} {theme.glyph(MIDDOT)} {names[1]}", f"{name} {value}")
+        for name, value in found.shared
+        if name in _RELATIONS
+    ]
+    if relations:
+        lines.extend(_section(theme, "relationships", _plural(len(relations), "relation")))
+        lines.extend(_table(theme, ("relationship", "files", "basis"), relations, keep=3, flex=2))
     return "\n".join(lines)
 
 
-def _pair(theme: Theme, name: str, value: str, width: int, colour: str) -> list[str]:
-    room = theme.width - 6 - width
-    lines = []
-    for index, part in enumerate(theme.wrap(value, room)):
-        head = theme.dim(name.ljust(width)) if index == 0 else " " * width
-        lines.append(f"    {head}  {theme.paint(part, colour)}")
-    return lines
+def render_doctor(found: Survey, theme: Theme | None = None, home: Path | None = None) -> str:
+    """What this machine can be asked, before anybody asks it.
+
+    `available` here is the technical reach of a store, not a judgement about
+    evidence: a source that is available and held nothing has answered, and one
+    that is unavailable never got the question.
+    """
+    theme = theme or detect()
+    said = _facts_line(theme, [_display(home), "external"]) if home else ""
+    lines = _chrome(theme, "doctor", [("profile", said)])
+
+    states: dict[str, int] = {}
+    for check in found.checks:
+        states[check.state] = states.get(check.state, 0) + 1
+
+    lines.extend(_section(theme, "summary", _plural(len(found.checks), "source")))
+    lines.extend(_counts(theme, [(state, str(states[state])) for state in sorted(states)]))
+
+    lines.extend(
+        _section(
+            theme,
+            "sources",
+            _plural(len(found.checks), "source"),
+            *(f"{count} {state}" for state, count in sorted(states.items())),
+        )
+    )
+    lines.extend(
+        _table(
+            theme,
+            ("source", "type", "status", "coverage / detail"),
+            [(check.name, check.kind, check.state, check.detail) for check in found.checks],
+            keep=3,
+            flex=3,
+            drop=(1, 3),
+        )
+    )
+
+    from .doctor import PARSER, PARTIAL
+
+    limits = [
+        (check.name.replace(" oldest", ""), f"no record before {check.detail}")
+        for check in found.horizon
+    ]
+    limits += [
+        (check.name, check.detail)
+        for check in found.checks
+        if check.state == PARTIAL and check.kind == PARSER
+    ]
+    if limits:
+        lines.extend(_section(theme, "limitations", _plural(len(limits), "item")))
+        lines.extend(_table(theme, ("source", "limitation"), limits, keep=2, flex=1))
+    return "\n".join(lines)
+
+
+def render_clean(
+    results: list[Cleaned],
+    source: Path,
+    destination: Path | None,
+    *,
+    theme: Theme | None = None,
+    check: bool = False,
+) -> str:
+    """What each file would give up, and what would still be readable after.
+
+    Under `--check` nothing was written, so nothing is said to have been: the
+    same rows, in the conditional, and the exit code printed with them because
+    that is what a pipeline acts on.
+    """
+    theme = theme or detect()
+    blank = _blank(theme)
+    cleaned = [item for item in results if item.removed]
+    survived = [item for item in cleaned if item.remaining]
+
+    lines = _chrome(
+        theme,
+        "clean --check" if check else "clean",
+        [
+            ("target", _display(source)),
+            (
+                "mode",
+                "check only · nothing written"
+                if check
+                else f"copies to {_display(destination)}"
+                if destination
+                else "",
+            ),
+        ],
+    )
+
+    lines.extend(_section(theme, "summary", _plural(len(results), "file")))
+    lines.extend(
+        _counts(
+            theme,
+            [
+                ("cleanable", str(len(cleaned))),
+                ("unsupported", str(len(results) - len(cleaned))),
+                ("would remain" if check else "still readable", str(len(survived))),
+                ("exit", "1" if survived else "0"),
+            ],
+        )
+    )
+
+    rows, marks = [], []
+    for item in results:
+        stripped = [BLOCK_LABELS.get(block, block) for block in item.removed]
+        if item.remaining:
+            result = "review"
+        elif item.removed:
+            result = "would clean" if check else "cleaned"
+        else:
+            result = "unsupported"
+        rows.append(
+            (
+                _relative(str(item.path), source),
+                _format(str(item.path)),
+                " · ".join(stripped) or blank,
+                result,
+            )
+        )
+        marks.append(theme.glyph(REVIEW) if item.remaining else " ")
+
+    lines.extend(
+        _section(
+            theme,
+            "results",
+            _plural(len(results), "file"),
+            f"{len(cleaned)} cleanable",
+            f"{len(results) - len(cleaned)} unsupported",
+        )
+    )
+    lines.extend(_table(theme, ("file", "format", "metadata", "result"), rows, marks=marks, keep=3))
+    lines.extend(_legend(theme, marks))
+
+    if survived:
+        remaining = [
+            (_relative(str(item.path), source), BLOCK_LABELS.get(block, block))
+            for item in survived
+            for block in item.remaining
+        ]
+        lines.extend(
+            _section(
+                theme,
+                "remaining metadata",
+                _plural(len(remaining), "block"),
+                _plural(len(survived), "file"),
+            )
+        )
+        lines.extend(
+            _table(
+                theme,
+                ("file", "source"),
+                remaining,
+                marks=[theme.glyph(REVIEW)] * len(remaining),
+                keep=2,
+            )
+        )
+    return "\n".join(lines)
 
 
 def document(shape: str, payload: dict[str, object]) -> str:
@@ -1483,7 +1669,7 @@ def document(shape: str, payload: dict[str, object]) -> str:
     release did.
     """
     stamped: dict[str, object] = {
-        "schema": f"filegrail.{shape}/{SCHEMA}",
+        "schema": f"filegrail.{shape}/{SCHEMAS[shape]}",
         "filegrail_version": __version__,
     }
     stamped.update(payload)
@@ -1505,14 +1691,14 @@ def render_json_doctor(found: Survey, home: Path | None = None) -> str:
 
 
 def render_json_explain(record: FileRecord, home: Path | None = None) -> str:
-    verdict = reconcile(record)
+    result = correlate(record)
     return document(
         "explain",
         {
             **_whose(home),
             "file": record.to_dict(),
-            "reconciliation": verdict.to_dict(),
-            "conclusion": conclusion(record, verdict, home),
+            "correlation": result.to_dict(),
+            "assessment": assessment(record, result, home),
         },
     )
 
@@ -1539,208 +1725,16 @@ def render_json(
         "files": [_file_json(record) for record in records],
         "summary": {
             "total": len(records),
-            "with_origin": sum(1 for record in records if record.origins),
+            "with_origin": sum(1 for record in records if record.evidence),
         },
     }
     payload["unsearched"] = (unsearched or Unsearched()).to_dict()
     if identify:
         payload["identifiers"] = [entry.to_dict() for entry in extract(records, content=content)]
     if cluster:
-        payload["shared_sources"] = [group.to_dict() for group in group_sources(records)]
+        payload["shared_attributes"] = [group.to_dict() for group in group_sources(records)]
 
     return document("scan", payload)
-
-
-def render_timeline(
-    records: list[FileRecord], root: Path, *, theme: Theme | None = None, home: Path | None = None
-) -> str:
-    theme = theme or detect()
-    events: list[tuple[str, str, str, str]] = []
-
-    for record in records:
-        name = _relative(record.path, root)
-        for origin in record.origins:
-            when = origin.at or record.btime or record.mtime
-            if when:
-                events.append((when, name, _headline(origin, record), origin.source))
-        if not record.origins:
-            when = record.btime or record.mtime
-            if when:
-                events.append((when, name, "(nothing found)", "filesystem"))
-
-    if not events:
-        return "No datable events found."
-
-    stamp_width = 21
-    rail = theme.rail_glyph()
-    # Only when there is one, so anything already reading a line per event from
-    # a scan of this machine sees exactly what it saw before.
-    lines = [*_whose_machine(theme, home), ""] if home else []
-    for when, name, detail, source in sorted(events):
-        colour = theme.evidence(source)
-        moment = theme.dim(when[:19].replace("T", " "))
-        under = " " * (stamp_width - 2)
-
-        for index, part in enumerate(theme.wrap(name, theme.width - stamp_width - 4)):
-            head = f"  {moment}  " if index == 0 else f"  {under}  "
-            lines.append(f"{head}{theme.bold(part)}")
-        # The claim sits in the gutter rather than under the file name. Aligning
-        # it with the name looked tidier and left it a column too narrow for a
-        # URL, which was then hard-broken inside itself - and half an address is
-        # one nothing can open, copy or grep for. Every claim gets the page.
-        for index, part in enumerate(theme.wrap(detail, theme.width - 4)):
-            head = f"  {rail} " if index == 0 else "    "
-            lines.append(f"{head}{theme.paint(part, colour)}")
-    return "\n".join(lines)
-
-
-# --- shared ------------------------------------------------------------------
-
-
-def _relative(path: str, root: Path) -> str:
-    try:
-        return str(Path(path).relative_to(root))
-    except ValueError:
-        return path
-
-
-def _display(root: Path) -> str:
-    try:
-        return "~/" + str(root.relative_to(Path.home()))
-    except ValueError:
-        return str(root)
-
-
-def _moment(value: str | None) -> str:
-    """A timestamp trimmed to the second.
-
-    Filesystem times carry microseconds, which are noise in a column meant to be
-    compared by eye and never precise enough to be evidence on their own.
-    """
-    if not value:
-        return ""
-    head = value[:19]
-    return f"{head}Z" if value.endswith("Z") else head
-
-
-def _size(value: int) -> str:
-    for unit, threshold in (("GB", 1 << 30), ("MB", 1 << 20), ("KB", 1 << 10)):
-        if value >= threshold:
-            return f"{value / threshold:.1f} {unit}"
-    return f"{value} B"
-
-
-def _visible(text: str) -> int:
-    """Length of `text` as printed, ignoring escape sequences."""
-    length = 0
-    index = 0
-    while index < len(text):
-        if text[index] == "\x1b":
-            terminator = text.find("m", index)
-            index = len(text) if terminator < 0 else terminator + 1
-            continue
-        length += 1
-        index += 1
-    return length
-
-
-# --- clean -------------------------------------------------------------------
-
-
-def render_clean(
-    results: list[Cleaned],
-    source: Path,
-    destination: Path | None,
-    *,
-    theme: Theme | None = None,
-    check: bool = False,
-) -> str:
-    """What each file gave up, and what it did not.
-
-    Under `check` nothing was written, so nothing is said to have been: the
-    same rows, in the conditional. A destination is optional there and may be
-    None, because a check can be asked without one.
-    """
-    theme = theme or detect()
-    rule = f"  {theme.rule(theme.width - 2)}"
-    # What came out is the discriminator rather than where the copy went. In a
-    # run that writes the two agree; in a check there is no copy to point at,
-    # and a summary that counted those would report nothing done at all.
-    cleaned = [item for item in results if item.removed]
-    survived = [item for item in cleaned if item.remaining]
-
-    lines = [
-        "",
-        f"  {theme.bold('filegrail')}  {theme.dim('clean')}  {theme.bold(_display(source))}",
-        rule,
-        "",
-        f"  {_destination(theme, destination, check)}",
-        "",
-    ]
-
-    for item in results:
-        name = _relative(str(item.path), source)
-        # The names the rest of the report uses. What `clean` strips is written
-        # into the JSON as a block id, and printing that id here would have one
-        # report calling the same block `png-text` in one place and `PNG text`
-        # in another.
-        stripped = [BLOCK_LABELS.get(block, block) for block in item.removed]
-        said = ", ".join(stripped) if stripped else theme.dim(item.note or "nothing")
-        colour = "recorded" if item.removed else "faint"
-        lines.append(_row(theme, f"  {_mark(theme, BULLET, colour)} ", name, theme.dim(said)))
-
-    lines.extend(["", rule])
-    lines.extend(
-        _wrapped(
-            theme,
-            _facts_line(
-                theme,
-                [
-                    _plural(len(results), "file"),
-                    f"{len(cleaned)} {'would be cleaned' if check else 'cleaned'}",
-                    f"{len(results) - len(cleaned)} left alone",
-                ],
-            ),
-            " " * _INDENT,
-            str,
-        )
-    )
-
-    if survived:
-        # The whole point of reading the copies back. A file reported as
-        # cleaned that is not cleaned is worse than one nobody touched.
-        seen = "readable in the copies"
-        warning = f"would still be {seen}" if check else f"still {seen}"
-        lines.extend(["", f"  {theme.paint(warning, 'conflict')}"])
-        for item in survived:
-            # A written copy is named where it lies, since that is the file
-            # somebody would publish. A check has no copy, so it names the
-            # original, which is the only thing it can point at.
-            where = (
-                _relative(str(item.path), source)
-                if item.written is None
-                else _relative(str(item.written), destination or source)
-            )
-            lines.append(f"    {where}  {theme.dim(', '.join(item.remaining))}")
-        lines.append(
-            f"  {theme.dim('a stripper is written per format, and a format can carry a block')}"
-        )
-        lines.append(f"  {theme.dim('somewhere it does not reach. Do not publish these.')}")
-
-    lines.append("")
-    return "\n".join(lines)
-
-
-def _destination(theme: Theme, destination: Path | None, check: bool) -> str:
-    """Where the copies went, or the fact that none did."""
-    if not check:
-        return f"{theme.dim('copies written to')}  {theme.paint(str(destination), 'body')}"
-    if destination is None:
-        return theme.dim("nothing written")
-    return (
-        f"{theme.dim('nothing written; copies would go to')}  "
-        f"{theme.paint(str(destination), 'body')}"
-    )
 
 
 def render_json_clean(

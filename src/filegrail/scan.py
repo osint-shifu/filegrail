@@ -1,4 +1,4 @@
-"""Walk a directory and attach every origin claim that can be found for it."""
+"""Walk a directory and attach every evidence record that can be found for it."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .lineage import attach_lineage
-from .models import FileRecord, Origin
+from .models import FILENAME, NAME_AND_SIZE, EvidenceRecord, FileRecord
 from .sources import (
     collect_browser_downloads,
     collect_quarantine_events,
@@ -70,7 +70,7 @@ class Unsearched:
 
     Two answers a report must not merge. A directory skipped for its name is a
     choice this tool made and can be told not to make; a directory that could
-    not be read is a hole in the evidence. `no findings` is a claim about files
+    not be read is a hole in the evidence. `no evidence found` is a statement about files
     that were looked at, and neither of these produced any.
     """
 
@@ -166,9 +166,9 @@ def scan(
     # that was later moved into the case directory still resolves. The record
     # keeps the path as its own operating system spelled it, which is why the
     # name is taken with `basename` and not with `Path`.
-    downloads_by_name: dict[str, list[Origin]] = {}
-    for target, origins in downloads.items():
-        downloads_by_name.setdefault(basename(target), []).extend(origins)
+    downloads_by_name: dict[str, list[EvidenceRecord]] = {}
+    for target, found in downloads.items():
+        downloads_by_name.setdefault(basename(target), []).extend(found)
 
     history = (
         collect_shell_history({path.name for path in files}, home=home) if use_shell_history else {}
@@ -194,101 +194,101 @@ def scan(
         )
 
         exact = downloads.get(str(path), [])
-        record.origins.extend(exact)
+        record.evidence.extend(exact)
         if not exact:
-            for origin in downloads_by_name.get(path.name, []):
-                record.origins.append(matched_by_name(origin, stat.st_size))
+            for one in downloads_by_name.get(path.name, []):
+                record.evidence.append(matched_by_name(one, stat.st_size))
 
-        record.origins.extend(read_file_attributes(path))
-        record.origins.extend(read_quarantine(path, quarantined))
+        record.evidence.extend(read_file_attributes(path))
+        record.evidence.extend(read_quarantine(path, quarantined))
         if sidecar := read_sidecar(path):
-            record.origins.append(sidecar)
+            record.evidence.append(sidecar)
         # Found from the file rather than from a profile: the record sits beside
         # it, so a mounted image's trash reads without `--home` being given.
         if thrown_away := read_trash(path):
-            record.origins.append(thrown_away)
+            record.evidence.append(thrown_away)
         if named := read_messenger_name(path):
-            record.origins.append(named)
+            record.evidence.append(named)
         if in_sync := read_sync(path, synced):
-            record.origins.append(in_sync)
+            record.evidence.append(in_sync)
         # A block found by sweeping an archive's raw bytes is a member's, not
         # the container's: a zip is not made by Photoshop because a photograph
         # inside it was. The members are read under their own names instead.
         if is_archive(path):
             if follow_archives:
-                record.origins.extend(read_contents(path))
+                record.evidence.extend(read_contents(path))
         else:
             for reader in (read_c2pa_manifest, read_embedded_metadata, read_iptc):
                 claim = reader(path)
                 if claim is not None:
-                    record.origins.append(claim)
-            record.origins.extend(read_xmp(path))
-        record.origins.extend(read_mail(path))
-        record.origins.extend(history.get(path.name, []))
-        record.origins.extend(recent.get(str(path), []))
-        record.origins.extend(read_shortcuts(path, stat.st_size, shortcuts))
+                    record.evidence.append(claim)
+            record.evidence.extend(read_xmp(path))
+        record.evidence.extend(read_mail(path))
+        record.evidence.extend(history.get(path.name, []))
+        record.evidence.extend(recent.get(str(path), []))
+        record.evidence.extend(read_shortcuts(path, stat.st_size, shortcuts))
         records.append(record)
 
     if follow_archives:
-        _attach_archive_origins(records, downloads, downloads_by_name)
-    _attach_torrent_origins(records, files, home)
+        _attach_archive_records(records, downloads, downloads_by_name)
+    _attach_torrent_records(records, files, home)
     attach_lineage(records)
 
     return records
 
 
-def _attach_archive_origins(
+def _attach_archive_records(
     records: list[FileRecord],
-    downloads: dict[str, list[Origin]],
-    downloads_by_name: dict[str, list[Origin]],
+    downloads: dict[str, list[EvidenceRecord]],
+    downloads_by_name: dict[str, list[EvidenceRecord]],
 ) -> None:
-    """Give files their origin from the archive they were extracted from.
+    """Give files the origin of the archive they were extracted from.
 
     Archives are considered whether or not they are inside the scanned tree:
     a case directory is often the *result* of unpacking a download that lives
     somewhere else entirely.
     """
-    candidates: dict[str, list[Origin]] = {}
+    candidates: dict[str, list[EvidenceRecord]] = {}
     for record in records:
         path = Path(record.path)
-        if is_archive(path) and record.origins:
-            candidates[str(path)] = record.origins
+        if is_archive(path) and record.evidence:
+            candidates[str(path)] = record.evidence
 
-    for target, origins in downloads.items():
+    for target, found in downloads.items():
         path = Path(target)
         if is_archive(path) and path.is_file():
-            candidates.setdefault(str(path), origins)
+            candidates.setdefault(str(path), found)
 
     if not candidates:
         return
 
     by_signature: dict[tuple[str, int], list[FileRecord]] = {}
     for record in records:
-        if not record.origins:
+        if not record.evidence:
             by_signature.setdefault((Path(record.path).name, record.size), []).append(record)
     if not by_signature:
         return
 
-    for archive_path, origins in candidates.items():
+    for archive_path, found in candidates.items():
         members = list_members(Path(archive_path))
         if not members:
             continue
-        best = max(origins, key=lambda origin: origin.confidence)
+        leading = max(found, key=lambda record: record.priority)
         archive_name = Path(archive_path).name
         for name, sizes in members.items():
             for size in sizes:
                 for record in by_signature.get((name, size), []):
-                    record.origins.append(inherited_origin(best, archive_name))
+                    record.evidence.append(inherited_origin(leading, archive_name))
 
 
-def _attach_torrent_origins(
+def _attach_torrent_records(
     records: list[FileRecord], files: list[Path], home: Path | None = None
 ) -> None:
     """Give a file the torrent that lists it, where one was scanned beside it.
 
     A torrent is paired the way an archive member is - base name and exact size
     together - because a name alone matches far too much and a size alone
-    matches more. What differs is that a torrent carries an origin of its own
+    matches more. What differs is that a torrent carries a record of its own
     rather than one to inherit, so every matching record gets it, including the
     ones that already know something about themselves: a photograph with EXIF
     is no less interesting for also having been in a torrent.
@@ -302,7 +302,7 @@ def _attach_torrent_origins(
         for name, sizes in torrent.members.items():
             for size in sizes:
                 for record in by_signature.get((name, size), []):
-                    record.origins.append(torrent.origin)
+                    record.evidence.append(torrent.record)
 
 
 #: Why a name match was needed, for a source that recorded where the file was
@@ -310,15 +310,18 @@ def _attach_torrent_origins(
 MOVED = "the file was moved or renamed since download"
 
 
-def matched_by_name(origin: Origin, size: int, because: str = MOVED) -> Origin:
-    """Copy an origin, recording that it was matched by name and not by path.
+def matched_by_name(record: EvidenceRecord, size: int, because: str = MOVED) -> EvidenceRecord:
+    """Copy a record, saying on the record that a name was all that matched.
 
     A name match is made on purpose: it survives the file being moved or
     renamed, which is exactly when a path match fails. But it also matches a
     different file that happens to share the name, so where the record kept a
-    byte count it is checked - a size that agrees is corroboration the name
-    alone cannot give, and one that disagrees very likely means this is not the
-    file the record is about.
+    byte count it is checked - a size that agrees is a second point of contact
+    the name alone cannot give, and one that disagrees very likely means this
+    is not the file the record is about.
+
+    The basis goes in `match` rather than into prose, so that nothing
+    downstream has to read English to find out how firm the tie is.
 
     Why the name was all there was differs by source, so the caller says, and
     a caller whose own note has already said it passes nothing. A download
@@ -327,14 +330,11 @@ def matched_by_name(origin: Origin, size: int, because: str = MOVED) -> Origin:
     and saying it moved would describe a disagreement between two things where
     only one of them exists.
     """
-    reason = f"; {because}" if because else ""
-    note = f"matched by file name{reason}"
-    if origin.bytes:
-        if origin.bytes == size:
-            note = f"matched by file name and size{reason}"
+    basis, said = FILENAME, because
+    if record.bytes:
+        if record.bytes == size:
+            basis = NAME_AND_SIZE
         else:
-            note = (
-                f"matched by file name, but the recorded size differs "
-                f"({origin.bytes} bytes recorded, {size} on disk)"
-            )
-    return replace(origin, note=f"{origin.note}; {note}" if origin.note else note)
+            differs = f"the recorded size differs ({record.bytes} bytes recorded, {size} on disk)"
+            said = f"{because}; {differs}" if because else differs
+    return replace(record, match=basis, match_note=said or None)

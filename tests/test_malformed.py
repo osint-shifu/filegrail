@@ -70,21 +70,21 @@ _READERS: tuple[Callable[[Path], object], ...] = (
 
 
 def _png(chunks: list[tuple[bytes, bytes]]) -> bytes:
-    def chunk(kind: bytes, payload: bytes) -> bytes:
+    def chunk(category: bytes, payload: bytes) -> bytes:
         return (
             struct.pack(">I", len(payload))
-            + kind
+            + category
             + payload
-            + struct.pack(">I", zlib.crc32(kind + payload))
+            + struct.pack(">I", zlib.crc32(category + payload))
         )
 
     header = (b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0))
     return b"\x89PNG\r\n\x1a\n" + b"".join(chunk(*part) for part in [header, *chunks])
 
 
-def _box(kind: bytes, payload: bytes) -> bytes:
+def _box(category: bytes, payload: bytes) -> bytes:
     """A length, a type and a payload - the shape of an atom and of a JUMBF box."""
-    return struct.pack(">I", len(payload) + 8) + kind + payload
+    return struct.pack(">I", len(payload) + 8) + category + payload
 
 
 def _manifest() -> bytes:
@@ -99,8 +99,8 @@ def _manifest() -> bytes:
     return _box(b"jumb", description(b"c2pa", "c2pa") + claim)
 
 
-def _riff(kind: bytes, chunks: list[tuple[bytes, bytes]]) -> bytes:
-    body = kind + b"".join(
+def _riff(category: bytes, chunks: list[tuple[bytes, bytes]]) -> bytes:
+    body = category + b"".join(
         name + struct.pack("<I", len(payload)) + payload + (b"\x00" if len(payload) % 2 else b"")
         for name, payload in chunks
     )

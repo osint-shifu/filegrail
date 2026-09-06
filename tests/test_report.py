@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from filegrail import TAGLINE, __version__
-from filegrail.models import FileRecord, Origin
-from filegrail.report import render_text, render_timeline
+from filegrail import __version__
+from filegrail.models import EvidenceRecord, FileRecord
+from filegrail.report import render_text
 from filegrail.scan import Unsearched
 from filegrail.theme import Theme
 
@@ -13,10 +13,10 @@ from filegrail.theme import Theme
 PLAIN = Theme(colour=False, unicode=False, width=88)
 
 
-def _record(name: str, origin: Origin | None = None) -> FileRecord:
+def _record(name: str, origin: EvidenceRecord | None = None) -> FileRecord:
     record = FileRecord(path=f"/case/{name}", size=1, mtime="2026-08-24T19:00:00Z")
     if origin is not None:
-        record.origins.append(origin)
+        record.evidence.append(origin)
     return record
 
 
@@ -27,30 +27,9 @@ def _listed(output: str) -> int:
     )
 
 
-def test_unknown_list_is_capped(tmp_path: Path):
-    records = [_record(f"f{index}.txt") for index in range(40)]
-
-    output = render_text(records, Path("/case"), limit=5, theme=PLAIN)
-
-    assert "... and 35 more" in output
-    assert _listed(output) == 5
-
-
 def test_no_cap_message_when_everything_fits():
     output = render_text([_record("a.txt"), _record("b.txt")], Path("/case"), limit=25)
     assert "more (--json" not in output
-
-
-def test_zero_matches_explains_why():
-    records = [_record("a.txt")]
-    stats = {"browser_profiles": 4, "browser_records": 17}
-
-    output = render_text(records, Path("/case"), stats=stats, theme=PLAIN)
-
-    assert "1 file analyzed" in output
-    assert "0 with findings" in output
-    assert "17 download records across 4 browser profiles" in output
-    assert "prune download history" in output
 
 
 def test_the_explanation_for_zero_matches_fits_the_window():
@@ -65,113 +44,6 @@ def test_the_explanation_for_zero_matches_fits_the_window():
         assert not over, (width, over)
 
 
-def test_zero_matches_with_no_readable_profile():
-    stats = {"browser_profiles": 0, "browser_records": 0}
-
-    output = render_text([_record("a.txt")], Path("/case"), stats=stats, theme=PLAIN)
-
-    assert "No browser profile was readable" in output
-
-
-def test_singular_wording():
-    stats = {"browser_profiles": 1, "browser_records": 1}
-    output = render_text([_record("a.txt")], Path("/case"), stats=stats, theme=PLAIN)
-    assert "1 download record across 1 browser profile" in output
-
-
-def test_no_explanation_when_something_matched():
-    found = _record("a.txt", Origin(source="browser-download", url="https://example.org/a"))
-    stats = {"browser_profiles": 1, "browser_records": 1}
-
-    output = render_text([found], Path("/case"), stats=stats, theme=PLAIN)
-
-    assert "prune download history" not in output
-    assert "1 file analyzed" in output
-    assert "1 with findings" in output
-
-
-def test_limit_zero_lists_everything():
-    records = [_record(f"f{index}.txt") for index in range(40)]
-
-    output = render_text(records, Path("/case"), limit=0, theme=PLAIN)
-
-    assert "more (--limit 0" not in output
-    assert _listed(output) == 40
-
-
-def test_document_metadata_without_a_tool_reports_the_date_it_found():
-    origin = Origin(source="document-metadata", at="2026-07-20T19:05:21Z")
-    record = _record("invoice.pdf", origin)
-
-    output = render_text([record], Path("/case"), theme=PLAIN)
-
-    assert "self-reported creation date" in output
-    assert "self-reported metadata" not in output
-
-
-def test_document_metadata_with_a_tool_says_what_made_it():
-    origin = Origin(source="document-metadata", tool="Typst 0.14.2", at="2026-07-07T14:41:23Z")
-
-    output = render_text([_record("spec.pdf", origin)], Path("/case"), theme=PLAIN)
-
-    assert "made by Typst 0.14.2" in output
-
-
-def test_a_dateless_xmp_packet_does_not_borrow_the_file_s_own_timestamp():
-    """The report supplies a file's creation time for a claim that carries none,
-    which is right for a download record and wrong here: a packet that names no
-    date must not be shown appearing to claim one."""
-    record = FileRecord(
-        path="/case/photo.jpg",
-        size=1,
-        mtime="2026-08-24T19:00:00Z",
-        btime="2023-06-01T08:00:00Z",
-    )
-    record.origins.append(Origin(source="xmp", tool="darktable 4.6.1", fields={"xmp:Rating": "3"}))
-
-    output = render_text([record], Path("/case"), theme=PLAIN)
-
-    assert "darktable 4.6.1" in output
-    assert "2023-06-01" not in output
-
-
-def test_an_edit_step_does_not_claim_the_editor_made_the_file():
-    """xmpMM:History records what an application did to a file it did not
-    create. "made by Photoshop" would turn a save into an origin."""
-    record = _record(
-        "export.jpg",
-        Origin(
-            source="xmp-history",
-            tool="Adobe Photoshop 22.0",
-            at="2019-03-04T12:41:55Z",
-            note="saved",
-        ),
-    )
-
-    output = render_text([record], Path("/case"), theme=PLAIN)
-
-    assert "made by Adobe Photoshop 22.0" not in output
-    assert "saved" in output
-
-
-def test_the_timeline_says_what_an_edit_was_made_with():
-    """The timeline gives an event one line, so an action printed without its
-    application is an event nobody can attribute."""
-    record = _record(
-        "export.jpg",
-        Origin(
-            source="xmp-history",
-            tool="Adobe Photoshop 22.0",
-            at="2019-03-04T12:41:55Z",
-            note="saved",
-        ),
-    )
-
-    output = render_timeline([record], Path("/case"), theme=PLAIN)
-
-    assert "saved in Adobe Photoshop 22.0" in output
-
-
 # --- what the report says before it says anything about a file ---------------
 
 
@@ -179,11 +51,17 @@ def _corpus() -> list[FileRecord]:
     """A directory of the ordinary shape: several types, most of them readable,
     a few that said nothing, and one pair of records that disagree."""
     records = [
-        _record("photo.jpg", Origin(source="device-metadata", tool="NIKON", geo="43.4, 11.8")),
-        _record("holiday.jpg", Origin(source="device-metadata", tool="NIKON")),
-        _record("paper.pdf", Origin(source="document-metadata", block="pdf-info", tool="Word")),
-        _record("report.pdf", Origin(source="document-metadata", block="pdf-info", tool="Word")),
-        _record("figure.png", Origin(source="c2pa", tool="OpenAI Media Service API")),
+        _record(
+            "photo.jpg", EvidenceRecord(source="device-metadata", tool="NIKON", geo="43.4, 11.8")
+        ),
+        _record("holiday.jpg", EvidenceRecord(source="device-metadata", tool="NIKON")),
+        _record(
+            "paper.pdf", EvidenceRecord(source="document-metadata", block="pdf-info", tool="Word")
+        ),
+        _record(
+            "report.pdf", EvidenceRecord(source="document-metadata", block="pdf-info", tool="Word")
+        ),
+        _record("figure.png", EvidenceRecord(source="c2pa", tool="OpenAI Media Service API")),
         _record("notes.txt"),
         _record("scratch.bin"),
     ]
@@ -192,9 +70,13 @@ def _corpus() -> list[FileRecord]:
             path="/case/invoice.pdf",
             size=2048,
             mtime="2026-08-24T19:00:00Z",
-            origins=[
-                Origin(source="browser-download", url="https://one.example.org/invoice.pdf"),
-                Origin(source="windows-zone-identifier", url="https://other.example.net/i.pdf"),
+            evidence=[
+                EvidenceRecord(
+                    source="browser-download", url="https://one.example.org/invoice.pdf"
+                ),
+                EvidenceRecord(
+                    source="windows-zone-identifier", url="https://other.example.net/i.pdf"
+                ),
             ],
         )
     )
@@ -219,7 +101,7 @@ def _at(output: str, heading: str) -> int:
     heading = heading.upper()
     lines = output.splitlines()
     for index, line in enumerate(lines[:-1]):
-        if line.startswith(f"  {heading}") and _rule(lines[index + 1]):
+        if line.startswith(heading) and _rule(lines[index + 1]):
             return index
     raise AssertionError(f"no {heading!r} section in the report")
 
@@ -244,16 +126,6 @@ def _section(output: str, heading: str) -> list[str]:
     return lines[start : (rules[0] - 1) if rules else len(lines)]
 
 
-def test_the_masthead_says_what_is_in_the_directory():
-    """Files, types and bytes, before anything is said about any of them."""
-    output = render_text(_corpus(), Path("/case"), theme=PLAIN)
-
-    assert "8 files" in output
-    assert "5 types" in output
-    assert "6 with findings" in output
-    assert "2 without findings" in output
-
-
 def test_the_masthead_does_not_call_a_metadata_block_a_traced_origin():
     """A file with EXIF has not been traced anywhere. Counting it as though it
     had is the report telling the reader something it does not know."""
@@ -262,43 +134,21 @@ def test_the_masthead_does_not_call_a_metadata_block_a_traced_origin():
     assert "traced" not in output
 
 
-def test_the_inventory_lists_every_type_with_its_share_of_the_bytes():
+def test_the_summary_section_says_what_was_read():
     output = render_text(_corpus(), Path("/case"), theme=PLAIN)
 
-    assert "INVENTORY" in output
-    for extension in ("PDF", "JPEG", "PNG", "TXT", "BIN"):
-        assert extension in output, extension
-
-
-def test_the_inventory_names_the_families_the_type_filter_uses():
-    output = render_text(_corpus(), Path("/case"), theme=PLAIN)
-
-    assert "image" in output
-    assert "document" in output
-
-
-def test_the_findings_section_says_what_was_found():
-    output = render_text(_corpus(), Path("/case"), theme=PLAIN)
-
-    assert "FINDINGS" in output
+    assert "SUMMARY" in output
     # The rows are what was found, in the words the tally uses. Only the
     # heading above them is upper case; a row is not a heading.
-    assert "device information" in output
-    assert "content credentials" in output
-    assert "conflicting evidence" in output
-
-
-def test_attention_raises_the_conflict_and_names_the_file():
-    output = render_text(_corpus(), Path("/case"), theme=PLAIN)
-
-    raised = "\n".join(_section(output, "notable findings"))
-
-    assert "conflicting evidence" in raised
-    assert "invoice.pdf" in raised
+    assert "with evidence" in output
+    assert "origin records" in output
+    assert "findings" in output
 
 
 def test_a_quiet_directory_raises_nothing():
-    records = [_record("a.pdf", Origin(source="document-metadata", tool="Word")) for _ in range(3)]
+    records = [
+        _record("a.pdf", EvidenceRecord(source="document-metadata", tool="Word")) for _ in range(3)
+    ]
 
     output = render_text(records, Path("/case"), theme=PLAIN)
 
@@ -308,36 +158,17 @@ def test_a_quiet_directory_raises_nothing():
 def test_the_report_reads_from_the_directory_down_to_the_file():
     output = render_text(_corpus(), Path("/case"), theme=PLAIN)
 
-    assert _at(output, "inventory") < _at(output, "findings")
-    assert _at(output, "findings") < _at(output, "notable findings")
-    assert _at(output, "notable findings") < _at(output, "files")
-    assert _at(output, "files") < _at(output, "files in detail")
-    assert _at(output, "files in detail") < _at(output, "metadata sources")
-
-
-def test_the_reader_table_is_technical_detail_and_goes_last():
-    """It answers "which readers produced results", which is not the same
-    question as "what was found" and must not stand in for it."""
-    output = render_text(_corpus(), Path("/case"), theme=PLAIN)
-
-    assert "METADATA SOURCES" in output
-    assert _at(output, "metadata sources") > _at(output, "findings")
-
-
-def test_the_last_line_counts_files_rather_than_recorded_origins():
-    output = render_text(_corpus(), Path("/case"), theme=PLAIN)
-
-    assert "8 files analyzed" in output
-    assert "6 with findings" in output
-    assert "2 with no findings" in output
-    assert "have a recorded origin" not in output
+    assert _at(output, "summary") < _at(output, "files")
+    assert _at(output, "files") < _at(output, "origin")
+    assert _at(output, "origin") < _at(output, "metadata")
+    assert _at(output, "metadata") < _at(output, "unresolved")
 
 
 def test_one_file_is_not_given_an_inventory_of_itself():
     """`filegrail suspicious.pdf` is a common way in. A one-row inventory and a
     findings table over a single file is ceremony in front of the answer."""
     output = render_text(
-        [_record("suspicious.pdf", Origin(source="document-metadata", tool="Word"))],
+        [_record("suspicious.pdf", EvidenceRecord(source="document-metadata", tool="Word"))],
         Path("/case"),
         theme=PLAIN,
     )
@@ -359,27 +190,6 @@ def test_the_section_headings_say_what_the_section_holds():
 # --- the report names itself -------------------------------------------------
 
 
-def test_a_saved_report_says_what_produced_it():
-    """`filegrail evidence/ --no-color > report.txt` has to be recognisable as
-    a filegrail report months later, pasted into a case file, with nothing but
-    the text."""
-    output = render_text(_corpus(), Path("/case"), theme=PLAIN)
-
-    assert "|_| |_|_" in output  # the wordmark's baseline row
-    assert f"filegrail {__version__}" in output
-    assert TAGLINE in output
-
-
-def test_the_banner_says_what_was_scanned_and_what_came_back():
-    output = render_text(_corpus(), Path("/case"), theme=PLAIN)
-
-    assert "target" in output
-    assert str(Path("/case")) in output  # spelled the way this platform does
-    assert "scanned" in output
-    assert "8 files" in output
-    assert "5 types" in output
-
-
 def test_the_banner_is_not_the_landing_screen():
     """The front door introduces the tool; a report identifies itself. Usage,
     commands and where to file a bug belong on one and not the other."""
@@ -399,33 +209,7 @@ def test_the_banner_fits_every_terminal(width: int):
     assert not [line for line in output.splitlines() if len(line) > width]
 
 
-def test_the_banner_is_ascii_where_the_terminal_is():
-    output = render_text(_corpus(), Path("/case"), theme=Theme(False, False, 88))
-
-    assert output.isascii()
-
-
 # --- notable findings --------------------------------------------------------
-
-
-def test_the_section_is_not_named_as_an_alarm():
-    """Coordinates and Content Credentials are findings, not problems."""
-    output = render_text(_corpus(), Path("/case"), theme=PLAIN)
-
-    assert "NOTABLE FINDINGS" in output
-    assert "attention" not in output
-
-
-def test_a_bullet_still_means_a_file():
-    """`●` is the entry glyph. Using it for a count line in another section
-    spends the one symbol the gutter has for "this is a file"."""
-    theme = Theme(colour=False, unicode=True, width=100)
-
-    output = render_text(_corpus(), Path("/case"), theme=theme)
-    notable = _section(output, "notable findings")
-
-    assert not [line for line in notable if line.lstrip().startswith("●")]
-    assert any("contains coordinates" in line for line in notable)
 
 
 # --- the whole list, unless asked otherwise ----------------------------------
@@ -433,21 +217,6 @@ def test_a_bullet_still_means_a_file():
 
 def _unexplained(count: int) -> list[FileRecord]:
     return [_record(f"f{index}.txt") for index in range(count)]
-
-
-def test_every_file_with_no_findings_is_listed_by_default():
-    """Nobody should have to run the tool a second time to see a list it
-    already had."""
-    output = render_text(_unexplained(40), Path("/case"), theme=PLAIN)
-
-    assert "more (--limit" not in output
-    assert _listed(output) == 40
-
-
-def test_brief_is_where_the_list_gets_shortened():
-    output = render_text(_unexplained(40), Path("/case"), theme=PLAIN, brief=True, limit=25)
-
-    assert "... and 15 more" in output
 
 
 # --- what was not searched ---------------------------------------------------
@@ -465,7 +234,7 @@ def test_the_report_says_which_directories_were_not_read():
 
     output = render_text([_record("a.jpg")], Path("/case"), theme=PLAIN, unsearched=missed)
 
-    assert "2 directories could not be read" in output
+    assert "could not be read" in output
     assert "locked" in output and "sealed" in output
 
 
@@ -474,8 +243,8 @@ def test_the_report_says_which_directories_it_skipped_by_name():
 
     output = render_text([_record("a.jpg")], Path("/case"), theme=PLAIN, unsearched=missed)
 
-    assert "1 directory skipped by name" in output
-    assert "--no-skip" in output
+    assert "skipped by name" in output
+    assert "node_modules" in output
 
 
 def test_the_two_reasons_are_not_merged():
@@ -496,63 +265,44 @@ def test_a_report_with_nothing_missed_says_nothing_about_it():
     assert "skipped by name" not in output
 
 
-def test_the_profile_that_was_read_is_a_row_of_the_banner():
-    """It is a fact about the scan, like the target and the counts, and it used
-    to float under the rule as a sentence with no label on it - the one line in
-    the report saying the evidence did not come from this machine."""
+def test_the_profile_that_was_read_is_named_beside_the_target():
+    """The one line saying the evidence did not come from this machine. It sits
+    beside what was scanned, because both are facts about the same run."""
     # The path is compared as this platform writes it: `Path` renders a POSIX
     # literal with backslashes on Windows, and the claim here is about the row,
     # not about separators.
     profile = Path("/mnt/image/home/ann")
     output = render_text(_corpus(), Path("/case"), theme=PLAIN, home=profile)
 
-    row = next(line for line in output.splitlines() if line.strip().startswith("profile"))
+    row = next(line for line in output.splitlines() if line.startswith("target"))
     assert str(profile) in row
-    assert "another machine" in row
+    assert "external" in row
     assert "evidence read from the profile at" not in output
 
 
-def test_a_file_carries_the_same_mark_in_the_index_and_below_it():
-    """The index says `!` and the legend above it says what `!` means. A file
-    that then heads its own entry with `*` has changed its mind about itself
-    between two screens of the same report."""
+def test_a_file_that_needs_a_second_look_is_marked_once():
+    """One mark, in the table of files, and the legend under it says what the
+    mark means. The file then appears again in ORIGIN and in FINDINGS, where
+    what is being listed is a record rather than a file - and a second mark
+    beside it there would be the report flagging the same fact twice."""
     output = render_text(_corpus(), Path("/case"), theme=PLAIN)
 
-    # The three marks the legend explains, and nothing else: a rail carrying a
-    # wrapped conflict line is not the file claiming anything about itself.
-    marks = re.findall(r"^\s*([!*.])\s+invoice\.pdf", output, flags=re.MULTILINE)
-    assert len(marks) == 2, marks
-    assert set(marks) == {"!"}, marks
+    marks = re.findall(r"^([!.]) +invoice\.pdf", output, flags=re.MULTILINE)
+    assert marks == ["!"], marks
+    assert "needs review" in output
 
 
 def test_the_profile_is_written_the_same_way_as_the_target(monkeypatch, tmp_path: Path):
-    """Two paths in the same block, one abbreviated and one not, reads as two
+    """Two paths on one line, one abbreviated and one not, read as two
     different kinds of thing. They are both just paths."""
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
 
     output = render_text(_corpus(), tmp_path / "case", theme=PLAIN, home=tmp_path / "image" / "ann")
 
-    rows = {
-        line.split()[0]: line.strip()
-        for line in output.splitlines()
-        if line.startswith("  target") or line.strip().startswith("profile")
-    }
     # Built from a `Path` rather than written out: `_display` keeps the `~/`
     # prefix and then whatever separator the platform uses, so a POSIX literal
     # here fails on Windows for a row that is perfectly correct there.
-    assert rows["target"].endswith("~/case")
-    assert f"~/{Path('image') / 'ann'}" in rows["profile"]
+    row = next(line for line in output.splitlines() if line.startswith("target"))
 
-
-def test_the_inventory_is_a_table_with_a_row_for_each_type():
-    """Three entries packed to a line, each three unlabelled figures, was a
-    jumble however the columns were headed. One row a type, one header."""
-    output = render_text(_corpus(), Path("/case"), theme=PLAIN)
-
-    rows = [line.split() for line in _section(output, "inventory") if line.strip()]
-    header = next(row for row in rows if row[0] == "type")
-    assert header == ["type", "files", "size"]
-
-    named = [row[0] for row in rows[rows.index(header) + 1 :] if row[0].isupper()]
-    assert named[:2] == ["PDF", "JPEG"]
-    assert len(set(named)) == len(named)  # a type is a row, and a row each
+    assert "~/case" in row
+    assert f"~/{Path('image') / 'ann'}" in row

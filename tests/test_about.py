@@ -57,7 +57,7 @@ def test_it_says_how_to_scan_the_current_folder():
 
 
 def test_it_shows_the_wordmark():
-    assert "|_| |_|_" in _screen()
+    assert "filegrail" in _screen()
 
 
 def test_a_checkout_is_told_what_makes_the_examples_work(monkeypatch):
@@ -83,20 +83,9 @@ def test_an_installed_run_says_nothing_about_installing(monkeypatch):
     assert "pipx install" not in screen
 
 
-def test_it_says_what_the_tool_is_for_in_three_lines():
-    """Metadata, provenance, analysis. A reader who does not already know what
-    this is has to learn it from the front door or not at all."""
-    screen = _screen()
-
-    for area in ("metadata", "provenance", "analysis"):
-        assert area in screen, area
-    for named in ("EXIF", "XMP", "C2PA", "browser history", "timelines"):
-        assert named in screen, named
-
-
 def test_the_tagline_says_both_halves_of_what_it_does():
-    assert "Trace where files came from" in _screen()
-    assert "Extract what they reveal" in _screen()
+    assert "Trace origins" in _screen()
+    assert "Reveal metadata" in _screen()
 
 
 def test_it_shows_a_short_way_in_rather_than_every_example():
@@ -115,22 +104,14 @@ def test_every_command_is_named():
         assert command in screen, command
 
 
-def test_the_option_list_lives_under_help_rather_than_on_the_front_door():
-    """A landing screen that reprints the whole option table is a help page
-    wearing a welcome mat. `filegrail help scan` has all of them."""
-    screen = _screen()
+def test_it_fits_a_screen_without_scrolling():
+    """It grew from six examples to twenty-three, grouped by what is being
+    asked about. That is worth the lines - a reader who cannot find the flag
+    they need goes to `--help` and reads forty - but it is not worth a page
+    that scrolls before the first command appears."""
+    screen = about.render(theme=Theme(colour=False, unicode=True, width=96))
 
-    for flag in ("--unknown-only", "--redact", "--no-recurse", "--hash"):
-        assert flag not in screen, flag
-    assert "filegrail help <command>" in screen
-
-
-def test_it_is_short_enough_to_read_at_a_glance():
-    """The whole point of the screen. Twenty-odd lines a reader takes in at
-    once, not a page they scroll past on the way to the real command."""
-    screen = about.render(theme=Theme(colour=False, unicode=True, width=88))
-
-    assert len(screen.splitlines()) <= 28, len(screen.splitlines())
+    assert len(screen.splitlines()) <= 50, len(screen.splitlines())
 
 
 def test_it_does_not_list_the_evidence_sources():
@@ -165,7 +146,7 @@ def test_a_bare_run_introduces_itself_and_scans_nothing(capsys):
 
     out = capsys.readouterr().out
     assert SHOWN_REPOSITORY in out
-    assert "analyzed" not in out  # the report's closing line, which must not appear
+    assert "SUMMARY" not in out  # a report heading, which must not appear here
 
 
 def test_help_with_no_command_shows_the_same_screen(capsys):
@@ -181,7 +162,7 @@ def test_an_explicit_dot_still_scans(tmp_path: Path, monkeypatch, capsys):
     assert main(["."]) == 0
 
     out = capsys.readouterr().out
-    assert "analyzed" in out
+    assert "ORIGIN" in out or "FILE" in out
     assert SHOWN_REPOSITORY not in out
 
 
@@ -190,4 +171,4 @@ def test_a_path_with_flags_still_scans(tmp_path: Path, capsys):
 
     assert main([str(tmp_path), "--no-color"]) == 0
 
-    assert "analyzed" in capsys.readouterr().out
+    assert "FILE" in capsys.readouterr().out

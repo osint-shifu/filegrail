@@ -39,7 +39,7 @@ def test_reads_ooxml_authorship(tmp_path: Path):
     assert "author Jan Kowalski" in origin.note
     assert "last edited by Anna Nowak" in origin.note
     assert "company Acme Holdings" in origin.note
-    assert origin.confidence == 50
+    assert origin.priority == 50
 
 
 def test_ooxml_without_properties_yields_nothing(tmp_path: Path):

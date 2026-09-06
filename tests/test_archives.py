@@ -58,8 +58,8 @@ def test_nested_member_with_a_shared_name_still_inherits(tmp_path: Path):
 
     record = scan(case, home=tmp_path, use_shell_history=False)[0]
 
-    assert record.best is not None
-    assert record.best.source == "archive-member"
+    assert record.primary is not None
+    assert record.primary.source == "archive-member"
 
 
 def test_corrupt_archive_returns_no_members(tmp_path: Path):
@@ -81,7 +81,7 @@ def test_extracted_files_inherit_the_archive_origin(tmp_path: Path):
     records = {Path(r.path).name: r for r in scan(case, home=tmp_path, use_shell_history=False)}
 
     for name in ("notes.md", "data.csv"):
-        best = records[name].best
+        best = records[name].primary
         assert best is not None
         assert best.source == "archive-member"
         assert best.url == "https://example.org/pack.zip"
@@ -99,7 +99,7 @@ def test_member_modified_after_extraction_is_not_claimed(tmp_path: Path):
 
     record = scan(case, home=tmp_path, use_shell_history=False)[0]
 
-    assert record.origins == []
+    assert record.evidence == []
 
 
 def test_inheritance_can_be_disabled(tmp_path: Path):
@@ -113,4 +113,4 @@ def test_inheritance_can_be_disabled(tmp_path: Path):
 
     record = scan(case, home=tmp_path, use_shell_history=False, follow_archives=False)[0]
 
-    assert record.origins == []
+    assert record.evidence == []

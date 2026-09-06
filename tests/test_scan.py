@@ -35,9 +35,9 @@ def test_exact_path_match_has_no_moved_note(tmp_path: Path):
 
     record = scan(case, home=tmp_path, use_shell_history=False)[0]
 
-    assert record.best is not None
-    assert record.best.source == "browser-download"
-    assert record.best.note is None
+    assert record.primary is not None
+    assert record.primary.source == "browser-download"
+    assert record.primary.note is None
 
 
 def test_moved_file_is_matched_by_name_and_flagged(tmp_path: Path):
@@ -48,8 +48,8 @@ def test_moved_file_is_matched_by_name_and_flagged(tmp_path: Path):
 
     record = scan(case, home=tmp_path, use_shell_history=False)[0]
 
-    assert record.best is not None
-    assert "moved or renamed" in (record.best.note or "")
+    assert record.primary is not None
+    assert "moved or renamed" in (record.primary.match_note or "")
 
 
 def test_file_without_any_origin(tmp_path: Path):
@@ -59,8 +59,8 @@ def test_file_without_any_origin(tmp_path: Path):
 
     record = scan(case, home=tmp_path, use_shell_history=False)[0]
 
-    assert record.origins == []
-    assert record.best is None
+    assert record.evidence == []
+    assert record.primary is None
     assert record.size == 9
 
 
@@ -190,10 +190,10 @@ def test_a_scan_links_a_file_to_the_one_it_was_made_from(tmp_path: Path):
 
 # --- what the walk did not look inside ---------------------------------------
 #
-# `no findings` is a claim about a file the tool looked at. A directory it never
+# `no evidence found` is a claim about a file the tool looked at. A directory it never
 # entered produces no files at all, so nothing in the report is about them and
 # nothing in the report says so. The two reasons a directory goes unvisited are
-# different in kind and are kept apart: one is a choice the tool made and can be
+# different in category and are kept apart: one is a choice the tool made and can be
 # told not to make, the other is a hole in the evidence.
 
 

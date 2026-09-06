@@ -3,7 +3,7 @@
 Every other reader here answers *where did this come from*. This one answers
 nothing on its own: it hands back the readable text of a document so that the
 identifier detectors can be pointed at it, and the text is not a claim about
-provenance. A body is not evidence of arrival, and turning one into an `Origin`
+provenance. A body is not evidence of arrival, and turning one into an `EvidenceRecord`
 would put a paragraph beside a download record as though the two said the same
 kind of thing.
 

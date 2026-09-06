@@ -22,7 +22,7 @@ from email.parser import BytesHeaderParser
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
-from ..models import Origin
+from ..models import EvidenceRecord
 
 SUFFIXES = {".eml"}
 
@@ -92,7 +92,7 @@ _FOR = re.compile(r"\bfor\s+<?([^>\s;]+)", re.I)
 _ADDRESS = re.compile(r"\[(?:IPv6:)?([0-9A-Fa-f:.]{3,45})\]")
 
 
-def read_mail(path: Path) -> list[Origin]:
+def read_mail(path: Path) -> list[EvidenceRecord]:
     """Return the delivery record and the message's own headers."""
     suffix = path.suffix.lower()
     if suffix in SUFFIXES:
@@ -106,7 +106,7 @@ def read_mail(path: Path) -> list[Origin]:
     return []
 
 
-def _claims(message: Message) -> list[Origin]:
+def _claims(message: Message) -> list[EvidenceRecord]:
     """The hops, then what the message says about itself."""
     hops = message.get_all("Received") or []
     found = [
@@ -118,7 +118,7 @@ def _claims(message: Message) -> list[Origin]:
     return [origin for origin in found if origin is not None]
 
 
-def _outlook(path: Path) -> list[Origin]:
+def _outlook(path: Path) -> list[EvidenceRecord]:
     """Read a compound document as the message it is.
 
     Spec-only: assembled from [MS-OXMSG], and never run against a file Outlook
@@ -149,7 +149,7 @@ def _outlook(path: Path) -> list[Origin]:
 
     subject = fields.get("Subject")
     return [
-        Origin(
+        EvidenceRecord(
             source="email-header",
             note=f"subject {subject}" if subject else None,
             fields=fields,
@@ -171,7 +171,7 @@ def _text(name: str, raw: bytes) -> str | None:
     return raw.decode("utf-8", "replace").rstrip("\x00") or None
 
 
-def _hop(value: str, source: str) -> Origin | None:
+def _hop(value: str, source: str) -> EvidenceRecord | None:
     """One server's note of taking the message from another."""
     said = " ".join(value.split())
     fields = {
@@ -196,7 +196,7 @@ def _hop(value: str, source: str) -> Origin | None:
     if seen and seen != claimed:
         note = f"{note} at {seen}"
 
-    return Origin(
+    return EvidenceRecord(
         source=source,
         # The server that wrote the line, which is the one thing in it that
         # server knew first-hand.
@@ -207,7 +207,7 @@ def _hop(value: str, source: str) -> Origin | None:
     )
 
 
-def _self_description(message: Message) -> Origin | None:
+def _self_description(message: Message) -> EvidenceRecord | None:
     """What the message says about itself, none of which anybody checked."""
     fields = {}
     for name in _HEADERS:
@@ -218,7 +218,7 @@ def _self_description(message: Message) -> Origin | None:
         return None
 
     subject = fields.get("Subject")
-    return Origin(
+    return EvidenceRecord(
         source="email-header",
         tool=next((fields[name] for name in _COMPOSER if name in fields), None),
         at=_moment(fields.get("Date", ""), whole=True),

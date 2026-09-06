@@ -31,10 +31,10 @@ VT_FILETIME = 64
 # --- compound file -----------------------------------------------------------
 
 
-def directory_entry(name: str, kind: int, start: int, size: int, child: int = FREE) -> bytes:
+def directory_entry(name: str, category: int, start: int, size: int, child: int = FREE) -> bytes:
     raw = name.encode("utf-16-le") + b"\x00\x00"
     entry = raw.ljust(64, b"\x00")[:64]
-    entry += struct.pack("<HBB", len(raw), kind, 1)
+    entry += struct.pack("<HBB", len(raw), category, 1)
     entry += struct.pack("<III", FREE, FREE, child)
     entry += b"\x00" * 16 + b"\x00" * 4 + b"\x00" * 16
     entry += struct.pack("<IQ", start, size)
@@ -97,8 +97,8 @@ def ole(streams: dict[str, bytes]) -> bytes:
 
     root = directory_entry("Root Entry", 5, mini_start, len(mini_stream), child=1)
     directory.append(root)
-    for name, kind, start, size in entries:
-        directory.append(directory_entry(name, kind, start, size))
+    for name, category, start, size in entries:
+        directory.append(directory_entry(name, category, start, size))
 
     directory_start, directory_count = allocate(b"".join(directory), SECTOR)
     fat.extend(chain(directory_start, directory_count))

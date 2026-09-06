@@ -7,7 +7,7 @@ answer lives on the server rather than on this machine, so nothing below claims
 it.
 
 What is left is containment, and it answers a different question from the other
-acquisition sources rather than a weaker version of the same one. **Sync runs
+origin sources rather than a weaker version of the same one. **Sync runs
 both ways.** A file in a synced folder may have arrived from the account, or
 may have been made here and pushed to it, and the folder cannot tell those
 apart. So it is recorded as something that handled the file, which is what is
@@ -22,7 +22,7 @@ import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..models import Origin
+from ..models import EvidenceRecord
 
 #: A configuration naming more roots than this is not one of these clients.
 _MAX_ROOTS = 64
@@ -53,12 +53,12 @@ def collect_sync_roots(home: Path | None = None) -> list[SyncRoot]:
     return found[:_MAX_ROOTS]
 
 
-def read_sync(path: Path, roots: list[SyncRoot]) -> Origin | None:
+def read_sync(path: Path, roots: list[SyncRoot]) -> EvidenceRecord | None:
     """Say that this file sits inside a folder some client syncs."""
     for root in roots:
         if not _inside(path, root.path):
             continue
-        return Origin(
+        return EvidenceRecord(
             source="sync-folder",
             tool=root.client,
             note=f"inside a folder {root.client} keeps in step with {root.account}",

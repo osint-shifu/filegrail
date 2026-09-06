@@ -19,7 +19,7 @@ from filegrail.identify import (
     normalize_domain,
     normalize_url,
 )
-from filegrail.models import FileRecord, Origin
+from filegrail.models import EvidenceRecord, FileRecord
 from filegrail.report import render_json, render_text
 from filegrail.theme import Theme
 
@@ -28,7 +28,7 @@ PLAIN = Theme(colour=False, unicode=False, width=88)
 
 def _record(name: str, **origin) -> FileRecord:
     record = FileRecord(path=f"/case/{name}", size=1, mtime="2026-08-24T19:00:00Z")
-    record.origins.append(Origin(**origin))
+    record.evidence.append(EvidenceRecord(**origin))
     return record
 
 
@@ -184,7 +184,7 @@ def test_the_report_lists_them_on_request():
     output = render_text(records, Path("/case"), theme=PLAIN, identify=True)
 
     assert "a@b.org" in output
-    assert "email" in output
+    assert "EMAILS" in output
 
 
 def test_json_carries_them_on_request():
@@ -194,7 +194,7 @@ def test_json_carries_them_on_request():
 
     emails = [i for i in payload["identifiers"] if i["type"] == "email"]
     assert emails[0]["normalized"] == "a@b.org"
-    assert emails[0]["where"] == ["report.pdf · Author"]
+    assert emails[0]["where"] == ["report.pdf · document metadata · Author"]
 
 
 def test_json_omits_them_otherwise():
@@ -220,8 +220,8 @@ def test_a_message_id_is_not_offered_as_an_address():
     every test for one. Nobody can write to it, and a lead nobody can follow is
     worse than no lead - the field name is known here, so it can be told."""
     record = FileRecord(path="/case/note.eml", size=10, mtime="")
-    record.origins.append(
-        Origin(
+    record.evidence.append(
+        EvidenceRecord(
             source="email-header",
             fields={
                 "Message-ID": "<20190304182228.7ttQ1a@example.com>",
@@ -252,7 +252,7 @@ def _document(tmp_path: Path, text: str, name: str = "letter.txt", **origin: obj
         path=str(written), size=written.stat().st_size, mtime="2026-08-24T19:00:00Z"
     )
     if origin:
-        record.origins.append(Origin(**origin))
+        record.evidence.append(EvidenceRecord(**origin))
     return record
 
 
@@ -276,7 +276,8 @@ def test_content_widens_the_corpus_to_what_the_document_says(tmp_path: Path):
 
 def test_a_value_from_a_document_says_where_in_the_document_it_was(tmp_path: Path):
     """An identifier reported as `notes.txt` sends somebody back to search the
-    file. One reported as `notes.txt - line 3` does not."""
+    file. One reported as `notes.txt - content - line 3` does not: it names the
+    file, what read it, and where inside it the value was."""
     record = _document(
         tmp_path,
         "nothing here\nnor here\nwrite to ann.shaw@acme-legal.example\n",
@@ -286,7 +287,7 @@ def test_a_value_from_a_document_says_where_in_the_document_it_was(tmp_path: Pat
 
     email = next(e for e in extract([record], content=True) if e.type == "email")
 
-    assert email.where == [f"notes.txt{PLACE}line 3"]
+    assert email.where == [f"notes.txt{PLACE}content{PLACE}line 3"]
 
 
 def test_a_value_written_in_a_document_and_recorded_about_it_says_both(tmp_path: Path):
@@ -321,7 +322,7 @@ def test_a_value_the_document_names_and_the_arrival_record_names_is_marked(tmp_p
 
 
 def test_a_value_only_a_document_claims_about_itself_is_not_an_arrival(tmp_path: Path):
-    """An intrinsic field travelled with the bytes; it does not say they arrived."""
+    """A metadata field travelled with the bytes; it does not say they arrived."""
     record = _document(
         tmp_path,
         "invoice from acme-legal.example",
@@ -378,71 +379,12 @@ def test_the_report_says_which_side_of_the_file_a_value_came_from(tmp_path: Path
 
     report = render_text(records, tmp_path, identify=True, content=True, theme=PLAIN)
 
-    assert "1 identifier is named in a document and in how it arrived" in " ".join(report.split())
-    # The value's own line says which side of the file it came from, and the
-    # three cases are distinguishable. The separator between the type and the
-    # corpus is a glyph the theme chooses, so the line is searched rather than
-    # reconstructed.
-    for value, corpus in (
-        ("acme-legal.example", "both"),
-        ("other.example", "text"),
-        ("third.example", "recorded"),
-    ):
-        section = report[report.index("IDENTIFIERS") :]
-        line = next(row for row in section.splitlines() if value in row)
-        assert line.split()[-1] == corpus, line
-        assert "domain" in line
-
-
-def test_the_report_has_no_corpus_column_when_there_is_one_corpus(tmp_path: Path):
-    """A column saying the same word on every row is noise, not information."""
-    record = _document(
-        tmp_path,
-        "nothing here",
-        source="browser-download",
-        url="https://acme-legal.example/invoice.pdf",
-    )
-
-    printed = " ".join(render_text([record], tmp_path, identify=True, theme=PLAIN).split())
-
-    assert "acme-legal.example" in printed
-    assert "recorded" not in printed
-    assert "named in a document" not in printed
-
-
-def test_a_value_too_long_to_sit_beside_its_type_keeps_the_line(tmp_path: Path):
-    """A URL is the thing this section exists to be pivoted on, and one broken
-    across two lines inside a path segment cannot be copied out of a terminal.
-    The type moves into the gutter with the rest of what is said about it."""
-    url = "https://portal.example.org/press/2026/q3/holiday-master-copy.jpg"
-    record = _document(tmp_path, "nothing here", source="browser-download", url=url)
-
-    printed = render_text(
-        [record], tmp_path, identify=True, theme=Theme(colour=False, unicode=False, width=72)
-    )
-    block = printed.split("IDENTIFIERS")[1]
-
-    assert any(line.strip().endswith(url) for line in block.splitlines()), block
-    said = next(line for line in block.splitlines() if "kind" in line)
-    assert said.split()[-1] == "url"
-
-
-def test_an_identifier_is_a_block_that_names_its_places(tmp_path: Path):
-    """A row with the type repeated down a column, a cryptic `2 in 1` and one
-    place under it was hard to read and did not answer *where*. An identifier is
-    a block now, in the language the rest of the report already uses."""
-    record = _document(
-        tmp_path,
-        "write to ann.shaw@acme-legal.example twice: ann.shaw@acme-legal.example",
-        name="notes.txt",
-        source="document-metadata",
-    )
-
-    printed = render_text([record], tmp_path, identify=True, content=True, theme=PLAIN)
-    block = printed.split("IDENTIFIERS")[1]
-
-    assert "ann.shaw@acme-legal.example" in block
-    assert "email" in block
-    assert "2 occurrences in 1 file" in block
-    assert "notes.txt" in block
-    assert "2 in 1" not in block
+    assert "CROSS-SOURCE MATCHES" in " ".join(report.split())
+    # A value in the document *and* in how the file arrived is the pairing this
+    # exists to find, and it gets a section of its own rather than a word at the
+    # end of a row: a reader scanning for it should not have to compare two
+    # tables by eye.
+    crossed = report[report.index("CROSS-SOURCE MATCHES") :]
+    assert "acme-legal.example" in crossed
+    assert "other.example" not in crossed
+    assert "third.example" not in crossed

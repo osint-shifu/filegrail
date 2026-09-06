@@ -113,7 +113,7 @@ worded as a common ancestor and reported apart from the directed edges.
 - **Templates**, as above.
 - **Forgery.** Every one of these values is plain text in a packet nobody signs.
   A link is what the file says, not what happened, and the report must not
-  promote it beyond that. This is the same footing as every other intrinsic
+  promote it beyond that. This is the same footing as every other metadata
   claim in the tool, and it is already how they are labelled.
 - **Collision.** `MaterialTypeDecisionTreev2.pdf` writes one uuid as both its
   document and its instance. Matching must compare `DocumentID` against
@@ -143,7 +143,7 @@ archive it came out of. The lineage pass is the same shape and runs beside it.
 
 ### What it does *not* do in this version
 
-An ancestor's acquisition record is **not** inherited down a derivation edge.
+An ancestor's origin record is **not** inherited down a derivation edge.
 The archive case inherits because the bytes were literally inside the archive.
 A derived export is a different file, and "the picture this was made from was
 downloaded from X" is a sentence a reader should compose, not one the tool
@@ -163,5 +163,5 @@ per entry — and it is left for its own design.
    a real file today, and it makes the identifiers legible before anything tries
    to match them.
 2. **B**, the links within a scan, built against `exiftool`-written chains.
-3. The whole-graph view and acquisition inheritance: both need a decision from
+3. The whole-graph view and origin inheritance: both need a decision from
    the tool's owner first, and neither is blocked by 1 or 2.

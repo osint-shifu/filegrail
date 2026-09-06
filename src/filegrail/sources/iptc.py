@@ -17,7 +17,7 @@ from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..models import Origin
+from ..models import EvidenceRecord
 
 #: The image-resource block that holds an IIM datastream.
 _IPTC_RESOURCE = 0x0404
@@ -90,7 +90,7 @@ _DATASETS = {
 }
 
 
-def read_iptc(path: Path) -> Origin | None:
+def read_iptc(path: Path) -> EvidenceRecord | None:
     """Return what the file's IPTC block claims, or None."""
     block = _block(path)
     if not block:
@@ -100,7 +100,7 @@ def read_iptc(path: Path) -> Origin | None:
     if not fields:
         return None
 
-    return Origin(
+    return EvidenceRecord(
         source="iptc",
         block="iptc",
         tool=_tool(fields),

@@ -17,7 +17,7 @@ a file deleted from another volume goes to a trash on that volume - either
 `info/` as siblings, so a record is found from the file itself and no home
 directory has to be known: point this at a mounted image's trash and it reads.
 
-**What it does not say.** A trash record is `interaction`, not acquisition. It
+**What it does not say.** A trash record is `activity`, not origin. It
 proves this machine held the file at a path and then removed it from there; it
 says nothing at all about where the bytes came from before that.
 
@@ -34,7 +34,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import unquote
 
-from ..models import Origin
+from ..models import EvidenceRecord
 
 #: The home trash, relative to a home directory. Volume trashes are not listed:
 #: they are found from the deleted file rather than from a profile.
@@ -60,15 +60,15 @@ _MAX_RECORD_BYTES = 8192
 _MAX_RECORDS = 20_000
 
 
-def read_trash(path: Path) -> Origin | None:
+def read_trash(path: Path) -> EvidenceRecord | None:
     """What the trash recorded when this file was moved into it, if anything."""
     record = _record_for(path)
     if record is None:
         return None
-    return _origin(record, path.name)
+    return _record(record, path.name)
 
 
-def collect_trash(home: Path | None = None) -> list[Origin]:
+def collect_trash(home: Path | None = None) -> list[EvidenceRecord]:
     """Every record in the home trash, for a survey of what it holds.
 
     A list rather than an index by path, because nothing is matched against it.
@@ -81,7 +81,7 @@ def collect_trash(home: Path | None = None) -> list[Origin]:
     if not info.is_dir():
         return []
 
-    found: list[Origin] = []
+    found: list[EvidenceRecord] = []
     try:
         records = sorted(info.iterdir())
     except OSError:
@@ -89,7 +89,7 @@ def collect_trash(home: Path | None = None) -> list[Origin]:
     for record in records[:_MAX_RECORDS]:
         if record.suffix != _RECORD:
             continue
-        origin = _origin(record, record.name[: -len(_RECORD)])
+        origin = _record(record, record.name[: -len(_RECORD)])
         if origin is not None:
             found.append(origin)
     return found
@@ -109,7 +109,7 @@ def _record_for(path: Path) -> Path | None:
     return record if record.is_file() else None
 
 
-def _origin(record: Path, name: str) -> Origin | None:
+def _record(record: Path, name: str) -> EvidenceRecord | None:
     fields = _fields(record)
     if fields is None:
         return None
@@ -120,7 +120,7 @@ def _origin(record: Path, name: str) -> Origin | None:
         return None
 
     kept = {name: value for name, value in (("Path", original), ("DeletionDate", written)) if value}
-    return Origin(
+    return EvidenceRecord(
         source="freedesktop-trash",
         at=_deleted(written),
         note=f"deleted from {original}" if original else f"deleted, as {name}",

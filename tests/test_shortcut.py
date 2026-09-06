@@ -2,7 +2,7 @@
 
 A `.lnk` there is the counterpart of a `recently-used.xbel` entry and answers
 the same question at the same strength: something on that machine handled this
-file. Opening a file proves contact, not acquisition, and this does not pretend
+file. Opening a file proves contact, not origin, and this does not pretend
 otherwise.
 
 What it adds is where the file was when it was opened. The shortcut records the
@@ -209,21 +209,21 @@ def test_a_scan_reports_the_volume_a_file_was_opened_from(recent, carved: Path, 
 
     record = scan(carved, home=tmp_path, use_shell_history=False)[0]
 
-    claims = [o for o in record.origins if o.source == "windows-recent"]
+    claims = [o for o in record.evidence if o.source == "windows-recent"]
     assert len(claims) == 1
     assert claims[0].fields["Volume"] == "removable"
 
 
 def test_the_claim_is_about_handling_and_not_about_arrival(recent, carved: Path, tmp_path: Path):
     """A shortcut proves the file was opened. It says nothing about how it came."""
-    from filegrail.models import INTERACTION, kind
+    from filegrail.models import ACTIVITY, category
 
     recent("report.docx.lnk", _local())
 
     record = scan(carved, home=tmp_path, use_shell_history=False)[0]
 
-    claim = next(o for o in record.origins if o.source == "windows-recent")
-    assert kind(claim) == INTERACTION
+    claim = next(o for o in record.evidence if o.source == "windows-recent")
+    assert category(claim) == ACTIVITY
 
 
 def test_a_shortcut_for_a_different_file_is_not_attached(recent, carved: Path, tmp_path: Path):
@@ -231,7 +231,7 @@ def test_a_shortcut_for_a_different_file_is_not_attached(recent, carved: Path, t
 
     record = scan(carved, home=tmp_path, use_shell_history=False)[0]
 
-    assert not [o for o in record.origins if o.source == "windows-recent"]
+    assert not [o for o in record.evidence if o.source == "windows-recent"]
 
 
 def test_a_recorded_size_that_disagrees_is_reported(recent, carved: Path, tmp_path: Path):
@@ -240,8 +240,8 @@ def test_a_recorded_size_that_disagrees_is_reported(recent, carved: Path, tmp_pa
 
     record = scan(carved, home=tmp_path, use_shell_history=False)[0]
 
-    claim = next(o for o in record.origins if o.source == "windows-recent")
-    assert "differs" in claim.note
+    claim = next(o for o in record.evidence if o.source == "windows-recent")
+    assert "differs" in claim.match_note
 
 
 def test_a_target_id_list_is_stepped_over_rather_than_parsed(recent, tmp_path: Path):

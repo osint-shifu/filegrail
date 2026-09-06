@@ -6,7 +6,7 @@ encrypts its file cache, and for every one of these the answer lives on the
 server rather than on this machine.
 
 So the claim is containment and nothing more, and it answers a different
-question from the rest of the acquisition sources. Sync runs both ways. A file
+question from the origin sources. Sync runs both ways. A file
 in a synced folder may have arrived from the account or may have been made here
 and pushed to it, and the folder cannot tell those apart.
 """
@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from filegrail.models import INTERACTION, kind
+from filegrail.models import ACTIVITY, category
 from filegrail.scan import scan
 from filegrail.sources.sync import collect_sync_roots, read_sync
 
@@ -113,10 +113,10 @@ def test_it_says_the_file_was_handled_here_not_where_it_came_from(tmp_path: Path
 
     origin = read_sync(target, collect_sync_roots(home=tmp_path))
 
-    assert kind(origin) == INTERACTION
-    # `kind` answers INTERACTION for anything it does not know, so the rank is
+    assert category(origin) == ACTIVITY
+    # `category` answers ACTIVITY for anything it does not know, so the rank is
     # asserted too: together they say the source was actually registered.
-    assert origin.confidence > 0
+    assert origin.priority > 0
 
 
 def test_no_client_configured_at_all(tmp_path: Path):
@@ -133,4 +133,4 @@ def test_a_scan_attaches_it(tmp_path: Path):
 
     record = next(iter(scan(folder, use_shell_history=False, home=home)))
 
-    assert [o.tool for o in record.origins if o.source == "sync-folder"] == ["Nextcloud"]
+    assert [o.tool for o in record.evidence if o.source == "sync-folder"] == ["Nextcloud"]

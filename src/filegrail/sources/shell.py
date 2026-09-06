@@ -1,8 +1,9 @@
 """Shell history as a weak, corroborating origin source.
 
 A command that names a file is evidence that the command touched it, not proof
-that the command produced it. These origins are therefore reported at low
-confidence and never override a browser or operating-system record.
+that the command produced it. A fetch command is read as an origin record and
+everything else as activity, and neither displaces a browser or an
+operating-system record.
 
 Timestamps are only available when the shell was configured to store them
 (HISTTIMEFORMAT for bash, EXTENDED_HISTORY for zsh). Plain bash history has no
@@ -16,7 +17,7 @@ import shlex
 from pathlib import Path
 
 from ..models import FETCH_TOOLS as _FETCH_TOOLS
-from ..models import Origin
+from ..models import EvidenceRecord
 from ..util import iso
 
 HISTORY_FILES = [
@@ -86,18 +87,20 @@ def _match_names(names: set[str], words: list[str], command: str) -> set[str]:
     return matched
 
 
-def collect_shell_history(names: set[str], home: Path | None = None) -> dict[str, list[Origin]]:
+def collect_shell_history(
+    names: set[str], home: Path | None = None
+) -> dict[str, list[EvidenceRecord]]:
     """Map file name -> commands that mention it.
 
     Matching is by file name rather than full path because history rarely
     contains absolute paths. That makes it ambiguous, which is reflected in the
-    low confidence assigned to this source.
+    presentation rank this source is given.
     """
     home = home or Path.home()
     if not names:
         return {}
 
-    found: dict[str, list[Origin]] = {}
+    found: dict[str, list[EvidenceRecord]] = {}
     for relative in HISTORY_FILES:
         for timestamp, command in _parse_history(home / relative):
             try:
@@ -114,7 +117,7 @@ def collect_shell_history(names: set[str], home: Path | None = None) -> dict[str
 
             for name in matched:
                 found.setdefault(name, []).append(
-                    Origin(
+                    EvidenceRecord(
                         source="shell-history",
                         tool=program,
                         command=command if len(command) <= 300 else command[:297] + "...",

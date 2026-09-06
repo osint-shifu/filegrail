@@ -1,13 +1,14 @@
-"""Whether the acquisition records for a file agree with each other.
+"""Whether the origin records for a file agree with each other.
 
-One record is a claim. Two that agree are corroboration, and worth more than
-either alone. Two that disagree are a finding in their own right - a file
+One record is an observation. Two that agree are corroboration, and worth more
+than either alone. Two that disagree are a finding in their own right - a file
 downloaded twice, a file copied after it arrived, or origin metadata that was
-replaced afterwards - and a report that quietly prints the higher-scoring one
+replaced afterwards - and a report that quietly prints the higher-ranked one
 has destroyed that finding rather than reported it.
 
-Nothing here decides which record is true. It says what the records do, and
-leaves the reading of it to whoever is reading the report.
+Nothing here decides which record is true. Correlation says what the records
+do; a reader does the deciding, which is why the result is a
+`CorrelationResult` and not a verdict.
 """
 
 from __future__ import annotations
@@ -18,10 +19,19 @@ from datetime import datetime, timedelta
 from typing import NamedTuple
 
 from .identify import normalize_url
-from .models import ACQUISITION, INTRINSIC, FileRecord, Origin, kind, label
+from .models import (
+    FILENAME,
+    METADATA,
+    NAME_AND_SIZE,
+    ORIGIN,
+    EvidenceRecord,
+    FileRecord,
+    category,
+    label,
+)
 
-#: No acquisition record at all: nothing said how the file got here.
-NONE = "no acquisition record"
+#: No origin record at all: nothing said how the file got here.
+NONE = "no origin record"
 
 #: Exactly one. The ordinary case, and not a finding either way.
 SINGLE = "single source"
@@ -36,14 +46,14 @@ PARTIAL = "partial agreement"
 #: Different hosts. Something happened that the records do not jointly explain.
 CONFLICT = "conflict"
 
-#: Not an acquisition state at all: the file's two accounts of its own origin
+#: Not an origin state at all: the file's two accounts of its own origin
 #: contradict each other. It headlines the block when nothing about the
-#: acquisition records is worth headlining instead.
+#: origin records is worth headlining instead.
 CONTESTED = "contested attribution"
 
-#: Not an acquisition state either: the file's own account of itself puts a
+#: Not an origin state either: the file's own account of itself puts a
 #: change before the making of the thing changed. It headlines for the same
-#: reason `contested attribution` does - the acquisition state describes
+#: reason `contested attribution` does - the origin state describes
 #: records this finding never consulted.
 SELF_CONTRADICTORY = "contradicts itself"
 
@@ -267,7 +277,7 @@ class Mirror:
     #: through from the source document - which is what the corpus shows, XMP
     #: from February beside an Info dictionary from May. Naming the Info as the
     #: stale one would state the opposite of what happened. None says so, so a
-    #: conclusion does not rank two blocks it has no basis to rank.
+    #: correlation does not rank two blocks it has no basis to rank.
     maintained: str | None
 
 
@@ -297,17 +307,31 @@ class Finding:
     #: has a direction. None where it does not, and the two are then not ranked.
     maintained: str | None = None
 
+    #: What the finding is about, named the way the evidence names it: an
+    #: origin URL, `DateTimeOriginal`, a recorded size. A table can put it in a
+    #: column; a reader scanning for one field can find it.
+    field: str | None = None
+
+    #: The two values that differ, in the order `sources` names them. Carried
+    #: apart from the sentence so a report can lay them out, and so nothing has
+    #: to split English on a comma to get them back.
+    values: tuple[str, str] | None = None
+
     def to_dict(self) -> dict[str, object]:
         found: dict[str, object] = {"kind": self.kind, "text": self.text}
+        if self.field:
+            found["field"] = self.field
         if self.sources:
             found["sources"] = list(self.sources)
+        if self.values:
+            found["values"] = list(self.values)
         if self.maintained:
             found["maintained"] = self.maintained
         return found
 
 
 @dataclass(slots=True)
-class Verdict:
+class CorrelationResult:
     state: str
     findings: list[Finding] = field(default_factory=list)
 
@@ -319,9 +343,9 @@ class Verdict:
     def headline(self) -> str:
         """What the block of findings is about.
 
-        `state` describes the acquisition records and nothing else. Once a
-        finding can come from the file's own self-description, printing the
-        acquisition state above it labels one thing with the name of another.
+        `state` describes the origin records and nothing else. Once a finding
+        can come from the file's own self-description, printing the origin
+        state above it labels one thing with the name of another.
         """
         if self.state in (AGREEMENT, PARTIAL, CONFLICT):
             return self.state
@@ -355,28 +379,28 @@ class Verdict:
         }
 
 
-def reconcile(record: FileRecord) -> Verdict:
-    """Compare everything that claims to say how `record` arrived."""
-    acquisition = [origin for origin in record.origins if kind(origin) == ACQUISITION]
-    addressed = [origin for origin in acquisition if origin.url]
+def correlate(record: FileRecord) -> CorrelationResult:
+    """Compare everything that says how `record` reached this machine."""
+    origins = [found for found in record.evidence if category(found) == ORIGIN]
+    addressed = [found for found in origins if found.url]
 
-    verdict = Verdict(state=_state(addressed))
-    verdict.findings.extend(_address_findings(addressed, verdict.state))
-    verdict.findings.extend(_time_findings(record))
-    verdict.findings.extend(_order_findings(record))
-    verdict.findings.extend(_history_findings(record))
-    verdict.findings.extend(_match_findings(acquisition))
-    verdict.findings.extend(_attribution_findings(record))
-    return verdict
+    result = CorrelationResult(state=_state(addressed))
+    result.findings.extend(_address_findings(addressed, result.state))
+    result.findings.extend(_time_findings(record))
+    result.findings.extend(_order_findings(record))
+    result.findings.extend(_history_findings(record))
+    result.findings.extend(_match_findings(record, origins))
+    result.findings.extend(_attribution_findings(record))
+    return result
 
 
-def _state(addressed: list[Origin]) -> str:
+def _state(addressed: list[EvidenceRecord]) -> str:
     if not addressed:
         return NONE
     if len(addressed) == 1:
         return SINGLE
 
-    normalised = {_address(origin) for origin in addressed}
+    normalised = {_address(found) for found in addressed}
     if len(normalised) == 1:
         return AGREEMENT
     if len({host for _, host in normalised if host}) == 1:
@@ -384,23 +408,33 @@ def _state(addressed: list[Origin]) -> str:
     return CONFLICT
 
 
-def _address(origin: Origin) -> tuple[str, str | None]:
+def _address(found: EvidenceRecord) -> tuple[str, str | None]:
     """The URL reduced to what two records have to share to be the same."""
-    parsed = normalize_url(origin.url or "")
+    parsed = normalize_url(found.url or "")
     if parsed is None:
-        return (origin.url or "").rstrip("/").lower(), None
+        return (found.url or "").rstrip("/").lower(), None
     normalized, host = parsed
     return normalized.rstrip("/"), host
 
 
-def _address_findings(addressed: list[Origin], state: str) -> list[Finding]:
+def _address_findings(addressed: list[EvidenceRecord], state: str) -> list[Finding]:
     if state == AGREEMENT:
-        names = ", ".join(_label(origin) for origin in addressed)
-        return [Finding(CORROBORATION, f"{len(addressed)} records name the same address: {names}")]
+        names = ", ".join(_label(found) for found in addressed)
+        return [
+            Finding(
+                CORROBORATION,
+                f"{len(addressed)} records name the same address: {names}",
+                field="origin URL",
+                sources=(_label(addressed[0]), _label(addressed[1])),
+            )
+        ]
 
     if state in (PARTIAL, CONFLICT):
         which = PATH_DISAGREEMENT if state == PARTIAL else SOURCE_CONFLICT
-        return [Finding(which, f"{_label(origin)} says {origin.url}") for origin in addressed]
+        return [
+            Finding(which, f"{_label(found)} says {found.url}", field="origin URL")
+            for found in addressed
+        ]
     return []
 
 
@@ -411,10 +445,12 @@ def _time_findings(record: FileRecord) -> list[Finding]:
     events and says nothing, so it is not reported.
     """
     arrived = min(
-        (o.at for o in record.origins if kind(o) == ACQUISITION and o.at),
+        (o.at for o in record.evidence if category(o) == ORIGIN and o.at),
         default=None,
     )
-    authored = max((o.at for o in record.origins if kind(o) == INTRINSIC and o.at), default=None)
+    authored = max(
+        (o.at for o in record.evidence if category(o) == METADATA and o.at), default=None
+    )
 
     if arrived and authored and authored > arrived:
         return [
@@ -436,23 +472,26 @@ def _order_findings(record: FileRecord) -> list[Finding]:
     by hand - and which of those it was is a question the report cannot answer
     but the reader can now ask.
     """
-    found: list[Finding] = []
-    for origin in record.origins:
-        pair = _MADE_AND_CHANGED.get(origin.block or "")
+    findings: list[Finding] = []
+    for found in record.evidence:
+        pair = _MADE_AND_CHANGED.get(found.block or "")
         if pair is None:
             continue
-        made, changed = origin.fields.get(pair[0]), origin.fields.get(pair[1])
+        made, changed = found.fields.get(pair[0]), found.fields.get(pair[1])
         if not made or not changed:
             continue
         if _after(made, changed):
-            found.append(
+            findings.append(
                 Finding(
                     IMPOSSIBLE_ORDER,
-                    f"{label(origin)} says it was modified at {changed}, "
+                    f"{label(found)} says it was modified at {changed}, "
                     f"before it was created at {made}",
+                    field=f"{pair[0]} / {pair[1]}",
+                    sources=(label(found), label(found)),
+                    values=(made, changed),
                 )
             )
-    return found
+    return findings
 
 
 def _history_findings(record: FileRecord) -> list[Finding]:
@@ -467,7 +506,7 @@ def _history_findings(record: FileRecord) -> list[Finding]:
     unreliable, and a history that goes backwards usually does so repeatedly,
     which would bury every other finding about the file.
     """
-    steps = [origin.at for origin in record.origins if origin.source == "xmp-history" and origin.at]
+    steps = [found.at for found in record.evidence if found.source == "xmp-history" and found.at]
     for earlier, later in zip(steps, steps[1:], strict=False):
         if _after(earlier, later):
             return [
@@ -504,34 +543,49 @@ def _after(left: str, right: str) -> bool | None:
     return None
 
 
-def _match_findings(acquisition: list[Origin]) -> list[Finding]:
-    """Say when a record was tied to this file by its name alone.
+def _match_findings(record: FileRecord, origins: list[EvidenceRecord]) -> list[Finding]:
+    """Say how firmly each record was tied to this file, where it matters.
 
     A name match survives the file being moved, which is why it is made, but it
-    also matches a different file that happens to share the name.
+    also matches a different file that happens to share the name. The basis is
+    on the record itself, so this reads the model rather than the prose: the
+    size comparison is made here, against the file actually on disk, instead of
+    being inferred from a sentence somebody wrote earlier.
     """
-    found = []
-    for origin in acquisition:
-        note = origin.note or ""
-        if "recorded size differs" in note:
-            found.append(
+    findings = []
+    for found in origins:
+        basis = found.matched_by
+        if basis not in (FILENAME, NAME_AND_SIZE):
+            continue
+        if found.bytes and found.bytes != record.size:
+            findings.append(
                 Finding(
                     SIZE_MISMATCH,
-                    f"{_label(origin)} matched by name, but its recorded size differs",
+                    f"{_label(found)} matched by name, but its recorded size differs",
+                    field="size",
+                    sources=(_label(found), "the file"),
+                    values=(str(found.bytes), str(record.size)),
                 )
             )
-        elif "matched by file name and size" in note:
-            found.append(
+        elif basis == NAME_AND_SIZE:
+            findings.append(
                 Finding(
                     SIZE_CORROBORATION,
-                    f"{_label(origin)} matched by name, and its recorded size agrees",
+                    f"{_label(found)} matched by name, and its recorded size agrees",
+                    field="size",
+                    sources=(_label(found), "the file"),
                 )
             )
-        elif "matched by file name" in note:
-            found.append(
-                Finding(WEAK_MATCH, f"{_label(origin)} was matched by file name, not by path")
+        else:
+            findings.append(
+                Finding(
+                    WEAK_MATCH,
+                    f"{_label(found)} was matched by file name, not by path",
+                    field="match",
+                    sources=(_label(found), ""),
+                )
             )
-    return found
+    return findings
 
 
 def _attribution_findings(record: FileRecord) -> list[Finding]:
@@ -544,10 +598,10 @@ def _attribution_findings(record: FileRecord) -> list[Finding]:
     while a difference is the trace of one of them having been changed. Which of
     the two is stale is exactly the question the reader has to answer.
     """
-    found = []
+    findings: list[Finding] = []
     for mirror in MIRRORS:
-        found.extend(_disagreements(record, mirror))
-    return found
+        findings.extend(_disagreements(record, mirror))
+    return findings
 
 
 def _disagreements(record: FileRecord, mirror: Mirror) -> list[Finding]:
@@ -559,7 +613,7 @@ def _disagreements(record: FileRecord, mirror: Mirror) -> list[Finding]:
     theirs = _named(left)
     ours = _named(right)
     kept = {mirror.left: left, mirror.right: right}.get(mirror.maintained or "")
-    found = []
+    findings = []
     for name, other, agree in (
         *((a, b, _same_text) for a, b in mirror.text),
         *((a, b, _same_moment) for a, b in mirror.moments),
@@ -568,26 +622,28 @@ def _disagreements(record: FileRecord, mirror: Mirror) -> list[Finding]:
         # `agree` returns None when it cannot read one of the two. Unreadable is
         # not disagreement, and reporting it as such would be a fabrication.
         if said and also and agree(said, also) is False:
-            found.append(
+            findings.append(
                 Finding(
                     ATTRIBUTION_CONFLICT,
                     f"{name}: {_label(left)} says {said}, {_label(right)} says {also}",
                     sources=(_label(left), _label(right)),
                     maintained=_label(kept) if kept else None,
+                    field=name,
+                    values=(said, also),
                 )
             )
-    return found
+    return findings
 
 
-def _describing(record: FileRecord, block: str) -> Origin | None:
-    for origin in record.origins:
-        if origin.block == block:
-            return origin
+def _describing(record: FileRecord, block: str) -> EvidenceRecord | None:
+    for found in record.evidence:
+        if found.block == block:
+            return found
     return None
 
 
-def _named(origin: Origin) -> dict[str, str]:
-    return {name.lower(): value for name, value in origin.fields.items()}
+def _named(found: EvidenceRecord) -> dict[str, str]:
+    return {name.lower(): value for name, value in found.fields.items()}
 
 
 def _same_text(left: str, right: str) -> bool:
@@ -679,5 +735,5 @@ def _plain(value: str) -> str:
     return " ".join(value.split()).casefold()
 
 
-def _label(origin: Origin) -> str:
-    return label(origin)
+def _label(found: EvidenceRecord) -> str:
+    return label(found)

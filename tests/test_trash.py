@@ -2,7 +2,7 @@
 
 Nothing else on a Linux desktop writes down where a file used to be, and the
 record sits beside the file rather than being matched to it - which is what
-makes this stronger than the other sources of its kind and worth reading.
+makes this stronger than the other sources of its category and worth reading.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from filegrail.doctor import survey
-from filegrail.models import INTERACTION, kind, label
+from filegrail.models import ACTIVITY, category, label
 from filegrail.sources.trash import collect_trash, read_trash
 
 
@@ -162,18 +162,18 @@ def test_a_relative_path_in_a_trash_that_names_no_volume_is_left_alone(tmp_path:
 # --- what a scan and a survey do with it --------------------------------------
 
 
-def test_a_trash_record_is_interaction_and_is_registered_as_a_source(tmp_path: Path):
+def test_a_trash_record_is_activity_and_is_registered_as_a_source(tmp_path: Path):
     """It proves this machine held the file and removed it. Nothing more.
 
-    `kind` defaults to interaction for a source nobody registered, so the rank
+    `category` raises for a source nobody registered, so the presentation rank
     is what says this one was actually written into the tables rather than
     falling through them.
     """
     thrown = _trash(tmp_path / "Trash", "report.pdf", path="/home/ann/report.pdf")
     origin = read_trash(thrown)
 
-    assert kind(origin) == INTERACTION
-    assert origin.confidence == 45
+    assert category(origin) == ACTIVITY
+    assert origin.priority == 45
     assert label(origin) == "trash record"
 
 
@@ -185,7 +185,7 @@ def test_a_scan_of_a_trash_reports_where_its_files_were(tmp_path: Path):
 
     records = scan(root / "files", use_shell_history=False, home=tmp_path)
 
-    assert [origin.note for record in records for origin in record.origins] == [
+    assert [origin.note for record in records for origin in record.evidence] == [
         "deleted from /home/ann/Documents/report.pdf"
     ]
 

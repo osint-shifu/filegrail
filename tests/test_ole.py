@@ -43,14 +43,14 @@ def _property_set(fmtid: bytes, properties: dict[int, tuple[int, object]]) -> by
     identifiers = sorted(properties)
     encoded: list[bytes] = []
     for identifier in identifiers:
-        kind, value = properties[identifier]
-        if kind == VT_LPSTR:
+        category, value = properties[identifier]
+        if category == VT_LPSTR:
             raw = value.encode("utf-8") + b"\x00"
             blob = struct.pack("<II", VT_LPSTR, len(raw)) + raw
-        elif kind == VT_FILETIME:
+        elif category == VT_FILETIME:
             blob = struct.pack("<I", VT_FILETIME) + _filetime(value)
         else:  # pragma: no cover - the tests use no other type
-            raise AssertionError(f"unsupported property type {kind}")
+            raise AssertionError(f"unsupported property type {category}")
         encoded.append(blob + b"\x00" * (-len(blob) % 4))
 
     table_size = 8 + len(identifiers) * 8

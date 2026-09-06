@@ -19,7 +19,7 @@ from filegrail.lineage import (
     SOURCE_OF,
     attach_lineage,
 )
-from filegrail.models import FileRecord, Origin
+from filegrail.models import EvidenceRecord, FileRecord
 from filegrail.report import render_text
 from filegrail.theme import Theme
 
@@ -35,7 +35,7 @@ FROM_INSTANCE = "xmpMM:DerivedFrom/stRef:instanceID"
 def _file(name: str, fields: dict[str, str] | None = None) -> FileRecord:
     record = FileRecord(path=f"/case/{name}", size=100, mtime="2026-08-24T19:00:00Z")
     if fields is not None:
-        record.origins.append(Origin(source="xmp", fields=dict(fields)))
+        record.evidence.append(EvidenceRecord(source="xmp", fields=dict(fields)))
     return record
 
 
@@ -148,7 +148,7 @@ def test_the_strongest_relation_is_the_only_one_reported():
 
     attach_lineage([parent, child])
 
-    assert [kind for kind, _ in _relations(child)] == [DERIVED_FROM]
+    assert [category for category, _ in _relations(child)] == [DERIVED_FROM]
 
 
 def test_a_crowd_is_counted_rather_than_named():
@@ -235,7 +235,7 @@ def test_a_crowded_link_says_how_many_rather_than_nothing():
     output = render_text(records, Path("/case"), theme=PLAIN)
 
     assert "common ancestor" in output
-    assert "19 other files" in output
+    assert "19 files" in output
 
 
 def test_a_link_reaches_the_json():

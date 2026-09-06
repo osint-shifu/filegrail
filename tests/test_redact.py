@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from filegrail.cli import main
-from filegrail.models import FileRecord, Origin
+from filegrail.models import EvidenceRecord, FileRecord
 from filegrail.redact import fingerprint, looks_like_secret, redact_text, redact_url
 
 
@@ -89,7 +89,7 @@ def test_same_secret_twice_gets_the_same_fingerprint():
 
 
 def test_origin_redacts_url_referrer_and_command():
-    origin = Origin(
+    origin = EvidenceRecord(
         source="browser-download",
         url="https://example.org/f?token=abcdef123456",
         referrer="https://example.org/p?api_key=zyxwvu987654",
@@ -111,7 +111,7 @@ def test_origin_redacts_note_and_location_too():
     subject line or a URL pasted where a place name belongs would ride
     through `--redact` untouched.
     """
-    origin = Origin(
+    origin = EvidenceRecord(
         source="email-delivery",
         note="Fwd: your key sk-abcdefghijklmnopqrstuvwx",
         location="see https://vault.example.org/f?token=abcdef123456",
@@ -126,12 +126,14 @@ def test_origin_redacts_note_and_location_too():
 
 def test_file_record_redacts_every_origin():
     record = FileRecord(path="/case/a", size=1, mtime="2026-08-24T19:00:00Z")
-    record.origins.append(Origin(source="shell-history", command="tool --token=abcdef123456"))
+    record.evidence.append(
+        EvidenceRecord(source="shell-history", command="tool --token=abcdef123456")
+    )
 
     safe = record.redacted()
 
-    assert "abcdef123456" not in safe.origins[0].command
-    assert "abcdef123456" in record.origins[0].command  # original untouched
+    assert "abcdef123456" not in safe.evidence[0].command
+    assert "abcdef123456" in record.evidence[0].command  # original untouched
 
 
 # --- the commands that print evidence ----------------------------------------

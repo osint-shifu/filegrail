@@ -29,12 +29,10 @@ NONE = 0
 #: Every colour as (hex, 256-colour code, 16-colour code). Chosen to stay legible
 #: on both light and dark backgrounds, which rules out the saturated end.
 _PALETTE = {
-    # Evidence classes, strongest first.
-    "recorded": ("5faf87", 71, 32),
-    "inherited": ("5fafaf", 73, 36),
-    "credentialed": ("af87af", 139, 35),
-    "self-reported": ("5f87af", 68, 34),
-    "circumstantial": ("d7af5f", 179, 33),
+    # One colour per category, in the order a report prints them.
+    "origin": ("5faf87", 71, 32),
+    "metadata": ("5f87af", 68, 34),
+    "activity": ("d7af5f", 179, 33),
     # Neutrals.
     "body": ("d0d0d0", 252, 37),
     "muted": ("8a8a8a", 245, 90),
@@ -44,71 +42,20 @@ _PALETTE = {
     "warning": ("d7875f", 173, 33),
 }
 
-#: Which class of evidence each source belongs to. This is the whole colour
-#: system: a source is coloured by who is making the claim, not by what it says.
+#: Which colour a source is painted in. Keyed by the category the record
+#: belongs to, so the palette says the same thing the report is organised
+#: around: how the file got here, what it says about itself, what happened to
+#: it afterwards. It used to be keyed by a six-way strength scale, which meant
+#: the colours quietly asserted an ordering the model no longer makes.
 EVIDENCE = {
-    "browser-download": "recorded",
-    "windows-zone-identifier": "recorded",
-    "macos-wherefroms": "recorded",
-    "macos-quarantine": "recorded",
-    "xdg-xattr": "recorded",
-    # A program wrote down where it fetched the bytes, which is the same kind
-    # of claim a browser's database makes. How much the pairing to this file is
-    # worth is what the rank says, not the colour.
-    "ytdlp-sidecar": "recorded",
-    # Both are a note another system wrote as the message passed through. How
-    # much that system is worth believing is what the rank says, not the colour.
-    "email-delivery": "recorded",
-    "email-relay": "recorded",
-    "archive-member": "inherited",
-    "torrent": "inherited",
-    "c2pa": "credentialed",
-    "device-metadata": "self-reported",
-    "xmp": "self-reported",
-    "xmp-history": "self-reported",
-    "iptc": "self-reported",
-    "email-header": "self-reported",
-    "document-metadata": "self-reported",
-    "archive-content": "self-reported",
-    "messenger-name": "circumstantial",
-    "shell-history": "circumstantial",
-    "recent-documents": "circumstantial",
-    "sync-folder": "circumstantial",
-    # Directly recorded, like the two above, and what it implies about where
-    # the bytes came from is the same as theirs: nothing. Which of the three is
-    # worth more is what the rank says, not the colour.
-    "freedesktop-trash": "circumstantial",
-    "windows-recent": "circumstantial",
-    "filesystem": "faint",
+    "origin": "origin",
+    "metadata": "metadata",
+    "activity": "activity",
 }
 
-#: How each class reads as a strength, on the meter line.
-#:
-#: The number behind it ranks sources against each other and stays in `--json`,
-#: but printing `55` in a report invites it to be read as a probability, which
-#: it never was. There is no statistical basis for `55`; there is a defensible
-#: ordering of how directly a source knows what it claims.
-STRENGTH = {
-    "recorded": "direct",
-    "inherited": "inherited",
-    "credentialed": "credentialed",
-    "self-reported": "self-reported",
-    "circumstantial": "circumstantial",
-    "faint": "weak",
-}
+#: The categories in the order entries are printed in.
+EVIDENCE_ORDER = ("origin", "metadata", "activity")
 
-#: How each class reads as a section heading, in the order the report uses.
-EVIDENCE_HEADINGS = [
-    ("recorded", "recorded by another system"),
-    ("inherited", "inherited from an archive"),
-    ("credentialed", "content credentials"),
-    ("self-reported", "file metadata"),
-    ("circumstantial", "mentioned in shell history"),
-    ("faint", "filesystem timestamps only"),
-]
-
-#: Kept for callers that still speak in source names.
-SOURCE_COLOURS = dict(EVIDENCE)
 
 BAR_FULL = "▰"
 BAR_EMPTY = "▱"
@@ -122,7 +69,17 @@ RULE = "─"
 MIDDOT = "·"
 ELLIPSIS = "…"
 
+#: Starts a record in a table: the row is a thing, the lines under it are
+#: what that thing holds. It carries no analytic meaning.
+RECORD = "\u203a"
+
+#: Between two values that disagree. `vs` reads as a comparison somebody is
+#: making; this reads as the two not being the same thing.
+NOT_EQUAL = "≠"
+
 _ASCII = {
+    RECORD: ">",
+    NOT_EQUAL: "!=",
     BAR_FULL: "#",
     BAR_EMPTY: ".",
     BULLET: "*",
@@ -168,8 +125,14 @@ class Theme:
         return f"{prefix}{sequence}{text}{RESET}"
 
     def evidence(self, source: str) -> str:
-        """The palette entry for a source, by the class of claim it makes."""
-        return EVIDENCE.get(source, "faint")
+        """The palette entry for a source, by the category it belongs to.
+
+        Imported here rather than taken from a second table: one place decides
+        what a source is about, and the colours follow it.
+        """
+        from .models import SOURCE_CATEGORIES
+
+        return EVIDENCE.get(SOURCE_CATEGORIES.get(source, ""), "faint")
 
     def dim(self, text: str) -> str:
         return self.paint(text, "faint")
@@ -233,18 +196,6 @@ class Theme:
         return self.dim(self.glyph(RULE) * (width or self.width))
 
     # -- meters --
-
-    def bar(self, confidence: int, slots: int = 5) -> str:
-        """A five-slot meter. Colour carries the source; length carries the trust."""
-        filled = max(1, round(confidence / 100 * slots))
-        return self.glyph(BAR_FULL) * filled + self.glyph(BAR_EMPTY) * (slots - filled)
-
-    def meter(self, confidence: int, colour: str, slots: int = 5) -> str:
-        """`bar`, painted: filled slots carry the class, empty ones stay faint."""
-        filled = max(1, round(confidence / 100 * slots))
-        return self.paint(self.glyph(BAR_FULL) * filled, colour) + self.dim(
-            self.glyph(BAR_EMPTY) * (slots - filled)
-        )
 
     def coverage(self, done: int, total: int, slots: int = 12) -> str:
         """The run's own progress. Body colour, because it is not a claim."""

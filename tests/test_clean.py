@@ -80,12 +80,12 @@ def test_a_file_with_nothing_to_remove_says_so(tmp_path: Path):
 # --- PNG ---------------------------------------------------------------------
 
 
-def _chunk(kind: bytes, payload: bytes) -> bytes:
+def _chunk(category: bytes, payload: bytes) -> bytes:
     return (
         struct.pack(">I", len(payload))
-        + kind
+        + category
         + payload
-        + struct.pack(">I", zlib.crc32(kind + payload))
+        + struct.pack(">I", zlib.crc32(category + payload))
     )
 
 
@@ -139,13 +139,13 @@ def test_a_png_with_no_text_is_left_alone(tmp_path: Path):
 # --- ISO base media (MP4, MOV) -----------------------------------------------
 
 
-def _atom(kind: bytes, payload: bytes) -> bytes:
-    return struct.pack(">I", len(payload) + 8) + kind + payload
+def _atom(category: bytes, payload: bytes) -> bytes:
+    return struct.pack(">I", len(payload) + 8) + category + payload
 
 
-def _itunes_text(kind: bytes, text: str) -> bytes:
+def _itunes_text(category: bytes, text: str) -> bytes:
     raw = text.encode("utf-8")
-    return _atom(kind, _atom(b"data", struct.pack(">II", 1, 0) + raw))
+    return _atom(category, _atom(b"data", struct.pack(">II", 1, 0) + raw))
 
 
 def _mvhd(created: int = 3_500_000_000) -> bytes:

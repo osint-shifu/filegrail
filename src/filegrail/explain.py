@@ -7,24 +7,32 @@ used in anything that matters.
 It adds no data. Everything here was already found; what is new is that the
 records are laid out by the question they answer, the ones that support each
 other are named, the ones that contradict each other are named, and the
-conclusion is drawn out loud - so that a reader can disagree with it. A verdict
-nobody can argue with is a verdict nobody should trust.
+assessment is written out loud - so that a reader can disagree with it. An
+assessment nobody can argue with is one nobody should trust.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from .models import ACQUISITION, INTERACTION, INTRINSIC, SOURCE_LABELS, FileRecord, Origin, kind
-from .reconcile import (
+from .correlate import (
     AGREEMENT,
     ATTRIBUTION_CONFLICT,
     NONE,
     PARTIAL,
     SINGLE,
     TIMELINE_CONFLICT,
+    CorrelationResult,
     Finding,
-    Verdict,
+)
+from .models import (
+    ACTIVITY,
+    METADATA,
+    ORIGIN,
+    SOURCE_LABELS,
+    EvidenceRecord,
+    FileRecord,
+    category,
 )
 
 
@@ -38,41 +46,49 @@ def questions(home: Path | None = None) -> tuple[tuple[str, str], ...]:
     """
     machine = "that machine" if home else "this machine"
     return (
-        (ACQUISITION, f"how the file reached {machine}"),
-        (INTRINSIC, "what the file records about its own earlier life"),
-        (INTERACTION, f"what handled it {'there' if home else 'here'} afterwards"),
+        (ORIGIN, f"how the file reached {machine}"),
+        (METADATA, "what the file records about its own earlier life"),
+        (ACTIVITY, f"what handled it {'there' if home else 'here'} afterwards"),
     )
 
 
 #: The questions as asked about this machine, which is the ordinary case.
-KINDS = questions()
+CATEGORY_QUESTIONS = questions()
 
 _COUNTS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
 
 
-def grouped(record: FileRecord, home: Path | None = None) -> list[tuple[str, str, list[Origin]]]:
-    """Every claim, under the question it answers. Empty kinds are dropped."""
+def grouped(
+    record: FileRecord, home: Path | None = None
+) -> list[tuple[str, str, list[EvidenceRecord]]]:
+    """Every record, under the question it answers. Empty categories are dropped."""
     out = []
     for name, question in questions(home):
-        claims = [origin for origin in record.origins if kind(origin) == name]
-        if claims:
-            claims.sort(key=lambda origin: -origin.confidence)
-            out.append((name, question, claims))
+        found = [record_ for record_ in record.evidence if category(record_) == name]
+        if found:
+            found.sort(key=lambda one: -one.priority)
+            out.append((name, question, found))
     return out
 
 
-def conclusion(record: FileRecord, verdict: Verdict, home: Path | None = None) -> list[str]:
-    """The reading of the evidence, in sentences, one idea each."""
+def assessment(
+    record: FileRecord, result: CorrelationResult, home: Path | None = None
+) -> list[str]:
+    """A careful reading of the records, in sentences, one idea each.
+
+    An assessment rather than a conclusion: it is what the records support,
+    not a determination that anything is settled.
+    """
     said: list[str] = []
-    acquisition = [o for o in record.origins if kind(o) == ACQUISITION]
-    intrinsic = [o for o in record.origins if kind(o) == INTRINSIC]
-    interaction = [o for o in record.origins if kind(o) == INTERACTION]
+    origins = [o for o in record.evidence if category(o) == ORIGIN]
+    described = [o for o in record.evidence if category(o) == METADATA]
+    handled = [o for o in record.evidence if category(o) == ACTIVITY]
 
-    said.append(_arrival(verdict, acquisition, home))
+    said.append(_arrival(result, origins, home))
 
-    contested = [f for f in verdict.findings if f.kind == ATTRIBUTION_CONFLICT]
-    if intrinsic and not contested:
-        tools = ", ".join(sorted({o.tool for o in intrinsic if o.tool})) or "itself"
+    contested = [f for f in result.findings if f.kind == ATTRIBUTION_CONFLICT]
+    if described and not contested:
+        tools = ", ".join(sorted({o.tool for o in described if o.tool})) or "itself"
         said.append(
             f"The file describes an earlier life of its own - {tools} - which says nothing "
             "about how it arrived and does not contest the record above."
@@ -85,16 +101,16 @@ def conclusion(record: FileRecord, verdict: Verdict, home: Path | None = None) -
             "cannot answer, only raise."
         )
 
-    if interaction and not acquisition:
+    if handled and not origins:
         where = "there" if home else "here"
-        who = ", ".join(sorted({o.tool for o in interaction if o.tool})) or f"something {where}"
+        who = ", ".join(sorted({o.tool for o in handled if o.tool})) or f"something {where}"
         said.append(
             f"It was handled {where} by {who}, which proves contact and not arrival: the file "
             f"may have reached {'that' if home else 'this'} machine by any route at all "
             "before that."
         )
 
-    if any(finding.kind == TIMELINE_CONFLICT for finding in verdict.findings):
+    if any(finding.kind == TIMELINE_CONFLICT for finding in result.findings):
         said.append(
             "The file also reports being created after it arrived, which cannot both be true. "
             "Either a clock was wrong, or the metadata was written after the fact."
@@ -138,10 +154,12 @@ def _which_is_stale(contested: list[Finding]) -> str:
     )
 
 
-def _arrival(verdict: Verdict, acquisition: list[Origin], home: Path | None = None) -> str:
-    count = _COUNTS.get(len(acquisition), str(len(acquisition)))
+def _arrival(
+    result: CorrelationResult, origins: list[EvidenceRecord], home: Path | None = None
+) -> str:
+    count = _COUNTS.get(len(origins), str(len(origins)))
 
-    if verdict.state == NONE:
+    if result.state == NONE:
         # The advice has to name the same machine the evidence would be on.
         # Sending a reader to survey their own laptop about somebody else's
         # profile wastes the one step that would have told them the truth.
@@ -152,29 +170,29 @@ def _arrival(verdict: Verdict, acquisition: list[Origin], home: Path | None = No
             f"that evidence exists {'there' if home else 'here'} at all before reading it "
             "as absence."
         )
-    if verdict.state == SINGLE:
+    if result.state == SINGLE:
         return (
             f"One record explains how the file arrived, and nothing corroborates it. "
-            f"That is the ordinary case, not a weakness, but it rests on {_only(acquisition)}."
+            f"That is the ordinary case, not a weakness, but it rests on {_only(origins)}."
         )
-    if verdict.state == AGREEMENT:
+    if result.state == AGREEMENT:
         return (
             f"{count.capitalize()} independent records agree on where the file came from. "
             "Neither depends on the other, so together they are worth more than either alone."
         )
-    if verdict.state == PARTIAL:
+    if result.state == PARTIAL:
         return (
             "The records agree on the host but name different paths. That is usually one "
             "record keeping a redirect and another the address it landed on."
         )
     return (
-        "The acquisition records do not agree. The file may have been downloaded more than "
+        "The origins records do not agree. The file may have been downloaded more than "
         "once, copied after it arrived, or had its origin metadata replaced - and nothing "
         "here settles which."
     )
 
 
-def _only(acquisition: list[Origin]) -> str:
-    if not acquisition:
+def _only(origins: list[EvidenceRecord]) -> str:
+    if not origins:
         return "nothing"
-    return SOURCE_LABELS.get(acquisition[0].source, acquisition[0].source)
+    return SOURCE_LABELS.get(origins[0].source, origins[0].source)
