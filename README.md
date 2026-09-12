@@ -217,7 +217,10 @@ The same identifier detection is applied to metadata and, with `--content`, docu
 | `email` | addresses whose TLD is a real one | the address inside a message id - its host is still kept |
 | `ipv4` | dotted quads, with private and reserved ranges marked as such | version numbers, and digits in a field naming software |
 | `geo` | coordinates written with a hemisphere letter, a degree sign, a `geo:` URI, a map URL or an explicit latitude label | a bare pair of decimals, however many places it carries |
-| `md5` `sha1` `sha256` | 32, 40 and 64 hex digits | digests in a field naming software, which are build ids |
+| `md5` `sha1` `sha256` | 32, 40 and 64 hex digits, bare or as colon-separated pairs; a digest of an address seen in the same scan is named for it | digests in a field naming software, which are build ids |
+| `ipv6` | addresses with all eight groups written out, or any form inside the brackets a URL puts round one | a compressed address standing bare, which is what a scope operator looks like in code |
+| `cve` | vulnerability ids, in either case | |
+| `registry` | Windows registry keys under any hive, long name or short, as one key | |
 | `btc` | bitcoin addresses whose checksum holds, legacy and `bc1`, the latter lowercased | a mixed-case `bc1` spelling, which no wallet writes |
 | `iban` | account numbers whose country, length and mod-97 check agree, spaces dropped | |
 | `nip` `regon` | Polish tax and statistical numbers beside their label, or a NIP behind an EU `PL` prefix | the same digits standing bare, however the check digit comes out |

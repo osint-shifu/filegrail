@@ -974,11 +974,36 @@ _TYPE_SECTIONS = {
     "domain": "domains",
     "email": "emails",
     "ipv4": "ip addresses",
+    "ipv6": "ipv6 addresses",
     "geo": "coordinates",
     "md5": "md5",
     "sha1": "sha1",
     "sha256": "sha256",
+    "btc": "bitcoin addresses",
+    "iban": "bank accounts",
+    "bic": "bank codes",
+    "nip": "nip",
+    "regon": "regon",
+    "ssn": "social security numbers",
+    "ein": "employer ids",
+    "aba": "routing numbers",
+    "onion": "onion addresses",
+    "mac": "hardware addresses",
+    "sid": "windows sids",
+    "secret": "credentials",
+    "person": "people",
+    "org": "organisations",
+    "handle": "accounts",
+    "postcode": "postcodes",
+    "tracker": "trackers",
+    "cve": "cves",
+    "registry": "registry keys",
 }
+
+
+def _shown(entry: Identifier) -> str:
+    """The value as the report prints it: a digest of a known address says so."""
+    return f"{entry.normalized} (digest of {entry.of})" if entry.of else entry.normalized
 
 
 def _places(entry: Identifier) -> list[tuple[str, str, str]]:
@@ -1051,12 +1076,17 @@ def _identifiers(theme: Theme, found: list[Identifier], *, content: bool = False
         _plural(len(crossed), "cross-source") if crossed else "",
     )[:-1]
 
-    for kind, heading in _TYPE_SECTIONS.items():
+    # Every type present, in the table's order and then any the table has not
+    # heard of, under its own name: a value that reaches `--json` and not the
+    # report is a lead nobody sees.
+    present = {entry.type for entry in found}
+    kinds = [kind for kind in _TYPE_SECTIONS if kind in present]
+    kinds += sorted(present - set(_TYPE_SECTIONS))
+    for kind in kinds:
+        heading = _TYPE_SECTIONS.get(kind, kind)
         entries = [entry for entry in found if entry.type == kind]
-        if not entries:
-            continue
         seen_at: list[tuple[str, ...]] = [
-            (entry.normalized, file, source, field)
+            (_shown(entry), file, source, field)
             for entry in entries
             for file, source, field in _places(entry)
         ]
@@ -1076,7 +1106,7 @@ def _identifiers(theme: Theme, found: list[Identifier], *, content: bool = False
         for entry in crossed:
             sources = sorted({source for _, source, _ in _places(entry)})
             files = sorted({file for file, _, _ in _places(entry)})
-            rows.append((entry.normalized, " · ".join(sources), " · ".join(files)))
+            rows.append((_shown(entry), " · ".join(sources), " · ".join(files)))
         lines.extend(_section(theme, "cross-source matches", _plural(len(rows), "value")))
         lines.extend(_table(theme, ("value", "sources", "files"), rows, keep=3, flex=0))
     return lines

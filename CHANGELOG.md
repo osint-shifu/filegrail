@@ -7,7 +7,29 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Fixed
+
+- The text report printed only the identifier types it had always known -
+  urls, domains, emails, ip addresses, coordinates and the three digests -
+  and silently dropped every type added since: a wallet address or a
+  person's name reached `--json` and not the page. Every type present is
+  now printed, the known ones under their heading and any other under its
+  own name, so a type can no longer go missing without a test noticing.
+
 ### Added
+
+- Indicators a report of an incident is made of: `cve` ids, `registry` keys
+  under any hive as one key, and IPv6 addresses in the two spellings that
+  cannot be mistaken for code - all eight groups written out, or inside the
+  brackets a URL puts round one. A digest written as colon-separated pairs,
+  the way a certificate fingerprint is shown, is the same value as the bare
+  spelling and folds into it.
+
+- A digest that is the digest of an address seen in the same scan is named
+  for it, in the report and as `of` in `--json`. A list of hashed addresses
+  is how advertising platforms and Gravatar carry an address without writing
+  it, and one address in the clear beside the list names an entry of it with
+  certainty.
 
 - The United States numbers: `ssn`, `ein` and `aba`. None can be trusted on
   its own - two have no checksum and the routing number's passes one random

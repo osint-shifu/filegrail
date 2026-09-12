@@ -778,3 +778,84 @@ def test_a_numeric_tracker_id_needs_its_service_beside_it(tmp_path: Path):
     found = sorted(e.normalized for e in extract([record], content=True) if e.type == "tracker")
 
     assert found == ["amazon:mysite-20", "facebook:123456789012345", "yandex:12345678"]
+
+
+# --- indicators -----------------------------------------------------------------
+
+
+def test_a_cve_id_is_found_in_either_case(tmp_path: Path):
+    record = _document(
+        tmp_path, "patched cve-2021-44228 and CVE-2021-44228", source="document-metadata"
+    )
+
+    found = [(e.normalized, e.count) for e in extract([record], content=True) if e.type == "cve"]
+
+    assert found == [("CVE-2021-44228", 2)]
+
+
+def test_a_registry_key_is_one_value_under_either_hive_spelling(tmp_path: Path):
+    record = _document(
+        tmp_path,
+        r"HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run and "
+        r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run again",
+        source="document-metadata",
+    )
+
+    found = [
+        (e.normalized, e.count) for e in extract([record], content=True) if e.type == "registry"
+    ]
+
+    assert found == [(r"hklm\software\microsoft\windows\currentversion\run", 2)]
+
+
+def test_a_fingerprint_written_with_colons_is_the_same_digest(tmp_path: Path):
+    bare = "2fd4e1c67a2d28fced849ee1bb76e7391b93eb12"
+    colons = ":".join(bare[i : i + 2] for i in range(0, 40, 2)).upper()
+    record = _document(tmp_path, f"sha1 {bare}\nfingerprint {colons}\n", source="document-metadata")
+
+    found = [(e.normalized, e.count) for e in extract([record], content=True) if e.type == "sha1"]
+
+    assert found == [(bare, 2)]
+
+
+def test_an_ipv6_address_is_believed_written_out_or_in_brackets_and_not_bare(tmp_path: Path):
+    record = _document(
+        tmp_path,
+        "host 2001:0db8:85a3:0000:0000:8a2e:0370:7334 and http://[2001:db8::1]/x and ::1 and a::b",
+        source="document-metadata",
+    )
+
+    found = sorted(e.normalized for e in extract([record], content=True) if e.type == "ipv6")
+
+    assert found == ["2001:db8:85a3::8a2e:370:7334", "2001:db8::1"]
+
+
+def test_a_digest_of_an_address_in_the_corpus_is_named_for_it(tmp_path: Path):
+    """A list of hashed addresses beside one address in the clear is that
+    address, named twice; the hash says which one it is."""
+    import hashlib
+
+    address = "ann.shaw@acme.example"
+    digest = hashlib.md5(address.encode()).hexdigest()
+    other = hashlib.md5(b"nothing").hexdigest()
+    record = _document(
+        tmp_path,
+        f"list: {digest} {other}\ncontact Ann.Shaw@acme.example\n",
+        source="document-metadata",
+    )
+
+    found = {(e.type, e.normalized): e for e in extract([record], content=True)}
+
+    assert found[("md5", digest)].of == address
+    assert found[("md5", other)].of is None
+    assert found[("md5", digest)].to_dict()["of"] == address
+
+
+def test_the_text_report_shows_every_type_the_extractor_knows():
+    """A type the report's own table has not heard of must still be printed:
+    a value that reaches `--json` and not the report is a lead nobody sees."""
+    record = _record("x", source="document-metadata", note="1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
+
+    text = render_text([record], Path("/case"), theme=PLAIN, identify=True)
+
+    assert "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" in text

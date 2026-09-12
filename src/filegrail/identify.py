@@ -32,6 +32,7 @@ one corpus can say so.
 
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import re
 from collections.abc import Iterator
@@ -351,6 +352,42 @@ ANCHORED_TRACKERS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("clarity", re.compile(r"clarity\.ms/tag/([a-z0-9]{8,12})(?![\w\-])")),
 )
 
+CVE_RE = re.compile(r"\b(CVE-\d{4}-\d{4,7})\b", re.IGNORECASE)
+
+#: A registry key under any hive, long name or short. Windows does not care
+#: about case, so neither does the normalised form, which also uses the
+#: short hive name so the two spellings are one key.
+REGISTRY_RE = re.compile(
+    r"\b(HKEY_LOCAL_MACHINE|HKEY_CURRENT_USER|HKEY_CLASSES_ROOT|HKEY_USERS|HKEY_CURRENT_CONFIG"
+    r"|HKLM|HKCU|HKCR|HKU|HKCC)(\\[^\s\"'<>|*?]+)",
+    re.IGNORECASE,
+)
+_HIVES = {
+    "hkey_local_machine": "hklm",
+    "hkey_current_user": "hkcu",
+    "hkey_classes_root": "hkcr",
+    "hkey_users": "hku",
+    "hkey_current_config": "hkcc",
+}
+
+#: A digest written as colon-separated pairs, the way a certificate or an SSH
+#: key fingerprint is shown: sixteen, twenty or thirty-two of them. The same
+#: value as the bare spelling, and folded into it.
+COLON_DIGEST_RE = re.compile(
+    r"(?<![0-9A-Fa-f:])("
+    r"(?:[0-9A-Fa-f]{2}:){15}[0-9A-Fa-f]{2}"
+    r"|(?:[0-9A-Fa-f]{2}:){19}[0-9A-Fa-f]{2}"
+    r"|(?:[0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}"
+    r")(?![0-9A-Fa-f:])"
+)
+
+#: IPv6, in the two spellings that cannot be mistaken for code: all eight
+#: groups written out, or any form inside the brackets a URL puts round one.
+#: A compressed address standing bare - `a::b` - is still not taken: `::` is
+#: what a scope operator looks like, and the false-positive rate is ruinous.
+IPV6_FULL_RE = re.compile(r"(?<![\w:.])((?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4})(?![\w:.])")
+IPV6_BRACKET_RE = re.compile(r"\[([0-9A-Fa-f:.]{2,45})\]")
+
 _UPPER = "A-ZÀ-ÖØ-ÞĄĆĘŁŃÓŚŹŻ"
 _LOWER = "a-zß-öø-ÿąćęłńóśźż"
 
@@ -477,6 +514,12 @@ class Identifier:
     #: coincidence, and it is the whole reason for reading content at all.
     acquired: bool = False
 
+    #: For a digest: the address in the same scan it is the digest of. A list
+    #: of hashed addresses is how advertising platforms and Gravatar carry an
+    #: address without writing it, and one address in the clear beside the
+    #: list names an entry of it with certainty.
+    of: str | None = None
+
     def to_dict(self) -> dict[str, object]:
         data: dict[str, object] = {
             "type": self.type,
@@ -490,6 +533,8 @@ class Identifier:
         }
         if self.private is not None:
             data["private"] = self.private
+        if self.of is not None:
+            data["of"] = self.of
         return data
 
 
@@ -720,6 +765,20 @@ def extract(records: list[FileRecord], *, content: bool = False) -> list[Identif
     for entry in found.values():
         entry.files = len({place.split(PLACE, 1)[0] for place in entry.where})
 
+    # A digest that is the digest of an address seen in the same scan is that
+    # address, named twice: once hashed, once in the clear. Equality of the
+    # digest is certain, so this is the one link here that involves no guess.
+    for address in [entry.normalized for entry in found.values() if entry.type == "email"]:
+        encoded = address.encode("utf-8")
+        for kind, digest in (
+            ("md5", hashlib.md5(encoded, usedforsecurity=False).hexdigest()),
+            ("sha1", hashlib.sha1(encoded, usedforsecurity=False).hexdigest()),
+            ("sha256", hashlib.sha256(encoded).hexdigest()),
+        ):
+            hashed = found.get((kind, digest))
+            if hashed is not None:
+                hashed.of = address
+
     return sorted(found.values(), key=lambda i: (i.type, -i.count, i.normalized))
 
 
@@ -796,6 +855,35 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
         raw = match.group(1)
         kind = {32: "md5", 40: "sha1", 64: "sha256"}[len(raw)]
         yield kind, raw, raw.lower(), None
+
+    for match in COLON_DIGEST_RE.finditer(text):
+        if software:
+            continue
+        digest = match.group(1).replace(":", "").lower()
+        kind = {32: "md5", 40: "sha1", 64: "sha256"}[len(digest)]
+        yield kind, match.group(1), digest, None
+
+    for pattern in (IPV6_FULL_RE, IPV6_BRACKET_RE):
+        for match in pattern.finditer(text):
+            try:
+                address6 = ipaddress.IPv6Address(match.group(1))
+            except ipaddress.AddressValueError:
+                continue
+            reserved6 = (
+                address6.is_private
+                or address6.is_reserved
+                or address6.is_loopback
+                or address6.is_link_local
+            )
+            yield "ipv6", match.group(1), str(address6), bool(reserved6)
+
+    for match in CVE_RE.finditer(text):
+        yield "cve", match.group(1), match.group(1).upper(), None
+
+    for match in REGISTRY_RE.finditer(text):
+        hive = match.group(1).lower()
+        key = _HIVES.get(hive, hive) + match.group(2).rstrip(_TRAILING_PUNCT).casefold()
+        yield "registry", match.group(0).rstrip(_TRAILING_PUNCT), key, None
 
     # The self-checking values. A wallet address is believed wherever it
     # stands; the tax numbers only beside their label, see the patterns.
