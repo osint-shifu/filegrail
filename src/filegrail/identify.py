@@ -199,6 +199,10 @@ _MAILBOX_FIELDS = frozenset({"from", "to", "cc", "reply-to", "sender"})
 #: agency in IPTC, a scanner in a PNG and something else again in RIFF.
 _ORG_FIELDS = frozenset({"company", "credit"})
 
+#: Hex and dashes only - a GUID, a digest - is a device id, not a name, however
+#: many of its letters are letters.
+_HEX_BLOB_RE = re.compile(r"[0-9a-f\-]+")
+
 #: What an application writes where a name should go.
 _NOBODY = frozenset(
     {
@@ -536,6 +540,8 @@ def _names(value: str) -> Iterator[str]:
         plain = _plain(name)
         if len(plain) < 2 or plain in _NOBODY or not any(char.isalpha() for char in plain):
             continue
+        if _HEX_BLOB_RE.fullmatch(plain):
+            continue  # a device id or a digest where a name should go
         if EMAIL_RE.fullmatch(name):
             continue  # already an email, and naming it twice says nothing new
         yield name

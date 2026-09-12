@@ -605,8 +605,15 @@ def test_a_person_is_read_from_a_field_that_names_one():
     placeholder = _record(
         "form.docx", source="document-metadata", fields={"Author": "Microsoft Office User"}
     )
+    # Seen in the wild: an application writing its device id where the
+    # photographer's name goes.
+    blob = _record(
+        "image.jpg",
+        source="document-metadata",
+        fields={"Artist": "7a3c0114-90a5-43cf-af74-75f091770f13"},
+    )
 
-    found = extract([docx, mail, placeholder])
+    found = extract([docx, mail, placeholder, blob])
 
     assert sorted(e.normalized for e in found if e.type == "person") == ["ann shaw", "jan kowalski"]
     assert [e.normalized for e in found if e.type == "email"] == ["ann.shaw@acme.example"]
