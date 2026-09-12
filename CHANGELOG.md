@@ -5,6 +5,19 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- Identifier types that carry their own checksum: `btc` for bitcoin addresses,
+  legacy and `bc1` alike, `iban` for bank accounts, and the Polish `nip` and
+  `regon`. One changed character fails the check, so a match is believed
+  without a region hint. The tax numbers are the exception and are taken only
+  beside their label or behind the `PL` of an EU VAT id: their check digit
+  passes about one random number in eleven, and ten bare digits in a document
+  are an order number far more often than a taxpayer. The arithmetic is the
+  standard library, in `checksums.py`.
+
 ## 0.8.2 - 2026-09-06
 
 ### Changed

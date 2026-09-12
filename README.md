@@ -30,7 +30,7 @@ It draws from three areas:
 
 1. **[Origin - what the machine recorded](#evidence-sources)** - browser history, OS origin metadata, shell history, archives, torrents, recent-file records, sync folders and trash. These traces can reveal where a file came from, how it arrived, when it appeared and where it was stored.
 2. **[Metadata - what the file records about itself](#supported-formats)** - EXIF, XMP, IPTC, C2PA, document properties, media tags, email headers and other embedded data. This can reveal devices, software, authors, timestamps, GPS coordinates and document history.
-3. **[Content - what the file says inside](#document-content)** - with `--content`, readable text from supported documents is scanned for URLs, domains, email addresses, IP addresses, coordinates and MD5/SHA-1/SHA-256 values. The text itself is not printed or stored - only extracted identifiers and their locations.
+3. **[Content - what the file says inside](#document-content)** - with `--content`, readable text from supported documents is scanned for the [supported identifier types](#identifier-types). The text itself is not printed or stored - only extracted identifiers and their locations.
 
 Where evidence was found and what that evidence means are kept separate:
 
@@ -212,6 +212,9 @@ The same identifier detection is applied to metadata and, with `--content`, docu
 | `ipv4` | dotted quads, with private and reserved ranges marked as such | version numbers, and digits in a field naming software |
 | `geo` | coordinates written with a hemisphere letter, a degree sign, a `geo:` URI, a map URL or an explicit latitude label | a bare pair of decimals, however many places it carries |
 | `md5` `sha1` `sha256` | 32, 40 and 64 hex digits | digests in a field naming software, which are build ids |
+| `btc` | bitcoin addresses whose checksum holds, legacy and `bc1`, the latter lowercased | a mixed-case `bc1` spelling, which no wallet writes |
+| `iban` | account numbers whose country, length and mod-97 check agree, spaces dropped | |
+| `nip` `regon` | Polish tax and statistical numbers beside their label, or a NIP behind an EU `PL` prefix | the same digits standing bare, however the check digit comes out |
 
 Every value keeps its file, source and exact field or document location.
 

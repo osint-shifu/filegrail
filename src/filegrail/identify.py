@@ -1,9 +1,11 @@
 """Identifiers found in the metadata a scan already read.
 
 The detectors here are ported from DirSifu (MIT, same author), which arrived at
-them by finding out what a regex sweep actually costs. Six types, each one
+them by finding out what a regex sweep actually costs. Each type is
 recognisable with high precision and normalisable without guessing: email, url,
-domain, ipv4, cryptographic hash and geographic coordinate.
+domain, ipv4, cryptographic hash and geographic coordinate - and, because a
+checksum lets a value vouch for itself, a bitcoin address, an IBAN and the
+Polish tax and statistical numbers, the last two only beside their label.
 
 Deliberately **not** detected, with reasons, because a noisy identifier list is
 worse than a short one:
@@ -41,6 +43,7 @@ from pathlib import Path
 from typing import NamedTuple
 from urllib.parse import urlsplit
 
+from .checksums import bech32_version, is_base58check, is_iban, is_nip, is_regon
 from .models import ORIGIN, FileRecord, category
 from .models import label as source_label
 
@@ -110,6 +113,26 @@ FILE_LIKE_RE = re.compile(
     r"|doc|docx|xls|xlsx|ppt|pptx|pdf|jpg|jpeg|png|gif|tif|tiff|heic|mp4|mp3|dotm)$",
     re.IGNORECASE,
 )
+
+#: Candidates only: the checksum decides. A legacy or pay-to-script address is
+#: base58 with a version character in front; a Bech32 address is `bc1` and its
+#: own alphabet, which leaves out `1`, `b`, `i` and `o` so nothing is misread.
+BTC_LEGACY_RE = re.compile(r"(?<![A-Za-z0-9])([13][1-9A-HJ-NP-Za-km-z]{25,34})(?![A-Za-z0-9])")
+BTC_BECH32_RE = re.compile(
+    r"(?<![A-Za-z0-9])(bc1[02-9ac-hj-np-z]{6,87})(?![A-Za-z0-9])", re.IGNORECASE
+)
+
+#: Printed in groups of four as often as not, so a space is allowed between
+#: any two characters and stripped before the number is checked.
+IBAN_RE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2}\d{2}(?: ?[A-Z0-9]){11,30})(?![A-Za-z0-9])")
+
+#: The Polish numbers are taken only beside their label, or behind the `PL`
+#: of an EU VAT id: their check digit passes about one random number in
+#: eleven, and ten bare digits in a document are an order number far more
+#: often than a taxpayer. The label is what makes the checksum worth trusting.
+NIP_LABELLED_RE = re.compile(r"\bNIP\b[\s:.#-]*((?:\d[\s-]?){9}\d)", re.IGNORECASE)
+NIP_PREFIXED_RE = re.compile(r"(?<![A-Za-z0-9])PL(\d{10})(?![A-Za-z0-9])")
+REGON_RE = re.compile(r"\bREGON\b[\s:.#-]*(\d{14}|\d{9})(?!\d)", re.IGNORECASE)
 
 _DEC = r"[-+]?\d{1,3}(?:\.\d+)?"
 
@@ -457,6 +480,30 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
         raw = match.group(1)
         kind = {32: "md5", 40: "sha1", 64: "sha256"}[len(raw)]
         yield kind, raw, raw.lower(), None
+
+    # The self-checking values. A wallet address is believed wherever it
+    # stands; the tax numbers only beside their label, see the patterns.
+    for match in BTC_LEGACY_RE.finditer(text):
+        if is_base58check(match.group(1)):
+            yield "btc", match.group(1), match.group(1), None
+
+    for match in BTC_BECH32_RE.finditer(text):
+        if bech32_version(match.group(1)) is not None:
+            yield "btc", match.group(1), match.group(1).lower(), None
+
+    for match in IBAN_RE.finditer(text):
+        if is_iban(match.group(1)):
+            yield "iban", match.group(1), "".join(match.group(1).split()), None
+
+    for pattern in (NIP_LABELLED_RE, NIP_PREFIXED_RE):
+        for match in pattern.finditer(text):
+            digits = re.sub(r"\D", "", match.group(1))
+            if is_nip(digits):
+                yield "nip", match.group(1), digits, None
+
+    for match in REGON_RE.finditer(text):
+        if is_regon(match.group(1)):
+            yield "regon", match.group(1), match.group(1), None
 
     # Domains harvested from URLs and emails are certain. Bare tokens have to
     # clear the TLD list and not look like a file name.

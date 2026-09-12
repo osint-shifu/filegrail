@@ -388,3 +388,100 @@ def test_the_report_says_which_side_of_the_file_a_value_came_from(tmp_path: Path
     assert "acme-legal.example" in crossed
     assert "other.example" not in crossed
     assert "third.example" not in crossed
+
+
+# --- self-checking identifiers ------------------------------------------------
+#
+# A wallet address, a bank account and a tax number carry their own checksum,
+# so a match can be believed without a region hint or a surrounding label. The
+# tax numbers are the exception: their checksum passes about one random number
+# in eleven, so they are taken only beside the label that names them.
+
+
+def test_a_bitcoin_address_with_a_valid_checksum_is_found(tmp_path: Path):
+    record = _document(
+        tmp_path, "pay 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa by friday", source="document-metadata"
+    )
+
+    found = {(e.type, e.normalized) for e in extract([record], content=True)}
+
+    assert ("btc", "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa") in found
+
+
+def test_a_bech32_address_is_found_and_lowercased(tmp_path: Path):
+    """The spec allows an all-uppercase spelling; one wallet must be one entry."""
+    record = _document(
+        tmp_path, "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4", source="document-metadata"
+    )
+
+    found = [e for e in extract([record], content=True) if e.type == "btc"]
+
+    assert [e.normalized for e in found] == ["bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"]
+
+
+def test_a_bitcoin_address_with_a_broken_checksum_is_not(tmp_path: Path):
+    record = _document(
+        tmp_path, "pay 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNb", source="document-metadata"
+    )
+
+    assert [e for e in extract([record], content=True) if e.type == "btc"] == []
+
+
+def test_an_iban_is_found_without_its_spaces(tmp_path: Path):
+    record = _document(
+        tmp_path, "account GB82 WEST 1234 5698 7654 32 please", source="document-metadata"
+    )
+
+    found = [e for e in extract([record], content=True) if e.type == "iban"]
+
+    assert [e.normalized for e in found] == ["GB82WEST12345698765432"]
+    assert found[0].value == "GB82 WEST 1234 5698 7654 32"
+
+
+def test_an_iban_that_fails_mod_97_is_not(tmp_path: Path):
+    record = _document(tmp_path, "account GB82WEST12345698765433", source="document-metadata")
+
+    assert [e for e in extract([record], content=True) if e.type == "iban"] == []
+
+
+def test_a_nip_is_found_only_beside_its_label(tmp_path: Path):
+    labelled = _document(tmp_path, "NIP: 526-025-02-74", name="a.txt", source="document-metadata")
+    bare = _document(tmp_path, "call 5260250274 today", name="b.txt", source="document-metadata")
+
+    found = {(e.type, e.normalized) for e in extract([labelled, bare], content=True)}
+
+    assert ("nip", "5260250274") in found
+    nip = next(e for e in extract([labelled, bare], content=True) if e.type == "nip")
+    assert nip.files == 1
+
+
+def test_a_nip_behind_its_country_prefix_is_found(tmp_path: Path):
+    """The EU VAT spelling is the label: `PL` and ten digits."""
+    record = _document(tmp_path, "vat id PL5260250274", source="document-metadata")
+
+    found = {(e.type, e.normalized) for e in extract([record], content=True)}
+
+    assert ("nip", "5260250274") in found
+
+
+def test_a_nip_with_a_broken_check_digit_is_not(tmp_path: Path):
+    record = _document(tmp_path, "NIP 5260250275", source="document-metadata")
+
+    assert [e for e in extract([record], content=True) if e.type == "nip"] == []
+
+
+def test_a_regon_is_found_beside_its_label(tmp_path: Path):
+    record = _document(
+        tmp_path, "REGON: 123456785, and REGON 12345678500010", source="document-metadata"
+    )
+
+    found = sorted(e.normalized for e in extract([record], content=True) if e.type == "regon")
+
+    assert found == ["123456785", "12345678500010"]
+
+
+def test_a_self_checking_value_in_metadata_is_found_too():
+    """The detectors run over both corpora; a note can carry a wallet."""
+    record = _record("x", source="document-metadata", note="1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
+
+    assert [e.type for e in extract([record])] == ["btc"]
