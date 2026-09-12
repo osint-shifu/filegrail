@@ -586,3 +586,54 @@ def test_private_key_blocks_are_one_fact_wherever_they_sit(tmp_path: Path):
     found = [e for e in extract([a, b], content=True) if e.type == "secret"]
 
     assert [(e.value, e.files) for e in found] == [("private key block", 2)]
+
+
+# --- who a file says made it ---------------------------------------------------
+#
+# A person or a company is never read out of prose - a capitalised pair of
+# words is a name, a town and a sign-off in equal measure. It is read from the
+# fields whose *name* says who: an author line, a by-line, the display name on
+# a mail header. That is a fact the format declared, and the corpus it lives
+# in is metadata, so a document body cannot produce one by construction.
+
+
+def test_a_person_is_read_from_a_field_that_names_one():
+    docx = _record("letter.docx", source="document-metadata", fields={"Author": "Jan Kowalski"})
+    mail = _record(
+        "note.eml", source="email-header", fields={"From": "Ann Shaw <ann.shaw@acme.example>"}
+    )
+    placeholder = _record(
+        "form.docx", source="document-metadata", fields={"Author": "Microsoft Office User"}
+    )
+
+    found = extract([docx, mail, placeholder])
+
+    assert sorted(e.normalized for e in found if e.type == "person") == ["ann shaw", "jan kowalski"]
+    assert [e.normalized for e in found if e.type == "email"] == ["ann.shaw@acme.example"]
+
+
+def test_a_name_in_prose_is_not_a_person(tmp_path: Path):
+    record = _document(
+        tmp_path, "Author: Jan Kowalski\nSigned, Ann Shaw", source="document-metadata"
+    )
+
+    assert [e for e in extract([record], content=True) if e.type == "person"] == []
+
+
+def test_a_company_and_the_accounts_a_file_points_at_are_read():
+    record = _record(
+        "report.docx",
+        source="document-metadata",
+        fields={
+            "Company": "Acme Ltd",
+            "Template": r"C:\Users\jkowalski\AppData\Roaming\Microsoft\Templates\Normal.dotm",
+        },
+        note="see https://github.com/jkowalski and https://x.com/home for more",
+    )
+
+    found = {(e.type, e.normalized) for e in extract([record])}
+
+    assert ("org", "acme ltd") in found
+    assert ("handle", "github:jkowalski") in found
+    assert ("handle", "home:jkowalski") in found
+    assert not [h for kind, h in found if kind == "handle" and h.startswith("x:")]

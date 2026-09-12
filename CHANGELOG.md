@@ -23,6 +23,16 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   fingerprint redaction writes, never as the value. Every private key opens
   with the same line, so key blocks are one fact with a list of places.
 
+- Three identifier types for who a file says made it. `person` is read from
+  the fields whose name says so - an author line, a by-line, an artist tag,
+  the display name on a mail header - and never from the text of a document,
+  where a capitalised pair of words is a name, a town and a sign-off in equal
+  measure. `org` is the company or credit a file records. `handle` is an
+  account a file points at: the user in a profile URL on a known platform, or
+  the login in a user directory the file carries in a template path or a
+  recorded location. One spelling of a name is one entry; two spellings stay
+  two, because deciding they are one would be guessing.
+
 ## 0.9.0 - 2026-09-12
 
 ### Added

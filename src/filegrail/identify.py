@@ -37,6 +37,7 @@ import re
 from collections.abc import Iterator
 from contextlib import suppress
 from dataclasses import dataclass, field
+from email.utils import getaddresses
 from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
@@ -179,6 +180,97 @@ _SECRET_PATTERNS = tuple(
 #: what it holds, and all of them are the one fact.
 PRIVATE_KEY_RE = re.compile(r"-----BEGIN (?:[A-Z]+ )*PRIVATE KEY-----")
 PRIVATE_KEY = "private key block"
+
+#: Fields whose *name* says a person wrote this. Matched on the whole name,
+#: namespace and all: XMP's `dc:creator` is the author, while a bare `Creator`
+#: in a PDF or a PNG is the program that wrote it, which is why that one sits
+#: in the software fields above. A name is never read out of prose - a
+#: capitalised pair of words is a name, a town and a sign-off in equal
+#: measure - and since a document body is addressed by line, it cannot
+#: reach these tables by construction.
+_PERSON_FIELDS = frozenset(
+    {"author", "dc:creator", "artist", "by-line", "lastmodifiedby", "cp:lastmodifiedby"}
+)
+
+#: Mail headers carrying mailboxes, whose display names are people.
+_MAILBOX_FIELDS = frozenset({"from", "to", "cc", "reply-to", "sender"})
+
+#: Fields whose name says an organisation. `Source` is not here: it is an
+#: agency in IPTC, a scanner in a PNG and something else again in RIFF.
+_ORG_FIELDS = frozenset({"company", "credit"})
+
+#: What an application writes where a name should go.
+_NOBODY = frozenset(
+    {
+        "microsoft office user",
+        "windows user",
+        "office user",
+        "user",
+        "admin",
+        "administrator",
+        "unknown",
+        "author",
+        "owner",
+        "default",
+        "n/a",
+        "none",
+        "anonymous",
+        "guest",
+        "root",
+        "system",
+        "unnamed",
+        "untitled",
+    }
+)
+
+#: Where a URL is somebody's profile: the host, what to call the platform,
+#: and what the path has to look like. `www.` and `m.` come off the host.
+_PROFILE_PATH = {
+    "x": re.compile(r"^/([A-Za-z0-9_]{1,15})/?$"),
+    "instagram": re.compile(r"^/([A-Za-z0-9_.]{1,30})/?$"),
+    "github": re.compile(r"^/([A-Za-z0-9][A-Za-z0-9\-]{0,38})/?$"),
+    "linkedin": re.compile(r"^/in/([A-Za-z0-9\-%]+)/?$"),
+    "telegram": re.compile(r"^/([A-Za-z0-9_]{5,32})/?$"),
+    "tiktok": re.compile(r"^/@([A-Za-z0-9_.]+)/?$"),
+    "youtube": re.compile(r"^/@([A-Za-z0-9_.\-]+)/?$"),
+    "reddit": re.compile(r"^/(?:u|user)/([A-Za-z0-9_\-]+)/?$"),
+    "facebook": re.compile(r"^/([A-Za-z0-9.]{5,})/?$"),
+}
+_PROFILE_HOSTS = {
+    "x.com": "x",
+    "twitter.com": "x",
+    "instagram.com": "instagram",
+    "github.com": "github",
+    "linkedin.com": "linkedin",
+    "t.me": "telegram",
+    "telegram.me": "telegram",
+    "tiktok.com": "tiktok",
+    "youtube.com": "youtube",
+    "reddit.com": "reddit",
+    "facebook.com": "facebook",
+}
+
+#: First path segments that are a site's own pages rather than somebody's.
+_NOT_A_HANDLE = frozenset(
+    {
+        "home", "search", "login", "signup", "signin", "settings", "explore", "p",
+        "reel", "reels", "stories", "orgs", "about", "help", "share", "sharer",
+        "sharer.php", "groups", "pages", "events", "hashtag", "i", "intent",
+        "profile.php", "topics", "marketplace", "watch", "tv", "status",
+        "notifications", "messages", "privacy", "terms", "features", "pricing",
+        "sponsors", "apps", "site", "new", "join", "trending", "live", "shorts",
+        "feed", "dialog", "photo", "video", "videos", "posts", "tag", "tags",
+        "channel", "user", "pub", "company", "jobs", "legal", "policies",
+    }
+)  # fmt: skip
+
+#: A user's directory on the machine that made the file - `C:\Users\name`,
+#: `/Users/name`, `/home/name` - as it turns up in a template path, a
+#: recorded location or a command. The ones every machine has are nobody's.
+USER_DIR_RE = re.compile(r"(?:^|[\\/])(?i:Users|home)[\\/]([^\\/\s:*?\"<>|]{1,64})(?=[\\/]|$)")
+_SHARED_HOMES = frozenset(
+    {"public", "default", "default user", "all users", "shared", "administrator"}
+)
 
 _DEC = r"[-+]?\d{1,3}(?:\.\d+)?"
 
@@ -404,6 +496,46 @@ def _looks_like_version(text: str, start: int) -> bool:
     return start > 0 and text[start - 1] in "vV"
 
 
+def _plain(name: str) -> str:
+    """One spelling for one name: case and spacing folded, accents kept.
+
+    `Kowalski, Jan` and `Jan Kowalski` stay two entries. Deciding they are one
+    would be guessing, and a wrong merge is worse than a duplicate.
+    """
+    return " ".join(name.strip().strip("\"'").split()).casefold()
+
+
+def _names(value: str) -> Iterator[str]:
+    """The names in a field, which XMP and Office write `;`-separated."""
+    for part in value.split(";"):
+        name = part.strip().strip("\"'")
+        plain = _plain(name)
+        if len(plain) < 2 or plain in _NOBODY or not any(char.isalpha() for char in plain):
+            continue
+        if EMAIL_RE.fullmatch(name):
+            continue  # already an email, and naming it twice says nothing new
+        yield name
+
+
+def _profile(url: str) -> tuple[str, str] | None:
+    """(platform, user) if `url` is somebody's page on a platform this knows."""
+    try:
+        parts = urlsplit(url.rstrip(_TRAILING_PUNCT))
+    except ValueError:
+        return None
+    host = (parts.hostname or "").lower()
+    for prefix in ("www.", "m.", "mobile."):
+        if host.startswith(prefix):
+            host = host[len(prefix) :]
+    platform = _PROFILE_HOSTS.get(host)
+    if platform is None:
+        return None
+    match = _PROFILE_PATH[platform].match(parts.path)
+    if match is None or match.group(1).lower() in _NOT_A_HANDLE:
+        return None
+    return platform, match.group(1)
+
+
 # --- the corpus --------------------------------------------------------------
 
 
@@ -487,6 +619,25 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
 
     identifier = where.lower().rpartition(":")[2] in _MESSAGE_ID_FIELDS
 
+    # Who the file says made it: read from the name of the field, never from
+    # what the text looks like.
+    named = where.lower()
+    if named in _PERSON_FIELDS:
+        for person in _names(text):
+            yield "person", person, _plain(person), None
+    elif named in _MAILBOX_FIELDS:
+        for display, _address in getaddresses([text]):
+            for person in _names(display):
+                yield "person", person, _plain(person), None
+    elif named in _ORG_FIELDS:
+        for organisation in _names(text):
+            yield "org", organisation, _plain(organisation), None
+
+    for match in USER_DIR_RE.finditer(text):
+        login = match.group(1)
+        if login.lower() not in _SHARED_HOMES:
+            yield "handle", f"home:{login}", f"home:{login.lower()}", None
+
     for match in EMAIL_RE.finditer(text):
         host = normalize_domain(match.group(1))
         if host is None:
@@ -505,6 +656,10 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
         yield "url", match.group(0).rstrip(_TRAILING_PUNCT), normalized, None
         if host:
             hosts.add(host)
+        profile = _profile(match.group(0))
+        if profile is not None:
+            platform, user = profile
+            yield "handle", f"{platform}:{user}", f"{platform}:{user.lower()}", None
 
     # XMP writes `pdf:Producer` where a PDF writes `Producer`, so the namespace
     # comes off before the name is looked up.
