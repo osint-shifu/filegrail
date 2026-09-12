@@ -167,6 +167,7 @@ _NAMES = (
     "report.doc",
     "voice.wav",
     "song.mp3",
+    "track.gpx",
 )
 
 
@@ -224,6 +225,11 @@ def corpus(tmp_path_factory: pytest.TempPathFactory) -> dict[str, bytes]:
             ],
         ),
         "song.mp3": _id3([(b"TSSE", "Lavf58.76.100"), (b"TPE1", "Someone")]),
+        "track.gpx": (
+            b'<gpx><wpt lat="52.2297" lon="21.0122"><name>Warsaw</name></wpt>'
+            b'<trk><trkseg><trkpt lat="52.1" lon="21.1"/><trkpt lat="52.3" lon="21.3"/>'
+            b"</trkseg></trk></gpx>"
+        ),
     }
 
 

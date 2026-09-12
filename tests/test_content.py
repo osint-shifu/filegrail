@@ -419,3 +419,69 @@ def test_the_two_bodies_of_a_message_are_named_apart(tmp_path: Path):
 
     assert found["body"] == "plain body"
     assert found["body (html)"] == "rich body"
+
+
+# --- positions --------------------------------------------------------------
+#
+# A track file and a map file carry positions as structure, not prose: an
+# attribute pair, or `lon,lat` with the longitude first. The reader renders
+# each one as a `geo:` URI, which is the one spelling the coordinate detector
+# takes without a hemisphere letter or a label - so the detectors need not
+# know these formats exist, and a bare decimal pair is still never believed.
+
+
+def test_a_gpx_waypoint_is_a_geo_uri_with_its_place(tmp_path: Path):
+    path = tmp_path / "walk.gpx"
+    path.write_text(
+        '<gpx><wpt lat="52.2297" lon="21.0122"><name>Warsaw</name></wpt></gpx>',
+        encoding="utf-8",
+    )
+
+    assert ("waypoint 1", "geo:52.2297,21.0122") in [tuple(p) for p in read_passages(path) or []]
+
+
+def test_a_longitude_first_pair_is_turned_around(tmp_path: Path):
+    """KML and GeoJSON both write `lon,lat`; a reader that forgot would put
+    Warsaw in the Indian Ocean and nothing downstream could tell."""
+    kml = tmp_path / "places.kml"
+    kml.write_text(
+        "<kml><Placemark><Point><coordinates>21.0122,52.2297,0</coordinates></Point>"
+        "</Placemark></kml>",
+        encoding="utf-8",
+    )
+    geojson = tmp_path / "places.geojson"
+    geojson.write_text(
+        '{"type":"FeatureCollection","features":[{"type":"Feature","geometry":'
+        '{"type":"Point","coordinates":[21.0122,52.2297]}}]}',
+        encoding="utf-8",
+    )
+
+    assert ("placemark 1", "geo:52.2297,21.0122") in [tuple(p) for p in read_passages(kml) or []]
+    assert ("feature 1", "geo:52.2297,21.0122") in [tuple(p) for p in read_passages(geojson) or []]
+
+
+def test_a_track_gives_only_its_start_and_its_end(tmp_path: Path):
+    """A track is thousands of points and a report is not the place for them;
+    where it began and where it stopped is what a reader wants to know."""
+    path = tmp_path / "run.gpx"
+    path.write_text(
+        '<gpx><trk><trkseg><trkpt lat="52.1" lon="21.1"/><trkpt lat="52.2" lon="21.2"/>'
+        '<trkpt lat="52.3" lon="21.3"/></trkseg></trk></gpx>',
+        encoding="utf-8",
+    )
+
+    found = [tuple(p) for p in read_passages(path) or []]
+
+    assert ("track 1 start", "geo:52.1,21.1") in found
+    assert ("track 1 end", "geo:52.3,21.3") in found
+    assert not [p for p in found if "52.2" in p[1]]
+
+
+def test_a_graph_file_gives_up_its_labels(tmp_path: Path):
+    path = tmp_path / "links.graphml"
+    path.write_text(
+        '<graphml><node id="n0"><data key="d0">ann.shaw@acme-legal.example</data></node></graphml>',
+        encoding="utf-8",
+    )
+
+    assert "ann.shaw@acme-legal.example" in _text(path)

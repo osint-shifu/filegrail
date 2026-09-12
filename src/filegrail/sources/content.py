@@ -37,6 +37,7 @@ Deliberately not read, with reasons:
 from __future__ import annotations
 
 import codecs
+import json
 import re
 import zipfile
 from html.parser import HTMLParser
@@ -96,10 +97,23 @@ PLAIN_SUFFIXES = {
     ".conf",
     ".vcf",
     ".ics",
+    # A map and a canvas are JSON too: an Obsidian board is text in nodes, and
+    # GeoJSON is read a second time, below, for the positions its text hides.
+    ".geojson",
+    ".canvas",
 }
 
+#: Data formats read twice: once by line like any text, once for the
+#: positions they carry as structure rather than prose.
+GEOJSON_SUFFIXES = {".geojson"}
+
+#: Markup read twice for the same reason. A track and a map file are XML, so
+#: their names and links come out like any markup; the positions need a
+#: reader that knows which attribute is the latitude.
+POSITION_SUFFIXES = {".gpx", ".kml"}
+
 #: Markup, read for its text and its links rather than its tags.
-MARKUP_SUFFIXES = {".html", ".htm", ".xhtml", ".xml"} | SVG_SUFFIXES
+MARKUP_SUFFIXES = {".html", ".htm", ".xhtml", ".xml", ".graphml"} | SVG_SUFFIXES | POSITION_SUFFIXES
 
 #: Packages whose body lives in a named member beside the properties.
 PACKAGE_SUFFIXES = OOXML_SUFFIXES | ODF_SUFFIXES | EPUB_SUFFIXES
@@ -172,9 +186,15 @@ def read_passages(path: Path) -> list[Passage] | None:
 
     try:
         if suffix in PLAIN_SUFFIXES:
-            found = _lines(_decode(_head(path)))
+            text = _decode(_head(path))
+            found = _lines(text)
+            if suffix in GEOJSON_SUFFIXES:
+                found += _features(text)
         elif suffix in MARKUP_SUFFIXES:
-            found = _read(_decode(_head(path)))
+            markup = _decode(_head(path))
+            found = _read(markup)
+            if suffix in POSITION_SUFFIXES:
+                found += _positions(markup)
         elif suffix in PACKAGE_SUFFIXES:
             found = _package(path)
         elif suffix in MAIL_SUFFIXES:
@@ -289,6 +309,170 @@ def _read(markup: str) -> list[Passage]:
     parser.feed(markup)
     parser.close()
     return parser.found
+
+
+class _Positions(HTMLParser):
+    """The positions a track or map file carries as structure, as `geo:` URIs.
+
+    GPX writes a point as a `lat`/`lon` attribute pair; KML writes `lon,lat`
+    with the longitude first. Each is rendered `geo:lat,lon`, the one spelling
+    the coordinate detector takes on its own - so the detectors need not know
+    these formats exist, and a bare pair of decimals in a document is still
+    never believed. The digits are the document's own, not a float printed
+    back: what is reported is what the file said.
+
+    A track or a line is thousands of points and a report is not the place
+    for them; where it began and where it stopped is what a reader wants to
+    know, so those two are kept and the rest are not. A named point is kept
+    whole. Not read: `gx:Track`, polygons and multi-geometries - each is a
+    different element, and none has come up.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.found: list[Passage] = []
+        self._waypoints = 0
+        self._tracks = 0
+        self._placemarks = 0
+        #: The points of the track being read, or None outside one.
+        self._track: list[tuple[str, str]] | None = None
+        #: Which geometry the current placemark holds, once it says.
+        self._shape: str | None = None
+        #: The text of a `<coordinates>` element, which can arrive in pieces.
+        self._coordinates: list[str] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "wpt":
+            pair = _pair(dict(attrs))
+            if pair is not None:
+                self._waypoints += 1
+                self.found.append(Passage(f"waypoint {self._waypoints}", _geo(pair)))
+        elif tag == "trk":
+            self._tracks += 1
+            self._track = []
+        elif tag == "trkpt" and self._track is not None:
+            pair = _pair(dict(attrs))
+            if pair is not None:
+                self._track.append(pair)
+        elif tag == "placemark":
+            self._placemarks += 1
+            self._shape = None
+        elif tag in ("point", "linestring"):
+            self._shape = tag
+        elif tag == "coordinates":
+            self._coordinates = []
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        # `<trkpt .../>` is the common spelling; an empty `<trk/>` or
+        # `<coordinates/>` opens and closes and must not stay open.
+        self.handle_starttag(tag, attrs)
+        self.handle_endtag(tag)
+
+    def handle_data(self, data: str) -> None:
+        if self._coordinates is not None:
+            self._coordinates.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "trk":
+            points, self._track = self._track or [], None
+            if points:
+                self.found.append(Passage(f"track {self._tracks} start", _geo(points[0])))
+            if len(points) > 1:
+                self.found.append(Passage(f"track {self._tracks} end", _geo(points[-1])))
+        elif tag == "coordinates":
+            text, self._coordinates = "".join(self._coordinates or []), None
+            points = _turned(text)
+            number = self._placemarks
+            if self._shape == "point" and points:
+                self.found.append(Passage(f"placemark {number}", _geo(points[0])))
+            elif self._shape == "linestring" and points:
+                self.found.append(Passage(f"placemark {number} start", _geo(points[0])))
+                if len(points) > 1:
+                    self.found.append(Passage(f"placemark {number} end", _geo(points[-1])))
+            self._shape = None
+
+
+def _positions(markup: str) -> list[Passage]:
+    parser = _Positions()
+    parser.feed(markup)
+    parser.close()
+    return parser.found
+
+
+def _pair(attrs: dict[str, str | None]) -> tuple[str, str] | None:
+    """A GPX point's latitude and longitude, if both are present and numbers."""
+    latitude, longitude = attrs.get("lat"), attrs.get("lon")
+    if latitude is None or longitude is None:
+        return None
+    try:
+        float(latitude), float(longitude)
+    except ValueError:
+        return None
+    return latitude.strip(), longitude.strip()
+
+
+def _turned(text: str) -> list[tuple[str, str]]:
+    """KML's whitespace-separated `lon,lat[,alt]` tuples, turned into (lat, lon)."""
+    points: list[tuple[str, str]] = []
+    for token in text.split():
+        parts = token.split(",")
+        if len(parts) < 2:
+            continue
+        try:
+            float(parts[0]), float(parts[1])
+        except ValueError:
+            continue
+        points.append((parts[1], parts[0]))
+    return points
+
+
+def _geo(pair: tuple[str, str]) -> str:
+    return f"geo:{pair[0]},{pair[1]}"
+
+
+def _position(value: object) -> tuple[str, str] | None:
+    """One GeoJSON position, `[lon, lat, ...]`, as (lat, lon) - longitude first there too."""
+    if not isinstance(value, list) or len(value) < 2:
+        return None
+    longitude, latitude = value[0], value[1]
+    for number in (longitude, latitude):
+        if isinstance(number, bool) or not isinstance(number, (int, float)):
+            return None
+    return str(latitude), str(longitude)
+
+
+def _features(text: str) -> list[Passage]:
+    """The point and line features of a GeoJSON file, in the order it lists them.
+
+    A file that does not parse - cut short by the budget, or not JSON at all -
+    contributes no positions and keeps its lines.
+    """
+    try:
+        document = json.loads(text)
+    except ValueError:
+        return []
+    features = document.get("features") if isinstance(document, dict) else None
+    if not isinstance(features, list):
+        features = [document]
+    found: list[Passage] = []
+    for number, feature in enumerate(features, 1):
+        if not isinstance(feature, dict):
+            continue
+        geometry = feature.get("geometry", feature)
+        if not isinstance(geometry, dict):
+            continue
+        shape, coordinates = geometry.get("type"), geometry.get("coordinates")
+        if shape == "Point":
+            pair = _position(coordinates)
+            if pair is not None:
+                found.append(Passage(f"feature {number}", _geo(pair)))
+        elif shape == "LineString" and isinstance(coordinates, list):
+            points = [pair for pair in map(_position, coordinates) if pair is not None]
+            if points:
+                found.append(Passage(f"feature {number} start", _geo(points[0])))
+            if len(points) > 1:
+                found.append(Passage(f"feature {number} end", _geo(points[-1])))
+    return found
 
 
 def _stripped(markup: str) -> str:

@@ -18,6 +18,15 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   are an order number far more often than a taxpayer. The arithmetic is the
   standard library, in `checksums.py`.
 
+- `--content` reads track and map files - `.gpx`, `.kml`, `.geojson` - and
+  reports the positions they carry as structure: every named point, and the
+  start and the end of every track or line, since a track is thousands of
+  points and a report is not the place for them. Each is written as a `geo:`
+  URI, the one spelling the coordinate detector takes on its own, so a bare
+  pair of decimals in a document is still never believed. KML and GeoJSON
+  put the longitude first; the reader turns them around. `.graphml` and an
+  Obsidian `.canvas` are read as the markup and JSON they are.
+
 ## 0.8.2 - 2026-09-06
 
 ### Changed
