@@ -323,3 +323,38 @@ def test_the_badge_agrees_too():
     badge = re.search(r"badge/formats-(\d+)", README.read_text(encoding="utf-8"))
     assert badge is not None, "the readme no longer carries a format badge"
     assert int(badge.group(1)) == len(_readable())
+
+
+# --- the identifier types --------------------------------------------------------
+#
+# Three lists have to agree: the types the extractor yields, the rows of the
+# readme's table, and the headings the report prints them under. The report
+# once knew eight and silently dropped the rest, and nothing here noticed.
+
+
+def _yielded_types() -> set[str]:
+    """Every type `identify._scan` can yield, read out of its source."""
+    import filegrail.identify as identify
+
+    source = Path(identify.__file__).read_text(encoding="utf-8")
+    literal = set(re.findall(r'yield "([a-z0-9]+)"', source))
+    # The digests are yielded through a variable chosen by length.
+    return literal | {"md5", "sha1", "sha256"}
+
+
+def _readme_types() -> set[str]:
+    listed: set[str] = set()
+    for row in _readme_rows(README, "### Identifier types")[1:]:
+        listed |= set(re.findall(r"`([a-z0-9]+)`", row[0]))
+    return listed
+
+
+def test_every_type_the_extractor_yields_is_in_the_readme_table():
+    assert _yielded_types() == _readme_types(), sorted(_yielded_types() ^ _readme_types())
+
+
+def test_every_documented_type_has_a_heading_in_the_report():
+    from filegrail.report import _TYPE_SECTIONS
+
+    assert _readme_types() <= set(_TYPE_SECTIONS), sorted(_readme_types() - set(_TYPE_SECTIONS))
+    assert set(_TYPE_SECTIONS) <= _readme_types(), sorted(set(_TYPE_SECTIONS) - _readme_types())
