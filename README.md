@@ -556,6 +556,7 @@ Reports may contain:
 - IP and hardware addresses
 - GPS coordinates and postal addresses
 - bank accounts, tax numbers and wallet addresses
+- analytics and advertising ids, which name an account
 
 A credential found inside a document is reported as its kind and a fingerprint, never as the value.
 
