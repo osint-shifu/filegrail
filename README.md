@@ -225,6 +225,7 @@ The same identifier detection is applied to metadata and, with `--content`, docu
 | `mac` | hardware addresses in either spelling, as one value with colons | the all-zero and the broadcast address |
 | `sid` | Windows account and group SIDs, `S-1-5-21-…` with a relative id | the short well-known SIDs such as `S-1-5-18` |
 | `bic` | bank identifier codes beside a `BIC` or `SWIFT` label, 8 or 11 characters, whose country is a real one | the same code standing bare |
+| `secret` | API keys and tokens with a vendor prefix, JWTs and private key blocks, reported as the kind and a fingerprint and never as the value | credentials `--redact` finds only by the name beside them |
 
 Every value keeps its file, source and exact field or document location.
 

@@ -544,3 +544,45 @@ def test_the_shapes_that_look_right_and_are_not_are_left_alone(tmp_path: Path):
     )
 
     assert [e.type for e in extract([record], content=True)] == []
+
+
+# --- credentials --------------------------------------------------------------
+#
+# A key or a token in a document is a finding, and printing it into a report
+# that leaves the machine is the one mistake here that cannot be undone. So a
+# credential is reported as what it is and a fingerprint of it, the same one
+# `--redact` writes, and never as the value.
+
+
+def test_a_credential_is_reported_as_a_fingerprint_never_the_value(tmp_path: Path):
+    from filegrail.redact import fingerprint
+
+    key = "AKIAIOSFODNN7EXAMPLE"
+    token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnop"
+    record = _document(tmp_path, f"aws {key}\nbearer {token}\n", source="document-metadata")
+
+    found = [e for e in extract([record], content=True) if e.type == "secret"]
+
+    assert sorted(e.value for e in found) == [
+        f"aws_access_key {fingerprint(key)}",
+        f"jwt {fingerprint(token)}",
+    ]
+    assert not [e for e in found if key in e.value or token in e.normalized]
+
+
+def test_private_key_blocks_are_one_fact_wherever_they_sit(tmp_path: Path):
+    """Every key opens with the same line and a per-line scan never sees the
+    rest, so the identity of a key block is where it is, not what it holds."""
+    a = _document(
+        tmp_path,
+        "-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n",
+        name="a.txt",
+        source="document-metadata",
+    )
+    b = _document(
+        tmp_path, "-----BEGIN PRIVATE KEY-----\nMIIE...\n", name="b.txt", source="document-metadata"
+    )
+
+    found = [e for e in extract([a, b], content=True) if e.type == "secret"]
+
+    assert [(e.value, e.files) for e in found] == [("private key block", 2)]

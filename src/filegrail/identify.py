@@ -45,6 +45,8 @@ from urllib.parse import urlsplit
 from .checksums import bech32_version, is_base58check, is_iban, is_nip, is_onion, is_regon
 from .models import ORIGIN, FileRecord, category
 from .models import label as source_label
+from .redact import PATTERNS as REDACT_PATTERNS
+from .redact import fingerprint
 
 #: What files record about themselves: the corpus this has always read, and the
 #: one the detectors were tuned for. Short structured strings, where a match is
@@ -159,6 +161,24 @@ BIC_RE = re.compile(
     r"([A-Za-z]{6}[A-Za-z0-9]{2}(?:[A-Za-z0-9]{3})?)(?![\w\-])",
     re.IGNORECASE,
 )
+
+#: The credential shapes `--redact` knows by their prefix, taken here as
+#: identifiers: a key or a token in a document is a finding. Only the shapes
+#: that prove themselves - a vendor prefix, a JWT's three segments - and not
+#: the rules that go by the name beside a value, which stay redaction's
+#: business. What is reported is the kind and a fingerprint, the same one
+#: redaction writes, and never the value: a report that leaves the machine
+#: must not become the place the secret was copied to.
+_SECRET_KINDS = frozenset({"aws_access_key", "vendor_token", "jwt"})
+_SECRET_PATTERNS = tuple(
+    (kind, pattern, group) for kind, pattern, group in REDACT_PATTERNS if kind in _SECRET_KINDS
+)
+
+#: Every private key opens with the same line, and a scan that goes by the
+#: line never sees the rest. So a key block's identity is where it is, not
+#: what it holds, and all of them are the one fact.
+PRIVATE_KEY_RE = re.compile(r"-----BEGIN (?:[A-Z]+ )*PRIVATE KEY-----")
+PRIVATE_KEY = "private key block"
 
 _DEC = r"[-+]?\d{1,3}(?:\.\d+)?"
 
@@ -553,6 +573,14 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
         code = match.group(1).upper()
         if code[4:6].lower() in known_tlds():
             yield "bic", match.group(1), code, None
+
+    for kind, pattern, group in _SECRET_PATTERNS:
+        for match in pattern.finditer(text):
+            handle = f"{kind} {fingerprint(match.group(group))}"
+            yield "secret", handle, handle, None
+
+    for _ in PRIVATE_KEY_RE.finditer(text):
+        yield "secret", PRIVATE_KEY, PRIVATE_KEY, None
 
     # Domains harvested from URLs and emails are certain. Bare tokens have to
     # clear the TLD list and not look like a file name.

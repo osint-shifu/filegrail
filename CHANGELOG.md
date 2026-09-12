@@ -16,6 +16,13 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   particular; and `bic` for bank identifier codes, which have no checksum
   and are taken only beside a `BIC` or `SWIFT` label.
 
+- A `secret` identifier type: the API keys and tokens `--redact` already
+  knows by their vendor prefix, JWTs, and private key blocks. A credential in
+  a document is a finding, and a report that leaves the machine must not
+  become the place it was copied to, so each is reported as its kind and the
+  fingerprint redaction writes, never as the value. Every private key opens
+  with the same line, so key blocks are one fact with a list of places.
+
 ## 0.9.0 - 2026-09-12
 
 ### Added
