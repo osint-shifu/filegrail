@@ -5,6 +5,18 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- Two more things an incident report is made of: `path`, where a file sat
+  on a Windows machine - a drive letter, an environment variable or a UNC
+  share, which names a host - as one value however it is cased; and
+  `executable`, the bare name of something Windows will run, on its own or
+  inside a path or a URL. POSIX paths are not taken, a slash being in every
+  URL and every fraction, and neither is anything ending in `.com`, which
+  every domain does.
+
 ## 0.11.0 - 2026-09-12
 
 ### Fixed

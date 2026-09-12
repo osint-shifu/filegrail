@@ -998,6 +998,8 @@ _TYPE_SECTIONS = {
     "tracker": "trackers",
     "cve": "cves",
     "registry": "registry keys",
+    "path": "paths",
+    "executable": "executables",
 }
 
 

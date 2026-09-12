@@ -388,6 +388,29 @@ COLON_DIGEST_RE = re.compile(
 IPV6_FULL_RE = re.compile(r"(?<![\w:.])((?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4})(?![\w:.])")
 IPV6_BRACKET_RE = re.compile(r"\[([0-9A-Fa-f:.]{2,45})\]")
 
+#: Where a file sat on a Windows machine: a drive letter, an environment
+#: variable, or a UNC share, which names a host. POSIX paths are not taken -
+#: a slash is in every URL and every fraction. Windows does not care about
+#: case, so neither does the normalised form.
+_PATH_PART = r"[^\\/:*?\"<>|\s]+"
+PATH_RE = re.compile(
+    rf"(?<![\w\\])("
+    rf"[A-Za-z]:\\(?:{_PATH_PART}\\)*(?:{_PATH_PART})?"
+    rf"|%[A-Za-z_][A-Za-z0-9_]*%\\(?:{_PATH_PART}\\)*(?:{_PATH_PART})?"
+    rf"|\\\\{_PATH_PART}(?:\\{_PATH_PART})+"
+    r")"
+)
+
+#: The bare name of something Windows will run, on its own or inside a path
+#: or a URL. No spaces, or `run the file evil.exe` is one name; no `.com`,
+#: or every domain is one; no source files, which are the stuff of every
+#: readme.
+EXECUTABLE_RE = re.compile(
+    r"(?<![\w\-.])([\w\-.]+\.(?:exe|dll|scr|sys|bat|cmd|ps1|vbs|vbe|jse|wsf|hta|msi|lnk|pif|cpl|jar))"
+    r"(?![\w\-])",
+    re.IGNORECASE,
+)
+
 _UPPER = "A-ZÀ-ÖØ-ÞĄĆĘŁŃÓŚŹŻ"
 _LOWER = "a-zß-öø-ÿąćęłńóśźż"
 
@@ -884,6 +907,16 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
         hive = match.group(1).lower()
         key = _HIVES.get(hive, hive) + match.group(2).rstrip(_TRAILING_PUNCT).casefold()
         yield "registry", match.group(0).rstrip(_TRAILING_PUNCT), key, None
+
+    for match in PATH_RE.finditer(text):
+        location = match.group(1).rstrip(_TRAILING_PUNCT)
+        # A bare drive or variable - `C:\`, `%TEMP%\` - is a place, not a file.
+        if location.rstrip("\\").count("\\") == 0:
+            continue
+        yield "path", location, location.casefold(), None
+
+    for match in EXECUTABLE_RE.finditer(text):
+        yield "executable", match.group(1), match.group(1).casefold(), None
 
     # The self-checking values. A wallet address is believed wherever it
     # stands; the tax numbers only beside their label, see the patterns.

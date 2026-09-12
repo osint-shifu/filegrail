@@ -221,6 +221,8 @@ The same identifier detection is applied to metadata and, with `--content`, docu
 | `ipv6` | addresses with all eight groups written out, or any form inside the brackets a URL puts round one | a compressed address standing bare, which is what a scope operator looks like in code |
 | `cve` | vulnerability ids, in either case | |
 | `registry` | Windows registry keys under any hive, long name or short, as one key | |
+| `path` | where a file sat on a Windows machine - a drive letter, an environment variable or a UNC share - as one value however it is cased | POSIX paths, which a slash makes of every URL and every fraction; a bare drive or variable |
+| `executable` | the bare name of a Windows executable, script, installer or shortcut, on its own or inside a path or a URL | names with spaces, source files, and anything ending in com, which every domain does |
 | `btc` | bitcoin addresses whose checksum holds, legacy and `bc1`, the latter lowercased | a mixed-case `bc1` spelling, which no wallet writes |
 | `iban` | account numbers whose country, length and mod-97 check agree, spaces dropped | |
 | `nip` `regon` | Polish tax and statistical numbers beside their label, or a NIP behind an EU `PL` prefix | the same digits standing bare, however the check digit comes out |

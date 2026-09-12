@@ -859,3 +859,41 @@ def test_the_text_report_shows_every_type_the_extractor_knows():
     text = render_text([record], Path("/case"), theme=PLAIN, identify=True)
 
     assert "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" in text
+
+
+# --- what an incident report is made of ------------------------------------------
+
+
+def test_a_windows_path_is_one_value_however_it_is_cased(tmp_path: Path):
+    record = _document(
+        tmp_path,
+        r"dropped to C:\Users\Public\update.exe then c:\users\public\UPDATE.EXE; "
+        r"config in %APPDATA%\Roaming\svc\run.bat; share \\FS01\tools\rat.dll; "
+        r"key HKLM\Software\x is not a path; /usr/bin/env neither",
+        source="document-metadata",
+    )
+
+    found = sorted(
+        (e.normalized, e.count) for e in extract([record], content=True) if e.type == "path"
+    )
+
+    assert found == [
+        (r"%appdata%\roaming\svc\run.bat", 1),
+        (r"\\fs01\tools\rat.dll", 1),
+        (r"c:\users\public\update.exe", 2),
+    ]
+
+
+def test_an_executable_name_is_found_bare_or_inside_a_path_and_a_source_file_is_not(tmp_path: Path):
+    record = _document(
+        tmp_path,
+        r"see evil.exe and C:\tmp\Evil.EXE and http://x.example/dl/evil.exe; "
+        r"edit main.py and readme.md",
+        source="document-metadata",
+    )
+
+    found = [
+        (e.normalized, e.count) for e in extract([record], content=True) if e.type == "executable"
+    ]
+
+    assert found == [("evil.exe", 3)]
