@@ -544,10 +544,13 @@ Reports may contain:
 
 - private URLs
 - credentials or tokens embedded in URLs/commands
-- file-system paths
-- email addresses
-- IP addresses
-- GPS coordinates
+- file-system paths, and the account names in them
+- email addresses, and the names of people and companies a file records
+- IP and hardware addresses
+- GPS coordinates and postal addresses
+- bank accounts, tax numbers and wallet addresses
+
+A credential found inside a document is reported as its kind and a fingerprint, never as the value.
 
 Redact sensitive values before sharing output:
 
