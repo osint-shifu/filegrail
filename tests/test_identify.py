@@ -931,3 +931,40 @@ def test_a_vin_is_taken_by_its_check_digit_or_beside_its_label(tmp_path: Path):
     found = sorted(e.normalized for e in extract([record], content=True) if e.type == "vin")
 
     assert found == ["1HGCM82633A004352", "WVWZZZ3CZWE000001"]
+
+
+# --- registries and networks ---------------------------------------------------------
+
+
+def test_a_company_registry_number_is_taken_beside_its_label(tmp_path: Path):
+    """None of these carries a checksum, so the label is the whole warrant. A
+    SEC filer number is one number however many zeros the filing pads it with."""
+    record = _document(
+        tmp_path,
+        "Company No. 09876543, Companies House SC123456, bare 12345678; "
+        "CIK 0000320193 and CIK: 320193; VAT: DE123456789, VAT ID GB123456789, VAT PL5260250274",
+        source="document-metadata",
+    )
+
+    found = extract([record], content=True)
+    by_type = {
+        kind: sorted((e.normalized, e.count) for e in found if e.type == kind)
+        for kind in ("crn", "cik", "vat", "nip")
+    }
+
+    assert by_type["crn"] == [("09876543", 1), ("SC123456", 1)]
+    assert by_type["cik"] == [("320193", 2)]
+    assert by_type["vat"] == [("DE123456789", 1), ("GB123456789", 1)]
+    assert by_type["nip"] == [("5260250274", 1)]
+
+
+def test_an_autonomous_system_number_is_taken_and_a_product_name_is_not(tmp_path: Path):
+    record = _document(
+        tmp_path,
+        "peers with AS15169 and ASN 3356, ASN: 174; runs on an AS400 to AS9100",
+        source="document-metadata",
+    )
+
+    found = sorted(e.normalized for e in extract([record], content=True) if e.type == "asn")
+
+    assert found == ["AS15169", "AS174", "AS3356"]

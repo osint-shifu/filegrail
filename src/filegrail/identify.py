@@ -424,6 +424,27 @@ ETH_RE = re.compile(r"(?<![A-Za-z0-9])(0x[0-9a-fA-F]{40})(?![A-Za-z0-9])")
 VIN_RE = re.compile(r"(?<![A-Z0-9])([A-HJ-NPR-Z0-9]{17})(?![A-Z0-9])")
 VIN_LABELLED_RE = re.compile(r"\bVIN\b[\s:.#-]*([A-HJ-NPR-Z0-9]{17})(?![A-Z0-9])")
 
+#: Company registry numbers carry no checksum, so the label is the whole
+#: warrant: a Companies House number, a SEC filer's CIK, an EU VAT id whose
+#: country is one. A Polish VAT id is a NIP and is taken as that.
+CRN_RE = re.compile(
+    r"\b(?:Company\s+(?:No\.?|Number|Reg(?:istration)?(?:\s+(?:No\.?|Number))?)"
+    r"|Companies\s+House(?:\s+(?:No\.?|Number))?|Registered\s+(?:No\.?|Number))"
+    r"[\s:.#-]*(\d{8}|[A-Za-z]{2}\d{6})(?!\w)",
+    re.IGNORECASE,
+)
+CIK_RE = re.compile(r"\bCIK\b[\s:.#-]*(\d{1,10})(?!\d)")
+VAT_RE = re.compile(
+    r"\bVAT(?:\s+(?:No\.?|Number|ID|Reg(?:istration)?(?:\s+(?:No\.?|Number))?))?\b"
+    r"[\s:.#-]*([A-Za-z]{2}[A-Za-z0-9]{8,12})(?!\w)",
+    re.IGNORECASE,
+)
+
+#: An autonomous system number, as `ASN 3356` or `AS3356`. The second
+#: spelling is also a product line and a quality standard, which are not.
+ASN_RE = re.compile(r"\bASN\s*[:#]?\s*(\d{1,6})(?!\d)|\bAS(\d{1,6})(?!\w)")
+_NOT_AN_ASN = frozenset({"400", "9100", "9110", "9120"})
+
 _UPPER = "A-ZÀ-ÖØ-ÞĄĆĘŁŃÓŚŹŻ"
 _LOWER = "a-zß-öø-ÿąćęłńóśźż"
 
@@ -1016,6 +1037,23 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
     for match in ABA_RE.finditer(text):
         if is_aba(match.group(1)):
             yield "aba", match.group(1), match.group(1), None
+
+    for match in CRN_RE.finditer(text):
+        yield "crn", match.group(1), match.group(1).upper(), None
+
+    for match in CIK_RE.finditer(text):
+        yield "cik", match.group(1), str(int(match.group(1))), None
+
+    for match in VAT_RE.finditer(text):
+        code = match.group(1).upper()
+        country = code[:2].lower()
+        if country != "pl" and country in known_tlds():
+            yield "vat", match.group(1), code, None
+
+    for match in ASN_RE.finditer(text):
+        number = next(group for group in match.groups() if group)
+        if number not in _NOT_AN_ASN:
+            yield "asn", match.group(0), f"AS{int(number)}", None
 
     for match in TRACKER_RE.finditer(text):
         tag = match.group(1)

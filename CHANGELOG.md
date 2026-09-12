@@ -20,6 +20,13 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   check digit holds, and beside a `VIN` label as written, because Europe
   never required the digit and a real European VIN fails it.
 
+- Registry numbers beside their label, none of which carries a checksum:
+  `crn` for a UK company registration number, `cik` for a SEC filer id, as
+  one number however many zeros a filing pads it with, and `vat` for an EU
+  VAT id whose country is one - a Polish one being a `nip` already. And
+  `asn` for autonomous system numbers, leaving out the product line and the
+  quality standards spelled the same way.
+
 ## 0.12.1 - 2026-09-12
 
 ### Fixed
