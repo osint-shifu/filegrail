@@ -485,3 +485,60 @@ def test_a_graph_file_gives_up_its_labels(tmp_path: Path):
     )
 
     assert "ann.shaw@acme-legal.example" in _text(path)
+
+
+# --- labels in attributes, and packages of maps and graphs -------------------
+
+
+def test_a_graph_label_in_an_attribute_is_read(tmp_path: Path):
+    """GEXF and FreeMind keep the text of a node in an attribute, where a
+    reader that only keeps addresses would never look."""
+    path = tmp_path / "network.gexf"
+    path.write_text(
+        '<gexf><graph><nodes><node id="0" label="ann.shaw@acme-legal.example"/></nodes>'
+        "</graph></gexf>",
+        encoding="utf-8",
+    )
+
+    assert "ann.shaw@acme-legal.example" in _text(path)
+
+
+def test_a_zipped_map_gives_up_its_positions(tmp_path: Path):
+    path = tmp_path / "places.kmz"
+    _zip(
+        path,
+        {
+            "doc.kml": "<kml><Placemark><Point><coordinates>21.0122,52.2297,0"
+            "</coordinates></Point></Placemark></kml>"
+        },
+    )
+
+    assert ("placemark 1", "geo:52.2297,21.0122") in [tuple(p) for p in read_passages(path) or []]
+
+
+def test_a_mind_map_gives_up_its_json_body(tmp_path: Path):
+    path = tmp_path / "case.xmind"
+    _zip(path, {"content.json": '[{"rootTopic":{"title":"ann.shaw@acme-legal.example"}}]'})
+
+    found = read_passages(path) or []
+
+    assert [p.place for p in found] == ["body"]
+    assert "ann.shaw@acme-legal.example" in found[0].text
+
+
+def test_a_maltego_graph_gives_up_its_entities(tmp_path: Path):
+    path = tmp_path / "case.mtgx"
+    _zip(
+        path,
+        {
+            "Graphs/Graph1.graphml": '<graphml><node id="n0"><data key="d0">'
+            '<mtg:MaltegoEntity type="maltego.EmailAddress"><mtg:Properties>'
+            '<mtg:Property name="email"><mtg:Value>ann.shaw@acme-legal.example</mtg:Value>'
+            "</mtg:Property></mtg:Properties></mtg:MaltegoEntity></data></node></graphml>"
+        },
+    )
+
+    found = read_passages(path) or []
+
+    assert [p.place for p in found] == ["graph 1"]
+    assert "ann.shaw@acme-legal.example" in found[0].text

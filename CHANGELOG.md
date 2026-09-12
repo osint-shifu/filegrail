@@ -27,6 +27,11 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   put the longitude first; the reader turns them around. `.graphml` and an
   Obsidian `.canvas` are read as the markup and JSON they are.
 
+- `--content` reads a Gephi `.gexf` and a FreeMind `.mm` for the text a node
+  keeps in an attribute, and three more packages: a `.kmz` for the map inside
+  it, an `.xmind` for its topics, and a Maltego `.mtgx` for every graph it
+  exports, entities and values included.
+
 ## 0.8.2 - 2026-09-06
 
 ### Changed

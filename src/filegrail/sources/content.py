@@ -113,10 +113,25 @@ GEOJSON_SUFFIXES = {".geojson"}
 POSITION_SUFFIXES = {".gpx", ".kml"}
 
 #: Markup, read for its text and its links rather than its tags.
-MARKUP_SUFFIXES = {".html", ".htm", ".xhtml", ".xml", ".graphml"} | SVG_SUFFIXES | POSITION_SUFFIXES
+MARKUP_SUFFIXES = (
+    {".html", ".htm", ".xhtml", ".xml", ".graphml", ".gexf", ".mm"}
+    | SVG_SUFFIXES
+    | POSITION_SUFFIXES
+)
+
+#: Attributes that carry the text of a node, by the format that keeps it there.
+#: A Gephi graph and a FreeMind map both write what a node says as an attribute
+#: rather than as text, where a reader that keeps only addresses never looks.
+#: Per suffix rather than global: `value` is every form field in HTML.
+_LABEL_ATTRIBUTES: dict[str, frozenset[str]] = {
+    ".gexf": frozenset({"label"}),
+    ".mm": frozenset({"text"}),
+}
 
 #: Packages whose body lives in a named member beside the properties.
-PACKAGE_SUFFIXES = OOXML_SUFFIXES | ODF_SUFFIXES | EPUB_SUFFIXES
+#: A zipped map, a mind map and a Maltego export are packages too: a `.kml`,
+#: a JSON or XML body, and one GraphML per graph, each beside its metadata.
+PACKAGE_SUFFIXES = OOXML_SUFFIXES | ODF_SUFFIXES | EPUB_SUFFIXES | {".kmz", ".xmind", ".mtgx"}
 
 SUFFIXES = PLAIN_SUFFIXES | MARKUP_SUFFIXES | PACKAGE_SUFFIXES | MAIL_SUFFIXES | OUTLOOK_SUFFIXES
 
@@ -142,6 +157,12 @@ _PARTS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"^xl/worksheets/sheet(\d+)\.xml$"), "sheet {}"),
     (re.compile(r"^content\.xml$"), "body"),
     (re.compile(r"^styles\.xml$"), "headers and footers"),
+    # A KMZ is one map at the root; an XMind file keeps its topics in a JSON
+    # body, or an XML one in older versions, which the ODF row above already
+    # names; a Maltego export is one GraphML per graph, numbered by the file.
+    (re.compile(r"^[^/]+\.kml$", re.IGNORECASE), "map"),
+    (re.compile(r"^content\.json$"), "body"),
+    (re.compile(r"^Graphs/Graph(\d+)\.graphml$"), "graph {}"),
     # An EPUB is a book of chapters, each its own document, and the file name
     # is what the book itself calls them.
     (re.compile(r"^(?:.*/)?([^/]+\.x?html?)$", re.IGNORECASE), "{}"),
@@ -192,7 +213,7 @@ def read_passages(path: Path) -> list[Passage] | None:
                 found += _features(text)
         elif suffix in MARKUP_SUFFIXES:
             markup = _decode(_head(path))
-            found = _read(markup)
+            found = _read(markup, _LABEL_ATTRIBUTES.get(suffix, frozenset()))
             if suffix in POSITION_SUFFIXES:
                 found += _positions(markup)
         elif suffix in PACKAGE_SUFFIXES:
@@ -276,10 +297,11 @@ class _Text(HTMLParser):
     cost more than it is worth.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, labels: frozenset[str] = frozenset()) -> None:
         super().__init__(convert_charrefs=True)
         self.found: list[Passage] = []
         self._silent = 0
+        self._labels = labels
 
     def _keep(self, text: str) -> None:
         # `getpos` is the line of the markup being handled, which is the line
@@ -290,7 +312,7 @@ class _Text(HTMLParser):
         if tag in _SILENT:
             self._silent += 1
         for name, value in attrs:
-            if value and name.lower() in _LINK_ATTRIBUTES:
+            if value and (name.lower() in _LINK_ATTRIBUTES or name.lower() in self._labels):
                 self._keep(value)
 
     handle_startendtag = handle_starttag
@@ -304,8 +326,8 @@ class _Text(HTMLParser):
             self._keep(data)
 
 
-def _read(markup: str) -> list[Passage]:
-    parser = _Text()
+def _read(markup: str, labels: frozenset[str] = frozenset()) -> list[Passage]:
+    parser = _Text(labels)
     parser.feed(markup)
     parser.close()
     return parser.found
@@ -509,7 +531,18 @@ def _package(path: Path) -> list[Passage]:
             payload = read_part(archive, name)
             if payload is None:
                 continue
-            found.append(Passage(place, _stripped(_decode(payload))))
+            text = _decode(payload)
+            lowered = name.lower()
+            if lowered.endswith(".kml"):
+                # The map's names and links under the member's name, and its
+                # positions under their own - a placemark is where a value
+                # was, not the file it sat in.
+                found.append(Passage(place, _stripped(text)))
+                found += _positions(text)
+            elif lowered.endswith(".json"):
+                found.append(Passage(place, text))
+            else:
+                found.append(Passage(place, _stripped(text)))
     return found
 
 
