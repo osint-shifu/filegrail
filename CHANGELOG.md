@@ -17,6 +17,15 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   social security number is the key to somebody's identity and is reported
   the way a credential is, as a fingerprint and never as the number.
 
+- A `tracker` identifier type for analytics, tag-manager, advertising and
+  affiliate ids - the same one on two sites is one owner. Those with a
+  prefix of their own (UA-, G-, GTM-, AW-, DC-, pub-, pk_live_) are taken
+  wherever they stand; a bare number only beside the service that issued it
+  (Facebook Pixel, Yandex Metrica, Amazon Associates, Hotjar, Clarity). The
+  snippets live in `<script>`, which the content reader leaves out; the ids
+  survive in the loader and tracking-pixel URLs a page carries, which it
+  keeps.
+
 ## 0.10.0 - 2026-09-12
 
 ### Added

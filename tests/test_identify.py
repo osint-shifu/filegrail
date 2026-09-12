@@ -734,3 +734,47 @@ def test_a_routing_number_needs_its_label_and_its_checksum(tmp_path: Path):
     found = [(e.normalized, e.count) for e in extract([record], content=True) if e.type == "aba"]
 
     assert found == [("021000021", 1)]
+
+
+# --- trackers -----------------------------------------------------------------
+#
+# An analytics or advertising id is an account, and the same one on two sites
+# is one owner. The ones with a prefix are taken wherever they stand; a bare
+# number is taken only beside the service that issued it.
+
+
+def test_a_tracker_id_is_read_by_its_prefix_and_one_publisher_is_one_value(tmp_path: Path):
+    record = _document(
+        tmp_path,
+        "UA-12345-1 GTM-ABC123 G-1A2B3C4D G-SHOCK ca-pub-1234567890123456 pub-1234567890123456",
+        source="document-metadata",
+    )
+
+    found = sorted(
+        (e.normalized, e.count) for e in extract([record], content=True) if e.type == "tracker"
+    )
+
+    assert found == [
+        ("G-1A2B3C4D", 1),
+        ("GTM-ABC123", 1),
+        ("UA-12345-1", 1),
+        ("pub-1234567890123456", 2),
+    ]
+
+
+def test_a_numeric_tracker_id_needs_its_service_beside_it(tmp_path: Path):
+    """The snippets live in `<script>`, which the reader leaves out; the ids
+    survive in the `src` of the noscript image and the loader, which it keeps."""
+    record = _document(
+        tmp_path,
+        "<p>order 123456789012345</p>"
+        '<img src="https://www.facebook.com/tr?id=123456789012345&ev=PageView">'
+        '<img src="https://mc.yandex.ru/watch/12345678">'
+        '<a href="https://www.amazon.com/dp/B0X/?tag=mysite-20">buy</a>',
+        name="page.html",
+        source="document-metadata",
+    )
+
+    found = sorted(e.normalized for e in extract([record], content=True) if e.type == "tracker")
+
+    assert found == ["amazon:mysite-20", "facebook:123456789012345", "yandex:12345678"]

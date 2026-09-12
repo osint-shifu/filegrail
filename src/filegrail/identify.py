@@ -313,6 +313,44 @@ _EIN_PREFIXES = frozenset(
               *range(71, 78), *range(80, 89), *range(90, 96), 98, 99)
 )  # fmt: skip
 
+#: Analytics, tag-manager, advertising and payment ids with a prefix of their
+#: own, taken wherever they stand: an account is an account, and the same
+#: one on two sites is one owner. `ca-pub-` and `pub-` name the same AdSense
+#: publisher and fold into one. A Stripe publishable key is an account, not
+#: a secret - the secret one starts `sk_` and is a `secret`.
+TRACKER_RE = re.compile(
+    r"(?<![\w\-])("
+    r"UA-\d{4,10}-\d{1,4}"
+    r"|GTM-[A-Z0-9]{5,8}"
+    r"|AW-\d{9,11}"
+    r"|DC-\d{6,10}"
+    r"|(?:ca-)?pub-\d{16}"
+    r"|pk_live_[A-Za-z0-9]{20,}"
+    r")(?![\w\-])"
+)
+
+#: A GA4 measurement id, which has to carry a digit: `G-SHOCK` does not.
+GA4_RE = re.compile(r"(?<![\w\-])(G-(?=[A-Z0-9]*\d)[A-Z0-9]{8,12})(?![\w\-])")
+
+#: Ids that are a bare number and are believed only beside the service that
+#: issued them - in the loader or tracking-pixel URL a page carries, which
+#: the content reader keeps even though it leaves `<script>` out, or in the
+#: call itself where a text file quotes one. Two groups where a service has
+#: two spellings; whichever matched is the id.
+ANCHORED_TRACKERS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "facebook",
+        re.compile(
+            r"facebook\.com/tr/?\?(?:[^\s\"'&]*&)?id=(\d{15,16})(?!\d)"
+            r"|fbq\(\s*['\"]init['\"]\s*,\s*['\"](\d{15,16})['\"]"
+        ),
+    ),
+    ("yandex", re.compile(r"mc\.yandex\.ru/watch/(\d{6,9})(?!\d)|\bym\(\s*(\d{6,9})\s*,")),
+    ("amazon", re.compile(r"[?&]tag=([a-z0-9][a-z0-9\-]{1,30}-2[01])(?![\w\-])", re.IGNORECASE)),
+    ("hotjar", re.compile(r"\bhjid\s*[:=]\s*['\"]?(\d{5,8})(?!\d)")),
+    ("clarity", re.compile(r"clarity\.ms/tag/([a-z0-9]{8,12})(?![\w\-])")),
+)
+
 _UPPER = "A-ZÀ-ÖØ-ÞĄĆĘŁŃÓŚŹŻ"
 _LOWER = "a-zß-öø-ÿąćęłńóśźż"
 
@@ -833,6 +871,20 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
     for match in ABA_RE.finditer(text):
         if is_aba(match.group(1)):
             yield "aba", match.group(1), match.group(1), None
+
+    for match in TRACKER_RE.finditer(text):
+        tag = match.group(1)
+        lowered = tag.lower()
+        folded = lowered.removeprefix("ca-") if lowered.startswith(("ca-pub-", "pub-")) else tag
+        yield "tracker", tag, folded, None
+
+    for match in GA4_RE.finditer(text):
+        yield "tracker", match.group(1), match.group(1), None
+
+    for service, pattern in ANCHORED_TRACKERS:
+        for match in pattern.finditer(text):
+            tag = next(group for group in match.groups() if group)
+            yield "tracker", f"{service}:{tag}", f"{service}:{tag.lower()}", None
 
     # Domains harvested from URLs and emails are certain. Bare tokens have to
     # clear the TLD list and not look like a file name.

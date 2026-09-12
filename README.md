@@ -233,6 +233,7 @@ The same identifier detection is applied to metadata and, with `--content`, docu
 | `ssn` | US social security numbers beside their label, of a shape the administration issues, reported as a fingerprint and never as the number | the same digits standing bare, and the areas never issued - 000, 666, 900 and up |
 | `ein` | US employer identification numbers beside their label, with a prefix the IRS assigns | the same digits standing bare |
 | `aba` | US bank routing numbers beside their label, whose checksum and prefix hold | the same digits standing bare, which pass the checksum one time in ten |
+| `tracker` | analytics, tag-manager, advertising and affiliate ids - by their prefix where they have one (UA-, G-, GTM-, AW-, DC-, pub-, pk_live_), and beside the service that issued them otherwise (Facebook Pixel, Yandex Metrica, Amazon Associates, Hotjar, Clarity), including in the loader and pixel URLs a page carries | a number with no prefix and no service beside it |
 
 Every value keeps its file, source and exact field or document location.
 
