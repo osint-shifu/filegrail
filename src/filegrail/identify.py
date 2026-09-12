@@ -272,6 +272,30 @@ _SHARED_HOMES = frozenset(
     {"public", "default", "default user", "all users", "shared", "administrator"}
 )
 
+_UPPER = "A-ZÀ-ÖØ-ÞĄĆĘŁŃÓŚŹŻ"
+_LOWER = "a-zß-öø-ÿąćęłńóśźż"
+
+#: The one way a name is read out of prose: when the text itself labels it.
+#: A legal form says a company, an honorific says a person, a town after a
+#: postcode says an address. Recall is low by design. A capitalised pair of
+#: words on its own is a name, a town and a sign-off in equal measure, and
+#: is never believed.
+_LEGAL_FORM = (
+    r"Sp\. z o\.o\.|Sp\. j\.|Sp\. k\.|S\.K\.A\.|S\.A\.|SA|GmbH & Co\. KG|GmbH|AG"
+    r"|Ltd\.?|Limited|Inc\.?|Incorporated|L\.L\.C\.|LLC|LLP|PLC|Corp\.?|Corporation"
+    r"|Co\., Ltd\.?|& Co\.|B\.V\.|N\.V\.|S\.r\.l\.|S\.p\.A\.|S\.à r\.l\.|SARL|SAS"
+    r"|Pty\.? Ltd\.?|Oyj|Oy|ApS|A/S|s\.r\.o\.|a\.s\.|d\.o\.o\.|OÜ|SIA|UAB|Kft\.|Zrt\."
+)
+ORG_RE = re.compile(rf"((?:\b[{_UPPER}][\w&'’.\-]*\s+){{1,5}}(?:{_LEGAL_FORM}))(?![\w.])")
+HONORIFIC_RE = re.compile(
+    rf"\b(?:Pan|Pani|Mr|Mrs|Ms|Mx|Dr|Prof|Mgr|Herr|Frau|Sir|Dame)\.?\s+"
+    rf"([{_UPPER}][{_LOWER}{_UPPER}'\-]+(?:\s+[{_UPPER}][{_LOWER}'\-]+){{1,2}})(?![\w'])"
+)
+POSTCODE_RE = re.compile(
+    rf"\b(\d{{2}}-\d{{3}})\s+([{_UPPER}][{_LOWER}]+(?:[\s\-][{_UPPER}][{_LOWER}]+)*)\b"
+    r"|\b([A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})\b"
+)
+
 _DEC = r"[-+]?\d{1,3}(?:\.\d+)?"
 
 #: Ordered, and the order is the precision ranking: an earlier pattern claims
@@ -736,6 +760,17 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
 
     for _ in PRIVATE_KEY_RE.finditer(text):
         yield "secret", PRIVATE_KEY, PRIVATE_KEY, None
+
+    for match in ORG_RE.finditer(text):
+        organisation = match.group(1).strip()
+        yield "org", organisation, _plain(organisation).rstrip("."), None
+
+    for match in HONORIFIC_RE.finditer(text):
+        yield "person", match.group(1), _plain(match.group(1)), None
+
+    for match in POSTCODE_RE.finditer(text):
+        place = f"{match.group(1)} {match.group(2)}" if match.group(1) else match.group(3)
+        yield "postcode", place, _plain(place), None
 
     # Domains harvested from URLs and emails are certain. Bare tokens have to
     # clear the TLD list and not look like a file name.

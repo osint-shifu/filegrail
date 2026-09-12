@@ -33,6 +33,13 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   recorded location. One spelling of a name is one entry; two spellings stay
   two, because deciding they are one would be guessing.
 
+- The one way a name is read out of a document's text: when the text itself
+  labels it. A name ending in a legal form - Sp. z o.o., GmbH, Ltd, Inc, LLC -
+  is an `org`; a name after an honorific - Pan, Pani, Mr, Mrs, Dr, Prof - is a
+  `person`; a Polish postcode with its town, or a UK postcode by its shape, is
+  a `postcode`. Recall is low by design, and a capitalised pair of words on
+  its own is still never believed.
+
 ## 0.9.0 - 2026-09-12
 
 ### Added

@@ -226,9 +226,10 @@ The same identifier detection is applied to metadata and, with `--content`, docu
 | `sid` | Windows account and group SIDs, `S-1-5-21-…` with a relative id | the short well-known SIDs such as `S-1-5-18` |
 | `bic` | bank identifier codes beside a `BIC` or `SWIFT` label, 8 or 11 characters, whose country is a real one | the same code standing bare |
 | `secret` | API keys and tokens with a vendor prefix, JWTs and private key blocks, reported as the kind and a fingerprint and never as the value | credentials `--redact` finds only by the name beside them |
-| `person` | the names in fields that say who made a file - an author line, a by-line, an artist tag, the display name on a mail header | any name in the text of a document, and the placeholders an application writes, such as `Microsoft Office User` |
-| `org` | the company or credit a file records about itself | the `Source` field, an agency in one format and a scanner in another |
+| `person` | the names in fields that say who made a file - an author line, a by-line, an artist tag, the display name on a mail header - and, in text, a name only after an honorific such as Pan, Pani, Mr, Mrs, Dr or Prof | any other name in the text of a document, and the placeholders an application writes, such as `Microsoft Office User` |
+| `org` | the company or credit a file records about itself, and, in text, a name that ends in a legal form such as Sp. z o.o., GmbH, Ltd, Inc or LLC | the `Source` field, an agency in one format and a scanner in another |
 | `handle` | accounts a file points at: the user in a profile URL on a known platform, and the login in a user directory on the machine that made it | a platform's own pages, and the directories every machine has |
+| `postcode` | a Polish postcode with the town after it, and a UK postcode by its shape | a postcode standing bare, which is a range or a part number as often as a place, and US ZIP codes, which are five digits like everything else |
 
 Every value keeps its file, source and exact field or document location.
 

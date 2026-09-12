@@ -637,3 +637,45 @@ def test_a_company_and_the_accounts_a_file_points_at_are_read():
     assert ("handle", "github:jkowalski") in found
     assert ("handle", "home:jkowalski") in found
     assert not [h for kind, h in found if kind == "handle" and h.startswith("x:")]
+
+
+# --- names that carry their own label ------------------------------------------
+#
+# The one way a name is read out of prose: when the text itself labels it. A
+# legal suffix says a company, an honorific says a person, a postcode with the
+# town after it says an address. Recall is low by design; a capitalised pair
+# of words on its own is still never believed.
+
+
+def test_a_company_is_read_by_its_legal_suffix(tmp_path: Path):
+    record = _document(
+        tmp_path,
+        "we paid Acme Systems Ltd. and Zakłady Nowak Sp. z o.o. last year",
+        source="document-metadata",
+    )
+
+    found = sorted(e.normalized for e in extract([record], content=True) if e.type == "org")
+
+    assert found == ["acme systems ltd", "zakłady nowak sp. z o.o"]
+
+
+def test_a_person_is_read_after_an_honorific_and_not_without(tmp_path: Path):
+    record = _document(
+        tmp_path, "met Pani Anna Nowak and Ann Shaw at Mr J. Smith's", source="document-metadata"
+    )
+
+    found = sorted(e.normalized for e in extract([record], content=True) if e.type == "person")
+
+    assert found == ["anna nowak"]
+
+
+def test_a_postcode_is_read_with_the_town_it_belongs_to(tmp_path: Path):
+    record = _document(
+        tmp_path,
+        "ul. Prosta 1, 00-950 Warszawa and 12-345 in stock, or SW1A 1AA London",
+        source="document-metadata",
+    )
+
+    found = sorted(e.normalized for e in extract([record], content=True) if e.type == "postcode")
+
+    assert found == ["00-950 warszawa", "sw1a 1aa"]
