@@ -897,3 +897,37 @@ def test_an_executable_name_is_found_bare_or_inside_a_path_and_a_source_file_is_
     ]
 
     assert found == [("evil.exe", 3)]
+
+
+# --- ethereum and vehicles ----------------------------------------------------------
+
+
+def test_an_ethereum_address_is_taken_by_its_checksum_or_written_lowercase(tmp_path: Path):
+    """Mixed case carries a checksum and has to pass it; all-lowercase carries
+    none and is taken by its shape. A transaction hash is longer and is not."""
+    record = _document(
+        tmp_path,
+        "pay 0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed "
+        "or 0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed; "
+        "not 0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAeD; tx 0x" + "ab" * 32,
+        source="document-metadata",
+    )
+
+    found = [(e.normalized, e.count) for e in extract([record], content=True) if e.type == "eth"]
+
+    assert found == [("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed", 2)]
+
+
+def test_a_vin_is_taken_by_its_check_digit_or_beside_its_label(tmp_path: Path):
+    """North America requires the check digit and Europe does not: a bare VIN
+    has to pass it, a labelled one need not."""
+    record = _document(
+        tmp_path,
+        "car 1HGCM82633A004352, not 1HGCM82633A004353, not WVWZZZ3CZWE000001 bare, "
+        "VIN: WVWZZZ3CZWE000001 labelled",
+        source="document-metadata",
+    )
+
+    found = sorted(e.normalized for e in extract([record], content=True) if e.type == "vin")
+
+    assert found == ["1HGCM82633A004352", "WVWZZZ3CZWE000001"]

@@ -102,3 +102,16 @@ def test_a_regon_with_a_wrong_check_digit():
 
 def test_a_regon_of_the_wrong_length_is_nothing():
     assert not is_regon("1234567")
+
+
+# --- ethereum -----------------------------------------------------------------
+
+
+def test_keccak_matches_the_published_digest_and_eip55_reads_it():
+    from filegrail.checksums import is_eth, keccak256
+
+    assert (
+        keccak256(b"").hex() == "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+    )
+    assert is_eth("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed")
+    assert not is_eth("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAeD")

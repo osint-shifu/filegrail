@@ -224,6 +224,8 @@ The same identifier detection is applied to metadata and, with `--content`, docu
 | `path` | where a file sat on a Windows machine - a drive letter, an environment variable or a UNC share - as one value however it is cased | POSIX paths, which a slash makes of every URL and every fraction; a bare drive or variable |
 | `executable` | the bare name of a Windows executable, script, installer or shortcut, on its own or inside a path or a URL | names with spaces, source files, and anything ending in com, which every domain does |
 | `btc` | bitcoin addresses whose checksum holds, legacy and `bc1`, the latter lowercased | a mixed-case `bc1` spelling, which no wallet writes |
+| `eth` | ethereum addresses, mixed-case ones by their EIP-55 checksum and one-case ones by their shape, lowercased | a transaction hash, which is longer |
+| `vin` | vehicle identification numbers, bare when the North American check digit holds and beside a `VIN` label regardless, since Europe never required the digit | any other seventeen characters |
 | `iban` | account numbers whose country, length and mod-97 check agree, spaces dropped | |
 | `nip` `regon` | Polish tax and statistical numbers beside their label, or a NIP behind an EU `PL` prefix | the same digits standing bare, however the check digit comes out |
 | `onion` | Tor v3 addresses whose checksum holds, lowercased | |

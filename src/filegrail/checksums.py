@@ -186,3 +186,116 @@ def is_aba(digits: str) -> bool:
         return False
     weights = (3, 7, 1, 3, 7, 1, 3, 7, 1)
     return sum(int(d) * w for d, w in zip(digits, weights, strict=True)) % 10 == 0
+
+
+# --- ethereum -------------------------------------------------------------------
+#
+# EIP-55 spells an address in the case its own Keccak-256 digest dictates, so
+# the case is a checksum. `hashlib` has SHA-3, which is Keccak with a different
+# padding byte and a different answer; the sponge itself is forty lines.
+
+_KECCAK_ROUNDS = (
+    0x0000000000000001, 0x0000000000008082, 0x800000000000808A, 0x8000000080008000,
+    0x000000000000808B, 0x0000000080000001, 0x8000000080008081, 0x8000000000008009,
+    0x000000000000008A, 0x0000000000000088, 0x0000000080008009, 0x000000008000000A,
+    0x000000008000808B, 0x800000000000008B, 0x8000000000008089, 0x8000000000008003,
+    0x8000000000008002, 0x8000000000000080, 0x000000000000800A, 0x800000008000000A,
+    0x8000000080008081, 0x8000000000008080, 0x0000000080000001, 0x8000000080008008,
+)  # fmt: skip
+_KECCAK_ROTATIONS = (
+    (0, 36, 3, 41, 18),
+    (1, 44, 10, 45, 2),
+    (62, 6, 43, 15, 61),
+    (28, 55, 25, 21, 56),
+    (27, 20, 39, 8, 14),
+)
+_LANE = (1 << 64) - 1
+
+
+def _rotate(lane: int, by: int) -> int:
+    return ((lane << by) | (lane >> (64 - by))) & _LANE if by else lane
+
+
+def _keccak_f(state: list[list[int]]) -> list[list[int]]:
+    for constant in _KECCAK_ROUNDS:
+        parity = [
+            state[x][0] ^ state[x][1] ^ state[x][2] ^ state[x][3] ^ state[x][4] for x in range(5)
+        ]
+        theta = [parity[(x - 1) % 5] ^ _rotate(parity[(x + 1) % 5], 1) for x in range(5)]
+        state = [[state[x][y] ^ theta[x] for y in range(5)] for x in range(5)]
+        moved = [[0] * 5 for _ in range(5)]
+        for x in range(5):
+            for y in range(5):
+                moved[y][(2 * x + 3 * y) % 5] = _rotate(state[x][y], _KECCAK_ROTATIONS[x][y])
+        state = [
+            [moved[x][y] ^ ((~moved[(x + 1) % 5][y]) & moved[(x + 2) % 5][y]) for y in range(5)]
+            for x in range(5)
+        ]
+        state[0][0] ^= constant
+    return state
+
+
+def keccak256(data: bytes) -> bytes:
+    """Keccak-256 as Ethereum uses it: the original padding, not SHA-3's."""
+    rate = 136
+    padded = bytearray(data) + b"\x01"
+    padded += b"\x00" * (-len(padded) % rate)
+    padded[-1] |= 0x80
+    state = [[0] * 5 for _ in range(5)]
+    for offset in range(0, len(padded), rate):
+        block = padded[offset : offset + rate]
+        for i in range(rate // 8):
+            state[i % 5][i // 5] ^= int.from_bytes(block[8 * i : 8 * i + 8], "little")
+        state = _keccak_f(state)
+    return b"".join(state[i % 5][i // 5].to_bytes(8, "little") for i in range(4))
+
+
+def is_eth(text: str) -> bool:
+    """Whether `0x` and forty hex digits are an Ethereum address.
+
+    Written all in one case the address carries no checksum and is taken by
+    its shape; written in mixed case it has to be the case EIP-55 dictates.
+    """
+    body = text[2:]
+    if not text.startswith("0x") or len(body) != 40:
+        return False
+    if any(char not in "0123456789abcdefABCDEF" for char in body):
+        return False
+    if body == body.lower() or body == body.upper():
+        return True
+    digest = keccak256(body.lower().encode("ascii")).hex()
+    return all(
+        (char.upper() if int(nibble, 16) >= 8 else char.lower()) == char
+        for char, nibble in zip(body, digest[:40], strict=True)
+    )
+
+
+# --- vehicles -------------------------------------------------------------------
+
+_VIN_VALUES = dict(
+    zip(
+        "ABCDEFGHJKLMNPRSTUVWXYZ",
+        (1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 7, 9, 2, 3, 4, 5, 6, 7, 8, 9),
+        strict=True,
+    )
+)
+_VIN_WEIGHTS = (8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2)
+
+
+def is_vin(text: str) -> bool:
+    """Whether seventeen characters carry a North American VIN check digit.
+
+    Europe does not require the digit, so a European VIN fails here however
+    real it is; the caller takes those beside a label instead.
+    """
+    if len(text) != 17:
+        return False
+    try:
+        total = sum(
+            (int(char) if char.isdigit() else _VIN_VALUES[char]) * weight
+            for char, weight in zip(text, _VIN_WEIGHTS, strict=True)
+        )
+    except KeyError:
+        return False
+    remainder = total % 11
+    return ("X" if remainder == 10 else str(remainder)) == text[8]

@@ -980,6 +980,8 @@ _TYPE_SECTIONS = {
     "sha1": "sha1",
     "sha256": "sha256",
     "btc": "bitcoin addresses",
+    "eth": "ethereum addresses",
+    "vin": "vehicle ids",
     "iban": "bank accounts",
     "bic": "bank codes",
     "nip": "nip",

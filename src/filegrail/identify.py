@@ -48,10 +48,12 @@ from .checksums import (
     bech32_version,
     is_aba,
     is_base58check,
+    is_eth,
     is_iban,
     is_nip,
     is_onion,
     is_regon,
+    is_vin,
 )
 from .models import ORIGIN, FileRecord, category
 from .models import label as source_label
@@ -410,6 +412,17 @@ EXECUTABLE_RE = re.compile(
     r"(?![\w\-])",
     re.IGNORECASE,
 )
+
+#: An Ethereum address: `0x` and exactly forty hex digits. The checksum is
+#: the case, and `is_eth` reads it; a transaction hash is sixty-four and is
+#: not one.
+ETH_RE = re.compile(r"(?<![A-Za-z0-9])(0x[0-9a-fA-F]{40})(?![A-Za-z0-9])")
+
+#: Seventeen characters from the alphabet a VIN allows - no I, O or Q. Bare,
+#: it has to carry the North American check digit; beside its label it is
+#: taken as written, because Europe never required the digit.
+VIN_RE = re.compile(r"(?<![A-Z0-9])([A-HJ-NPR-Z0-9]{17})(?![A-Z0-9])")
+VIN_LABELLED_RE = re.compile(r"\bVIN\b[\s:.#-]*([A-HJ-NPR-Z0-9]{17})(?![A-Z0-9])")
 
 _UPPER = "A-ZÀ-ÖØ-ÞĄĆĘŁŃÓŚŹŻ"
 _LOWER = "a-zß-öø-ÿąćęłńóśźż"
@@ -931,6 +944,17 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
     for match in IBAN_RE.finditer(text):
         if is_iban(match.group(1)):
             yield "iban", match.group(1), "".join(match.group(1).split()), None
+
+    for match in ETH_RE.finditer(text):
+        if is_eth(match.group(1)):
+            yield "eth", match.group(1), match.group(1).lower(), None
+
+    for match in VIN_LABELLED_RE.finditer(text):
+        yield "vin", match.group(1), match.group(1), None
+
+    for match in VIN_RE.finditer(text):
+        if is_vin(match.group(1)):
+            yield "vin", match.group(1), match.group(1), None
 
     for pattern in (NIP_LABELLED_RE, NIP_PREFIXED_RE):
         for match in pattern.finditer(text):

@@ -5,6 +5,21 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `eth` for Ethereum addresses. A mixed-case address carries its checksum
+  in the case - EIP-55 - and has to pass it; that takes a Keccak-256, which
+  `hashlib` does not have (its SHA-3 pads differently and answers
+  differently), so the sponge is forty lines of standard library. An
+  address written all in one case carries no checksum and is taken by its
+  shape.
+
+- `vin` for vehicle identification numbers: bare when the North American
+  check digit holds, and beside a `VIN` label as written, because Europe
+  never required the digit and a real European VIN fails it.
+
 ## 0.12.1 - 2026-09-12
 
 ### Fixed
