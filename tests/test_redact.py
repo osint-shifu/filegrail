@@ -54,8 +54,18 @@ def test_redacts_vendor_tokens_and_keys():
         "AKIAIOSFODNN7EXAMPLE",
         "ghp_abcdefghijklmnopqrstuvwxyz0123",
         "sk-abcdefghijklmnopqrstuvwx",
+        # Built at run time: written out, these are the shapes the forge's
+        # push protection takes for the real thing, and it declines the push.
+        "sk_live_" + "a" * 26,
+        "rk_test_" + "b" * 26,
+        "npm_" + "c" * 36,
+        "hf_" + "d" * 32,
+        "shpat_" + "0123456789abcdef" * 2,
+        "SG." + "e" * 22 + "." + "f" * 43,
+        "123456789:" + "AAF" + "g" * 32,
+        "SK" + "0123456789abcdef" * 2,
     ):
-        assert secret not in redact_text(f"tool {secret}")
+        assert secret not in redact_text(f"tool {secret}"), secret
 
 
 def test_leaves_ordinary_commands_alone():
@@ -204,3 +214,23 @@ def test_a_command_that_prints_a_credentialed_url_can_redact_it(
     assert SECRET not in printed
     assert "REDACTED" in printed
     assert "media.example.org" in printed  # the address itself is evidence and stays
+
+
+def test_redacts_a_private_key_block_and_keeps_its_armour():
+    """The armour says what was there; the body is the secret. A key pasted
+    into a note arrives as one multi-line value, and a key on one line
+    arrives without its footer - both lose the body and nothing else. The
+    fixtures are assembled at run time: written out, the forge's push
+    protection takes them for the real thing and declines the push."""
+    armour = "-----"
+    head = f"{armour}BEGIN RSA PRIVATE KEY{armour}"
+    foot = f"{armour}END RSA PRIVATE KEY{armour}"
+    body = "MIIEow" + "A" * 40 + "\n" + "zr8Qb" + "B" * 30 + "\n"
+
+    redacted = redact_text(f"found in note: {head}\n{body}{foot}")
+    one_line = redact_text(f"key {armour}BEGIN PRIVATE KEY{armour} MIIEvQ{'C' * 30} then more")
+
+    assert "MIIEow" not in redacted and "zr8Qb" not in redacted
+    assert redacted.count("[REDACTED:private_key:") == 1
+    assert head in redacted and foot in redacted
+    assert "MIIEvQ" not in one_line and "then more" in one_line

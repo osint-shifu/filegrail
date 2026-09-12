@@ -50,6 +50,18 @@ SENSITIVE_QUERY_KEYS = frozenset(
 #: Ordered: earlier patterns win, so a token inside an Authorization header is
 #: redacted once, by the header rule, rather than twice.
 PATTERNS: tuple[tuple[str, re.Pattern[str], int], ...] = (
+    # The armour says what was there and stays; the body is the secret. A key
+    # pasted into a note arrives as one multi-line value, and a key on one
+    # line arrives without its footer, so the body is whatever base64 - or
+    # `Proc-Type:` header lines - follows the opening line, and nothing more.
+    (
+        "private_key",
+        re.compile(
+            r"(-----BEGIN (?:[A-Z]+ )*PRIVATE KEY-----)"
+            r"((?:\s*(?:[A-Za-z0-9+/=]{8,}|[A-Za-z-]+: [^\n]+))+)"
+        ),
+        2,
+    ),
     (
         "auth_header",
         re.compile(
@@ -68,12 +80,19 @@ PATTERNS: tuple[tuple[str, re.Pattern[str], int], ...] = (
         "vendor_token",
         re.compile(
             r"\b(sk-[A-Za-z0-9_\-]{16,}"
+            r"|[sr]k_(?:live|test)_[A-Za-z0-9]{16,}"
             r"|ghp_[A-Za-z0-9]{20,}"
             r"|gho_[A-Za-z0-9]{20,}"
             r"|github_pat_[A-Za-z0-9_]{20,}"
             r"|xox[baprs]-[A-Za-z0-9\-]{10,}"
             r"|AIza[0-9A-Za-z_\-]{30,}"
-            r"|glpat-[A-Za-z0-9_\-]{15,})"
+            r"|glpat-[A-Za-z0-9_\-]{15,}"
+            r"|npm_[A-Za-z0-9]{36}"
+            r"|hf_[A-Za-z0-9]{30,}"
+            r"|shp(?:at|ss|ca|pa)_[0-9a-f]{32}"
+            r"|SG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}"
+            r"|\d{8,10}:[A-Za-z0-9_\-]{35}"
+            r"|SK[0-9a-f]{32})"
         ),
         1,
     ),

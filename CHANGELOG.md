@@ -5,6 +5,20 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- `--redact` left a private key block in the output - the one credential
+  that is nothing but its body. The body is now replaced by its
+  fingerprint and the armour lines stay, so a reader still sees that a key
+  was there. The same rule serves the `secret` identifier.
+
+- `--redact` knew a Stripe secret key by its OpenAI spelling only. It now
+  knows Stripe's live and test keys, npm, Hugging Face, Shopify, SendGrid
+  and Twilio tokens and Telegram bot tokens by their shape, and so does
+  the `secret` identifier, which reads the same list.
+
 ## 0.12.0 - 2026-09-12
 
 ### Added
