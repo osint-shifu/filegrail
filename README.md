@@ -230,6 +230,9 @@ The same identifier detection is applied to metadata and, with `--content`, docu
 | `org` | the company or credit a file records about itself, and, in text, a name that ends in a legal form such as Sp. z o.o., GmbH, Ltd, Inc or LLC | the `Source` field, an agency in one format and a scanner in another |
 | `handle` | accounts a file points at: the user in a profile URL on a known platform, and the login in a user directory on the machine that made it | a platform's own pages, and the directories every machine has |
 | `postcode` | a Polish postcode with the town after it, and a UK postcode by its shape | a postcode standing bare, which is a range or a part number as often as a place, and US ZIP codes, which are five digits like everything else |
+| `ssn` | US social security numbers beside their label, of a shape the administration issues, reported as a fingerprint and never as the number | the same digits standing bare, and the areas never issued - 000, 666, 900 and up |
+| `ein` | US employer identification numbers beside their label, with a prefix the IRS assigns | the same digits standing bare |
+| `aba` | US bank routing numbers beside their label, whose checksum and prefix hold | the same digits standing bare, which pass the checksum one time in ten |
 
 Every value keeps its file, source and exact field or document location.
 

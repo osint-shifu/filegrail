@@ -686,3 +686,51 @@ def test_a_postcode_is_read_with_the_town_it_belongs_to(tmp_path: Path):
     found = sorted(e.normalized for e in extract([record], content=True) if e.type == "postcode")
 
     assert found == ["00-950 warszawa", "sw1a 1aa"]
+
+
+# --- united states ------------------------------------------------------------
+#
+# None of these carries a checksum a document can be trusted on alone - the
+# routing number has one, and it passes one random number in ten - so all
+# three are taken only beside the label that names them. A social security
+# number is the key to somebody's identity, and is reported the way a
+# credential is: as a fingerprint, never as the number.
+
+
+def test_a_social_security_number_is_a_fingerprint_beside_its_label(tmp_path: Path):
+    from filegrail.redact import fingerprint
+
+    record = _document(
+        tmp_path,
+        "SSN: 123-45-6789 on file; call 987-65-4321; SSN 000-12-3456 is a placeholder",
+        source="document-metadata",
+    )
+
+    found = [e for e in extract([record], content=True) if e.type == "ssn"]
+
+    assert [e.value for e in found] == [fingerprint("123456789")]
+    assert not [e for e in found if "123-45" in e.where[0] or "6789" in e.normalized]
+
+
+def test_an_employer_id_is_taken_beside_its_label_with_a_real_prefix(tmp_path: Path):
+    record = _document(
+        tmp_path,
+        "EIN 12-3456789 for Acme; invoice 12-3456789 again; Tax ID: 07-1234567 is not one",
+        source="document-metadata",
+    )
+
+    found = [(e.normalized, e.count) for e in extract([record], content=True) if e.type == "ein"]
+
+    assert found == [("12-3456789", 1)]
+
+
+def test_a_routing_number_needs_its_label_and_its_checksum(tmp_path: Path):
+    record = _document(
+        tmp_path,
+        "ABA routing 021000021 for wires; account 021000021; routing number 021000022 no",
+        source="document-metadata",
+    )
+
+    found = [(e.normalized, e.count) for e in extract([record], content=True) if e.type == "aba"]
+
+    assert found == [("021000021", 1)]

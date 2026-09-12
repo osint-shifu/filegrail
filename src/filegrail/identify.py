@@ -43,7 +43,15 @@ from pathlib import Path
 from typing import NamedTuple
 from urllib.parse import urlsplit
 
-from .checksums import bech32_version, is_base58check, is_iban, is_nip, is_onion, is_regon
+from .checksums import (
+    bech32_version,
+    is_aba,
+    is_base58check,
+    is_iban,
+    is_nip,
+    is_onion,
+    is_regon,
+)
 from .models import ORIGIN, FileRecord, category
 from .models import label as source_label
 from .redact import PATTERNS as REDACT_PATTERNS
@@ -275,6 +283,35 @@ USER_DIR_RE = re.compile(r"(?:^|[\\/])(?i:Users|home)[\\/]([^\\/\s:*?\"<>|]{1,64
 _SHARED_HOMES = frozenset(
     {"public", "default", "default user", "all users", "shared", "administrator"}
 )
+
+#: The United States numbers. None can be trusted on its own - two have no
+#: checksum and the third's passes one random number in ten - so each is
+#: taken only beside the label that names it. A social security number is
+#: the key to somebody's identity and is reported as a credential is: as a
+#: fingerprint, never as the number.
+SSN_RE = re.compile(
+    r"\b(?:SSN|SS#|Social Security(?:\s+(?:Number|No\.?|#))?)[\s:.#-]*"
+    r"(\d{3})-(\d{2})-(\d{4})(?!\d)",
+    re.IGNORECASE,
+)
+EIN_RE = re.compile(
+    r"\b(?:EIN|FEIN|TIN|Employer Identification(?:\s+(?:Number|No\.?))?"
+    r"|Tax ID(?:\s+(?:Number|No\.?))?)[\s:.#-]*(\d{2})-(\d{7})(?!\d)",
+    re.IGNORECASE,
+)
+ABA_RE = re.compile(
+    r"\b(?:ABA|RTN|routing(?:\s+(?:number|no\.?|#|transit(?:\s+number)?))?)[\s:.#-]*"
+    r"(\d{9})(?!\d)",
+    re.IGNORECASE,
+)
+
+#: The prefixes the IRS assigns an employer identification number; the gaps
+#: - 07, 17, 49, 69, 79, 89, 96 and their neighbours - were never used.
+_EIN_PREFIXES = frozenset(
+    f"{n:02d}"
+    for n in (*range(1, 7), *range(10, 17), *range(20, 28), *range(30, 49), *range(50, 69),
+              *range(71, 78), *range(80, 89), *range(90, 96), 98, 99)
+)  # fmt: skip
 
 _UPPER = "A-ZÀ-ÖØ-ÞĄĆĘŁŃÓŚŹŻ"
 _LOWER = "a-zß-öø-ÿąćęłńóśźż"
@@ -522,6 +559,11 @@ def find_coordinates(text: str) -> list[tuple[str, float, float, str]]:
 def _looks_like_version(text: str, start: int) -> bool:
     """``v1.2.3.4`` is a version string, not an address."""
     return start > 0 and text[start - 1] in "vV"
+
+
+def _ssn_shaped(area: str, group: str, serial: str) -> bool:
+    """Whether the three parts are ones the administration has ever issued."""
+    return area not in {"000", "666"} and area[0] != "9" and group != "00" and serial != "0000"
 
 
 def _plain(name: str) -> str:
@@ -777,6 +819,20 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
     for match in POSTCODE_RE.finditer(text):
         place = f"{match.group(1)} {match.group(2)}" if match.group(1) else match.group(3)
         yield "postcode", place, _plain(place), None
+
+    for match in SSN_RE.finditer(text):
+        if _ssn_shaped(*match.groups()):
+            handle = fingerprint("".join(match.groups()))
+            yield "ssn", handle, handle, None
+
+    for match in EIN_RE.finditer(text):
+        if match.group(1) in _EIN_PREFIXES:
+            number = f"{match.group(1)}-{match.group(2)}"
+            yield "ein", number, number, None
+
+    for match in ABA_RE.finditer(text):
+        if is_aba(match.group(1)):
+            yield "aba", match.group(1), match.group(1), None
 
     # Domains harvested from URLs and emails are certain. Bare tokens have to
     # clear the TLD list and not look like a file name.

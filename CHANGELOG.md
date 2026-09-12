@@ -5,6 +5,18 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- The United States numbers: `ssn`, `ein` and `aba`. None can be trusted on
+  its own - two have no checksum and the routing number's passes one random
+  number in ten - so each is taken only beside the label that names it, and
+  the shape has to be one that is issued: a social security area that exists,
+  an employer prefix the IRS assigns, a routing prefix a bank can have. A
+  social security number is the key to somebody's identity and is reported
+  the way a credential is, as a fingerprint and never as the number.
+
 ## 0.10.0 - 2026-09-12
 
 ### Added

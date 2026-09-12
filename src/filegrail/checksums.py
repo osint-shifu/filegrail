@@ -172,3 +172,17 @@ def is_onion(label: str) -> bool:
         return False
     digest = hashlib.sha3_256(b".onion checksum" + raw[:32] + raw[34:]).digest()
     return digest[:2] == raw[32:34]
+
+
+#: The first two digits a routing number can start with: Federal Reserve
+#: districts, thrifts, electronic-only and traveller's cheques. Anything else
+#: was never assigned.
+_ABA_PREFIXES = frozenset({f"{n:02d}" for n in (*range(0, 13), *range(21, 33), *range(61, 73), 80)})
+
+
+def is_aba(digits: str) -> bool:
+    """Whether nine digits are a US bank routing number: prefix and 3-7-1 mod 10."""
+    if len(digits) != 9 or not digits.isdigit() or digits[:2] not in _ABA_PREFIXES:
+        return False
+    weights = (3, 7, 1, 3, 7, 1, 3, 7, 1)
+    return sum(int(d) * w for d, w in zip(digits, weights, strict=True)) % 10 == 0
