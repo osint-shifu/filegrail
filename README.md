@@ -213,7 +213,7 @@ The same identifier detection is applied to metadata and, with `--content`, docu
 | Type | Taken | Not taken |
 |:---|:---|:---|
 | `url` | `http` and `https` addresses, normalized | |
-| `domain` | every host behind a URL or an address, and bare names whose TLD is a real one | anything shaped like a file name |
+| `domain` | every host behind a URL or an address, and bare names whose TLD is a real one | anything shaped like a file name, and onion names, which are their own type |
 | `email` | addresses whose TLD is a real one | the address inside a message id - its host is still kept |
 | `ipv4` | dotted quads, with private and reserved ranges marked as such | version numbers, and digits in a field naming software |
 | `geo` | coordinates written with a hemisphere letter, a degree sign, a `geo:` URI, a map URL or an explicit latitude label | a bare pair of decimals, however many places it carries |
@@ -221,6 +221,10 @@ The same identifier detection is applied to metadata and, with `--content`, docu
 | `btc` | bitcoin addresses whose checksum holds, legacy and `bc1`, the latter lowercased | a mixed-case `bc1` spelling, which no wallet writes |
 | `iban` | account numbers whose country, length and mod-97 check agree, spaces dropped | |
 | `nip` `regon` | Polish tax and statistical numbers beside their label, or a NIP behind an EU `PL` prefix | the same digits standing bare, however the check digit comes out |
+| `onion` | Tor v3 addresses whose checksum holds, lowercased | |
+| `mac` | hardware addresses in either spelling, as one value with colons | the all-zero and the broadcast address |
+| `sid` | Windows account and group SIDs, `S-1-5-21-…` with a relative id | the short well-known SIDs such as `S-1-5-18` |
+| `bic` | bank identifier codes beside a `BIC` or `SWIFT` label, 8 or 11 characters, whose country is a real one | the same code standing bare |
 
 Every value keeps its file, source and exact field or document location.
 

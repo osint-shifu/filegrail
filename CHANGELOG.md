@@ -5,6 +5,17 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- Four identifier types with a shape of their own: `onion` for version 3 Tor
+  addresses, checked by their checksum; `mac` for hardware addresses in
+  either spelling, reported as one value; `sid` for Windows account and
+  group SIDs, leaving out the short well-known ones that name nothing in
+  particular; and `bic` for bank identifier codes, which have no checksum
+  and are taken only beside a `BIC` or `SWIFT` label.
+
 ## 0.9.0 - 2026-09-12
 
 ### Added

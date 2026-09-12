@@ -20,6 +20,7 @@ long division.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 
 _BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -153,3 +154,21 @@ def is_regon(digits: str) -> bool:
         return False
     remainder = sum(int(d) * w for d, w in zip(digits[:-1], weights, strict=True)) % 11
     return (0 if remainder == 10 else remainder) == int(digits[-1])
+
+
+def is_onion(label: str) -> bool:
+    """Whether 56 base32 characters are a version 3 onion service address.
+
+    The label decodes to a public key, two bytes of checksum and a version
+    byte; the checksum is SHA3-256 over a fixed prefix, the key and the
+    version. Version 2 addresses are not accepted: the network stopped
+    serving them in 2021, and a sixteen-character hash has no checksum.
+    """
+    try:
+        raw = base64.b32decode(label.upper())
+    except ValueError:
+        return False
+    if len(raw) != 35 or raw[34] != 3:
+        return False
+    digest = hashlib.sha3_256(b".onion checksum" + raw[:32] + raw[34:]).digest()
+    return digest[:2] == raw[32:34]

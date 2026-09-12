@@ -2,10 +2,9 @@
 
 The detectors here are ported from DirSifu (MIT, same author), which arrived at
 them by finding out what a regex sweep actually costs. Each type is
-recognisable with high precision and normalisable without guessing: email, url,
-domain, ipv4, cryptographic hash and geographic coordinate - and, because a
-checksum lets a value vouch for itself, a bitcoin address, an IBAN and the
-Polish tax and statistical numbers, the last two only beside their label.
+recognisable with high precision and normalisable without guessing - by a known
+TLD, a checksum, a shape nothing else has, or the label beside it - and the
+readme's table of identifier types is the list of them.
 
 Deliberately **not** detected, with reasons, because a noisy identifier list is
 worse than a short one:
@@ -43,7 +42,7 @@ from pathlib import Path
 from typing import NamedTuple
 from urllib.parse import urlsplit
 
-from .checksums import bech32_version, is_base58check, is_iban, is_nip, is_regon
+from .checksums import bech32_version, is_base58check, is_iban, is_nip, is_onion, is_regon
 from .models import ORIGIN, FileRecord, category
 from .models import label as source_label
 
@@ -133,6 +132,33 @@ IBAN_RE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2}\d{2}(?: ?[A-Z0-9]){11,30})(?![A
 NIP_LABELLED_RE = re.compile(r"\bNIP\b[\s:.#-]*((?:\d[\s-]?){9}\d)", re.IGNORECASE)
 NIP_PREFIXED_RE = re.compile(r"(?<![A-Za-z0-9])PL(\d{10})(?![A-Za-z0-9])")
 REGON_RE = re.compile(r"\bREGON\b[\s:.#-]*(\d{14}|\d{9})(?!\d)", re.IGNORECASE)
+
+#: A version 3 onion address is 56 base32 characters and its own checksum.
+ONION_RE = re.compile(r"(?<![a-z2-7])([a-z2-7]{56})\.onion(?![\w\-])", re.IGNORECASE)
+
+#: Six pairs of hex with one separator throughout, and not a window cut out
+#: of something longer - a key fingerprint is the same pairs, sixteen or
+#: thirty-two of them.
+MAC_RE = re.compile(
+    r"(?<![\w:\-])([0-9A-Fa-f]{2}([:\-])(?:[0-9A-Fa-f]{2}\2){4}[0-9A-Fa-f]{2})(?![\w:\-])"
+)
+
+#: Neither is a device: one is unset, the other is everybody.
+_NOT_A_DEVICE = frozenset({"00:00:00:00:00:00", "ff:ff:ff:ff:ff:ff"})
+
+#: An account or group on a Windows machine or domain: the machine's three
+#: sub-authorities and a relative id. The short well-known SIDs - `S-1-5-18`
+#: is SYSTEM on every Windows there is - identify nothing in particular.
+SID_RE = re.compile(r"(?<![\w\-])(S-1-5-21-\d{1,10}-\d{1,10}-\d{1,10}-\d{1,10})(?![\w\-])")
+
+#: A bank identifier code has no checksum, so it is taken only beside its
+#: label, and its country has to be one. Eight characters, or eleven with a
+#: branch.
+BIC_RE = re.compile(
+    r"\b(?:BIC|SWIFT)\b(?:\s*(?:code|number))?[\s:.#-]*"
+    r"([A-Za-z]{6}[A-Za-z0-9]{2}(?:[A-Za-z0-9]{3})?)(?![\w\-])",
+    re.IGNORECASE,
+)
 
 _DEC = r"[-+]?\d{1,3}(?:\.\d+)?"
 
@@ -271,6 +297,11 @@ def known_tlds() -> frozenset[str]:
 def normalize_domain(host: str) -> str | None:
     cleaned = host.strip().strip(".").lower()
     if not cleaned or "." not in cleaned:
+        return None
+    # `.onion` is a special-use name (RFC 7686) that no resolver answers, and
+    # an address there is its own identifier type, checksum and all. It is
+    # not a domain here whatever the TLD list says - and it does say so.
+    if cleaned.endswith(".onion"):
         return None
     with suppress(UnicodeError, UnicodeDecodeError):
         cleaned = cleaned.encode("idna").decode("ascii")
@@ -504,6 +535,24 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
     for match in REGON_RE.finditer(text):
         if is_regon(match.group(1)):
             yield "regon", match.group(1), match.group(1), None
+
+    for match in ONION_RE.finditer(text):
+        label = match.group(1).lower()
+        if is_onion(label):
+            yield "onion", match.group(0), f"{label}.onion", None
+
+    for match in MAC_RE.finditer(text):
+        hardware = match.group(1).lower().replace("-", ":")
+        if hardware not in _NOT_A_DEVICE:
+            yield "mac", match.group(1), hardware, None
+
+    for match in SID_RE.finditer(text):
+        yield "sid", match.group(1), match.group(1), None
+
+    for match in BIC_RE.finditer(text):
+        code = match.group(1).upper()
+        if code[4:6].lower() in known_tlds():
+            yield "bic", match.group(1), code, None
 
     # Domains harvested from URLs and emails are certain. Bare tokens have to
     # clear the TLD list and not look like a file name.

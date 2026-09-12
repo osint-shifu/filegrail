@@ -485,3 +485,62 @@ def test_a_self_checking_value_in_metadata_is_found_too():
     record = _record("x", source="document-metadata", note="1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
 
     assert [e.type for e in extract([record])] == ["btc"]
+
+
+# --- addresses and accounts with a shape of their own ---------------------------
+
+
+def test_an_onion_address_with_a_valid_checksum_is_found_lowercased(tmp_path: Path):
+    record = _document(
+        tmp_path,
+        "mirror at DUCKDUCKGOGG42XJOC72X3SJASOWOARFBGCMVFIMAFTT6TWAGSWZCZAD.onion tonight",
+        source="document-metadata",
+    )
+
+    found = [e.normalized for e in extract([record], content=True) if e.type == "onion"]
+
+    assert found == ["duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion"]
+
+
+def test_a_mac_address_is_found_in_either_spelling_as_one_value(tmp_path: Path):
+    record = _document(
+        tmp_path, "nic AA-BB-CC-DD-EE-01 also seen as aa:bb:cc:dd:ee:01", source="document-metadata"
+    )
+
+    found = [e for e in extract([record], content=True) if e.type == "mac"]
+
+    assert [(e.normalized, e.count) for e in found] == [("aa:bb:cc:dd:ee:01", 2)]
+
+
+def test_a_windows_account_sid_is_found(tmp_path: Path):
+    record = _document(
+        tmp_path, "owner S-1-5-21-3623811015-3361044348-30300820-1013", source="document-metadata"
+    )
+
+    found = {(e.type, e.normalized) for e in extract([record], content=True)}
+
+    assert ("sid", "S-1-5-21-3623811015-3361044348-30300820-1013") in found
+
+
+def test_a_bic_is_found_beside_its_label_in_both_lengths(tmp_path: Path):
+    record = _document(
+        tmp_path, "SWIFT: deutdeff and BIC code DEUTDEFF500", source="document-metadata"
+    )
+
+    found = sorted(e.normalized for e in extract([record], content=True) if e.type == "bic")
+
+    assert found == ["DEUTDEFF", "DEUTDEFF500"]
+
+
+def test_the_shapes_that_look_right_and_are_not_are_left_alone(tmp_path: Path):
+    """A broken onion checksum, a broadcast address, a well-known SID and a
+    bare BIC are each the sort of thing a looser sweep would report."""
+    record = _document(
+        tmp_path,
+        "duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczae.onion "
+        "ff:ff:ff:ff:ff:ff 00:00:00:00:00:00 S-1-5-18 pay via DEUTDEFF today "
+        "BIC: ABCDXXFF",
+        source="document-metadata",
+    )
+
+    assert [e.type for e in extract([record], content=True)] == []
