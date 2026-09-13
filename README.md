@@ -564,9 +564,10 @@ Reports may contain:
 - IP and hardware addresses
 - GPS coordinates and postal addresses
 - bank accounts, tax numbers and wallet addresses
+- vehicle and company registration numbers
 - analytics and advertising ids, which name an account
 
-A credential found inside a document is reported as its kind and a fingerprint, never as the value.
+A credential found inside a document, and a social security number, are reported as a kind and a fingerprint, never as the value.
 
 Redact sensitive values before sharing output:
 
