@@ -464,7 +464,7 @@ Analyze a directory recursively:
 filegrail ./evidence
 ```
 
-A directory scan prints an investigation report: case summary, key findings, evidence coverage, conflicts, a numbered file index, investigative pivots and the detail of the files that need it. Files, findings, conflicts and pivots are numbered (`#001`, `F01`, `C01`, `P01`) and referenced across the report.
+A directory scan prints an investigation report: summary, key findings, a numbered file index, investigative pivots, the detail of the files that need it, evidence coverage and conflicts. Files, findings, conflicts and pivots are numbered (`#001`, `F01`, `C01`, `P01`) and referenced across the report.
 
 Analyze the current directory:
 

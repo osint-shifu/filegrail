@@ -1,8 +1,8 @@
 """The investigation report: a case read in the order an analyst asks about it.
 
-What was analysed, whether evidence was there to be found, what the records
-establish together, what contradicts itself, which files to open and which
-values lead somewhere else - and only after that the technical detail.
+What was analysed, what the records establish together, which files to open,
+which values lead somewhere else and the detail of the files that need it -
+and then what this machine could be searched for and what contradicts itself.
 
 Every object starts on a line of its own with a mark and a number, so the left
 edge alone says where one ends and the next begins, and no name is ever broken
@@ -170,9 +170,6 @@ def render_case(
     _masthead(page, case, home, now, brief=brief, verbose=verbose)
     _summary(page, case, records)
     _findings(page, case, files)
-    if not brief:
-        _coverage(page, case, unsearched)
-        _conflicts(page, case, files)
     _files(page, case, verbose=verbose, limit=limit, compact=brief)
     if not brief:
         _relationships(page, case, files)
@@ -180,6 +177,8 @@ def render_case(
             page.lines.extend(_clusters(page.theme, records, case.root))
         _pivots(page, case, files, verbose=verbose, identifiers=identifiers, content=content)
         _details(page, case, files, verbose=verbose)
+        _coverage(page, case, unsearched)
+        _conflicts(page, case, files)
         _notes(page, records)
     if filtered:
         page.gap()
@@ -266,7 +265,7 @@ def _summary(page: _Page, case: Case, records: list[FileRecord]) -> None:
         found = sum(1 for source in stores if source.state == "found")
         groups.append([("Coverage", f"{found} / {len(stores)} trace stores")])
 
-    page.section("CASE SUMMARY")
+    page.section("SUMMARY")
     page.figures(groups)
 
 
@@ -383,11 +382,14 @@ def _conflicts(page: _Page, case: Case, files: dict[str, CaseFile]) -> None:
         for difference in conflict.differences:
             page.add()
             page.wrapped(difference.field, indent)
-            width = max([len(source) for source, _ in difference.values] + [len("Delta")]) + 3
+            width = max([len(source) for source, _ in difference.values] + [len("Difference")]) + 3
             for source, value in difference.values:
                 page.prop(source or "Value", value, indent + 2, width=width)
             if difference.delta:
-                page.prop("Delta", difference.delta, indent + 2, width=width)
+                first = difference.values[0][0] or "the first"
+                second = difference.values[-1][0] or "the second"
+                said = f"{second} is {difference.delta} than {first}"
+                page.prop("Difference", said, indent + 2, width=width)
         page.gap()
 
 
@@ -519,7 +521,7 @@ def _pivots(
     if pivots is None or not pivots.total:
         return
     page.section("INVESTIGATIVE PIVOTS")
-    page.add("SUMMARY")
+    page.add("BY TYPE")
     page.add()
     page.figures([[(_type_name(kind), f"{count:,}") for kind, count in pivots.by_type]], indent=2)
 

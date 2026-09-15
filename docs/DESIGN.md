@@ -27,8 +27,8 @@ keep.
 | view | sections |
 |---|---|
 | `filegrail FILE` | `FILE → ORIGIN → METADATA → ACTIVITY → [blocks]` |
-| `filegrail DIR` | `CASE SUMMARY → [KEY FINDINGS] → [EVIDENCE COVERAGE] → [CONFLICTS] → FILES → [RELATIONSHIPS] → [CLUSTERS] → [INVESTIGATIVE PIVOTS] → [FILE DETAIL] → REPORT NOTES`, see 5b |
-| `--brief` | `CASE SUMMARY → [KEY FINDINGS] → FILES`, one line a file |
+| `filegrail DIR` | `SUMMARY → [KEY FINDINGS] → FILES → [RELATIONSHIPS] → [CLUSTERS] → [INVESTIGATIVE PIVOTS] → [FILE DETAIL] → [EVIDENCE COVERAGE] → [CONFLICTS] → REPORT NOTES`, see 5b |
+| `--brief` | `SUMMARY → [KEY FINDINGS] → FILES`, one line a file |
 | `explain` | `SUMMARY → ORIGIN → METADATA → [ACTIVITY] → [CORRELATION] → [blocks]` |
 | `--timeline` | `TIMELINE` |
 | `--content` | `INVESTIGATIVE PIVOTS` in a directory report, every value a section a type under `-v`; a single file: `IDENTIFIERS → one section a type` |
@@ -315,10 +315,10 @@ raising the same alarm twice.
 ## 5b. The investigation report
 
 `filegrail DIR` prints an investigation report rather than the table views
-above. It is read in the order a case is opened with: what was analysed,
-whether evidence was there to be found, what the records establish together,
-what contradicts itself, which files to open, which values lead somewhere
-else, and only then the technical detail. `explain`, `compare`, `doctor`,
+above. It is read in the order a case is worked through: what was analysed,
+what the records establish together, which files to open, which values lead
+somewhere else, the detail of the files that need it, and then what this
+machine could be searched for and what contradicts itself. `explain`, `compare`, `doctor`,
 `clean` and `--timeline` keep the grammar of sections 4 and 5. The layout is
 built by `casereport.py` from the `Case` that `analysis.py` makes of a scan, so
 no renderer decides what is true.
@@ -347,7 +347,7 @@ KEY FINDINGS
 ```
 
 A rule above the name and one below it. No counts beside the name: the counts
-are in `CASE SUMMARY`, lined up on the right.
+are in `SUMMARY`, lined up on the right.
 
 ### Objects and references
 

@@ -23,14 +23,14 @@ NOW = datetime(2026, 9, 15, 21, 18, tzinfo=timezone.utc)
 LONG = "investigative-case-file-review-final-version-for-the-board.pdf"
 
 HEADINGS = (
-    "CASE SUMMARY",
+    "SUMMARY",
     "KEY FINDINGS",
-    "EVIDENCE COVERAGE",
-    "CONFLICTS",
     "FILES",
     "RELATIONSHIPS",
     "INVESTIGATIVE PIVOTS",
     "FILE DETAIL",
+    "EVIDENCE COVERAGE",
+    "CONFLICTS",
     "REPORT NOTES",
     "END OF REPORT",
 )
@@ -96,13 +96,13 @@ def test_the_sections_follow_the_questions_a_case_is_opened_with():
     lines = _report(_corpus(), theme=_theme()).splitlines()
 
     assert [line for line in lines if line in HEADINGS] == [
-        "CASE SUMMARY",
+        "SUMMARY",
         "KEY FINDINGS",
-        "EVIDENCE COVERAGE",
-        "CONFLICTS",
         "FILES",
         "INVESTIGATIVE PIVOTS",
         "FILE DETAIL",
+        "EVIDENCE COVERAGE",
+        "CONFLICTS",
         "REPORT NOTES",
         "END OF REPORT",
     ]
@@ -137,7 +137,7 @@ def test_a_file_points_at_its_conflict_and_the_conflict_shows_both_statements():
 
     assert re.search(r"conflicts\s+C01", files)
     assert re.search(r"PDF Info\s+2018-05-11 18:37:20 UTC", report)
-    assert re.search(r"Delta\s+72 days earlier", report)
+    assert re.search(r"Difference\s+XMP is 72 days earlier than PDF Info", report)
 
 
 def test_the_notes_explain_only_the_match_bases_the_report_uses():

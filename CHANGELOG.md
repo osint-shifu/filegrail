@@ -7,6 +7,13 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Changed
+
+- The terminal report runs in the order of the HTML one - summary, key
+  findings, files, investigative pivots, file detail, evidence coverage,
+  conflicts, report notes - and says of two conflicting dates which one is how
+  much earlier, in place of a bare delta. `CASE SUMMARY` is `SUMMARY`.
+
 ### Added
 
 - `--html` prints the investigation report as one self-contained HTML page,
