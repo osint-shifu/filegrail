@@ -344,7 +344,7 @@ def _yielded_types() -> set[str]:
 
 def _readme_types() -> set[str]:
     listed: set[str] = set()
-    for row in _readme_rows(README, "### Identifier types")[1:]:
+    for row in _readme_rows(README, "### Investigative pivot types")[1:]:
         listed |= set(re.findall(r"`([a-z0-9]+)`", row[0]))
     return listed
 
