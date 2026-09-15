@@ -275,6 +275,7 @@ Filters intentionally reject many ambiguous values to reduce false positives.
 | `domain` | Every host behind a URL, an address or a UNC path, and bare names whose TLD is a real one | Anything shaped like a file name, and onion names, which are their own type |
 | `hostname` | Machine and server names that are not public domains: the machine a Windows shortcut was created on, the server in a UNC path and the hosts a `Received:` header names | IP addresses, public names, which are `domain`, and placeholders such as `localhost` or `server` |
 | `email` | Addresses whose TLD is a real one | The address inside a message ID; its host is still kept |
+| `message_id` | Message IDs from the `Message-ID`, `In-Reply-To` and `References` headers, so a reply and the message it answers share a value | The `Content-ID` of an attachment |
 | `ipv4` | Dotted quads, with private and reserved ranges marked as such | Version numbers, and digits in a field naming software |
 | `ipv6` | Addresses with all eight groups written out, or any form inside the brackets a URL places around one | A compressed address standing bare, which can resemble a scope operator in code |
 | `geo` | Coordinates written with a hemisphere letter, a degree sign, a `geo:` URI, a map URL or an explicit latitude label | A bare pair of decimals |
@@ -300,7 +301,7 @@ Filters intentionally reject many ambiguous values to reduce false positives.
 | `secret` | Vendor-prefixed API keys and tokens, JWTs and private-key blocks; reported as type and fingerprint, never as the secret value | Credentials detected only because of a nearby field name |
 | `person` | Names in fields identifying who made a file - author, by-line, artist or mail display name - and names in text when preceded by supported honorifics | Arbitrary names in document text and common application placeholders |
 | `org` | Company or credit fields and names in text ending with supported legal forms such as `Sp. z o.o.`, `GmbH`, `Ltd`, `Inc` or `LLC` | Ambiguous `Source` fields |
-| `handle` | Accounts referenced through known-platform profile URLs and user-directory logins from the originating machine | Platform-owned pages and common system directories |
+| `handle` | Accounts referenced through known-platform profile URLs, the owner in a GitHub repository or raw-file URL, and user-directory logins from the originating machine | Platform-owned pages and common system directories |
 | `postcode` | Polish postcode with town context and UK postcodes recognized by shape | Bare ambiguous postal-looking values and US ZIP codes |
 | `ssn` | US Social Security numbers beside their label and matching valid issuance shape; represented as a fingerprint, never the number | Bare values and ranges that were never issued |
 | `ein` | US Employer Identification Numbers beside their label and using an assigned prefix | The same digits standing bare |

@@ -261,10 +261,11 @@ _NOBODY = frozenset(
 
 #: Where a URL is somebody's profile: the host, what to call the platform,
 #: and what the path has to look like. `www.` and `m.` come off the host.
+#: On GitHub the owner is the first segment of any path, a repository included.
 _PROFILE_PATH = {
     "x": re.compile(r"^/([A-Za-z0-9_]{1,15})/?$"),
     "instagram": re.compile(r"^/([A-Za-z0-9_.]{1,30})/?$"),
-    "github": re.compile(r"^/([A-Za-z0-9][A-Za-z0-9\-]{0,38})/?$"),
+    "github": re.compile(r"^/([A-Za-z0-9][A-Za-z0-9\-]{0,38})(?:/|$)"),
     "linkedin": re.compile(r"^/in/([A-Za-z0-9\-%]+)/?$"),
     "telegram": re.compile(r"^/([A-Za-z0-9_]{5,32})/?$"),
     "tiktok": re.compile(r"^/@([A-Za-z0-9_.]+)/?$"),
@@ -277,6 +278,7 @@ _PROFILE_HOSTS = {
     "twitter.com": "x",
     "instagram.com": "instagram",
     "github.com": "github",
+    "raw.githubusercontent.com": "github",
     "linkedin.com": "linkedin",
     "t.me": "telegram",
     "telegram.me": "telegram",
@@ -297,6 +299,10 @@ _NOT_A_HANDLE = frozenset(
         "sponsors", "apps", "site", "new", "join", "trending", "live", "shorts",
         "feed", "dialog", "photo", "video", "videos", "posts", "tag", "tags",
         "channel", "user", "pub", "company", "jobs", "legal", "policies",
+        "advisories", "collections", "enterprise", "security", "readme", "codespaces",
+        "pulls", "issues", "organizations", "users", "contact", "resources", "solutions",
+        "team", "copilot", "account", "dashboard", "logout", "user-attachments", "assets",
+        "downloads", "stars", "customer-stories", "sessions",
     }
 )  # fmt: skip
 
@@ -572,6 +578,9 @@ _TRUSTED_COORDINATE_FIELDS = frozenset({"geo"})
 #: as a mailbox - `<id@domain>` - so it matches every test for an address, and
 #: nobody can write to it. A lead nobody can follow is worse than no lead.
 _MESSAGE_ID_FIELDS = frozenset({"message-id", "in-reply-to", "references", "content-id"})
+#: The headers that name a message by its id. `Content-ID` names a part of one.
+_MESSAGE_FIELDS = frozenset({"message-id", "in-reply-to", "references"})
+MESSAGE_ID_RE = re.compile(r"<([^<>\s@]+@[^<>\s@]+)>")
 
 _SOFTWARE_FIELDS = frozenset(
     {
@@ -907,6 +916,13 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
     hosts: set[str] = set()
 
     identifier = where.lower().rpartition(":")[2] in _MESSAGE_ID_FIELDS
+
+    # A reply names the message it answers, so one id seen in two saved
+    # messages is the thread between them. The host is not case-sensitive.
+    if where.lower().rpartition(":")[2] in _MESSAGE_FIELDS:
+        for match in MESSAGE_ID_RE.finditer(text):
+            mail_local, mail_host = match.group(1).rsplit("@", 1)
+            yield "message_id", match.group(0), f"<{mail_local}@{mail_host.lower()}>", None
 
     # Who the file says made it: read from the name of the field, never from
     # what the text looks like.

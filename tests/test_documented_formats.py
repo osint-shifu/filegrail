@@ -337,7 +337,7 @@ def _yielded_types() -> set[str]:
     import filegrail.identify as identify
 
     source = Path(identify.__file__).read_text(encoding="utf-8")
-    literal = set(re.findall(r'yield "([a-z0-9]+)"', source))
+    literal = set(re.findall(r'yield "([a-z0-9_]+)"', source))
     # The digests are yielded through a variable chosen by length.
     return literal | {"md5", "sha1", "sha256", "sha512"}
 
@@ -345,7 +345,7 @@ def _yielded_types() -> set[str]:
 def _readme_types() -> set[str]:
     listed: set[str] = set()
     for row in _readme_rows(README, "### Investigative pivot types")[1:]:
-        listed |= set(re.findall(r"`([a-z0-9]+)`", row[0]))
+        listed |= set(re.findall(r"`([a-z0-9_]+)`", row[0]))
     return listed
 
 

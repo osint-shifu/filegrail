@@ -974,6 +974,7 @@ _TYPE_SECTIONS = {
     "domain": "domains",
     "hostname": "hostnames",
     "email": "emails",
+    "message_id": "message ids",
     "ipv4": "ip addresses",
     "ipv6": "ipv6 addresses",
     "geo": "coordinates",

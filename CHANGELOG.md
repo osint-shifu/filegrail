@@ -23,6 +23,15 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 - `sha512` for 128 hexadecimal digits, `cwe` for weakness ids and `ghsa` for
   GitHub security advisories.
 
+- `message_id` from the `Message-ID`, `In-Reply-To` and `References`
+  headers, so a saved reply and the message it answers turn up under one
+  value.
+
+### Changed
+
+- `handle` takes the owner of any GitHub repository or raw-file URL, not
+  only of a profile page.
+
 ## 0.13.1 - 2026-09-15
 
 ### Changed

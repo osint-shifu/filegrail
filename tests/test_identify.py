@@ -676,6 +676,39 @@ def test_a_company_and_the_accounts_a_file_points_at_are_read():
     assert not [h for kind, h in found if kind == "handle" and h.startswith("x:")]
 
 
+def test_a_message_id_links_a_message_to_the_reply_that_quotes_it():
+    sent = _record(
+        "sent.eml", source="email-header", fields={"Message-ID": "<CAF1x9@mail.gmail.com>"}
+    )
+    reply = _record(
+        "reply.eml",
+        source="email-header",
+        fields={
+            "In-Reply-To": "<CAF1x9@MAIL.GMAIL.COM>",
+            "References": "<a1.b2@lists.example> <CAF1x9@mail.gmail.com>",
+            "Content-ID": "<image001.png@01DA>",
+        },
+    )
+
+    found = {e.normalized: e.files for e in extract([sent, reply]) if e.type == "message_id"}
+
+    assert found == {"<CAF1x9@mail.gmail.com>": 2, "<a1.b2@lists.example>": 1}
+
+
+def test_the_owner_of_a_github_repository_is_an_account(tmp_path: Path):
+    record = _document(
+        tmp_path,
+        "clone https://github.com/osint-shifu/filegrail/commit/abc, payload at "
+        "https://raw.githubusercontent.com/evil-dev/tools/main/x.ps1; see "
+        "https://github.com/features/actions and https://github.com/user-attachments/assets/1",
+        source="document-metadata",
+    )
+
+    found = sorted(e.normalized for e in extract([record], content=True) if e.type == "handle")
+
+    assert found == ["github:evil-dev", "github:osint-shifu"]
+
+
 # --- names that carry their own label ------------------------------------------
 #
 # The one way a name is read out of prose: when the text itself labels it. A
