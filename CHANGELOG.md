@@ -17,6 +17,11 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   is loaded from outside the page, a URL found in a file is text rather than a
   link, and every value that came out of a file is escaped.
 
+- In the HTML report every table sorts by any column, sizes and counts by
+  their value; a summary card opens the section it counts, with the file index
+  filtered to the files it counts; and a copy button beside a path, a pivot, a
+  conflicting value or a field copies the text shown, without opening it.
+
 ## 0.15.0 - 2026-09-16
 
 ### Added

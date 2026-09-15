@@ -93,3 +93,19 @@ def test_the_numbers_are_anchors_and_the_references_lead_to_them():
         assert anchor in page
     assert 'href="#C01"' in page
     assert 'href="#file-001"' in page
+
+
+def test_the_cards_open_what_they_count_and_the_index_sorts_by_raw_values():
+    page = _page(_corpus())
+
+    assert 'href="#files" data-filter="origin"' in page
+    assert 'href="#conflicts"' in page
+    assert 'class="index sortable"' in page
+    assert 'data-value="1024"' in page
+
+
+def test_a_copy_button_copies_the_value_shown_and_keeps_no_copy_of_its_own():
+    page = _page(_corpus())
+
+    assert '<span class="v">https://example.org/holiday.jpg</span><button class="copy"' in page
+    assert "data-copy" not in page

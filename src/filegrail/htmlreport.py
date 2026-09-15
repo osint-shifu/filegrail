@@ -122,38 +122,132 @@ margin:16px 0 6px;font-weight:600}
 footer{margin-top:52px;border-top:1px solid var(--line);padding-top:12px;
 color:var(--faint);font-size:12px}
 .hidden{display:none!important}
+a.card{display:block;color:inherit}a.card:hover{border-color:var(--muted);text-decoration:none}
+th.sort{cursor:pointer;user-select:none}th.sort:hover,th.sort:focus{color:var(--text);outline:none}
+th[aria-sort=ascending]::after{content:" \25B2";font-size:9px}
+th[aria-sort=descending]::after{content:" \25BC";font-size:9px}
+.copy{display:none;margin-left:7px;font:11px/1.4 var(--mono);color:var(--muted);background:none;
+border:1px solid var(--line);border-radius:3px;padding:0 5px;cursor:pointer;vertical-align:1px}
+.js .copy{display:inline-block}.copy:hover{color:var(--text);border-color:var(--muted)}
+.chip{border:1px solid var(--line);border-radius:4px;padding:2px 4px 2px 8px;color:var(--text)}
+.chip button{font:inherit;color:var(--muted);background:none;border:0;cursor:pointer}
 @media (max-width:720px){header.masthead,nav,main{padding-left:16px;padding-right:16px}
 .tools{margin-left:0}}
 @media print{:root{color-scheme:light;--bg:#fff;--panel:#fff;--panel2:#e6e6e6;--line:#bdbdbd;
 --text:#111;--muted:#4d4d4d;--faint:#6b6b6b;--link:#111;--review:#9c3d14;--origin:#2c6b4b;
 --metadata:#2c5a88;--activity:#7d5f18}
-body{font-size:10.5px}nav,.tools{display:none}a{color:inherit}
+body{font-size:10.5px}nav,.tools,.copy{display:none!important}a{color:inherit}
 .obj,details,tr,.card{break-inside:avoid}thead{display:table-header-group}
 h2{break-after:avoid}}
 """
 
 _SCRIPT = """
 (function () {
+  document.documentElement.classList.add('js');
+  var each = function (list, visit) { Array.prototype.forEach.call(list, visit); };
   var tools = document.getElementById('tools');
   var box = document.getElementById('search');
   var review = document.getElementById('only-review');
-  if (!tools || !box) { return; }
-  tools.classList.remove('hidden');
+  var chip = document.getElementById('filter');
+  var said = document.getElementById('filter-text');
+  var filter = '';
+  var names = {
+    evidence: 'files with evidence', origin: 'files with an origin record',
+    metadata: 'files with metadata', activity: 'files with an activity record'
+  };
   var items = Array.prototype.slice.call(document.querySelectorAll('[data-search]'));
+
+  function matches(item) {
+    if (!filter || !item.hasAttribute('data-found')) { return true; }
+    if (filter === 'evidence') { return item.dataset.state !== 'nothing'; }
+    return (' ' + item.dataset.found + ' ').indexOf(' ' + filter + ' ') !== -1;
+  }
   function apply() {
-    var wanted = box.value.trim().toLowerCase();
+    var wanted = box ? box.value.trim().toLowerCase() : '';
     var only = review && review.checked;
     items.forEach(function (item) {
       var shown = !wanted || item.textContent.toLowerCase().indexOf(wanted) !== -1;
       if (only && item.dataset.state && item.dataset.state !== 'review') { shown = false; }
+      shown = shown && matches(item);
       item.classList.toggle('hidden', !shown);
       if (shown && wanted && item.tagName === 'DETAILS') { item.open = true; }
     });
+    if (chip) {
+      chip.classList.toggle('hidden', !filter);
+      said.textContent = names[filter] || '';
+    }
   }
-  box.addEventListener('input', apply);
+  if (tools) { tools.classList.remove('hidden'); }
+  if (box) { box.addEventListener('input', apply); }
   if (review) { review.addEventListener('change', apply); }
+  each(document.querySelectorAll('a[data-filter]'), function (card) {
+    card.addEventListener('click', function () { filter = card.dataset.filter; apply(); });
+  });
+  var clear = document.getElementById('filter-clear');
+  if (clear) { clear.addEventListener('click', function () { filter = ''; apply(); }); }
+
+  each(document.querySelectorAll('table.sortable'), function (table) {
+    if (!table.tHead || !table.tBodies.length) { return; }
+    var heads = table.tHead.rows[0].cells;
+    each(heads, function (head, column) {
+      head.tabIndex = 0;
+      head.classList.add('sort');
+      function key(row) {
+        var cell = row.cells[column];
+        if (!cell) { return ''; }
+        var raw = cell.getAttribute('data-value');
+        return raw === null ? cell.textContent.trim().toLowerCase() : parseFloat(raw);
+      }
+      function sort() {
+        var body = table.tBodies[0];
+        var rows = Array.prototype.slice.call(body.rows);
+        var rising = head.getAttribute('aria-sort') !== 'ascending';
+        each(heads, function (other) { other.removeAttribute('aria-sort'); });
+        head.setAttribute('aria-sort', rising ? 'ascending' : 'descending');
+        rows.sort(function (a, b) {
+          var x = key(a), y = key(b);
+          var order = (typeof x === 'number' && typeof y === 'number')
+            ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true });
+          return rising ? order : -order;
+        });
+        rows.forEach(function (row) { body.appendChild(row); });
+      }
+      head.addEventListener('click', sort);
+      head.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); sort(); }
+      });
+    });
+  });
+
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest ? event.target.closest('button.copy') : null;
+    if (!button) { return; }
+    var value = button.previousElementSibling ? button.previousElementSibling.textContent : '';
+    function done(word) {
+      button.textContent = word;
+      setTimeout(function () { button.textContent = 'copy'; }, 1200);
+    }
+    function fallback() {
+      var area = document.createElement('textarea');
+      area.value = value;
+      document.body.appendChild(area);
+      area.select();
+      var copied = false;
+      try { copied = document.execCommand('copy'); } catch (error) { copied = false; }
+      document.body.removeChild(area);
+      done(copied ? 'copied' : 'failed');
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(value).then(function () { done('copied'); }, fallback);
+    } else {
+      fallback();
+    }
+  });
 })();
 """
+
+#: Values in a file's detail that are said about the record, not taken from it.
+_PLAIN = frozenset({"Match"})
 
 _SECTIONS = (
     ("summary", "Case summary"),
@@ -226,6 +320,8 @@ def render_html(
         '<div class="tools hidden" id="tools">',
         '<input type="search" id="search" placeholder="Search the report" aria-label="Search">',
         '<label><input type="checkbox" id="only-review"> only files to review</label>',
+        '<span class="chip hidden" id="filter">showing <span id="filter-text"></span>',
+        '<button type="button" id="filter-clear">clear</button></span>',
         "</div></nav>",
     ]
     body = ["<main>"]
@@ -268,9 +364,25 @@ def _link(ref: str) -> str:
     return f'<a href="#{_anchor(ref)}">{_e(ref)}</a>'
 
 
-def _props(pairs: list[tuple[str, str]], css: str = "props") -> str:
-    rows = "".join(f"<dt>{_e(label)}</dt><dd>{_e(value)}</dd>" for label, value in pairs)
-    return f'<dl class="{css}">{rows}</dl>'
+def _props(
+    pairs: list[tuple[str, str]],
+    css: str = "props",
+    copy: bool | frozenset[str] = False,
+    plain: frozenset[str] = frozenset(),
+) -> str:
+    """Labels and their values. Values `copy` names - or all but `plain` - get a copy button."""
+    rows = []
+    for label, value in pairs:
+        wanted = (copy is True and label not in plain) or (
+            isinstance(copy, frozenset) and label in copy
+        )
+        rows.append(f"<dt>{_e(label)}</dt><dd>{_value(value) if wanted else _e(value)}</dd>")
+    return f'<dl class="{css}">{"".join(rows)}</dl>'
+
+
+def _value(value: str) -> str:
+    """A value and a button that copies it: the text shown, never a second copy of it."""
+    return f'<span class="v">{_e(value)}</span><button class="copy" type="button">copy</button>'
 
 
 def _name(entry: CaseFile) -> str:
@@ -289,42 +401,54 @@ def _summary(case: Case) -> str:
     holding = {name: sum(1 for entry in case.files if entry.found[name]) for name in CATEGORIES}
     known = sum(1 for record in records if record.evidence)
     fields = sum(len(conflict.differences) for conflict in case.conflicts)
-    cards = [
-        ("Files", f"{len(records):,}", ""),
-        ("File types", f"{len(contents.types):,}", ""),
-        ("Total size", _size(contents.size), ""),
-        ("Files with evidence", f"{known:,} / {len(records):,}", ""),
-        ("Origin", f"{holding[ORIGIN]:,}", "origin"),
-        ("Metadata", f"{holding[METADATA]:,}", "metadata"),
-        ("Activity", f"{holding[ACTIVITY]:,}", "activity"),
+    files = "files" if case.files else None
+
+    #: Label, value, colour, the section it opens and the filter it sets there.
+    cards: list[tuple[str, str, str, str | None, str | None]] = [
+        ("Files", f"{len(records):,}", "", files, ""),
+        ("File types", f"{len(contents.types):,}", "", files, ""),
+        ("Total size", _size(contents.size), "", files, ""),
+        ("Files with evidence", f"{known:,} / {len(records):,}", "", files, "evidence"),
+        ("Origin", f"{holding[ORIGIN]:,}", "origin", files, "origin"),
+        ("Metadata", f"{holding[METADATA]:,}", "metadata", files, "metadata"),
+        ("Activity", f"{holding[ACTIVITY]:,}", "activity", files, "activity"),
         (
             "Conflicts",
             f"{len(case.conflicts)} files / {fields} fields" if case.conflicts else "0",
             "review" if case.conflicts else "",
+            "conflicts" if case.conflicts else None,
+            None,
         ),
-        ("Relationships", f"{case.relationships:,}", ""),
+        (
+            "Relationships",
+            f"{case.relationships:,}",
+            "",
+            "relationships" if case.relationships else None,
+            None,
+        ),
     ]
     if case.pivots is not None:
+        section = "pivots" if case.pivots.total else None
         cards += [
-            ("Investigative pivots", f"{case.pivots.total:,}", ""),
-            ("Shared pivots", f"{case.pivots.across:,}", ""),
-            ("Cross-corpus pivots", f"{case.pivots.cross_corpus:,}", ""),
+            ("Investigative pivots", f"{case.pivots.total:,}", "", section, None),
+            ("Shared pivots", f"{case.pivots.across:,}", "", section, None),
+            ("Cross-corpus pivots", f"{case.pivots.cross_corpus:,}", "", section, None),
         ]
     stores = [source for source in case.coverage if source.store]
     if stores:
         found = sum(1 for source in stores if source.state == "found")
-        cards.append(("Trace stores found", f"{found} / {len(stores)}", ""))
+        cards.append(("Trace stores found", f"{found} / {len(stores)}", "", "coverage", None))
+
     shown = []
-    for label, value, css in cards:
-        number = (
-            f'<div class="n {css}">{_e(value)}</div>'
-            if css in CATEGORIES
-            else (f'<div class="n">{_e(value)}</div>')
-        )
-        shown.append(
-            f'<div class="card {"review" if css == "review" else ""}">'
-            f'{number}<div class="l">{_e(label)}</div></div>'
-        )
+    for label, value, css, section, chosen in cards:
+        colour = f" {css}" if css in CATEGORIES else ""
+        inner = f'<div class="n{colour}">{_e(value)}</div><div class="l">{_e(label)}</div>'
+        classes = "card review" if css == "review" else "card"
+        if section is None:
+            shown.append(f'<div class="{classes}">{inner}</div>')
+            continue
+        chosen_filter = f' data-filter="{chosen}"' if chosen is not None else ""
+        shown.append(f'<a class="{classes}" href="#{section}"{chosen_filter}>{inner}</a>')
     return f'<div class="cards">{"".join(shown)}</div>'
 
 
@@ -397,7 +521,8 @@ def _coverage(case: Case, unsearched: Unsearched | None) -> str:
             f'<td class="value">{_e(_relative(path, case.root))}</td><td></td><td></td></tr>'
         )
     table = (
-        '<div class="wide"><table><thead><tr><th>Status</th><th>Source</th><th>Detail</th>'
+        '<div class="wide"><table class="sortable"><thead><tr>'
+        "<th>Status</th><th>Source</th><th>Detail</th>"
         f"<th>Since</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
     )
     notes = []
@@ -428,19 +553,22 @@ def _conflict(conflict: Conflict, files: dict[str, CaseFile]) -> str:
             )
             said = _e(source or "value")
             rows.append(
-                f'<tr>{field}<td class="source">{said}</td><td class="value">{_e(value)}</td></tr>'
+                f'<tr>{field}<td class="source">{said}</td>'
+                f'<td class="value">{_value(value)}</td></tr>'
             )
         if difference.delta:
             rows.append(
                 f'<tr><td class="source">Delta</td>'
                 f'<td class="value delta">{_e(difference.delta)}</td></tr>'
             )
+    sources = [
+        ("Sources", " ↔ ".join(conflict.sources)),
+        ("Fields", str(len(conflict.differences))),
+    ]
     return (
         f'<article class="obj review" id="{conflict.ref}" data-search>'
         f'<h4><span class="ref">{conflict.ref}</span>{_link(entry.ref)} {_e(_name(entry))}</h4>'
-        + _props(
-            [("Sources", " ↔ ".join(conflict.sources)), ("Fields", str(len(conflict.differences)))]
-        )
+        + _props(sources)
         + '<div class="wide"><table><thead><tr><th>Field</th><th>Source</th><th>Value</th></tr>'
         f"</thead><tbody>{''.join(rows)}</tbody></table></div></article>"
     )
@@ -458,24 +586,27 @@ def _files(case: Case) -> str:
         return ""
     kinds = {finding.ref: finding.kind for finding in case.findings}
     rows = []
-    for entry in case.files:
+    for number, entry in enumerate(case.files, 1):
         folder = _folder(case, entry.record)
-        path = f'<div class="path">{_e(folder)}</div>' if folder else ""
+        path = f'<div class="path">{_value(folder)}</div>' if folder else ""
         mark = "!" if entry.state == REVIEW else "·" if entry.state == NOTHING else ""
+        held = " ".join(name for name in CATEGORIES if entry.found[name])
         found = "".join(
             f'<td class="{name}">{_e(" · ".join(entry.found[name]) or "—")}</td>'
             for name in CATEGORIES
         )
+        size = entry.record.size
         rows.append(
             f'<tr id="{_anchor(entry.ref)}" class="{entry.state}" data-search '
-            f'data-state="{entry.state}"><td class="ref">{_e(mark)} {_e(entry.ref)}</td>'
+            f'data-state="{entry.state}" data-found="{held}">'
+            f'<td class="ref" data-value="{number}">{_e(mark)} {_e(entry.ref)}</td>'
             f'<td class="name">{_e(_name(entry))}{path}</td>'
             f"<td>{_e(_format(entry.record.path))}</td>"
-            f'<td class="num">{_e(_size(entry.record.size))}</td>{found}'
+            f'<td class="num" data-value="{size}">{_e(_size(size))}</td>{found}'
             f"<td>{_references(entry, kinds)}</td></tr>"
         )
     return (
-        '<div class="wide"><table class="index"><thead><tr>'
+        '<div class="wide"><table class="index sortable"><thead><tr>'
         "<th>#</th><th>File</th><th>Type</th><th>Size</th>"
         "<th>Origin</th><th>Metadata</th><th>Activity</th><th>References</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table></div>"
@@ -495,7 +626,8 @@ def _relationships(case: Case, files: dict[str, CaseFile]) -> str:
     if not rows:
         return ""
     return (
-        '<div class="wide"><table><thead><tr><th>File</th><th>Relationship</th><th>Related</th>'
+        '<div class="wide"><table class="sortable"><thead><tr><th>File</th>'
+        "<th>Relationship</th><th>Related</th>"
         f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
     )
 
@@ -511,28 +643,31 @@ def _pivots(
     pivots = case.pivots
     if pivots is None or not pivots.total:
         return ""
-    parts = ["<h3>Summary</h3>", '<div class="wide"><table><tbody>']
-    parts += [
-        f'<tr><td>{_e(_type_name(kind))}</td><td class="num">{count:,}</td></tr>'
+    counted = "".join(
+        f"<tr><td>{_e(_type_name(kind))}</td>"
+        f'<td class="num" data-value="{count}">{count:,}</td></tr>'
         for kind, count in pivots.by_type
+    )
+    parts = [
+        "<h3>Summary</h3>",
+        '<div class="wide"><table class="sortable"><thead><tr><th>Type</th><th>Count</th>'
+        f"</tr></thead><tbody>{counted}</tbody></table></div>",
     ]
-    parts.append("</tbody></table></div>")
     if pivots.shared:
         parts.append("<h3>Cross-file pivots</h3>")
         for ref, entry in pivots.shared:
             sources = dict.fromkeys(
                 place.split(PLACE)[1] for place in entry.where if PLACE in place
             )
+            facts = [
+                ("Value", entry.value),
+                ("Files", f"{entry.files:,}"),
+                ("Sources", " · ".join(sources)),
+            ]
             parts.append(
                 f'<article class="obj" id="{ref}" data-search>'
                 f'<h4><span class="ref">{ref}</span>{_e(entry.type.upper())}</h4>'
-                + _props(
-                    [
-                        ("Value", entry.value),
-                        ("Files", f"{entry.files:,}"),
-                        ("Sources", " · ".join(sources)),
-                    ]
-                )
+                + _props(facts, copy=frozenset({"Value"}))
                 + "</article>"
             )
     if pivots.dense:
@@ -543,12 +678,14 @@ def _pivots(
             name = f"{_link(held.ref)} {_e(Path(dense.path).name)}" if held else _e(dense.path)
             kinds = " · ".join(f"{_type_name(kind)} {count:,}" for kind, count in dense.by_type)
             rows.append(
-                f'<tr data-search><td>{name}</td><td class="num">{dense.places:,}</td>'
+                f"<tr data-search><td>{name}</td>"
+                f'<td class="num" data-value="{dense.places}">{dense.places:,}</td>'
                 f"<td>{_e(kinds)}</td></tr>"
             )
         parts.append(
-            '<div class="wide"><table><thead><tr><th>File</th><th>Pivot locations</th>'
-            f"<th>By type</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+            '<div class="wide"><table class="sortable"><thead><tr><th>File</th>'
+            "<th>Pivot locations</th><th>By type</th></tr></thead>"
+            f"<tbody>{''.join(rows)}</tbody></table></div>"
         )
     if verbose and identifiers:
         parts.append(_every_pivot(identifiers))
@@ -564,15 +701,17 @@ def _every_pivot(identifiers: list[Identifier]) -> str:
     parts = ["<h3>Every pivot</h3>"]
     for kind, entries in kinds.items():
         rows = "".join(
-            f'<tr data-search><td class="value">{_e(entry.value)}</td>'
-            f'<td class="num">{entry.count:,}</td><td class="num">{entry.files:,}</td>'
+            f'<tr data-search><td class="value">{_value(entry.value)}</td>'
+            f'<td class="num" data-value="{entry.count}">{entry.count:,}</td>'
+            f'<td class="num" data-value="{entry.files}">{entry.files:,}</td>'
             f'<td class="path">{_e(" | ".join(entry.where))}</td></tr>'
             for entry in entries
         )
         parts.append(
             f"<details><summary>{_e(_type_name(kind))} · {len(entries):,}</summary>"
-            '<div class="body wide"><table><thead><tr><th>Value</th><th>Count</th><th>Files</th>'
-            f"<th>Where (sample)</th></tr></thead><tbody>{rows}</tbody></table></div></details>"
+            '<div class="body wide"><table class="sortable"><thead><tr><th>Value</th>'
+            "<th>Count</th><th>Files</th><th>Where (sample)</th></tr></thead>"
+            f"<tbody>{rows}</tbody></table></div></details>"
         )
     return "".join(parts)
 
@@ -589,7 +728,7 @@ def _details(case: Case, files: dict[str, CaseFile], *, verbose: bool) -> str:
         facts = [("Type", _format(record.path)), ("Size", _size(record.size))]
         if folder := _folder(case, record):
             facts.append(("Path", folder))
-        body = [_props(facts)]
+        body = [_props(facts, copy=frozenset({"Path"}))]
         for name in CATEGORIES:
             held = [found for found in record.evidence if category(found) == name]
             body.append(f'<h5 class="{name}">{_e(name)}</h5>')
@@ -599,7 +738,7 @@ def _details(case: Case, files: dict[str, CaseFile], *, verbose: bool) -> str:
             for found in held:
                 body.append(
                     f'<div class="record"><div class="name">{_e(named(found))}</div>'
-                    f"{_props(_facts(found, name, verbose=verbose))}</div>"
+                    f"{_props(_facts(found, name, verbose=verbose), copy=True, plain=_PLAIN)}</div>"
                 )
         notes = []
         for ref in entry.conflicts:
@@ -625,9 +764,11 @@ def _details(case: Case, files: dict[str, CaseFile], *, verbose: bool) -> str:
                 '<ul class="files">' + "".join(f"<li>{note}</li>" for note in notes) + "</ul>"
             )
         css = "review" if entry.state == REVIEW else ""
+        held_in = " ".join(name for name in CATEGORIES if entry.found[name])
         parts.append(
             f'<details class="{css}" id="detail-{entry.ref[1:]}" open data-search '
-            f'data-state="{entry.state}"><summary>{_e(entry.ref)} {_e(_name(entry))}</summary>'
+            f'data-state="{entry.state}" data-found="{held_in}">'
+            f"<summary>{_e(entry.ref)} {_e(_name(entry))}</summary>"
             f'<div class="body">{"".join(body)}</div></details>'
         )
     return "".join(parts)

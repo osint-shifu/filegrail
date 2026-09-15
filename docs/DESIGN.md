@@ -407,6 +407,11 @@ from outside the page, a URL found in a file is text rather than a link, and no
 data sits in a script that the page does not show, so a redacted scan cannot
 leave what it redacted behind in hidden JSON.
 
+Tables sort by any column. A summary card opens the section it counts, with
+the file index filtered to match. A value is never a link out of the page:
+beside it is a copy button, which copies the text shown, so opening an address
+found in a case is always a separate, deliberate act somewhere else.
+
 ## 6. Layout & Spacing
 
 - **Min terminal width**: `48` (degrades, stays correct)
