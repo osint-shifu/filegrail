@@ -427,6 +427,36 @@ def test_a_bitcoin_address_with_a_broken_checksum_is_not(tmp_path: Path):
     assert [e for e in extract([record], content=True) if e.type == "btc"] == []
 
 
+def test_the_other_chains_are_each_their_own_type_by_their_own_checksum(tmp_path: Path):
+    """A `3` address was pay-to-script on Litecoin too, once; it stays a `btc`."""
+    monero = (
+        "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQG"
+        "v7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A"
+    )
+    record = _document(
+        tmp_path,
+        "ltc LUEweDxDA4WhvWiNXXSxjM9CYzHPJv4QQF and ltc1qw508d6qejxtdg4y5r3zarvary0c5xw7kgmn4n9, "
+        "doge DEA5vGb2NpAwCiCp5yTE16F3DueQUVivQp, bch qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a, "
+        f"xmr {monero}, "
+        "p2sh 3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy, broken DEA5vGb2NpAwCiCp5yTE16F3DueQUVivQq",
+        source="document-metadata",
+    )
+
+    wallets = {"btc", "ltc", "doge", "bch", "xmr"}
+    found = sorted(
+        (e.type, e.normalized) for e in extract([record], content=True) if e.type in wallets
+    )
+
+    assert found == [
+        ("bch", "bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a"),
+        ("btc", "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy"),
+        ("doge", "DEA5vGb2NpAwCiCp5yTE16F3DueQUVivQp"),
+        ("ltc", "LUEweDxDA4WhvWiNXXSxjM9CYzHPJv4QQF"),
+        ("ltc", "ltc1qw508d6qejxtdg4y5r3zarvary0c5xw7kgmn4n9"),
+        ("xmr", monero),
+    ]
+
+
 def test_an_iban_is_found_without_its_spaces(tmp_path: Path):
     record = _document(
         tmp_path, "account GB82 WEST 1234 5698 7654 32 please", source="document-metadata"
@@ -791,6 +821,17 @@ def test_a_cve_id_is_found_in_either_case(tmp_path: Path):
     found = [(e.normalized, e.count) for e in extract([record], content=True) if e.type == "cve"]
 
     assert found == [("CVE-2021-44228", 2)]
+
+
+def test_a_sha512_digest_and_weakness_and_advisory_ids_are_found(tmp_path: Path):
+    record = _document(
+        tmp_path, f"sum {'AB' * 64}, cwe-79 and GHSA-JFH8-C2JP-5V3Q", source="document-metadata"
+    )
+
+    found = {(e.type, e.normalized) for e in extract([record], content=True)}
+
+    assert {("sha512", "ab" * 64), ("cwe", "CWE-79"), ("ghsa", "GHSA-jfh8-c2jp-5v3q")} <= found
+    assert not [value for kind, value in found if kind in {"md5", "sha1", "sha256"}]
 
 
 def test_a_registry_key_is_one_value_under_either_hive_spelling(tmp_path: Path):

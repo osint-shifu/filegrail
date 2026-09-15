@@ -14,6 +14,15 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   path and the hosts at either end of a `Received:` hop. A server in a UNC
   path that has a public name is now a `domain`.
 
+- `ltc`, `doge`, `bch` and `xmr` for Litecoin, Dogecoin, Bitcoin Cash and
+  Monero addresses, each believed only when its own checksum holds:
+  Base58Check with the version byte naming the chain, Bech32 for `ltc1`,
+  CashAddr's forty-bit polynomial, and Keccak-256 for Monero. A `3` address
+  stays a `btc`.
+
+- `sha512` for 128 hexadecimal digits, `cwe` for weakness ids and `ghsa` for
+  GitHub security advisories.
+
 ## 0.13.1 - 2026-09-15
 
 ### Changed

@@ -278,12 +278,17 @@ Filters intentionally reject many ambiguous values to reduce false positives.
 | `ipv4` | Dotted quads, with private and reserved ranges marked as such | Version numbers, and digits in a field naming software |
 | `ipv6` | Addresses with all eight groups written out, or any form inside the brackets a URL places around one | A compressed address standing bare, which can resemble a scope operator in code |
 | `geo` | Coordinates written with a hemisphere letter, a degree sign, a `geo:` URI, a map URL or an explicit latitude label | A bare pair of decimals |
-| `md5` `sha1` `sha256` | 32, 40 and 64 hexadecimal digits, bare or as colon-separated pairs; a digest of an address seen in the same scan is named for it | Digests in a field naming software, which may be build IDs |
+| `md5` `sha1` `sha256` `sha512` | 32, 40, 64 and 128 hexadecimal digits, bare, and all but the longest also as colon-separated pairs; a digest of an address seen in the same scan is named for it | Digests in a field naming software, which may be build IDs |
 | `cve` | Vulnerability identifiers, case-insensitive | |
+| `cwe` | Weakness identifiers such as `CWE-79`, case-insensitive | |
+| `ghsa` | GitHub security advisory identifiers, normalized to lowercase after the prefix | |
 | `registry` | Windows Registry keys under any hive, long name or short, as one key | |
 | `path` | Windows paths using a drive letter, environment variable or UNC share | POSIX paths; a bare drive or variable |
 | `executable` | Bare names of Windows executables, scripts, installers or shortcuts, alone or inside a path or URL | Names with spaces, source files and anything ending in `com` |
 | `btc` | Bitcoin addresses whose checksum holds, including legacy and `bc1`; Bech32 values are normalized to lowercase | Mixed-case `bc1` spelling |
+| `bch` | Bitcoin Cash addresses in CashAddr form whose checksum holds, with or without the `bitcoincash:` prefix, normalized with it | Legacy Bitcoin Cash addresses, which are written the same as Bitcoin ones |
+| `ltc` `doge` | Litecoin and Dogecoin addresses whose checksum holds and whose version byte names the chain, including `ltc1`; Bech32 values are normalized to lowercase | A `3` address, which Litecoin once shared with Bitcoin and which is a `btc` |
+| `xmr` | Monero standard, integrated and subaddresses whose Keccak-256 checksum holds | |
 | `eth` | Ethereum addresses, mixed-case ones validated using EIP-55 and one-case values by shape, normalized to lowercase | Transaction hashes |
 | `vin` | Vehicle identification numbers when the North American check digit holds, and values beside a `VIN` label regardless | Other arbitrary seventeen-character strings |
 | `iban` | Account numbers whose country, length and mod-97 check agree, with spaces removed | |

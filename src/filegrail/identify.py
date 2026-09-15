@@ -45,11 +45,13 @@ from typing import NamedTuple
 from urllib.parse import urlsplit
 
 from .checksums import (
+    base58check_version,
     bech32_version,
     is_aba,
-    is_base58check,
+    is_cashaddr,
     is_eth,
     is_iban,
+    is_monero,
     is_nip,
     is_onion,
     is_regon,
@@ -108,7 +110,8 @@ EMAIL_RE = re.compile(
 URL_RE = re.compile(r"\bhttps?://[^\s<>\"'`\](){}]+", re.IGNORECASE)
 IPV4_RE = re.compile(r"(?<![\w.\-])(\d{1,3}(?:\.\d{1,3}){3})(?![\w.\-])")
 HASH_RE = re.compile(
-    r"(?<![A-Za-z0-9\-])([A-Fa-f0-9]{32}|[A-Fa-f0-9]{40}|[A-Fa-f0-9]{64})(?![A-Za-z0-9\-])"
+    r"(?<![A-Za-z0-9\-])([A-Fa-f0-9]{32}|[A-Fa-f0-9]{40}|[A-Fa-f0-9]{64}|[A-Fa-f0-9]{128})"
+    r"(?![A-Za-z0-9\-])"
 )
 DOMAIN_RE = re.compile(
     r"(?<![\w.@\-/\\])"
@@ -128,11 +131,29 @@ FILE_LIKE_RE = re.compile(
 )
 
 #: Candidates only: the checksum decides. A legacy or pay-to-script address is
-#: base58 with a version character in front; a Bech32 address is `bc1` and its
-#: own alphabet, which leaves out `1`, `b`, `i` and `o` so nothing is misread.
-BTC_LEGACY_RE = re.compile(r"(?<![A-Za-z0-9])([13][1-9A-HJ-NP-Za-km-z]{25,34})(?![A-Za-z0-9])")
+#: base58 with a version character in front - `1` and `3` on Bitcoin, `L` and
+#: `M` on Litecoin, `D`, `9` and `A` on Dogecoin - and the version byte under
+#: it names the chain. A Bech32 address is `bc1` or `ltc1` and its own
+#: alphabet, which leaves out `1`, `b`, `i` and `o` so nothing is misread.
+LEGACY_ADDRESS_RE = re.compile(
+    r"(?<![A-Za-z0-9])([13LMD9A][1-9A-HJ-NP-Za-km-z]{25,34})(?![A-Za-z0-9])"
+)
 BTC_BECH32_RE = re.compile(
     r"(?<![A-Za-z0-9])(bc1[02-9ac-hj-np-z]{6,87})(?![A-Za-z0-9])", re.IGNORECASE
+)
+LTC_BECH32_RE = re.compile(
+    r"(?<![A-Za-z0-9])(ltc1[02-9ac-hj-np-z]{6,87})(?![A-Za-z0-9])", re.IGNORECASE
+)
+#: A Bitcoin Cash address: CashAddr's forty-two characters, with the
+#: `bitcoincash:` prefix or without it - the checksum covers it either way.
+CASHADDR_RE = re.compile(
+    r"(?<![A-Za-z0-9:])((?:bitcoincash:)?[qp][02-9ac-hj-np-z]{41})(?![A-Za-z0-9])",
+    re.IGNORECASE,
+)
+#: A Monero address: `4` or `8` and ninety-four base58 characters, eleven more
+#: for an integrated one.
+MONERO_RE = re.compile(
+    r"(?<![A-Za-z0-9])([48][1-9A-HJ-NP-Za-km-z]{94}(?:[1-9A-HJ-NP-Za-km-z]{11})?)(?![A-Za-z0-9])"
 )
 
 #: Printed in groups of four as often as not, so a space is allowed between
@@ -355,6 +376,9 @@ ANCHORED_TRACKERS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 CVE_RE = re.compile(r"\b(CVE-\d{4}-\d{4,7})\b", re.IGNORECASE)
+CWE_RE = re.compile(r"\b(CWE-\d{1,4})\b", re.IGNORECASE)
+#: A GitHub advisory: three groups of four from the alphabet GitHub mints them in.
+GHSA_RE = re.compile(r"\b(GHSA(?:-[23456789cfghjmpqrvwx]{4}){3})\b", re.IGNORECASE)
 
 #: A registry key under any hive, long name or short. Windows does not care
 #: about case, so neither does the normalised form, which also uses the
@@ -869,6 +893,7 @@ def extract(records: list[FileRecord], *, content: bool = False) -> list[Identif
             ("md5", hashlib.md5(encoded, usedforsecurity=False).hexdigest()),
             ("sha1", hashlib.sha1(encoded, usedforsecurity=False).hexdigest()),
             ("sha256", hashlib.sha256(encoded).hexdigest()),
+            ("sha512", hashlib.sha512(encoded).hexdigest()),
         ):
             hashed = found.get((kind, digest))
             if hashed is not None:
@@ -951,7 +976,7 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
         if software:
             continue  # a build id, not a digest of anything a case cares about
         raw = match.group(1)
-        kind = {32: "md5", 40: "sha1", 64: "sha256"}[len(raw)]
+        kind = {32: "md5", 40: "sha1", 64: "sha256", 128: "sha512"}[len(raw)]
         yield kind, raw, raw.lower(), None
 
     for match in COLON_DIGEST_RE.finditer(text):
@@ -978,6 +1003,12 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
     for match in CVE_RE.finditer(text):
         yield "cve", match.group(1), match.group(1).upper(), None
 
+    for match in CWE_RE.finditer(text):
+        yield "cwe", match.group(1), match.group(1).upper(), None
+
+    for match in GHSA_RE.finditer(text):
+        yield "ghsa", match.group(1), "GHSA" + match.group(1)[4:].lower(), None
+
     for match in REGISTRY_RE.finditer(text):
         hive = match.group(1).lower()
         key = _HIVES.get(hive, hive) + match.group(2).rstrip(_TRAILING_PUNCT).casefold()
@@ -1001,13 +1032,31 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
 
     # The self-checking values. A wallet address is believed wherever it
     # stands; the tax numbers only beside their label, see the patterns.
-    for match in BTC_LEGACY_RE.finditer(text):
-        if is_base58check(match.group(1)):
+    for match in LEGACY_ADDRESS_RE.finditer(text):
+        address_version = base58check_version(match.group(1))
+        if address_version in (0x00, 0x05):
             yield "btc", match.group(1), match.group(1), None
+        elif address_version in (0x30, 0x32):
+            yield "ltc", match.group(1), match.group(1), None
+        elif address_version in (0x1E, 0x16):
+            yield "doge", match.group(1), match.group(1), None
 
     for match in BTC_BECH32_RE.finditer(text):
         if bech32_version(match.group(1)) is not None:
             yield "btc", match.group(1), match.group(1).lower(), None
+
+    for match in LTC_BECH32_RE.finditer(text):
+        if bech32_version(match.group(1), "ltc") is not None:
+            yield "ltc", match.group(1), match.group(1).lower(), None
+
+    for match in CASHADDR_RE.finditer(text):
+        if is_cashaddr(match.group(1)):
+            cash_body = match.group(1).lower().rpartition(":")[2]
+            yield "bch", match.group(1), f"bitcoincash:{cash_body}", None
+
+    for match in MONERO_RE.finditer(text):
+        if is_monero(match.group(1)):
+            yield "xmr", match.group(1), match.group(1), None
 
     for match in IBAN_RE.finditer(text):
         if is_iban(match.group(1)):

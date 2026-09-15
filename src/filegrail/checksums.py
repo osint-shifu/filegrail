@@ -62,25 +62,31 @@ _REGON_WEIGHTS = {
 
 
 def is_base58check(text: str) -> bool:
-    """Whether `text` is a 25-byte Base58Check payload whose tail is its digest.
+    """Whether `text` is a 25-byte Base58Check payload whose tail is its digest."""
+    return base58check_version(text) is not None
 
-    That is the shape of a legacy or pay-to-script Bitcoin address: a version
-    byte, a twenty-byte hash and four bytes of double SHA-256 over the rest.
+
+def base58check_version(text: str) -> int | None:
+    """The version byte of a 25-byte Base58Check payload, or None if it is not one.
+
+    That is the shape of a legacy or pay-to-script address: a version byte, a
+    twenty-byte hash and four bytes of double SHA-256 over the rest. Bitcoin
+    and the chains that copied it tell their addresses apart by that byte.
     """
     number = 0
     for char in text:
         index = _BASE58.find(char)
         if index < 0:
-            return False
+            return None
         number = number * 58 + index
     body = number.to_bytes((number.bit_length() + 7) // 8, "big")
     # Each leading `1` is a leading zero byte, which the integer cannot carry.
     leading = len(text) - len(text.lstrip("1"))
     raw = b"\x00" * leading + body
     if len(raw) != 25:
-        return False
+        return None
     digest = hashlib.sha256(hashlib.sha256(raw[:-4]).digest()).digest()
-    return digest[:4] == raw[-4:]
+    return raw[0] if digest[:4] == raw[-4:] else None
 
 
 def _polymod(values: list[int]) -> int:
@@ -94,8 +100,8 @@ def _polymod(values: list[int]) -> int:
     return checksum
 
 
-def bech32_version(text: str) -> int | None:
-    """The witness version of a mainnet Bech32 address, or None if it is not one.
+def bech32_version(text: str, hrp: str = _MAINNET) -> int | None:
+    """The witness version of a Bech32 address under `hrp`, or None if it is not one.
 
     Version 0 addresses (``bc1q``) use the original Bech32 checksum; every
     later version, Taproot's ``bc1p`` among them, uses Bech32m. Mixed case is
@@ -106,7 +112,7 @@ def bech32_version(text: str) -> int | None:
         return None
     lowered = text.lower()
     prefix, separator, data = lowered.rpartition("1")
-    if prefix != _MAINNET or not separator or len(data) < 6:
+    if prefix != hrp or not separator or len(data) < 6:
         return None
     try:
         values = [_BECH32.index(char) for char in data]
@@ -120,6 +126,36 @@ def bech32_version(text: str) -> int | None:
     if _polymod(expanded + values) != expected:
         return None
     return version
+
+
+# --- bitcoin cash ---------------------------------------------------------------
+#
+# CashAddr is Bech32's alphabet with a forty-bit checksum of its own, computed
+# over the `bitcoincash` prefix whether or not the address is written with it.
+
+_CASHADDR_PREFIX = "bitcoincash"
+_CASHADDR_GENERATOR = (0x98F2BC8E61, 0x79B76D99E2, 0xF33E5FB3C4, 0xAE2EABE2A8, 0x1E4F43E470)
+
+
+def is_cashaddr(text: str) -> bool:
+    """Whether `text` is a Bitcoin Cash address, prefixed or bare, whose checksum holds."""
+    if text != text.lower() and text != text.upper():
+        return False
+    prefix, _, data = text.lower().rpartition(":")
+    if prefix not in ("", _CASHADDR_PREFIX) or len(data) != 42:
+        return False
+    try:
+        values = [_BECH32.index(char) for char in data]
+    except ValueError:
+        return False
+    checksum = 1
+    for value in [ord(char) & 31 for char in _CASHADDR_PREFIX] + [0] + values:
+        top = checksum >> 35
+        checksum = ((checksum & 0x07FFFFFFFF) << 5) ^ value
+        for bit, coefficient in enumerate(_CASHADDR_GENERATOR):
+            if (top >> bit) & 1:
+                checksum ^= coefficient
+    return checksum == 1
 
 
 def is_iban(text: str) -> bool:
@@ -268,6 +304,41 @@ def is_eth(text: str) -> bool:
         (char.upper() if int(nibble, 16) >= 8 else char.lower()) == char
         for char, nibble in zip(body, digest[:40], strict=True)
     )
+
+
+# --- monero ---------------------------------------------------------------------
+#
+# Monero's base58 is Bitcoin's alphabet applied eight bytes at a time, so every
+# block encodes to the same width, and its checksum is the first four bytes of
+# the Keccak-256 above.
+
+#: Bytes a final block holds, by how many characters encode it.
+_MONERO_BLOCK = {2: 1, 3: 2, 5: 3, 6: 4, 7: 5, 9: 6, 10: 7, 11: 8}
+#: The mainnet network bytes - standard, integrated, subaddress - and the
+#: length each decodes to.
+_MONERO_NETWORKS = {18: 69, 19: 77, 42: 69}
+
+
+def is_monero(text: str) -> bool:
+    """Whether `text` is a mainnet Monero address whose checksum holds."""
+    raw = bytearray()
+    for start in range(0, len(text), 11):
+        block = text[start : start + 11]
+        size = _MONERO_BLOCK.get(len(block))
+        if size is None:
+            return False
+        number = 0
+        for char in block:
+            index = _BASE58.find(char)
+            if index < 0:
+                return False
+            number = number * 58 + index
+        if number >> (8 * size):
+            return False
+        raw += number.to_bytes(size, "big")
+    if not raw or _MONERO_NETWORKS.get(raw[0]) != len(raw):
+        return False
+    return keccak256(bytes(raw[:-4]))[:4] == raw[-4:]
 
 
 # --- vehicles -------------------------------------------------------------------
