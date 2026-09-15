@@ -650,6 +650,8 @@ def test_a_person_is_read_from_a_field_that_names_one():
     placeholder = _record(
         "form.docx", source="document-metadata", fields={"Author": "Microsoft Office User"}
     )
+    # An OLE document's summary names its last editor under its own spelling.
+    sheet = _record("sheet.xls", source="document-metadata", fields={"LastAuthor": "Ann Shaw"})
     # Seen in the wild: an application writing its device id where the
     # photographer's name goes.
     blob = _record(
@@ -658,9 +660,10 @@ def test_a_person_is_read_from_a_field_that_names_one():
         fields={"Artist": "7a3c0114-90a5-43cf-af74-75f091770f13"},
     )
 
-    found = extract([docx, mail, placeholder, blob])
+    found = extract([docx, mail, placeholder, blob, sheet])
 
-    assert sorted(e.normalized for e in found if e.type == "person") == ["ann shaw", "jan kowalski"]
+    people = {e.normalized: e.files for e in found if e.type == "person"}
+    assert people == {"ann shaw": 2, "jan kowalski": 1}
     assert [e.normalized for e in found if e.type == "email"] == ["ann.shaw@acme.example"]
 
 

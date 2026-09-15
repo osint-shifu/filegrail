@@ -29,6 +29,10 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   and `iSamples team` were two authors of three files each rather than one
   of six.
 
+- The last editor an Office 97-2003 document names in its summary,
+  `LastAuthor`, is read as a person, as `lastModifiedBy` already was in the
+  formats that replaced it.
+
 ## 0.14.0 - 2026-09-15
 
 ### Added

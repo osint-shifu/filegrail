@@ -225,7 +225,15 @@ PRIVATE_KEY = "private key block"
 #: measure - and since a document body is addressed by line, it cannot
 #: reach these tables by construction.
 _PERSON_FIELDS = frozenset(
-    {"author", "dc:creator", "artist", "by-line", "lastmodifiedby", "cp:lastmodifiedby"}
+    {
+        "author",
+        "dc:creator",
+        "artist",
+        "by-line",
+        "lastmodifiedby",
+        "lastauthor",
+        "cp:lastmodifiedby",
+    }
 )
 
 #: Mail headers carrying mailboxes, whose display names are people.
