@@ -142,6 +142,9 @@ class Dense:
 @dataclass(slots=True)
 class Pivots:
     total: int
+
+    #: How many were found in more than one file; `shared` names the first few.
+    across: int
     shared: list[tuple[str, Identifier]]
     cross_corpus: int
     by_type: list[tuple[str, int]]
@@ -375,7 +378,7 @@ def _findings(
     for moment, stamped_files in sorted(stamped.items(), key=lambda pair: (-len(pair[1]), pair[0])):
         if len(stamped_files) < 2:
             continue
-        facts = [("timestamp", _stamp(moment)), ("files", str(len(stamped_files)))]
+        facts = [("timestamp", stamp(moment)), ("files", str(len(stamped_files)))]
         same = _same_bytes(stamped_files)
         if same is not None:
             facts.append(("bytes", "identical" if same else "different"))
@@ -453,7 +456,7 @@ def _generated(record: FileRecord) -> Item | None:
     return None
 
 
-def _stamp(moment: str) -> str:
+def stamp(moment: str) -> str:
     try:
         parsed = datetime.fromisoformat(moment.replace("Z", "+00:00"))
     except ValueError:
@@ -539,6 +542,7 @@ def _pivots(identifiers: list[Identifier], files: list[CaseFile]) -> Pivots:
 
     return Pivots(
         total=len(identifiers),
+        across=sum(1 for entry in identifiers if entry.files > 1),
         shared=[(f"P{number:02d}", entry) for number, entry in enumerate(shared, 1)],
         cross_corpus=sum(1 for entry in identifiers if len(entry.corpora) > 1),
         by_type=sorted(

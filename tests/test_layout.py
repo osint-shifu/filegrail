@@ -17,9 +17,12 @@ from pathlib import Path
 
 import pytest
 
+from filegrail.analysis import analyse
+from filegrail.casereport import render_case
 from filegrail.clean import Cleaned
 from filegrail.compare import compare
 from filegrail.doctor import survey
+from filegrail.identify import extract
 from filegrail.models import EvidenceRecord, FileRecord
 from filegrail.report import (
     render_clean,
@@ -93,7 +96,12 @@ def _every_view(theme: Theme) -> dict[str, str]:
     """Every text view there is, rendered from one corpus."""
     records = _corpus()
     one = records[1]
+    found = extract(records)
+    case = analyse(records, ROOT, survey=survey(Path("/nonexistent")), identifiers=found)
     return {
+        "case": render_case(case, theme=theme, identifiers=found),
+        "case-verbose": render_case(case, theme=theme, identifiers=found, verbose=True),
+        "case-brief": render_case(case, theme=theme, brief=True),
         "scan": render_text(records, ROOT, theme=theme),
         "brief": render_text(records, ROOT, theme=theme, brief=True),
         "file": render_text([one], ROOT, theme=theme),
@@ -137,8 +145,10 @@ def test_nothing_anywhere_is_truncated(width: int):
 def test_a_long_url_survives_intact(width: int):
     """Broken across lines by the window is unavoidable; broken and lost is not."""
     output = render_text(_corpus(), ROOT, theme=_theme(width))
+    case = render_case(analyse(_corpus(), ROOT), theme=_theme(width), verbose=True)
 
     assert LONG_URL in _flat(output)
+    assert LONG_URL in _flat(case)
 
 
 def _flat(output: str) -> str:

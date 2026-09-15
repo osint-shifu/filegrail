@@ -171,6 +171,7 @@ def test_pivots_are_counted_in_every_place_and_what_one_file_holds_is_folded():
     pivots = analyse(records, Path("/case"), identifiers=extract(records)).pivots
 
     assert pivots is not None
+    assert pivots.across == 2
     assert [(ref, e.type, e.normalized) for ref, e in pivots.shared] == [
         ("P01", "domain", "example.org"),
         ("P02", "url", "https://example.org/p1"),

@@ -66,6 +66,13 @@ BRANCH = "├"
 LAST = "└"
 FLAG = "!"
 RULE = "─"
+
+#: Opens and closes a whole report, which a single rule under a heading must
+#: not be mistaken for.
+DOUBLE_RULE = "═"
+
+#: Between two sources that state one field differently.
+BOTH_WAYS = "↔"
 MIDDOT = "·"
 ELLIPSIS = "…"
 
@@ -89,6 +96,8 @@ _ASCII = {
     LAST: "\\",
     FLAG: "!",
     RULE: "-",
+    DOUBLE_RULE: "=",
+    BOTH_WAYS: "<->",
     # Not "|": the rail already claims that glyph, and a separator that looks
     # like a gutter destroys the one alignment cue the ASCII layout has.
     MIDDOT: "-",
