@@ -22,6 +22,7 @@ from .analysis import analyse
 from .casereport import render_case
 from .doctor import survey
 from .filters import FAMILIES, UnknownType, describe, selection
+from .htmlreport import render_html
 from .identify import extract
 from .report import (
     render_compare,
@@ -38,6 +39,8 @@ from .scan import Unsearched, scan
 from .theme import detect
 
 if TYPE_CHECKING:  # only for the signatures; the scan brings the real thing
+    from .analysis import Case
+    from .identify import Identifier
     from .models import FileRecord
 
 COMMANDS = ("scan", "explain", "compare", "doctor", "menu", "clean", "help")
@@ -121,6 +124,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--verbose",
         action="store_true",
         help="Open every file: its full detail with every decoded field, and the full pivot lists.",
+    )
+    parser.add_argument(
+        "--html",
+        action="store_true",
+        help="Print the report as one self-contained HTML page, to redirect to a file.",
     )
     parser.add_argument(
         "--brief",
@@ -389,6 +397,9 @@ def _home(args: argparse.Namespace) -> Path | None | int:
 
 def _scan(rest: list[str]) -> int:
     args = build_parser().parse_args(rest)
+    if args.json and args.html:
+        print("filegrail: --json and --html are two outputs; choose one", file=sys.stderr)
+        return 2
     root = args.path.resolve()
     if not root.exists():
         return _missing(args.path)
@@ -443,11 +454,25 @@ def _scan(rest: list[str]) -> int:
                 unsearched=missed,
             )
         )
+    elif args.html:
+        case, found = _case(records, base, home, content=args.content, listed=listed)
+        print(
+            render_html(
+                case,
+                verbose=args.verbose,
+                identifiers=found,
+                content=args.content,
+                home=home,
+                unsearched=missed,
+                filtered=describe(args.families, args.extensions),
+                redacted=args.redact,
+            ),
+            end="",
+        )
     elif args.timeline:
         print(render_timeline(records, base, theme=theme, home=home))
     elif root.is_dir():
-        found = extract(records, content=args.content) if listed else None
-        case = analyse(records, base, survey=survey(home), identifiers=found)
+        case, found = _case(records, base, home, content=args.content, listed=listed)
         print(
             render_case(
                 case,
@@ -482,6 +507,14 @@ def _scan(rest: list[str]) -> int:
             )
         )
     return 0
+
+
+def _case(
+    records: list[FileRecord], base: Path, home: Path | None, *, content: bool, listed: bool
+) -> tuple[Case, list[Identifier] | None]:
+    """The scan read as a case, with its pivots when they were asked for."""
+    found = extract(records, content=content) if listed else None
+    return analyse(records, base, survey=survey(home), identifiers=found), found
 
 
 def _one(path: Path, home: Path | None = None) -> FileRecord | None:

@@ -5,6 +5,18 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `--html` prints the investigation report as one self-contained HTML page,
+  for a scan of a directory or of a single file: the same sections, numbers
+  and findings as the terminal report, with every number an anchor to click
+  through, a search box and a filter for the files to review. It is dark and
+  prints light. A Content-Security-Policy allows no network request, nothing
+  is loaded from outside the page, a URL found in a file is text rather than a
+  link, and every value that came out of a file is escaped.
+
 ## 0.15.0 - 2026-09-16
 
 ### Added

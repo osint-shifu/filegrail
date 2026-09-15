@@ -398,6 +398,15 @@ files whose arrival or handling was recorded, and every file under `-v`.
 | `[~]` | a trace source read in part |
 | `[-]` | a trace source not found, not readable or not supported |
 
+### As a page
+
+`--html` prints the same report as one HTML page: the same sections, numbers
+and references, with every number an anchor. It is dark by default and prints
+light. A Content-Security-Policy allows no network request, nothing is loaded
+from outside the page, a URL found in a file is text rather than a link, and no
+data sits in a script that the page does not show, so a redacted scan cannot
+leave what it redacted behind in hidden JSON.
+
 ## 6. Layout & Spacing
 
 - **Min terminal width**: `48` (degrades, stays correct)

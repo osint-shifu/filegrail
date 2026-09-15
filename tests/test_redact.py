@@ -181,7 +181,7 @@ def _invocation(command: str, media: Path, other: Path) -> list[str]:
 
 
 @pytest.mark.parametrize("command", ("scan", "explain", "compare"))
-@pytest.mark.parametrize("shape", ("--no-color", "--json"))
+@pytest.mark.parametrize("shape", ("--no-color", "--json", "--html"))
 def test_a_command_that_prints_a_credentialed_url_can_redact_it(
     command: str, shape: str, tmp_path: Path, monkeypatch, capsys
 ):
@@ -202,6 +202,8 @@ def test_a_command_that_prints_a_credentialed_url_can_redact_it(
     # the output can see - depends on whoever is running the suite.
     monkeypatch.setenv("COLUMNS", "110")
 
+    if shape == "--html" and command != "scan":
+        pytest.skip("--html is an output of a scan")
     media = _downloaded(tmp_path, "briefing.mp4", SECRET_URL)
     other = _downloaded(tmp_path, "annex.mp4", "https://media.example.org/v/13")
     argv = _invocation(command, media, other)

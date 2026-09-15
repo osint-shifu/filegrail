@@ -39,6 +39,14 @@ def test_scan_can_be_named_explicitly(tmp_path: Path, capsys):
     assert "FILE" in capsys.readouterr().out
 
 
+def test_html_is_printed_like_json_and_never_alongside_it(tmp_path: Path, capsys):
+    (tmp_path / "a.txt").write_text("a", encoding="utf-8")
+
+    assert main([str(tmp_path), "--html"]) == 0
+    assert capsys.readouterr().out.startswith("<!doctype html>")
+    assert main([str(tmp_path), "--html", "--json"]) == 2
+
+
 def test_help_lists_a_command(capsys):
     assert main(["help", "explain"]) == 0
 

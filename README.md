@@ -511,6 +511,7 @@ Investigative-pivot extraction, content inspection, hashing and clustering run o
 | `--unknown-only` | Show only files with no evidence found |
 | `--hash` | Compute SHA-256 for each file |
 | `-j`, `--json` | JSON output |
+| `--html` | The report as one self-contained HTML page, to redirect to a file |
 | `--redact` | Redact credentials before printing |
 | `--type NAME` | Filter by `archive`, `audio`, `document`, `image`, `mail`, `text` or `video` |
 | `--ext LIST` | Filter by extensions, e.g. `--ext jpg,pdf` |
@@ -578,6 +579,9 @@ filegrail ./case --json > report.json
 
 # JSON report with credentials redacted
 filegrail ./case --redact --json > report.json
+
+# HTML report, opened in a browser without a network connection
+filegrail ./case --content --html > report.html
 ```
 
 ---
