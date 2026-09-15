@@ -34,7 +34,7 @@ With `--content`, supported document bodies can also be inspected for investigat
 
 The document text itself is not printed or stored in the report. Only supported values and the locations where they were found are retained.
 
-Every evidence record also states **how it was associated with the file** — for example by an exact recorded path, a file attribute, matching name and size, archive membership, filename-only association or the file's own bytes.
+Every evidence record also states **how it was associated with the file** - for example by an exact recorded path, a file attribute, matching name and size, archive membership, filename-only association or the file's own bytes.
 
 An exact recorded path and a weak filename-only match are therefore never presented as equivalent.
 
@@ -292,7 +292,7 @@ Filters intentionally reject many ambiguous values to reduce false positives.
 | `sid` | Windows account and group SIDs such as `S-1-5-21-…` with a relative ID | Short well-known SIDs such as `S-1-5-18` |
 | `bic` | Bank identifier codes beside a `BIC` or `SWIFT` label, 8 or 11 characters, with a valid country code | The same code standing bare |
 | `secret` | Vendor-prefixed API keys and tokens, JWTs and private-key blocks; reported as type and fingerprint, never as the secret value | Credentials detected only because of a nearby field name |
-| `person` | Names in fields identifying who made a file — author, by-line, artist or mail display name — and names in text when preceded by supported honorifics | Arbitrary names in document text and common application placeholders |
+| `person` | Names in fields identifying who made a file - author, by-line, artist or mail display name - and names in text when preceded by supported honorifics | Arbitrary names in document text and common application placeholders |
 | `org` | Company or credit fields and names in text ending with supported legal forms such as `Sp. z o.o.`, `GmbH`, `Ltd`, `Inc` or `LLC` | Ambiguous `Source` fields |
 | `handle` | Accounts referenced through known-platform profile URLs and user-directory logins from the originating machine | Platform-owned pages and common system directories |
 | `postcode` | Polish postcode with town context and UK postcodes recognized by shape | Bare ambiguous postal-looking values and US ZIP codes |
@@ -386,9 +386,9 @@ Groups files by shared identifying values and reports the field responsible for 
 
 Examples:
 
-- **camera serial** — `EXIF · BodySerialNumber`: indicates the same recorded physical camera identifier;
-- **camera model** — `EXIF · Make + Model`: identifies the same model, not necessarily the same physical device;
-- **author** — `OOXML · creator` or equivalent: groups files carrying the same recorded author value.
+- **camera serial** - `EXIF · BodySerialNumber`: indicates the same recorded physical camera identifier;
+- **camera model** - `EXIF · Make + Model`: identifies the same model, not necessarily the same physical device;
+- **author** - `OOXML · creator` or equivalent: groups files carrying the same recorded author value.
 
 ### File relationships
 
