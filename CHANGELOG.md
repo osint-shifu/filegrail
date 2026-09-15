@@ -22,6 +22,11 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   filtered to the files it counts; and a copy button beside a path, a pivot, a
   conflicting value or a field copies the text shown, without opening it.
 
+- The HTML report lists every investigative pivot, one tab a type, with the
+  files each was found in as links and a sample of where, and says of two
+  conflicting dates which one is how much earlier. Its sections run summary,
+  key findings, files, pivots, file detail, evidence coverage, conflicts.
+
 ## 0.15.0 - 2026-09-16
 
 ### Added

@@ -109,3 +109,29 @@ def test_a_copy_button_copies_the_value_shown_and_keeps_no_copy_of_its_own():
 
     assert '<span class="v">https://example.org/holiday.jpg</span><button class="copy"' in page
     assert "data-copy" not in page
+
+
+def test_the_sections_come_in_the_order_they_are_worked_through():
+    page = _page(_corpus())
+
+    assert re.findall(r"<h2>([^<]+)</h2>", page) == [
+        "Summary",
+        "Key findings",
+        "Files",
+        "Investigative pivots",
+        "File detail",
+        "Conflicts",
+        "Report notes",
+    ]
+
+
+def test_every_pivot_is_listed_with_the_files_it_was_found_in():
+    page = _page(_corpus())
+    panel = page.split('id="pivots-type-url"')[1].split('class="panel')[0]
+
+    assert '<span class="v">https://example.org/holiday.jpg</span>' in panel
+    assert 'href="#file-002"' in panel
+
+
+def test_a_conflict_says_which_statement_is_how_much_earlier():
+    assert "XMP is 72 days earlier than PDF Info" in _page(_corpus())

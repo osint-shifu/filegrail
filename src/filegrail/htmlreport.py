@@ -27,9 +27,9 @@ from html import escape
 from pathlib import Path
 
 from . import __version__
-from .analysis import NOTHING, REVIEW, Case, CaseFile, Conflict, Finding, named
+from .analysis import NOTHING, REVIEW, Case, CaseFile, Conflict, Finding, Pivots, named
 from .casereport import _ABSENT, _LISTED, MATCHES, _capital, _facts, _folder, _type_name
-from .identify import PLACE, Identifier
+from .identify import Identifier
 from .models import ACTIVITY, CATEGORIES, METADATA, ORIGIN, category
 from .overview import inventory
 from .report import _format, _relative, _size
@@ -122,6 +122,14 @@ margin:16px 0 6px;font-weight:600}
 footer{margin-top:52px;border-top:1px solid var(--line);padding-top:12px;
 color:var(--faint);font-size:12px}
 .hidden{display:none!important}
+.tabs{display:none;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.js .tabs{display:flex}
+.tabs button{font:inherit;font-size:13px;color:var(--muted);background:var(--panel);
+border:1px solid var(--line);border-radius:4px;padding:4px 10px;cursor:pointer}
+.tabs button[aria-selected=true]{color:var(--text);border-color:var(--link)}
+.tabs .count{color:var(--faint);font-variant-numeric:tabular-nums}
+.js .panel.inactive{display:none}.searching .panel.inactive{display:block}
+.holder{display:inline-block;margin-right:12px}
+.wide>table.pivots{min-width:760px}
 a.card{display:block;color:inherit}a.card:hover{border-color:var(--muted);text-decoration:none}
 th.sort{cursor:pointer;user-select:none}th.sort:hover,th.sort:focus{color:var(--text);outline:none}
 th[aria-sort=ascending]::after{content:" \25B2";font-size:9px}
@@ -136,7 +144,7 @@ border:1px solid var(--line);border-radius:3px;padding:0 5px;cursor:pointer;vert
 @media print{:root{color-scheme:light;--bg:#fff;--panel:#fff;--panel2:#e6e6e6;--line:#bdbdbd;
 --text:#111;--muted:#4d4d4d;--faint:#6b6b6b;--link:#111;--review:#9c3d14;--origin:#2c6b4b;
 --metadata:#2c5a88;--activity:#7d5f18}
-body{font-size:10.5px}nav,.tools,.copy{display:none!important}a{color:inherit}
+body{font-size:10.5px}nav,.tools,.copy,.tabs{display:none!important}.panel.inactive{display:block!important}a{color:inherit}
 .obj,details,tr,.card{break-inside:avoid}thead{display:table-header-group}
 h2{break-after:avoid}}
 """
@@ -172,6 +180,7 @@ _SCRIPT = """
       item.classList.toggle('hidden', !shown);
       if (shown && wanted && item.tagName === 'DETAILS') { item.open = true; }
     });
+    document.body.classList.toggle('searching', !!wanted);
     if (chip) {
       chip.classList.toggle('hidden', !filter);
       said.textContent = names[filter] || '';
@@ -185,6 +194,20 @@ _SCRIPT = """
   });
   var clear = document.getElementById('filter-clear');
   if (clear) { clear.addEventListener('click', function () { filter = ''; apply(); }); }
+
+  each(document.querySelectorAll('.tabs'), function (list) {
+    var tabs = list.querySelectorAll('button[data-panel]');
+    each(tabs, function (tab) {
+      tab.addEventListener('click', function () {
+        each(tabs, function (other) {
+          var chosen = other === tab;
+          other.setAttribute('aria-selected', chosen ? 'true' : 'false');
+          var panel = document.getElementById(other.dataset.panel);
+          if (panel) { panel.classList.toggle('inactive', !chosen); }
+        });
+      });
+    });
+  });
 
   each(document.querySelectorAll('table.sortable'), function (table) {
     if (!table.tHead || !table.tBodies.length) { return; }
@@ -250,14 +273,14 @@ _SCRIPT = """
 _PLAIN = frozenset({"Match"})
 
 _SECTIONS = (
-    ("summary", "Case summary"),
+    ("summary", "Summary"),
     ("findings", "Key findings"),
-    ("coverage", "Evidence coverage"),
-    ("conflicts", "Conflicts"),
     ("files", "Files"),
     ("relationships", "Relationships"),
     ("pivots", "Investigative pivots"),
     ("detail", "File detail"),
+    ("coverage", "Evidence coverage"),
+    ("conflicts", "Conflicts"),
     ("notes", "Report notes"),
 )
 
@@ -284,7 +307,7 @@ def render_html(
         "conflicts": _conflicts(case, files),
         "files": _files(case),
         "relationships": _relationships(case, files),
-        "pivots": _pivots(case, files, verbose=verbose, identifiers=identifiers, content=content),
+        "pivots": _pivots(case, files, identifiers),
         "detail": _details(case, files, verbose=verbose),
         "notes": _notes(case),
     }
@@ -557,9 +580,12 @@ def _conflict(conflict: Conflict, files: dict[str, CaseFile]) -> str:
                 f'<td class="value">{_value(value)}</td></tr>'
             )
         if difference.delta:
+            first_source = difference.values[0][0] or "the first"
+            second_source = difference.values[-1][0] or "the second"
+            said = f"{second_source} is {difference.delta} than {first_source}"
             rows.append(
-                f'<tr><td class="source">Delta</td>'
-                f'<td class="value delta">{_e(difference.delta)}</td></tr>'
+                f'<tr><td class="source">Difference</td>'
+                f'<td class="value delta">{_e(said)}</td></tr>'
             )
     sources = [
         ("Sources", " ↔ ".join(conflict.sources)),
@@ -632,88 +658,105 @@ def _relationships(case: Case, files: dict[str, CaseFile]) -> str:
     )
 
 
-def _pivots(
-    case: Case,
-    files: dict[str, CaseFile],
-    *,
-    verbose: bool,
-    identifiers: list[Identifier] | None,
-    content: bool,
-) -> str:
+def _pivots(case: Case, files: dict[str, CaseFile], identifiers: list[Identifier] | None) -> str:
+    """Every pivot, one tab a type, each with the files it was found in and where."""
     pivots = case.pivots
-    if pivots is None or not pivots.total:
+    if pivots is None or not pivots.total or identifiers is None:
         return ""
-    counted = "".join(
-        f"<tr><td>{_e(_type_name(kind))}</td>"
-        f'<td class="num" data-value="{count}">{count:,}</td></tr>'
-        for kind, count in pivots.by_type
-    )
-    parts = [
-        "<h3>Summary</h3>",
-        '<div class="wide"><table class="sortable"><thead><tr><th>Type</th><th>Count</th>'
-        f"</tr></thead><tbody>{counted}</tbody></table></div>",
-    ]
-    if pivots.shared:
-        parts.append("<h3>Cross-file pivots</h3>")
-        for ref, entry in pivots.shared:
-            sources = dict.fromkeys(
-                place.split(PLACE)[1] for place in entry.where if PLACE in place
-            )
-            facts = [
-                ("Value", entry.value),
-                ("Files", f"{entry.files:,}"),
-                ("Sources", " · ".join(sources)),
-            ]
-            parts.append(
-                f'<article class="obj" id="{ref}" data-search>'
-                f'<h4><span class="ref">{ref}</span>{_e(entry.type.upper())}</h4>'
-                + _props(facts, copy=frozenset({"Value"}))
-                + "</article>"
-            )
-    if pivots.dense:
-        parts.append("<h3>High-density files</h3>")
-        rows = []
-        for dense in pivots.dense:
-            held = files.get(dense.path)
-            name = f"{_link(held.ref)} {_e(Path(dense.path).name)}" if held else _e(dense.path)
-            kinds = " · ".join(f"{_type_name(kind)} {count:,}" for kind, count in dense.by_type)
-            rows.append(
-                f"<tr data-search><td>{name}</td>"
-                f'<td class="num" data-value="{dense.places}">{dense.places:,}</td>'
-                f"<td>{_e(kinds)}</td></tr>"
-            )
-        parts.append(
-            '<div class="wide"><table class="sortable"><thead><tr><th>File</th>'
-            "<th>Pivot locations</th><th>By type</th></tr></thead>"
-            f"<tbody>{''.join(rows)}</tbody></table></div>"
-        )
-    if verbose and identifiers:
-        parts.append(_every_pivot(identifiers))
-    else:
-        parts.append('<p class="note">Full pivot lists: add -v, or use --json.</p>')
-    return "".join(parts)
-
-
-def _every_pivot(identifiers: list[Identifier]) -> str:
     kinds: dict[str, list[Identifier]] = {}
     for entry in identifiers:
         kinds.setdefault(entry.type, []).append(entry)
-    parts = ["<h3>Every pivot</h3>"]
-    for kind, entries in kinds.items():
-        rows = "".join(
-            f'<tr data-search><td class="value">{_value(entry.value)}</td>'
-            f'<td class="num" data-value="{entry.count}">{entry.count:,}</td>'
+    refs = {f"{entry.type}\0{entry.normalized}": ref for ref, entry in pivots.shared}
+    across = sorted(
+        (entry for entry in identifiers if entry.files > 1),
+        key=lambda entry: (-entry.files, -entry.count, entry.type, entry.normalized),
+    )
+
+    panels: list[tuple[str, str, int, str]] = []
+    if across:
+        table = _pivot_table(across, files, refs, across=True)
+        panels.append(("pivots-across", "Across files", len(across), table))
+    if pivots.dense:
+        panels.append(
+            ("pivots-dense", "High-density files", len(pivots.dense), _dense(pivots, files))
+        )
+    for kind, count in pivots.by_type:
+        table = _pivot_table(kinds[kind], files, refs, across=False)
+        panels.append((f"pivots-type-{kind}", _type_name(kind), count, table))
+
+    tabs = "".join(
+        f'<button type="button" role="tab" data-panel="{key}" '
+        f'aria-selected="{"true" if number == 0 else "false"}">'
+        f'{_e(label)} <span class="count">{count:,}</span></button>'
+        for number, (key, label, count, _table) in enumerate(panels)
+    )
+    shown = "".join(
+        f'<div class="panel{"" if number == 0 else " inactive"}" id="{key}" role="tabpanel">'
+        f"<h3>{_e(label)} · {count:,}</h3>{table}</div>"
+        for number, (key, label, count, table) in enumerate(panels)
+    )
+    lead = (
+        '<p class="note">Every pivot with the files it was found in and where, one tab a type. '
+        "The search box searches them all.</p>"
+    )
+    return f'{lead}<div class="tabs" role="tablist">{tabs}</div>{shown}'
+
+
+def _pivot_table(
+    entries: list[Identifier], files: dict[str, CaseFile], refs: dict[str, str], *, across: bool
+) -> str:
+    rows = []
+    for entry in entries:
+        ref = refs.get(f"{entry.type}\0{entry.normalized}")
+        holders = sorted(
+            entry.holders.items(),
+            key=lambda pair: (-pair[1], files[pair[0]].ref if pair[0] in files else pair[0]),
+        )
+        found_in = " ".join(_holder(files, path, times) for path, times in holders)
+        sample = entry.where[:5]
+        places = "<br>".join(_e(place) for place in sample)
+        if entry.count > len(sample):
+            places += f"<div>{len(sample)} of {entry.count:,} occurrences shown</div>"
+        opening = f'<tr id="{ref}" data-search>' if ref else "<tr data-search>"
+        leading = f'<td class="ref">{_e(ref or "")}</td><td>{_e(_type_name(entry.type))}</td>'
+        rows.append(
+            opening + (leading if across else "") + f'<td class="value">{_value(entry.value)}</td>'
             f'<td class="num" data-value="{entry.files}">{entry.files:,}</td>'
-            f'<td class="path">{_e(" | ".join(entry.where))}</td></tr>'
-            for entry in entries
+            f'<td class="num" data-value="{entry.count}">{entry.count:,}</td>'
+            f'<td>{found_in}</td><td class="path">{places}</td></tr>'
         )
-        parts.append(
-            f"<details><summary>{_e(_type_name(kind))} · {len(entries):,}</summary>"
-            '<div class="body wide"><table class="sortable"><thead><tr><th>Value</th>'
-            "<th>Count</th><th>Files</th><th>Where (sample)</th></tr></thead>"
-            f"<tbody>{rows}</tbody></table></div></details>"
+    heads = "<th>#</th><th>Type</th>" if across else ""
+    return (
+        f'<div class="wide"><table class="sortable pivots"><thead><tr>{heads}'
+        "<th>Value</th><th>Files</th><th>Occurrences</th><th>Found in</th>"
+        f"<th>Where (sample)</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def _holder(files: dict[str, CaseFile], path: str, times: int) -> str:
+    """A file a pivot was found in, as a link to it, and how often when more than once."""
+    held = files.get(path)
+    name = f"{_link(held.ref)} {_e(Path(path).name)}" if held else _e(Path(path).name)
+    often = f" ×{times:,}" if times > 1 else ""
+    return f'<span class="holder">{name}{often}</span>'
+
+
+def _dense(pivots: Pivots, files: dict[str, CaseFile]) -> str:
+    rows = []
+    for dense in pivots.dense:
+        held = files.get(dense.path)
+        name = f"{_link(held.ref)} {_e(Path(dense.path).name)}" if held else _e(dense.path)
+        kinds = " · ".join(f"{_type_name(kind)} {count:,}" for kind, count in dense.by_type)
+        rows.append(
+            f"<tr data-search><td>{name}</td>"
+            f'<td class="num" data-value="{dense.places}">{dense.places:,}</td>'
+            f"<td>{_e(kinds)}</td></tr>"
         )
-    return "".join(parts)
+    return (
+        '<div class="wide"><table class="sortable"><thead><tr><th>File</th>'
+        "<th>Pivot locations</th><th>By type</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
+    )
 
 
 def _details(case: Case, files: dict[str, CaseFile], *, verbose: bool) -> str:
