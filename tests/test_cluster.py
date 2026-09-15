@@ -49,6 +49,19 @@ def test_files_naming_the_same_author_are_grouped():
     assert groups["Someone Else"] == ["/case/c.docx"]
 
 
+def test_one_author_spelled_in_two_cases_is_one_group():
+    records = [
+        _record("/case/a.pdf", "pdf-info", Author="iSamples Team"),
+        _record("/case/b.pdf", "pdf-info", Author="iSamples team"),
+    ]
+
+    groups = [group for group in cluster(records) if group.axis == AUTHOR]
+
+    assert [(g.name, g.paths) for g in groups] == [
+        ("iSamples Team", ["/case/a.pdf", "/case/b.pdf"])
+    ]
+
+
 def test_files_from_one_camera_body_are_grouped_by_its_serial():
     records = [
         _photo("/case/1.jpg", Make="NIKON", Model="COOLPIX P6000", BodySerialNumber="3001234"),

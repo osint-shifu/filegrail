@@ -77,15 +77,18 @@ def cluster(records: list[FileRecord]) -> list[Group]:
     """Group the scanned files by every identifying value they share."""
     found: dict[tuple[str, str], list[str]] = {}
     bases: dict[tuple[str, str], str] = {}
+    # One name in two cases is one name - `iSamples Team` and `iSamples team`
+    # are the same team typed twice - and it is shown as it was first seen.
+    spelled: dict[tuple[str, str], str] = {}
     for record in records:
         for axis, name, basis in _names(record):
-            paths = found.setdefault((axis, name), [])
-            bases.setdefault((axis, name), basis)
+            key = (axis, name.casefold())
+            paths = found.setdefault(key, [])
+            bases.setdefault(key, basis)
+            spelled.setdefault(key, name)
             if record.path not in paths:
                 paths.append(record.path)
-    groups = [
-        Group(axis, name, paths, bases[(axis, name)]) for (axis, name), paths in found.items()
-    ]
+    groups = [Group(key[0], spelled[key], paths, bases[key]) for key, paths in found.items()]
     groups.sort(key=lambda group: (AXES.index(group.axis), -len(group.paths), group.name))
     return groups
 

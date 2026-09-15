@@ -19,6 +19,10 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   named in 28 files was said to be in 17, and two files of one name in two
   folders were one.
 
+- `--cluster` groups one name written in two cases as one: `iSamples Team`
+  and `iSamples team` were two authors of three files each rather than one
+  of six.
+
 ## 0.14.0 - 2026-09-15
 
 ### Added
