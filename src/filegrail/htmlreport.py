@@ -91,9 +91,13 @@ ul.files li{padding:2px 0;overflow-wrap:anywhere}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line);
 padding:6px 8px;white-space:nowrap}
-td{border-bottom:1px solid var(--panel2);padding:6px 8px;vertical-align:top;
-overflow-wrap:anywhere}
+td{border-bottom:1px solid var(--panel2);padding:6px 8px;vertical-align:top}
+td.value{overflow-wrap:anywhere}
 td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.ref,td.source{white-space:nowrap;font-family:var(--mono)}
+td.name{min-width:16em;overflow-wrap:break-word}
+td.field{min-width:8em;overflow-wrap:break-word}
+.wide>table.index{min-width:720px}
 tr.review td:first-child{box-shadow:inset 3px 0 var(--review)}
 tr.nothing{color:var(--muted)}
 .wide{overflow-x:auto}
@@ -417,12 +421,19 @@ def _conflict(conflict: Conflict, files: dict[str, CaseFile]) -> str:
     for difference in conflict.differences:
         span = len(difference.values) + (1 if difference.delta else 0)
         for number, (source, value) in enumerate(difference.values):
-            field = f'<td rowspan="{span}">{_e(difference.field)}</td>' if number == 0 else ""
+            field = (
+                f'<td class="field" rowspan="{span}">{_e(difference.field)}</td>'
+                if number == 0
+                else ""
+            )
             said = _e(source or "value")
-            rows.append(f'<tr>{field}<td>{said}</td><td class="value">{_e(value)}</td></tr>')
+            rows.append(
+                f'<tr>{field}<td class="source">{said}</td><td class="value">{_e(value)}</td></tr>'
+            )
         if difference.delta:
             rows.append(
-                f'<tr><td>Delta</td><td class="value delta">{_e(difference.delta)}</td></tr>'
+                f'<tr><td class="source">Delta</td>'
+                f'<td class="value delta">{_e(difference.delta)}</td></tr>'
             )
     return (
         f'<article class="obj review" id="{conflict.ref}" data-search>'
@@ -457,13 +468,15 @@ def _files(case: Case) -> str:
         )
         rows.append(
             f'<tr id="{_anchor(entry.ref)}" class="{entry.state}" data-search '
-            f'data-state="{entry.state}"><td class="value">{_e(mark)} {_e(entry.ref)}</td>'
-            f"<td>{_e(_name(entry))}{path}</td><td>{_e(_format(entry.record.path))}</td>"
+            f'data-state="{entry.state}"><td class="ref">{_e(mark)} {_e(entry.ref)}</td>'
+            f'<td class="name">{_e(_name(entry))}{path}</td>'
+            f"<td>{_e(_format(entry.record.path))}</td>"
             f'<td class="num">{_e(_size(entry.record.size))}</td>{found}'
             f"<td>{_references(entry, kinds)}</td></tr>"
         )
     return (
-        '<div class="wide"><table><thead><tr><th>#</th><th>File</th><th>Type</th><th>Size</th>'
+        '<div class="wide"><table class="index"><thead><tr>'
+        "<th>#</th><th>File</th><th>Type</th><th>Size</th>"
         "<th>Origin</th><th>Metadata</th><th>Activity</th><th>References</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
