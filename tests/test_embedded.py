@@ -64,8 +64,15 @@ def test_reads_pdf_info_dictionary(tmp_path: Path):
 
     assert origin is not None
     assert origin.tool == "Adobe PDF Library 15.0 (created in Adobe InDesign CC 13.1)"
-    assert origin.at == "2018-05-11T14:37:20Z"
+    assert origin.at == "2018-05-11T12:37:20Z"
     assert origin.note == "author Maria Wolf"
+
+    # West of Greenwich the offset is added back, not taken away.
+    behind = tmp_path / "behind.pdf"
+    behind.write_bytes(
+        b"%PDF-1.4\n<< /Producer (Visio) /CreationDate (D:20110224082252-07'00') >>\n"
+    )
+    assert (read_embedded_metadata(behind) or origin).at == "2011-02-24T15:22:52Z"
 
 
 def test_pdf_with_only_a_producer(tmp_path: Path):

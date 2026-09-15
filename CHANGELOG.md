@@ -5,6 +5,15 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- The time a PDF says it was created is read with its UTC offset. A
+  `CreationDate` of `D:20110224082252-07'00'` was placed on the timeline at
+  08:22 UTC, seven hours early, and beside the XMP copy of the same instant
+  it read as a different time.
+
 ## 0.14.0 - 2026-09-15
 
 ### Added

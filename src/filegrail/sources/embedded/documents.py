@@ -21,7 +21,7 @@ import re
 import xml.etree.ElementTree as ElementTree
 import zipfile
 import zlib
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from ...models import EvidenceRecord
@@ -165,20 +165,32 @@ def _decode_pdf_string(raw: bytes) -> str:
 
 
 def _parse_pdf_date(value: str | None) -> str | None:
-    """Parse a PDF date string, D:YYYYMMDDHHmmSS with an optional offset."""
+    """Parse a PDF date string, D:YYYYMMDDHHmmSS with an optional offset, into UTC.
+
+    The clock is local time and the offset says whose: `-07'00'` is seven hours
+    behind Greenwich, so the same instant in UTC is seven hours later. A date
+    with no offset is read as UTC, which is the reading that invents the least.
+    """
     if not value:
         return None
-    match = re.match(r"D?:?(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?", value.strip())
+    match = re.match(
+        r"D?:?(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?(?:Z|([+-])(\d{2})'?(\d{2})?)?",
+        value.strip(),
+    )
     if not match or not match.group(1):
         return None
     defaults = (0, 1, 1, 0, 0, 0)
     year, month, day, hour, minute, second = (
         int(group) if group else default
-        for group, default in zip(match.groups(), defaults, strict=True)
+        for group, default in zip(match.groups()[:6], defaults, strict=True)
     )
+    sign, hours, minutes = match.groups()[6:]
     try:
         stamp = datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)
-    except ValueError:
+        if sign:
+            offset = timedelta(hours=int(hours), minutes=int(minutes or 0))
+            stamp = stamp - offset if sign == "+" else stamp + offset
+    except (ValueError, OverflowError):
         return None
     return stamp.isoformat().replace("+00:00", "Z")
 
