@@ -7,6 +7,12 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- A Content Credentials record carries the claim generator, the software
+  agent and the digital source type as fields, under the manifest's own
+  names, rather than only inside its note.
+
 ### Fixed
 
 - The time a PDF says it was created is read with its UTC offset. A

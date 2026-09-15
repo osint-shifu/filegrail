@@ -312,12 +312,16 @@ def _summarise(claims: list[dict[str, Any]], binding: str | None = None) -> Evid
     software = None
     when = None
     source_type = None
+    source_uri = None
 
     for claim in claims:
         generator = generator or _generator_name(claim)
         for action in _actions(claim):
             when = when or _string(action.get("when"))
-            source_type = source_type or _source_label(action.get("digitalSourceType"))
+            # The label and the value it was read from come from one action,
+            # so the field never names a different source type than the note.
+            if source_type is None and (named := _source_label(action.get("digitalSourceType"))):
+                source_type, source_uri = named, _string(action.get("digitalSourceType"))
             software = software or _software_agent(action.get("softwareAgent"))
 
     tool = generator or software
@@ -327,7 +331,20 @@ def _summarise(claims: list[dict[str, Any]], binding: str | None = None) -> Evid
         return None
 
     notes = [note for note in (source_type, binding, "signature not verified") if note]
-    return EvidenceRecord(source="c2pa", block="c2pa", tool=tool, at=when, note="; ".join(notes))
+    # Under the manifest's own names, so what the claim said can be checked
+    # without reading it back out of a sentence.
+    fields = {
+        name: value
+        for name, value in (
+            ("claim_generator", generator),
+            ("softwareAgent", software),
+            ("digitalSourceType", source_uri),
+        )
+        if value
+    }
+    return EvidenceRecord(
+        source="c2pa", block="c2pa", tool=tool, at=when, note="; ".join(notes), fields=fields
+    )
 
 
 def _generator_name(claim: dict[str, Any]) -> str | None:
