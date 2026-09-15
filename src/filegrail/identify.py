@@ -403,6 +403,31 @@ PATH_RE = re.compile(
     r")"
 )
 
+#: A machine's name, as a shortcut's tracker block or a mail hop writes it. The
+#: underscore is there because NetBIOS allows one and DNS does not.
+HOSTNAME_RE = re.compile(
+    r"[A-Za-z0-9_](?:[A-Za-z0-9_\-]{0,61}[A-Za-z0-9_])?"
+    r"(?:\.[A-Za-z0-9_](?:[A-Za-z0-9_\-]{0,61}[A-Za-z0-9_])?)*"
+)
+#: Fields whose whole value is a machine: the shortcut's `MachineID`, and the
+#: two ends of a `Received:` hop. A mailbox in a `From:` header is not the shape.
+_HOSTNAME_FIELDS = frozenset({"machineid", "from", "by"})
+#: Names that stand in for a machine without being one.
+_NOT_A_HOST = frozenset(
+    {
+        "localhost",
+        "localhost.localdomain",
+        "unknown",
+        "tsclient",
+        "wsl.localhost",
+        "server",
+        "servername",
+        "hostname",
+        "computer",
+        "computername",
+    }
+)
+
 #: The bare name of something Windows will run, on its own or inside a path
 #: or a URL. No spaces, or `run the file evil.exe` is one name; no `.com`,
 #: or every domain is one; no source files, which are the stuff of every
@@ -696,6 +721,19 @@ def find_coordinates(text: str) -> list[tuple[str, float, float, str]]:
     return found
 
 
+def _hostname(name: str) -> str | None:
+    """A machine name no public DNS answers for, lowercased, or None."""
+    cleaned = name.strip().rstrip(".")
+    if not HOSTNAME_RE.fullmatch(cleaned):
+        return None
+    lowered = cleaned.lower()
+    if lowered in _NOT_A_HOST or re.fullmatch(r"[\d.]+", lowered):
+        return None
+    if normalize_domain(lowered) is not None:
+        return None  # a public name is a `domain`
+    return lowered
+
+
 def _looks_like_version(text: str, start: int) -> bool:
     """``v1.2.3.4`` is a version string, not an address."""
     return start > 0 and text[start - 1] in "vV"
@@ -859,6 +897,9 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
         for organisation in _names(text):
             yield "org", organisation, _plain(organisation), None
 
+    if named in _HOSTNAME_FIELDS and (machine := _hostname(text)):
+        yield "hostname", text.strip(), machine, None
+
     for match in USER_DIR_RE.finditer(text):
         login = match.group(1)
         if login.lower() not in _SHARED_HOMES:
@@ -948,6 +989,12 @@ def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
         if location.rstrip("\\").count("\\") == 0:
             continue
         yield "path", location, location.casefold(), None
+        if location.startswith("\\\\"):
+            share_host = location[2:].split("\\", 1)[0]
+            if machine := _hostname(share_host):
+                yield "hostname", share_host, machine, None
+            elif public_host := normalize_domain(share_host):
+                hosts.add(public_host)
 
     for match in EXECUTABLE_RE.finditer(text):
         yield "executable", match.group(1), match.group(1).casefold(), None

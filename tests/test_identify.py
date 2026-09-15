@@ -884,6 +884,31 @@ def test_a_windows_path_is_one_value_however_it_is_cased(tmp_path: Path):
     ]
 
 
+def test_a_machine_name_is_read_where_a_shortcut_a_share_or_a_mail_hop_records_one():
+    shortcut = _record(
+        "report.lnk",
+        source="windows-recent",
+        fields={"MachineID": "DESKTOP-7QK2", "NetworkShare": r"\\FILESRV01\share"},
+    )
+    hop = _record("note.eml", source="email-delivery", fields={"From": "WS-ANNA", "By": "EXCH01"})
+    lookalikes = _record(
+        "note2.eml",
+        source="email-header",
+        fields={"From": "Ann Shaw <ann@acme.example>"},
+        note=r"see \\server\share, \\localhost\c$, \\192.168.1.5\c$ and \\fs.example.com\x",
+    )
+
+    found = extract([shortcut, hop, lookalikes])
+
+    assert sorted(e.normalized for e in found if e.type == "hostname") == [
+        "desktop-7qk2",
+        "exch01",
+        "filesrv01",
+        "ws-anna",
+    ]
+    assert "fs.example.com" in [e.normalized for e in found if e.type == "domain"]
+
+
 def test_an_executable_name_is_found_bare_or_inside_a_path_and_a_source_file_is_not(tmp_path: Path):
     record = _document(
         tmp_path,

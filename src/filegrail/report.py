@@ -972,6 +972,7 @@ _IDENTIFIER_COLOURS = {
 _TYPE_SECTIONS = {
     "url": "urls",
     "domain": "domains",
+    "hostname": "hostnames",
     "email": "emails",
     "ipv4": "ip addresses",
     "ipv6": "ipv6 addresses",

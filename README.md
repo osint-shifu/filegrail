@@ -272,7 +272,8 @@ Filters intentionally reject many ambiguous values to reduce false positives.
 | Type | Taken | Not taken |
 | --- | --- | --- |
 | `url` | `http` and `https` addresses, normalized | |
-| `domain` | Every host behind a URL or an address, and bare names whose TLD is a real one | Anything shaped like a file name, and onion names, which are their own type |
+| `domain` | Every host behind a URL, an address or a UNC path, and bare names whose TLD is a real one | Anything shaped like a file name, and onion names, which are their own type |
+| `hostname` | Machine and server names that are not public domains: the machine a Windows shortcut was created on, the server in a UNC path and the hosts a `Received:` header names | IP addresses, public names, which are `domain`, and placeholders such as `localhost` or `server` |
 | `email` | Addresses whose TLD is a real one | The address inside a message ID; its host is still kept |
 | `ipv4` | Dotted quads, with private and reserved ranges marked as such | Version numbers, and digits in a field naming software |
 | `ipv6` | Addresses with all eight groups written out, or any form inside the brackets a URL places around one | A compressed address standing bare, which can resemble a scope operator in code |
@@ -683,6 +684,7 @@ Reports may contain:
 - email addresses;
 - names of people and organizations recorded in files;
 - IP addresses;
+- machine and server names;
 - hardware addresses;
 - GPS coordinates;
 - postal addresses;

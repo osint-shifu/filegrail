@@ -5,6 +5,15 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `hostname` for the names of machines and servers no public DNS answers
+  for: the machine a Windows shortcut was created on, the server in a UNC
+  path and the hosts at either end of a `Received:` hop. A server in a UNC
+  path that has a public name is now a `domain`.
+
 ## 0.13.1 - 2026-09-15
 
 ### Changed
