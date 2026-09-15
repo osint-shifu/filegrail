@@ -78,6 +78,10 @@ class _Text(NamedTuple):
     """One string to search, with everything needed to say where it came from."""
 
     file: str
+
+    #: The whole path, which is what makes two files two files. `file` is the
+    #: name a place is shown with, and one name turns up in many folders.
+    path: str
     source: str
     where: str
     text: str
@@ -852,17 +856,25 @@ def _texts(records: list[FileRecord], *, content: bool = False) -> Iterator[_Tex
                 ("location", found.location),
             ):
                 if value:
-                    yield _Text(name, source, label, value, IN_METADATA, arrival)
+                    yield _Text(name, record.path, source, label, value, IN_METADATA, arrival)
             for label, value in found.fields.items():
                 if value:
-                    yield _Text(name, source, label, str(value), IN_METADATA, arrival)
+                    yield _Text(name, record.path, source, label, str(value), IN_METADATA, arrival)
         if content:
             # One yield per passage rather than one per file. Scanning them
             # apart is what lets a value carry the line, slide or chapter it
             # was on, and it costs about a fifth more than scanning the
             # document as one string.
             for passage in read_passages(Path(record.path)) or ():
-                yield _Text(name, CONTENT_SOURCE, passage.place, passage.text, IN_CONTENT, False)
+                yield _Text(
+                    name,
+                    record.path,
+                    CONTENT_SOURCE,
+                    passage.place,
+                    passage.text,
+                    IN_CONTENT,
+                    False,
+                )
 
 
 def extract(records: list[FileRecord], *, content: bool = False) -> list[Identifier]:
@@ -874,6 +886,8 @@ def extract(records: list[FileRecord], *, content: bool = False) -> list[Identif
     and see where one value is both.
     """
     found: dict[tuple[str, str], Identifier] = {}
+    # Counted apart from the places, which are only a sample of them.
+    holders: dict[tuple[str, str], set[str]] = {}
 
     for source in _texts(records, content=content):
         place = f"{source.file}{PLACE}{source.source}{PLACE}{source.where}"
@@ -884,14 +898,15 @@ def extract(records: list[FileRecord], *, content: bool = False) -> list[Identif
                 entry = Identifier(type=family, value=raw, normalized=normalized, private=private)
                 found[key] = entry
             entry.count += 1
+            holders.setdefault(key, set()).add(source.path)
             entry.corpora.add(source.corpus)
             entry.acquired = entry.acquired or source.acquired
             if place not in entry.where:
                 if len(entry.where) < MAX_SAMPLES:
                     entry.where.append(place)
 
-    for entry in found.values():
-        entry.files = len({place.split(PLACE, 1)[0] for place in entry.where})
+    for key, entry in found.items():
+        entry.files = len(holders[key])
 
     # A digest that is the digest of an address seen in the same scan is that
     # address, named twice: once hashed, once in the clear. Equality of the

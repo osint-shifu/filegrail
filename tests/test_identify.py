@@ -649,6 +649,19 @@ def test_a_person_is_read_from_a_field_that_names_one():
     assert [e.normalized for e in found if e.type == "email"] == ["ann.shaw@acme.example"]
 
 
+def test_a_value_counts_every_file_it_is_in_not_only_the_sampled_places():
+    """The places are a sample; the file count is not. Two files of one name in
+    two folders are two files."""
+    records = [
+        _record(f"d{i}/letter.docx", source="document-metadata", fields={"Author": "Jan Kowalski"})
+        for i in range(25)
+    ]
+
+    entry = next(e for e in extract(records) if e.type == "person")
+
+    assert (entry.count, entry.files) == (25, 25)
+
+
 def test_a_name_in_prose_is_not_a_person(tmp_path: Path):
     record = _document(
         tmp_path, "Author: Jan Kowalski\nSigned, Ann Shaw", source="document-metadata"

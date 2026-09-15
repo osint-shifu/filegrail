@@ -14,6 +14,11 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   08:22 UTC, seven hours early, and beside the XMP copy of the same instant
   it read as a different time.
 
+- The number of files an identifier was found in counts every file. It was
+  counted from the twenty places kept as a sample, by file name, so an author
+  named in 28 files was said to be in 17, and two files of one name in two
+  folders were one.
+
 ## 0.14.0 - 2026-09-15
 
 ### Added
