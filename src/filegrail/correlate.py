@@ -705,6 +705,25 @@ def _utc(stamp: _Stamp) -> datetime | None:
     return moment - timedelta(minutes=stamp.offset)
 
 
+def instant(value: str) -> tuple[datetime, bool] | None:
+    """The moment a timestamp names, and whether its writer said which zone.
+
+    In UTC where it did; as the clock reading where it did not, which is the
+    most that can be said of it. None where it names no time of day at all, so
+    two readings are never set a distance apart that neither writer stated.
+    """
+    stamp = _instant(value)
+    if stamp is None or stamp.clock is None:
+        return None
+    moment = _utc(stamp)
+    if moment is not None:
+        return moment, True
+    try:
+        return datetime.strptime(stamp.day + stamp.clock, "%Y%m%d%H%M%S"), False
+    except ValueError:
+        return None
+
+
 def _instant(value: str) -> _Stamp | None:
     text = value.strip()
     offset = _offset(text)

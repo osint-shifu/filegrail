@@ -639,6 +639,11 @@ class Identifier:
     #: list names an entry of it with certainty.
     of: str | None = None
 
+    #: How many times each file held it, by path. What `files` counts, and
+    #: what says one list inside one file is most of a type - kept whole
+    #: where `where` is only a sample.
+    holders: dict[str, int] = field(default_factory=dict)
+
     def to_dict(self) -> dict[str, object]:
         data: dict[str, object] = {
             "type": self.type,
@@ -886,8 +891,6 @@ def extract(records: list[FileRecord], *, content: bool = False) -> list[Identif
     and see where one value is both.
     """
     found: dict[tuple[str, str], Identifier] = {}
-    # Counted apart from the places, which are only a sample of them.
-    holders: dict[tuple[str, str], set[str]] = {}
 
     for source in _texts(records, content=content):
         place = f"{source.file}{PLACE}{source.source}{PLACE}{source.where}"
@@ -898,15 +901,15 @@ def extract(records: list[FileRecord], *, content: bool = False) -> list[Identif
                 entry = Identifier(type=family, value=raw, normalized=normalized, private=private)
                 found[key] = entry
             entry.count += 1
-            holders.setdefault(key, set()).add(source.path)
+            entry.holders[source.path] = entry.holders.get(source.path, 0) + 1
             entry.corpora.add(source.corpus)
             entry.acquired = entry.acquired or source.acquired
             if place not in entry.where:
                 if len(entry.where) < MAX_SAMPLES:
                     entry.where.append(place)
 
-    for key, entry in found.items():
-        entry.files = len(holders[key])
+    for entry in found.values():
+        entry.files = len(entry.holders)
 
     # A digest that is the digest of an address seen in the same scan is that
     # address, named twice: once hashed, once in the clear. Equality of the
