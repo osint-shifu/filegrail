@@ -695,7 +695,7 @@ Reports may contain:
 
 A supported credential found inside a document, and a US Social Security number, are reported as their kind and a fingerprint, never as the value.
 
-Redact sensitive values before sharing output:
+Redact credentials before sharing output:
 
 ```bash
 filegrail ./case --redact
