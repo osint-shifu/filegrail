@@ -586,6 +586,11 @@ _MESSAGE_ID_FIELDS = frozenset({"message-id", "in-reply-to", "references", "cont
 _MESSAGE_FIELDS = frozenset({"message-id", "in-reply-to", "references"})
 MESSAGE_ID_RE = re.compile(r"<([^<>\s@]+@[^<>\s@]+)>")
 
+#: Fields whose value is a term from a published vocabulary. Its URI names the
+#: vocabulary - what kind of picture this is - and no host anybody in a case
+#: runs, so nothing in it is an identifier.
+_VOCABULARY_FIELDS = frozenset({"digitalsourcetype"})
+
 _SOFTWARE_FIELDS = frozenset(
     {
         "tool",
@@ -931,6 +936,8 @@ def extract(records: list[FileRecord], *, content: bool = False) -> list[Identif
 
 def _scan(text: str, where: str) -> Iterator[tuple[str, str, str, bool | None]]:
     """Yield (type, raw, normalized, private) for one value."""
+    if where.lower().rpartition(":")[2] in _VOCABULARY_FIELDS:
+        return
     hosts: set[str] = set()
 
     identifier = where.lower().rpartition(":")[2] in _MESSAGE_ID_FIELDS

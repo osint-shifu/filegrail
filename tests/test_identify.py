@@ -627,6 +627,21 @@ def test_private_key_blocks_are_one_fact_wherever_they_sit(tmp_path: Path):
 # in is metadata, so a document body cannot produce one by construction.
 
 
+def test_a_vocabulary_term_is_not_a_pivot():
+    """A Content Credentials source type is a URI into the IPTC vocabulary: it
+    says what kind of picture this is and names no host anybody in a case runs."""
+    record = _record(
+        "generated.png",
+        source="c2pa",
+        block="c2pa",
+        fields={
+            "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+        },
+    )
+
+    assert extract([record]) == []
+
+
 def test_a_person_is_read_from_a_field_that_names_one():
     docx = _record("letter.docx", source="document-metadata", fields={"Author": "Jan Kowalski"})
     mail = _record(
