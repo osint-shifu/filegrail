@@ -5,6 +5,23 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.13.1 - 2026-09-15
+
+### Changed
+
+- The readme is reorganised around the three categories of evidence and the
+  investigative pivots a scan can extract, with a table of the questions each
+  kind of evidence helps answer. No format, source, option, match basis or
+  schema fact changed.
+
+- The privacy note names every class of value a report may carry, vehicle and
+  company registration numbers among them, and says that `--redact` removes
+  credentials rather than every sensitive value.
+
+- The limits say that C2PA certificate and signature trust is not verified,
+  that a name-and-size match or a recorded author is not proof, and that no
+  external service is queried.
+
 ## 0.13.0 - 2026-09-13
 
 ### Added
