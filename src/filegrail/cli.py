@@ -18,7 +18,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from . import __version__
+from .analysis import analyse
+from .casereport import render_case
+from .doctor import survey
 from .filters import FAMILIES, UnknownType, describe, selection
+from .identify import extract
 from .report import (
     render_compare,
     render_doctor,
@@ -116,12 +120,12 @@ def build_parser() -> argparse.ArgumentParser:
         "-v",
         "--verbose",
         action="store_true",
-        help="Show every evidence record, not the strongest of each kind.",
+        help="Open every file: its full detail with every decoded field, and the full pivot lists.",
     )
     parser.add_argument(
         "--brief",
         action="store_true",
-        help="Stop at the index: one line a file, and no per-file detail.",
+        help="Stop at the summary, the key findings and a one-line index of the files.",
     )
     parser.add_argument(
         "--timeline",
@@ -441,6 +445,24 @@ def _scan(rest: list[str]) -> int:
         )
     elif args.timeline:
         print(render_timeline(records, base, theme=theme, home=home))
+    elif root.is_dir():
+        found = extract(records, content=args.content) if listed else None
+        case = analyse(records, base, survey=survey(home), identifiers=found)
+        print(
+            render_case(
+                case,
+                theme=theme,
+                verbose=args.verbose,
+                brief=args.brief,
+                limit=_limit(args),
+                identifiers=found,
+                content=args.content,
+                cluster=args.cluster,
+                home=home,
+                unsearched=missed,
+                filtered=describe(args.families, args.extensions),
+            )
+        )
     else:
         print(
             render_text(

@@ -27,12 +27,12 @@ keep.
 | view | sections |
 |---|---|
 | `filegrail FILE` | `FILE → ORIGIN → METADATA → ACTIVITY → [blocks]` |
-| `filegrail DIR` | `SUMMARY → FILES → ORIGIN → METADATA → [ACTIVITY] → [FINDINGS] → [RELATIONSHIPS] → [UNRESOLVED] → [SCAN GAPS]` |
-| `--brief` | `SUMMARY → FILES` |
+| `filegrail DIR` | `CASE SUMMARY → [KEY FINDINGS] → [EVIDENCE COVERAGE] → [CONFLICTS] → FILES → [RELATIONSHIPS] → [CLUSTERS] → [INVESTIGATIVE PIVOTS] → [FILE DETAIL] → REPORT NOTES`, see 5b |
+| `--brief` | `CASE SUMMARY → [KEY FINDINGS] → FILES`, one line a file |
 | `explain` | `SUMMARY → ORIGIN → METADATA → [ACTIVITY] → [CORRELATION] → [blocks]` |
 | `--timeline` | `TIMELINE` |
-| `--content` | `IDENTIFIERS → one section a type → [CROSS-SOURCE MATCHES]` |
-| `--cluster` | `CLUSTERS` |
+| `--content` | `INVESTIGATIVE PIVOTS` in a directory report, every value a section a type under `-v`; a single file: `IDENTIFIERS → one section a type` |
+| `--cluster` | `CLUSTERS`, after `RELATIONSHIPS` in a directory report |
 | `compare` | `FILES → METADATA → ORIGIN → CORRELATION → [RELATIONSHIPS]` |
 | `doctor` | `SUMMARY → SOURCES → [LIMITATIONS]` |
 | `clean --check` | `SUMMARY → RESULTS → [REMAINING METADATA]` |
@@ -311,6 +311,92 @@ marks that appear. And a fact is marked **once**: a file flagged in `FILES`
 appears again in `ORIGIN` and in `FINDINGS`, where what is listed is a record
 rather than a file, and a second `!` beside it there would be the report
 raising the same alarm twice.
+
+## 5b. The investigation report
+
+`filegrail DIR` prints an investigation report rather than the table views
+above. It is read in the order a case is opened with: what was analysed,
+whether evidence was there to be found, what the records establish together,
+what contradicts itself, which files to open, which values lead somewhere
+else, and only then the technical detail. `explain`, `compare`, `doctor`,
+`clean` and `--timeline` keep the grammar of sections 4 and 5. The layout is
+built by `casereport.py` from the `Case` that `analysis.py` makes of a scan, so
+no renderer decides what is true.
+
+### Masthead and closing
+
+```
+FILEGRAIL 0.14.0
+INVESTIGATION REPORT
+════════════════════════════════════════════════════════════════════════
+
+Target      /data/case
+Generated   2026-09-15 23:18 CEST
+```
+
+A double rule opens the report and two more close it around `END OF REPORT`,
+so a report pasted into a case file shows where it starts and where it stops.
+The mode follows the title: `· BRIEF`, `· VERBOSE`.
+
+### Sections
+
+```
+────────────────────────────────────────────────────────────────────────
+KEY FINDINGS
+────────────────────────────────────────────────────────────────────────
+```
+
+A rule above the name and one below it. No counts beside the name: the counts
+are in `CASE SUMMARY`, lined up on the right.
+
+### Objects and references
+
+Every file, finding, conflict and pivot starts on a line of its own, with a
+mark and a number local to the report. The numbers are how the sections point
+at each other, and they are not stable between two runs.
+
+| number | object |
+|---|---|
+| `#001` | a file, numbered in the order of the index |
+| `F01` | a key finding |
+| `C01` | a conflict |
+| `P01` | an investigative pivot |
+
+```
+! C01  #001  osint360-klienci-zastosowania.pdf
+
+       Sources     PDF Info ↔ XMP
+       Fields      2
+
+       CreationDate
+         PDF Info   2026-07-07 08:02:05 UTC
+         XMP        2013-12-23 23:15:00 UTC
+         Delta      12 years 6 months earlier
+```
+
+Properties hang under the object's title, their labels share one column in an
+object, and a value wraps under itself, never back to column zero. Indentation
+carries the hierarchy: the object, its properties, the values it compares. A
+file name is never broken inside a table column: the name opens the object
+line and its path, relative to the target, follows on a line of its own.
+
+### The index
+
+`FILES` gives a block to a file with a conflict, an origin or activity record,
+or a finding marked `!`. Every other file takes one line - name, type, size,
+what was read and the findings it is part of - and `-v` opens them all.
+`FILE DETAIL` follows the same rule: the files that need a second look and the
+files whose arrival or handling was recorded, and every file under `-v`.
+
+### Marks
+
+| mark | means |
+|---|---|
+| `!` | needs review: a conflict, or a finding that wants a second look |
+| `·` | worth knowing, or no evidence found for a file |
+| `[+]` | a trace store found, or an attribute this machine can read |
+| `[~]` | a trace source read in part |
+| `[-]` | a trace source not found, not readable or not supported |
 
 ## 6. Layout & Spacing
 

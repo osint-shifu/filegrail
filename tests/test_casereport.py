@@ -123,6 +123,14 @@ def test_a_file_with_nothing_to_say_takes_one_line_until_verbose_opens_it():
     assert "  #003  sheet.xlsx" in _report(_corpus(), theme=_theme(), verbose=True).splitlines()
 
 
+def test_brief_stops_at_a_one_line_index():
+    brief = _report(_corpus(), theme=_theme(), brief=True)
+
+    assert "  #003  sheet.xlsx  XLSX · 2.9 KB · OOXML properties · in isamples" in brief
+    for later in ("EVIDENCE COVERAGE", "CONFLICTS", "FILE DETAIL", "REPORT NOTES"):
+        assert later not in brief.splitlines(), later
+
+
 def test_a_file_points_at_its_conflict_and_the_conflict_shows_both_statements():
     report = _report(_corpus(), theme=_theme())
     files = report.split("\nFILES\n")[1].split("\nINVESTIGATIVE PIVOTS\n")[0]

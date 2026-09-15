@@ -13,6 +13,24 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   agent and the digital source type as fields, under the manifest's own
   names, rather than only inside its note.
 
+### Changed
+
+- A directory scan prints an investigation report. It opens with a case
+  summary and the key findings the records establish together - AI-generated
+  media, files that contradict themselves, files created at the same second,
+  shared authors and camera bodies, GPS, files nothing was found for - then
+  what this machine could be searched for, each conflict with both values and
+  how far apart two dates are, a file index, the investigative pivots found in
+  more than one file or crowded into one, and the detail of the files that
+  need it. Files, findings, conflicts and pivots are numbered (`#001`, `F01`,
+  `C01`, `P01`) and point at each other. A single file, `--timeline` and
+  `--json` are unchanged.
+
+- `-v` opens every file in the report, with every decoded field and the full
+  pivot lists, and `--limit` shortens the list of files nothing was found
+  for; neither changed the report before. `--brief` stops at the summary, the
+  findings and a one-line index.
+
 ### Fixed
 
 - The time a PDF says it was created is read with its UTC offset. A

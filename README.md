@@ -464,6 +464,8 @@ Analyze a directory recursively:
 filegrail ./evidence
 ```
 
+A directory scan prints an investigation report: case summary, key findings, evidence coverage, conflicts, a numbered file index, investigative pivots and the detail of the files that need it. Files, findings, conflicts and pivots are numbered (`#001`, `F01`, `C01`, `P01`) and referenced across the report.
+
 Analyze the current directory:
 
 ```bash
@@ -500,8 +502,8 @@ Investigative-pivot extraction, content inspection, hashing and clustering run o
 
 | Option | Purpose |
 | --- | --- |
-| `-v`, `--verbose` | Show every evidence record |
-| `--brief` | Index only, without per-file detail |
+| `-v`, `--verbose` | Open every file: its full detail with every decoded field, and the full pivot lists |
+| `--brief` | Summary, key findings and a one-line file index |
 | `--timeline` | Chronological event view |
 | `--identify` | Extract investigative pivots from metadata and provenance |
 | `--content` | Also inspect supported document content; implies `--identify` |
@@ -547,7 +549,7 @@ The output directory cannot be inside the directory being cleaned.
 # Full analysis of one file
 filegrail photo.jpg
 
-# Scan a case and show only the index
+# Summary, key findings and a one-line file index
 filegrail ./case --brief
 
 # Extract investigative pivots from metadata and provenance

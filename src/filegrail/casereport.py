@@ -173,7 +173,8 @@ def render_case(
     if not brief:
         _coverage(page, case, unsearched)
         _conflicts(page, case, files)
-        _files(page, case, verbose=verbose, limit=limit)
+    _files(page, case, verbose=verbose, limit=limit, compact=brief)
+    if not brief:
         _relationships(page, case, files)
         if cluster:
             page.lines.extend(_clusters(page.theme, records, case.root))
@@ -390,7 +391,7 @@ def _conflicts(page: _Page, case: Case, files: dict[str, CaseFile]) -> None:
         page.gap()
 
 
-def _files(page: _Page, case: Case, *, verbose: bool, limit: int) -> None:
+def _files(page: _Page, case: Case, *, verbose: bool, limit: int, compact: bool) -> None:
     if not case.files:
         return
     theme = page.theme
@@ -430,7 +431,7 @@ def _files(page: _Page, case: Case, *, verbose: bool, limit: int) -> None:
         # still points at every finding the file is part of.
         opened = bool(entry.conflicts or entry.found[ORIGIN] or entry.found[ACTIVITY])
         opened = opened or any(ref in notable for ref in entry.findings)
-        if verbose or opened:
+        if not compact and (verbose or opened):
             _file_block(page, case, entry, kinds)
         else:
             _file_line(page, case, entry, kinds)
@@ -557,10 +558,15 @@ def _pivots(
 
 
 def _details(page: _Page, case: Case, files: dict[str, CaseFile], *, verbose: bool) -> None:
+    # What wants a second look, and every file whose arrival or handling here
+    # was recorded: where a file came from is what the report is for.
     chosen = [
         entry
         for entry in case.files
-        if entry.state == REVIEW or (verbose and entry.state != NOTHING)
+        if entry.state == REVIEW
+        or entry.found[ORIGIN]
+        or entry.found[ACTIVITY]
+        or (verbose and entry.state != NOTHING)
     ]
     if not chosen:
         return
