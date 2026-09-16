@@ -36,6 +36,8 @@ An exact recorded path and a weak filename-only match are therefore never presen
 
 Scanning is local, read-only and makes no network requests.
 
+`--html` writes the same report as one self-contained page: tables that sort, numbers that link to each other and back, a filter over the file index and a search box over everything. The page loads nothing from outside itself and makes no network request, so it travels as a single file. **[See an example report](https://osint-shifu.github.io/filegrail/example-report.html)**, built from an invented case.
+
 `filegrail clean` is the only command that writes files. It creates cleaned copies in a separate destination and never modifies the originals.
 
 ---
@@ -58,6 +60,7 @@ When independent sources disagree, both values are preserved and the conflict is
 | **Content inspection** | Investigative pivots extracted from supported document bodies without copying the document text into the report |
 | **Timeline** | Origin, creation, editing and activity events in chronological order |
 | **File relationships** | XMP document identifiers and derivation chains between related files |
+| **Investigation report** | The whole case as one self-contained HTML page, sortable and searchable, with every file, finding, conflict and pivot linked to the others (`--html`) |
 | **Clusters** | Files grouped by shared camera serial, camera model or recorded author |
 | **Comparison** | Metadata, provenance and timing differences between two files |
 | **Explanation** | Evidence behind findings for one file |
