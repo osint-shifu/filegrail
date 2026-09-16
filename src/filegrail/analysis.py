@@ -345,7 +345,7 @@ def _findings(
     if generated:
         add(
             "generated",
-            "AI-generated media indicator",
+            "Declared AI-generated source",
             True,
             [("files", str(len(generated)))],
             generated,
@@ -452,6 +452,9 @@ def _generated(record: FileRecord) -> Item | None:
             if value := found.fields.get(key):
                 facts.append((name, str(value)))
         facts.append(("source type", _GENERATED[declared]))
+        # What the manifest says is not what this tool checked. The certificate
+        # chain is never validated here, so the claim travels with that said.
+        facts.append(("signature", "not verified"))
         return Item(record.path, facts)
     return None
 

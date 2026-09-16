@@ -91,7 +91,7 @@ def test_findings_are_drawn_only_from_what_the_records_say():
     case = analyse([generated, *twins, *two_only, *photos, bare], Path("/case"))
 
     assert [(f.ref, f.title) for f in case.findings] == [
-        ("F01", "AI-generated media indicator"),
+        ("F01", "Declared AI-generated source"),
         ("F02", "Same-second creation cluster"),
         ("F03", "Shared author"),
         ("F04", "Shared camera body"),
