@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-banner.png" alt="filegrail - file provenance, metadata analysis, investigative pivots" width="100%">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-logo-dark.png">
+  <img src="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-logo-light.png" alt="filegrail" width="380">
+</picture>
 
 [![PyPI](https://img.shields.io/pypi/v/filegrail?style=flat-square&color=3775A9)](https://pypi.org/project/filegrail/)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square)
