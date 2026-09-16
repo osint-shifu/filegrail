@@ -20,20 +20,20 @@
 
 ---
 
-`filegrail` is a local command-line tool for investigating files and directories.
+`filegrail` reconstructs file provenance, extracts metadata, correlates evidence and finds investigative pivots across both metadata and file content.
 
-It combines the traces that the operating system and applications leave about a file with the metadata embedded in the file itself. From them it shows where a file came from, what it reveals, what happened to it on this machine and which identifiers can be followed up in OSINT or DFIR work.
+It combines information stored inside files with traces left by browsers, operating systems, shells and other applications to show where a file came from, what happened to it on the machine and what can be followed further in OSINT or DFIR work.
 
 | Area | What it answers |
 | --- | --- |
-| **Origin** | Where did the file come from and how did it arrive? |
-| **Metadata** | What does the file reveal about devices, software, authors, timestamps, GPS and document history? |
-| **Activity** | Was the file opened, synchronized, moved or deleted on this machine? |
-| **Investigative pivots** | Which URLs, domains, IPs, hashes, accounts and other identifiers can be followed up? |
+| **Origin** | Where did the file come from and how did it reach this machine? |
+| **Metadata** | What does it reveal about devices, software, authors, timestamps, GPS and document history? |
+| **Activity** | Was it opened, synchronized, moved, extracted or deleted? |
+| **Investigative pivots** | Which URLs, domains, IPs, hashes, accounts and other identifiers can be followed further? |
 
 Analysis is **local**, makes **no network requests** and has **zero runtime dependencies**.
 
-Scanning never modifies the files it examines. `filegrail clean` writes cleaned copies to a separate directory, and `-o` writes a report to the file you name.
+Scanning never modifies the files it examines. `filegrail clean` writes cleaned copies to a separate directory, and `-o` writes the report to the file you specify.
 
 ## Quick start
 
@@ -67,13 +67,13 @@ Extract investigative pivots from metadata and provenance:
 filegrail ./evidence --pivots
 ```
 
-Also inspect the text of supported documents, including PDF:
+Extract investigative pivots from supported document content, including PDF:
 
 ```bash
 filegrail ./evidence --pivots --content
 ```
 
-Create a self-contained HTML investigation report:
+Create a self-contained HTML report:
 
 ```bash
 filegrail ./evidence --pivots --content --html > report.html
@@ -90,31 +90,31 @@ filegrail ./evidence --pivots --content --html > report.html
 | **File provenance** | Download URLs, referrers, fetch commands, archive and torrent membership, and local origin records |
 | **Metadata extraction** | EXIF, XMP, IPTC, C2PA, document properties, media tags, mail headers and more |
 | **Activity reconstruction** | Recent-file records, Windows shortcuts, trash records, sync folders and filesystem timestamps |
-| **Evidence correlation** | Agreements and conflicts between independent sources |
+| **Evidence correlation** | Matching and conflicting values across independent evidence sources |
 | **Investigative pivots** | Structured identifiers with their type, file, source and exact location |
-| **Content inspection** | Pivots from the text of supported documents without copying the text into the report |
+| **Content inspection** | Pivots extracted from supported document content |
 | **Timeline** | Origin, creation, modification and activity events in chronological order |
 | **File relationships** | XMP document identifiers and derivation chains between related files |
 | **Clustering** | Files grouped by shared camera serial, camera model or recorded author |
 | **File comparison** | Metadata, provenance and timing differences between two files |
-| **Extension check** | Files whose content is a different format than their extension claims |
-| **Evidence coverage** | Which local evidence sources are available and how far back they reach (`doctor`) |
+| **Extension check** | Files whose actual content does not match their extension |
+| **Evidence coverage** | Available local evidence sources and how far back they reach (`doctor`) |
 | **Metadata removal** | Cleaned copies of supported files, scanned again to verify the result |
-| **JSON and HTML output** | Machine-readable results for every main command, or the whole case as one self-contained page |
+| **JSON and HTML output** | Machine-readable output for main commands, or the full case as one self-contained page |
 
-Evidence is not reduced to a confidence score. Every record keeps its **source**, **category** and **match basis**, so an exact recorded path is never presented as equivalent to a filename-only match.
+Every finding shows where it came from and how it was matched to the file. Exact path matches are kept separate from weaker filename-only matches.
 
 ---
 
 ## Evidence sources
 
-`filegrail` combines evidence stored inside the file with traces left elsewhere on the system.
+`filegrail` reads evidence from two places: data stored inside the file and traces stored elsewhere on the system.
 
 ### Provenance and activity
 
-These records exist outside the analyzed file. Browsers, operating systems, shells and applications leave them when files are downloaded, opened, extracted, synchronized or deleted.
+These records exist outside the analyzed file. Browsers, operating systems, shells and applications can leave them when files are downloaded, opened, extracted, synchronized or deleted.
 
-What can be found depends on what still exists on the examined system.
+What can be found depends on which records still exist on the examined system.
 
 | Source | What `filegrail` reads |
 | --- | --- |
@@ -147,9 +147,9 @@ filegrail doctor --home /mnt/profile
 filegrail /mnt/evidence --home /mnt/profile
 ```
 
-Without `--home`, these records are read from the profile of the user running `filegrail`. `--no-shell-history` leaves shell history out.
+Without `--home`, these records are read from the profile of the user running `filegrail`. `--no-shell-history` excludes shell history.
 
-"No evidence found" covers only the sources that were available to search.
+"No evidence found" means no evidence was found in the sources that were available to search.
 
 ### Embedded metadata
 
@@ -199,13 +199,13 @@ XMP, XMP history and IPTC are not tied to one format and are read wherever a sup
 | **Investigation data** | GEXF, GraphML, XMind, FreeMind, JSON Canvas, Maltego MTGX |
 | **Provenance records** | `.torrent` files and `yt-dlp` `.info.json` sidecars |
 
-What is read differs by format: embedded metadata, archive members, provenance records or, with `--content`, document text. The metadata read from each image, media and document format is listed under [Embedded metadata](#embedded-metadata).
+What `filegrail` reads depends on the format: embedded metadata, archive members, provenance records or, with `--content`, document content. Metadata coverage for image, media and document formats is listed under [Embedded metadata](#embedded-metadata).
 
-A file in any other format still takes part in provenance analysis when a browser, shell or other local record names it.
+Other file formats can still be matched against browser, shell and other local records.
 
 ### Email
 
-Saved email messages can expose their delivery path through `Received:` headers.
+Saved email messages can reveal their delivery path through `Received:` headers.
 
 | Extension | Data extracted |
 | --- | --- |
@@ -214,7 +214,7 @@ Saved email messages can expose their delivery path through `Received:` headers.
 
 ### Archives
 
-`filegrail` inspects supported files inside archives without unpacking them.
+`filegrail` reads supported files inside archives without unpacking them.
 
 | Extensions | What is read |
 | --- | --- |
@@ -223,9 +223,9 @@ Saved email messages can expose their delivery path through `Received:` headers.
 
 ### Document content
 
-`--content` reads the text of supported documents and looks for investigative pivots in it.
+`--content` reads supported document content and extracts investigative pivots from it.
 
-The text itself is not added to the report, only the values found and where they were found.
+The source text itself is not added to the report. Only detected values and their locations are reported.
 
 At most 1 MB of text is read from one file, and at most 64 parts of one document, such as slides or chapters.
 
@@ -249,9 +249,9 @@ At most 1 MB of text is read from one file, and at most 64 parts of one document
 | `.mtgx` | Entities and their values from every graph | `graph 1` |
 | `.eml` `.msg` | Message body, every text part | `body`, `body (html)` |
 
-A scanned PDF page is a picture of text, and no OCR is performed.
+Scanned PDF pages contain images of text. `filegrail` does not perform OCR.
 
-See [docs/FORMATS.md](docs/FORMATS.md) for the complete format reference, including the formats the extension check recognizes and the detection rules for every pivot type.
+See [docs/FORMATS.md](docs/FORMATS.md) for the complete format reference, including formats recognized by the extension check and detection rules for every pivot type.
 
 ---
 
@@ -261,17 +261,17 @@ See [docs/FORMATS.md](docs/FORMATS.md) for the complete format reference, includ
 filegrail ./case --pivots
 ```
 
-extracts supported identifiers from metadata and provenance records.
+Extracts supported identifiers from metadata and provenance.
 
 ```bash
 filegrail ./case --pivots --content
 ```
 
-also looks for them in the text of supported documents.
+Also extracts them from supported document content.
 
-Every pivot keeps its **type**, **normalized value**, **file**, **source** and **exact location**, such as a metadata field, a line, a page or a slide. Values found in more than one file are counted as shared pivots.
+Every pivot includes its **type**, **normalized value**, **file**, **source** and **exact location**, such as a metadata field, line, page or slide. Values found in more than one file are counted as shared pivots.
 
-Supported pivot types, with the name each has in JSON:
+Supported pivot types, with their JSON names:
 
 - URLs, domains, hostnames and email addresses: `url`, `domain`, `hostname`, `email`
 - message IDs: `message_id`
@@ -294,7 +294,7 @@ Supported pivot types, with the name each has in JSON:
 
 Filters remove common false positives such as software version numbers, file names that only look like domains and hexadecimal build identifiers.
 
-A detected secret or US Social Security number is reported as its type and a fingerprint, never as the value.
+Detected secrets and US Social Security numbers are reported as a type and fingerprint, never as the raw value.
 
 ---
 
@@ -314,7 +314,7 @@ Combines available origin, metadata and activity timestamps into one chronologic
 filegrail ./photos --cluster
 ```
 
-Groups files by shared identifying values and names the field behind each group:
+Groups files by shared identifying values:
 
 - **camera serial** (`EXIF · BodySerialNumber`): the same recorded physical camera;
 - **camera model** (`EXIF · Make + Model`): the same model, not necessarily the same device;
@@ -322,7 +322,7 @@ Groups files by shared identifying values and names the field behind each group:
 
 ### File relationships
 
-XMP identifiers such as `xmpMM:DocumentID`, `xmpMM:InstanceID`, `xmpMM:OriginalDocumentID` and `xmpMM:DerivedFrom` can link files after renaming or export. A relationship is reported as derived-from, source-of, same-document or common-ancestor.
+XMP identifiers such as `xmpMM:DocumentID`, `xmpMM:InstanceID`, `xmpMM:OriginalDocumentID` and `xmpMM:DerivedFrom` can link files after renaming or export. Relationships are reported as derived-from, source-of, same-document or common-ancestor.
 
 ### Explain
 
@@ -342,36 +342,36 @@ Compares metadata, provenance and timing between two files.
 
 ### Correlation and conflicts
 
-When several sources describe the same file, `filegrail` compares them and keeps every value instead of silently choosing one. It reports:
+When several sources describe the same file, `filegrail` compares them and keeps conflicting values instead of choosing one automatically. It reports:
 
 - several sources supporting the same origin;
 - conflicting origin URLs;
 - file-size mismatches;
 - filename-only matches;
-- a file reporting that it was created after it arrived here;
+- a file reporting that it was created after it arrived on the machine;
 - creation and modification dates in impossible order;
 - XMP editing steps out of sequence;
 - EXIF, IPTC or PDF Info fields that disagree with XMP;
 - C2PA hard-binding mismatches.
 
-Files whose content is a different format than their extension claims are listed together among the key findings. A format several extensions legitimately share, such as a ZIP under `.docx`, `.epub` or `.jar`, is not reported.
+Files whose actual content does not match their extension are listed among the key findings. Formats that legitimately use another container format, such as ZIP-based `.docx`, `.epub` or `.jar` files, are not reported as mismatches.
 
-Correlation is evidence for investigation, not automatic attribution.
+Correlation helps identify evidence worth investigating. It does not perform automatic attribution.
 
 ### Match basis
 
-Every evidence record states how it was associated with the file. These values appear in the report's `match` column and under `match.method` in JSON.
+Every evidence record shows how it was matched to the file.
 
 | Basis | What it means | Where it comes from |
 | --- | --- | --- |
-| `embedded` | Decoded from the file's own bytes | EXIF, XMP, IPTC, document properties, Content Credentials, mail headers |
-| `file-attribute` | Read from what the filesystem keeps for this exact file | `Zone.Identifier`, macOS Where From, XDG attributes, creation times |
-| `recorded-path` | An external store names this exact path | Browser download history, Recent Documents |
-| `sidecar` | A separate file written next to it and naming it | `yt-dlp` sidecar, freedesktop trash record |
-| `name+size` | Both name and size agree | Torrents, archive members, Windows shortcuts |
-| `filename` | Only the name matched | A download record for a file that has since moved, a messenger naming pattern |
-| `container-member` | Read from a member, or inherited from the container | Archives |
-| `sync-root` | The file lies under a folder managed by a supported client | Nextcloud, Dropbox, Syncthing, OneDrive |
+| `embedded` | Read from the file itself | EXIF, XMP, IPTC, document properties, Content Credentials, mail headers |
+| `file-attribute` | Stored by the filesystem for this exact file | `Zone.Identifier`, macOS Where From, XDG attributes, creation times |
+| `recorded-path` | An external record contains the exact path | Browser download history, Recent Documents |
+| `sidecar` | A separate file stored next to the file and linked by name | `yt-dlp` sidecar, freedesktop trash record |
+| `name+size` | File name and size both match | Torrents, archive members, Windows shortcuts |
+| `filename` | Only the file name matches | A download record for a file that has moved, a messenger naming pattern |
+| `container-member` | Read from a container member or inherited from the container | Archives |
+| `sync-root` | The file is inside a folder managed by a supported sync client | Nextcloud, Dropbox, Syncthing, OneDrive |
 
 ---
 
@@ -384,7 +384,7 @@ filegrail <command> [options]
 
 Running `filegrail` with no arguments shows the command overview without starting a scan.
 
-A directory scan prints an investigation report: summary, key findings, a numbered file index, investigative pivots, the detail of files that need it, evidence coverage and conflicts. Files, findings, conflicts and pivots are numbered (`#001`, `F01`, `C01`, `P01`) and referenced across the report.
+A directory scan prints an investigation report with a summary, key findings, numbered file index, investigative pivots, file details, evidence coverage and conflicts. Files, findings, conflicts and pivots are numbered (`#001`, `F01`, `C01`, `P01`) and referenced across the report.
 
 ### Commands
 
@@ -402,15 +402,15 @@ A directory scan prints an investigation report: summary, key findings, a number
 
 ### Scan options
 
-A normal scan reads embedded metadata and the available local provenance traces. Pivot extraction, content inspection, hashing and clustering run only when requested.
+A normal scan reads embedded metadata and available local provenance records. Pivot extraction, content inspection, hashing and clustering run only when requested.
 
 | Option | Purpose |
 | --- | --- |
 | `--brief` | Summary, key findings and a one-line file index |
 | `-v`, `--verbose` | Every file in full detail, with every decoded field and the full pivot lists |
 | `--pivots` | Extract investigative pivots from metadata and provenance |
-| `--content` | With `--pivots`, also look in the text of supported documents; on its own it turns `--pivots` on |
-| `--timeline` | Chronological event view |
+| `--content` | Also extract pivots from supported document content; enables `--pivots` |
+| `--timeline` | Show events in chronological order |
 | `--cluster` | Group files by shared cameras and authors |
 | `--unknown-only` | Show only files with no evidence found |
 | `--hash` | Compute SHA-256 for each file |
@@ -425,7 +425,7 @@ A normal scan reads embedded metadata and the available local provenance traces.
 | `--no-recurse` | Do not scan subdirectories |
 | `--no-skip` | Include normally skipped build, cache and vendor directories |
 | `--no-shell-history` | Do not use shell history |
-| `--no-archives` | Do not give an archive's origin to the files inside it |
+| `--no-archives` | Do not give an archive's origin to files inside it |
 | `--color`, `--no-color` | Force or disable ANSI color |
 
 ### Common tasks
@@ -433,33 +433,33 @@ A normal scan reads embedded metadata and the available local provenance traces.
 | Task | Command |
 | --- | --- |
 | Find where a file came from | `filegrail download.pdf` |
-| See the evidence behind a finding | `filegrail explain download.pdf` |
+| Show the evidence behind a finding | `filegrail explain download.pdf` |
 | Get an overview of a large directory | `filegrail ./case --brief` |
-| List the identifiers in a set of documents | `filegrail ./case --pivots --content` |
-| Find photos taken with the same camera | `filegrail ./photos --cluster` |
-| Put everything that happened in order | `filegrail ./case --timeline` |
+| Extract identifiers from documents | `filegrail ./case --pivots --content` |
+| Find photos linked to the same camera | `filegrail ./photos --cluster` |
+| Build a chronological timeline | `filegrail ./case --timeline` |
 | Investigate a copied profile or mounted image | `filegrail /mnt/evidence --home /mnt/profile` |
-| Export JSON with a SHA-256 for every file | `filegrail ./case --hash --json > report.json` |
-| Share a report with credentials redacted | `filegrail ./case --pivots --content --redact --html -o report.html` |
-| Check what would remain before publishing | `filegrail clean ./publish --check` |
+| Export JSON with SHA-256 for every file | `filegrail ./case --hash --json > report.json` |
+| Create a report with credentials redacted | `filegrail ./case --pivots --content --redact --html -o report.html` |
+| Check what metadata would remain before publishing | `filegrail clean ./publish --check` |
 
 ---
 
 ## HTML reports
 
-`--html` writes the same report as one self-contained page with:
+`--html` creates the same investigation report as one self-contained page with:
 
 - summary and key findings;
 - a file index with filters;
 - provenance and metadata evidence for every file;
 - investigative pivots;
 - evidence coverage and conflicts;
-- tables that sort by any column;
-- files, findings, conflicts and pivots linked to each other;
-- a search box over the whole report;
-- a dark and a light theme, and a light print layout.
+- sortable tables;
+- links between files, findings, conflicts and pivots;
+- full-report search;
+- dark and light themes, plus a light print layout.
 
-The page loads nothing from outside itself and makes no network requests, so it opens offline and travels as a single file.
+The report loads nothing from outside itself and makes no network requests. It works offline and can be shared as a single file.
 
 ```bash
 filegrail ./case --pivots --content --html -o report.html
@@ -483,7 +483,7 @@ filegrail ./case --pivots --content --html -o report.html
 | **Microsoft OOXML** | `.docx` `.docm` `.dotx` `.xlsx` `.xlsm` `.xltx` `.pptx` `.pptm` |
 | **OpenDocument** | `.odt` `.ods` `.odp` `.odg` `.ott` `.otp` |
 
-Clean one file or a directory:
+Clean one file or directory:
 
 ```bash
 filegrail clean ./publish --out ./clean
@@ -502,10 +502,10 @@ filegrail clean ./publish --check
 | `--overwrite` | Replace an existing destination file |
 | `--type NAME` | Filter by file family |
 | `--ext LIST` | Filter by extension |
-| `--no-recurse` | Do not descend into subdirectories |
+| `--no-recurse` | Do not scan subdirectories |
 | `-j`, `--json` | JSON output |
 
-After cleaning, each copy is scanned again and any supported metadata that remains is reported.
+After cleaning, every copy is scanned again and any supported metadata that remains is reported.
 
 Metadata removal is **not anonymization**. Pixels, sensor patterns, codec fingerprints, document content and other information outside supported metadata structures may still identify a source.
 
@@ -513,7 +513,7 @@ Metadata removal is **not anonymization**. Pixels, sensor patterns, codec finger
 
 ## Automation
 
-Scans and the `explain`, `compare`, `doctor` and `clean` commands all have JSON output for `jq`, Python, notebooks and pipelines:
+Scans and the `explain`, `compare`, `doctor` and `clean` commands support JSON output for `jq`, Python, notebooks and pipelines:
 
 ```bash
 filegrail ./case --json > report.json
@@ -532,7 +532,7 @@ filegrail ./case --pivots --content --json | jq -r '.identifiers[] | select(.typ
 filegrail ./case --pivots --content --json | jq -r '.identifiers[] | select(.files > 1) | "\(.type)\t\(.normalized)\t\(.files) files"'
 ```
 
-Each command has its own schema version, which changes only when a field in that document changes meaning or is removed.
+Each command has its own schema version. The version changes only when a field changes meaning or is removed.
 
 | Command | Schema |
 | --- | --- |
@@ -542,9 +542,11 @@ Each command has its own schema version, which changes only when a field in that
 | `doctor` | `filegrail.doctor/1` |
 | `clean` | `filegrail.clean/1` |
 
-Every scan document contains `schema`, `filegrail_version`, `root`, `summary`, `files` and `unsearched`, and depending on how the scan was run also `home` (with `--home`), `identifiers` (with `--pivots` or `--content`) and `shared_attributes` (with `--cluster`).
+Every scan document contains `schema`, `filegrail_version`, `root`, `summary`, `files` and `unsearched`.
 
-Each file includes `path`, `size`, `mtime`, `btime`, `sha256`, `links` and `evidence`. Evidence records carry their `category`, `source`, `match` and decoded fields, and correlation results are stored under `correlation`.
+Depending on the scan, it can also contain `home` (with `--home`), `identifiers` (with `--pivots` or `--content`) and `shared_attributes` (with `--cluster`).
+
+Each file includes `path`, `size`, `mtime`, `btime`, `sha256`, `links` and `evidence`. Evidence records include their `category`, `source`, `match` and decoded fields. Correlation results are stored under `correlation`.
 
 ### Exit codes
 
@@ -560,7 +562,7 @@ Each file includes `path`, `size`, `mtime`, `btime`, `sha256`, `links` and `evid
 
 `filegrail` runs locally and does not query external services.
 
-The generated report is the main privacy risk. It can contain private URLs, credentials in URLs or commands, filesystem paths and account names, email addresses, names of people and organizations, IP addresses, machine names, hardware addresses, GPS coordinates, postal addresses, bank, tax and company identifiers, vehicle identification numbers, wallet addresses and tracker IDs.
+Reports can contain sensitive data, including private URLs, credentials in URLs or commands, filesystem paths, account names, email addresses, names of people and organizations, IP addresses, machine names, hardware addresses, GPS coordinates, postal addresses, bank, tax and company identifiers, vehicle identification numbers, wallet addresses and tracker IDs.
 
 `--redact` replaces credentials found in URLs and commands, such as tokens, API keys and passwords, with a fingerprint:
 
@@ -568,19 +570,19 @@ The generated report is the main privacy risk. It can contain private URLs, cred
 filegrail ./case --redact
 ```
 
-Other values are not redacted, so review the output before sharing it.
+Other values are not redacted, so review the report before sharing it.
 
-`filegrail` analyzes evidence that still exists:
+`filegrail` can only analyze evidence that still exists:
 
 - cleared browser history, removed extended attributes or missing shell history cannot be reconstructed;
 - a sync folder shows folder and account context, not who uploaded a file;
 - messenger filename patterns do not identify a sender or conversation;
 - an archive or torrent match by name and size is an association, not proof of authorship or intent;
 - a shared camera model does not identify the same physical camera, while a body serial is a much stronger link;
-- recorded author and organization metadata can be edited and is not a verified identity;
+- recorded author and organization metadata can be edited and does not prove identity;
 - C2PA hard binding is checked, but certificate chains and signature trust are **not** verified.
 
-It is not a monitoring agent, a chain-of-custody system, a full disk-forensics suite, an automatic attribution engine or an OSINT enrichment service.
+It is not a monitoring agent, chain-of-custody system, full disk-forensics suite, automatic attribution engine or OSINT enrichment service.
 
 ---
 
