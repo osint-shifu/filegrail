@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "filegrail"
 version = "0.22.0"
-description = "Reconstruct where the files in a directory came from, after the fact."
+description = "Trace file origins. Extract metadata. Find investigative pivots."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
