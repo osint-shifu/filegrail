@@ -60,6 +60,7 @@ When independent sources disagree, both values are preserved and the conflict is
 | **Metadata extraction** | Device, software, author, timestamps, GPS, revision data and other embedded fields |
 | **Activity reconstruction** | Evidence that a file was opened, synchronized, moved, deleted or otherwise handled locally |
 | **Evidence correlation** | Agreements and conflicts between independent sources |
+| **Extension and content** | Whether a file's leading bytes are written in the format its name claims |
 | **Investigative pivots** | Supported pivot types with their file, source and exact location |
 | **Content inspection** | Investigative pivots extracted from supported document bodies without copying the document text into the report |
 | **Timeline** | Origin, creation, editing and activity events in chronological order |
@@ -84,6 +85,7 @@ When independent sources disagree, both values are preserved and the conflict is
 | Was it opened or handled on this system? | Recent Documents, shortcuts, trash records, sync folders and filesystem timestamps |
 | Do several sources support the same origin? | Evidence correlation |
 | Do sources contradict one another? | Conflicting URLs, timestamps, file sizes and metadata fields |
+| Is the file the format its name claims? | The format written in the leading bytes, held against the extension |
 | Are several files related? | XMP lineage, camera identifiers, authors and clustering |
 | What can be used for further OSINT/DFIR enrichment? | URLs, domains, IPs, hashes, email addresses, CVEs, accounts, infrastructure identifiers, wallets and other investigative pivots |
 | What happened first? | Combined timeline |
