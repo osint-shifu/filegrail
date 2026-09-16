@@ -81,6 +81,25 @@ def test_a_composite_font_is_read_the_width_its_codes_are_written_in(tmp_path: P
     assert "m@x.co" in found[0].text
 
 
+def test_a_simple_font_is_read_a_byte_a_code_whatever_its_map_declares(tmp_path: Path):
+    """What a desktop publisher writes: a TrueType font whose `/ToUnicode`
+    declares codes two bytes wide. A simple font is shown a byte at a time all
+    the same, and read in pairs every letter it draws is lost."""
+    path = tmp_path / "published.pdf"
+    path.write_bytes(
+        document(
+            [_shows(b"ABCDEF")],
+            font=b"<< /Type /Font /Subtype /TrueType /BaseFont /X /ToUnicode {extra} >>",
+            extra=stream(tounicode(SHIFTED, width=2)) + b"\nendstream",
+        )
+    )
+
+    found = read_passages(path)
+
+    assert found is not None
+    assert "m@x.co" in found[0].text
+
+
 def test_a_font_whose_glyphs_mean_nothing_here_is_dropped_rather_than_guessed(tmp_path: Path):
     """A subset font naming `g1 g2 g3` says what it draws to nobody. Reading
     the bytes anyway would put whatever they happen to be into the report."""

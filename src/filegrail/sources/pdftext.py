@@ -363,6 +363,8 @@ def _mapping(font: bytes, objects: dict[int, bytes]) -> Font:
     """
     # A composite font is shown two bytes at a time unless its own CMap says
     # otherwise, which the `/ToUnicode` codespace below is allowed to correct.
+    # A simple font is shown one byte at a time whatever its map declares: a
+    # writer that gives one a two-byte codespace has not changed what it draws.
     composite = b"/Type0" in font
     width = 2 if composite else 1
     advances, missing = _widths(font, objects)
@@ -374,7 +376,7 @@ def _mapping(font: bytes, objects: dict[int, bytes]) -> Font:
         if data:
             decoded, stated = _cmap(data)
             if decoded:
-                return Font(stated or width, decoded, advances, missing)
+                return Font((stated or width) if composite else 1, decoded, advances, missing)
 
     if composite:
         # An identity encoding names glyphs, not letters.
