@@ -25,3 +25,7 @@ test-data/
 # The design document is kept locally rather than published: it is a working
 # specification, not documentation for a reader of the repository.
 docs/DESIGN.md
+
+# A local mirror of the project instructions for agent tools that look for this
+# name. It says how to work in this checkout, not what the project is.
+AGENTS.md
