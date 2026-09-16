@@ -263,7 +263,7 @@ reported as not understood, rather than guessed at.
 ```bash
 filegrail . --type image          # image, video, audio, document, archive, mail, text
 filegrail . --ext jpg,pdf         # exactly these
-filegrail . --json | jq '.files[].origins[] | select(.block == "pdf-info")'
+filegrail . --json | jq '.files[].evidence[] | select(.block == "pdf-info")'
 ```
 
 The `--type` families are derived from the readers themselves, so a format

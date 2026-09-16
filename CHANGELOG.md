@@ -5,6 +5,15 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- **The one worked `jq` example in the format reference named a key that has
+  not existed since 0.8.0.** `.files[].origins[]` is `.files[].evidence[]`,
+  as the schema table in the README has said all along, so a reader who
+  copied the line got an empty result and no reason for it.
+
 ## 0.19.0 - 2026-09-16
 
 ### Fixed

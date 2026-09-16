@@ -138,7 +138,7 @@ room for a fourth thing that is not a kind.
 ### Where it runs
 
 `scan()` already makes one cross-file pass after the per-file loop —
-`_attach_archive_origins`, which gives an extracted file the origin of the
+`_attach_archive_records`, which gives an extracted file the origin of the
 archive it came out of. The lineage pass is the same shape and runs beside it.
 
 ### What it does *not* do in this version
