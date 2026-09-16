@@ -8,7 +8,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .lineage import attach_lineage
-from .models import FILENAME, NAME_AND_SIZE, EvidenceRecord, FileRecord
+from .models import FILENAME, NAME_AND_SIZE, ORIGIN, EvidenceRecord, FileRecord
 from .sources import (
     collect_browser_downloads,
     collect_quarantine_events,
@@ -264,7 +264,12 @@ def _attach_archive_records(
 
     by_signature: dict[tuple[str, int], list[FileRecord]] = {}
     for record in records:
-        if not record.evidence:
+        # A file that already knows where it came from keeps that answer; the
+        # archive's is second-hand beside it. Knowing anything else is not the
+        # same thing - a photograph carrying nothing but EXIF has said where it
+        # was taken and still not said how it got here, which is exactly what
+        # the archive can answer.
+        if not any(found.category == ORIGIN for found in record.evidence):
             by_signature.setdefault((Path(record.path).name, record.size), []).append(record)
     if not by_signature:
         return

@@ -5,6 +5,19 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- **A file that describes itself is no longer refused the origin of the
+  archive it came out of.** The check was written to stop a known origin
+  being overwritten by a second-hand one, and it read that way while the
+  records it looked at were origins. When that collection widened to carry
+  metadata and activity too, the check came along unchanged and quietly began
+  to mean "nothing at all is known about this file". A photograph with EXIF
+  has said where it was taken and still not said how it got here - the one
+  question the archive could answer, for the one file the pass skipped.
+
 ## 0.18.1 - 2026-09-16
 
 ### Fixed

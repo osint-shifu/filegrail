@@ -4,6 +4,7 @@ from pathlib import Path
 
 from filegrail.scan import scan
 from filegrail.sources.archives import is_archive, list_members
+from tests.photo import jpeg_with_exif
 
 from .test_browser import CHROMIUM_SCHEMA, START_TIME
 
@@ -21,7 +22,7 @@ def _download_record(home: Path, target: str) -> None:
     connection.close()
 
 
-def _make_zip(path: Path, entries: dict[str, str]) -> None:
+def _make_zip(path: Path, entries: dict[str, str | bytes]) -> None:
     with zipfile.ZipFile(path, "w") as archive:
         for name, content in entries.items():
             archive.writestr(name, content)
@@ -86,6 +87,32 @@ def test_extracted_files_inherit_the_archive_origin(tmp_path: Path):
         assert best.source == "archive-member"
         assert best.url == "https://example.org/pack.zip"
         assert "extracted from pack.zip" in best.note
+
+
+def test_a_member_that_describes_itself_still_inherits_the_archive_origin(tmp_path: Path):
+    """EXIF says where a photograph was taken, never how it arrived here.
+
+    The archive is the one record that answers that, so carrying metadata must
+    not cost a file the answer. This guarded a real regression: the check began
+    as one for a known origin and briefly became one for any evidence at all.
+    """
+    photo = tmp_path / "photo.jpg"
+    jpeg_with_exif(photo, "Canon", "EOS R5", "2026:03:01 10:00:00")
+    blob = photo.read_bytes()
+
+    archive = tmp_path / "pack.zip"
+    _make_zip(archive, {"photo.jpg": blob})
+    _download_record(tmp_path, str(archive))
+
+    case = tmp_path / "case"
+    case.mkdir()
+    (case / "photo.jpg").write_bytes(blob)
+
+    record = scan(case, home=tmp_path, use_shell_history=False)[0]
+
+    sources = [found.source for found in record.evidence]
+    assert "device-metadata" in sources, "the file lost what it says about itself"
+    assert "archive-member" in sources, "the file lost where the archive says it came from"
 
 
 def test_member_modified_after_extraction_is_not_claimed(tmp_path: Path):
