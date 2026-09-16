@@ -5,6 +5,27 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.22.1 - 2026-09-16
+
+### Changed
+
+- **Every release is published on GitHub, with its changelog section as the
+  notes.** The releases page stopped at 0.3.0 and went on calling it the
+  latest; every version since has a release there now.
+
+### Fixed
+
+- **The logo at the top of the README is shown at a size that reads.** The
+  lockup sits on a wide canvas, and at the width it was given the name came out
+  about a hundred pixels across.
+
+- **The line under the package name on PyPI says what the README says:**
+  "Trace file origins. Extract metadata. Find investigative pivots."
+
+- **The version badge names the version released.** It asked PyPI at view
+  time, and the image proxies of GitHub and PyPI kept the answer, so a new
+  release page could show a version several releases old.
+
 ## 0.22.0 - 2026-09-16
 
 ### Added
