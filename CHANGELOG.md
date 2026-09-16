@@ -5,6 +5,24 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.18.1 - 2026-09-16
+
+### Fixed
+
+- **A manifest's claim that a model made the file is no longer shown without
+  saying the signature was never checked.** The note was on the record and
+  reached the terminal and the JSON, but the finding built its own rows and
+  left it behind, so the HTML report carried the claim alone. The finding is
+  `Declared AI-generated source` now, and it says `signature: not verified`
+  beside the source type. The tool validates no certificate chain, and the
+  report that travels furthest should be the last place to forget it.
+
+### Changed
+
+- The brand artwork no longer carries the C2PA manifest it was exported with.
+  It was nine tenths of every SVG, and a repository is its own provenance for
+  its own logo. Every drawing renders exactly as before.
+
 ## 0.18.0 - 2026-09-16
 
 ### Changed
