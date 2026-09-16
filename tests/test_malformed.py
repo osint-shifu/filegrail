@@ -45,6 +45,7 @@ from filegrail.sources.sidecar import read_sidecar
 from filegrail.sources.torrent import read_torrent
 from filegrail.sources.xmp import read_xmp
 from tests.compound import ole
+from tests.pdf import document as pdf_document
 from tests.photo import jpeg_with_exif
 from tests.shortcut import link_info, shortcut, volume_id
 
@@ -168,6 +169,7 @@ _NAMES = (
     "voice.wav",
     "song.mp3",
     "track.gpx",
+    "brief.pdf",
 )
 
 
@@ -200,6 +202,8 @@ def corpus(tmp_path_factory: pytest.TempPathFactory) -> dict[str, bytes]:
             }
         ),
         "bundle.zip": _zip({"holiday/photo.jpg": "not really a photo", "readme.txt": "hello"}),
+        # Cut anywhere, a PDF loses the table that says where its pages are.
+        "brief.pdf": pdf_document([b"BT /F1 12 Tf 72 720 Td (write to press@example.org) Tj ET"]),
         "linux.torrent": b"d8:announce20:http://tracker.test4:infod4:name9:linux.iso"
         b"12:piece lengthi262144e6:pieces20:" + b"\xa5" * 20 + b"ee",
         "message.eml": (

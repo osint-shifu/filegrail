@@ -229,6 +229,7 @@ Content scanning is limited to 1 MB of text per file and 64 members of a package
 | `.gpx` `.kml` | Names and links as markup, plus every named point and the start and end of every track as geo positions | `line 12`, `waypoint 3`, `track 1 start`, `placemark 2` |
 | `.geojson` | Text by line, plus every point and the start and end of every line as geo positions | `line 12`, `feature 1`, `feature 1 end` |
 | `.gexf` `.mm` | Visible text and links, plus node labels kept in attributes | `line 12` |
+| `.pdf` | The text of each page, decoded through the font that draws it; a font whose glyphs cannot be established is skipped rather than guessed at | `page 7` |
 | `.docx` `.docm` `.dotx` | Body, footnotes, endnotes and comments | `body`, `footnotes`, `endnotes`, `comments` |
 | `.xlsx` `.xlsm` `.xltx` | Shared strings and inline cell text | `cell text`, `sheet 2` |
 | `.pptx` `.pptm` | Slide text and notes | `slide 4`, `slide 4 notes` |
@@ -239,7 +240,7 @@ Content scanning is limited to 1 MB of text per file and 64 members of a package
 | `.mtgx` | Every graph of a Maltego export, including entities and their values | `graph 1` |
 | `.eml` `.msg` | Decoded message body, every text part | `body`, `body (html)` |
 
-PDF metadata is supported, but PDF body text is not extracted by `--content`.
+A scanned page is a picture of text rather than text, and no OCR is performed.
 
 ---
 
@@ -760,7 +761,7 @@ It does not manufacture missing history.
 - A shared camera model does not identify the same physical camera; a body serial is a materially stronger link.
 - Recorded author or organization metadata can be edited and should not be treated as verified identity by itself.
 - C2PA hard binding is checked, but certificate-chain and signature trust are **not** verified.
-- PDF metadata is read; PDF body text is not extracted by `--content`.
+- Text in a scanned PDF is an image; `--content` reads what a document draws, and no OCR is performed.
 - Unsupported file formats can still participate in provenance analysis when external or local evidence about them exists.
 - Negative findings depend on the evidence sources that were available to search.
 - `filegrail` is not a monitoring agent.

@@ -18,15 +18,13 @@ XML, and this package already opens them for their properties, with a bounded
 member reader written for exactly this hazard. The body is a different member
 of the same archive.
 
+A PDF is read by `pdftext`, which is the one format here that needed a parser
+rather than plumbing: the bytes a PDF draws are indices into whatever encoding
+each font uses, so the text comes back through that font or does not come back
+at all. What it refuses, and why, is in that module.
+
 Deliberately not read, with reasons:
 
-* **PDF** - the only format here that genuinely needs work rather than
-  plumbing. Pulling the string literals out of a content stream takes an
-  afternoon and produces readable text for perhaps half of real documents;
-  for the other half it produces mush that cannot be told apart from data.
-  In a tool that reports evidence, a confident wrong answer is worse than an
-  absent one, and `_origin()` in the readers beside this one already refuses
-  to guess for the same reason.
 * **Source code** - a checkout is thousands of files whose identifiers are
   dependency hosts and licence URLs. `SKIP_DIRECTORIES` keeps a scan out of
   `node_modules` on the same principle.
@@ -46,10 +44,11 @@ from pathlib import Path
 from typing import NamedTuple
 
 from .embedded.containers import EPUB_SUFFIXES, ODF_SUFFIXES, SVG_SUFFIXES
-from .embedded.documents import OOXML_SUFFIXES
+from .embedded.documents import OOXML_SUFFIXES, PDF_SUFFIXES
 from .embedded.parts import read_part
 from .mail import OUTLOOK_SUFFIXES
 from .mail import SUFFIXES as MAIL_SUFFIXES
+from .pdftext import MAX_FILE_BYTES, read_pages
 
 #: The most text taken from one file. Identifiers repeat; a document long
 #: enough to exhaust this has said what it is going to say, and the point of
@@ -139,7 +138,14 @@ _LABEL_ATTRIBUTES: dict[str, frozenset[str]] = {
 #: a JSON or XML body, and one GraphML per graph, each beside its metadata.
 PACKAGE_SUFFIXES = OOXML_SUFFIXES | ODF_SUFFIXES | EPUB_SUFFIXES | {".kmz", ".xmind", ".mtgx"}
 
-SUFFIXES = PLAIN_SUFFIXES | MARKUP_SUFFIXES | PACKAGE_SUFFIXES | MAIL_SUFFIXES | OUTLOOK_SUFFIXES
+SUFFIXES = (
+    PLAIN_SUFFIXES
+    | MARKUP_SUFFIXES
+    | PACKAGE_SUFFIXES
+    | MAIL_SUFFIXES
+    | OUTLOOK_SUFFIXES
+    | PDF_SUFFIXES
+)
 
 #: Which members of a package hold what the document says, and what to call
 #: each one. Word keeps the notes and comments outside the main part, a deck
@@ -224,6 +230,8 @@ def read_passages(path: Path) -> list[Passage] | None:
             found = _read(markup, _LABEL_ATTRIBUTES.get(suffix, frozenset()))
             if suffix in POSITION_SUFFIXES:
                 found += _positions(markup)
+        elif suffix in PDF_SUFFIXES:
+            found = [Passage(f"page {number}", text) for number, text in read_pages(_whole(path))]
         elif suffix in PACKAGE_SUFFIXES:
             found = _package(path)
         elif suffix in MAIL_SUFFIXES:
@@ -277,6 +285,23 @@ def _cells(text: str, delimiter: str) -> list[Passage]:
         for index, cell in enumerate(row, 1):
             found.append(Passage(f"row {number} · column {index}", cell))
     return found
+
+
+def _whole(path: Path) -> bytes:
+    """A PDF, all of it, or nothing.
+
+    The front of the file is not enough: a PDF says where its pages are in a
+    table at the end, and an object may sit anywhere between. So the bound is
+    on the size of the document rather than on a prefix of it, and one past
+    the bound is left unread rather than read in part - half a PDF is not a
+    shorter PDF, it is an unreadable one.
+    """
+    try:
+        if path.stat().st_size > MAX_FILE_BYTES:
+            return b""
+        return path.read_bytes()
+    except OSError:
+        return b""
 
 
 def _head(path: Path) -> bytes:

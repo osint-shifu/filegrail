@@ -5,6 +5,32 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.21.0 - 2026-09-16
+
+### Added
+
+- **`--content` reads a PDF.** It was the one format the option refused, on the
+  grounds that pulling the string literals out of a content stream gives
+  readable text for about half of real documents and mush for the rest. That
+  was an estimate, and measuring it found something else: the naive pull fails
+  not because a PDF is unreadable but because it reads the wrong bytes - font
+  programs instead of page content, and one byte at a time where a composite
+  font is shown two.
+
+  A PDF stores instructions rather than text, and the bytes in them are indices
+  into whatever encoding each font happens to use. So every run is decoded
+  through the font that draws it: the `/ToUnicode` CMap where the writer
+  supplied one, a named encoding or `/Differences` otherwise, and printable
+  ASCII for a font that states neither. A font whose glyphs resolve to nothing
+  is skipped rather than read as bytes, and an encrypted document is refused,
+  because the failure worth avoiding here is not unreadable prose - it is an
+  address assembled out of the wrong glyphs. Dropping a run costs a lead;
+  inventing one costs the investigation.
+
+  A value is reported against `page 7`. A PDF records its pages as structure,
+  which is why a page can be named here and cannot in a word processor's
+  document, where pagination happens when something renders the file.
+
 ## 0.20.2 - 2026-09-16
 
 ### Fixed
