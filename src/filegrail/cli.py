@@ -167,8 +167,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--content",
         action="store_true",
-        help="Also read what the documents say, not only what they record "
-        "about themselves. Implies --pivots.",
+        help="Also look for pivots in the text of supported documents. "
+        "Turns --pivots on by itself.",
     )
     parser.add_argument(
         "--hash", action="store_true", dest="hash_files", help="Compute SHA-256 for each file."

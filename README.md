@@ -70,13 +70,13 @@ filegrail ./evidence --pivots
 Also inspect the text of supported documents, including PDF:
 
 ```bash
-filegrail ./evidence --content
+filegrail ./evidence --pivots --content
 ```
 
 Create a self-contained HTML investigation report:
 
 ```bash
-filegrail ./evidence --content --html > report.html
+filegrail ./evidence --pivots --content --html > report.html
 ```
 
 [View an example HTML report](https://osint-shifu.github.io/filegrail/example-report.html), built from an invented case.
@@ -264,10 +264,10 @@ filegrail ./case --pivots
 extracts supported identifiers from metadata and provenance records.
 
 ```bash
-filegrail ./case --content
+filegrail ./case --pivots --content
 ```
 
-also reads the text of supported documents and turns pivot extraction on.
+also looks for them in the text of supported documents.
 
 Every pivot keeps its **type**, **normalized value**, **file**, **source** and **exact location**, such as a metadata field, a line, a page or a slide. Values found in more than one file are counted as shared pivots.
 
@@ -409,7 +409,7 @@ A normal scan reads embedded metadata and the available local provenance traces.
 | `--brief` | Summary, key findings and a one-line file index |
 | `-v`, `--verbose` | Every file in full detail, with every decoded field and the full pivot lists |
 | `--pivots` | Extract investigative pivots from metadata and provenance |
-| `--content` | Also read the text of supported documents; turns on `--pivots` |
+| `--content` | With `--pivots`, also look in the text of supported documents; on its own it turns `--pivots` on |
 | `--timeline` | Chronological event view |
 | `--cluster` | Group files by shared cameras and authors |
 | `--unknown-only` | Show only files with no evidence found |
@@ -435,12 +435,12 @@ A normal scan reads embedded metadata and the available local provenance traces.
 | Find where a file came from | `filegrail download.pdf` |
 | See the evidence behind a finding | `filegrail explain download.pdf` |
 | Get an overview of a large directory | `filegrail ./case --brief` |
-| List the identifiers in a set of documents | `filegrail ./case --content` |
+| List the identifiers in a set of documents | `filegrail ./case --pivots --content` |
 | Find photos taken with the same camera | `filegrail ./photos --cluster` |
 | Put everything that happened in order | `filegrail ./case --timeline` |
 | Investigate a copied profile or mounted image | `filegrail /mnt/evidence --home /mnt/profile` |
 | Export JSON with a SHA-256 for every file | `filegrail ./case --hash --json > report.json` |
-| Share a report with credentials redacted | `filegrail ./case --content --redact --html -o report.html` |
+| Share a report with credentials redacted | `filegrail ./case --pivots --content --redact --html -o report.html` |
 | Check what would remain before publishing | `filegrail clean ./publish --check` |
 
 ---
@@ -462,7 +462,7 @@ A normal scan reads embedded metadata and the available local provenance traces.
 The page loads nothing from outside itself and makes no network requests, so it opens offline and travels as a single file.
 
 ```bash
-filegrail ./case --content --html -o report.html
+filegrail ./case --pivots --content --html -o report.html
 ```
 
 [See an example report](https://osint-shifu.github.io/filegrail/example-report.html), built from an invented case.
@@ -526,10 +526,10 @@ For example, with `jq`:
 filegrail ./case --json | jq -r '.files[] | .path as $file | .evidence[] | select(.category == "origin" and .url) | "\($file)\t\(.url)"'
 
 # Every email address found in metadata and documents
-filegrail ./case --content --json | jq -r '.identifiers[] | select(.type == "email") | .normalized'
+filegrail ./case --pivots --content --json | jq -r '.identifiers[] | select(.type == "email") | .normalized'
 
 # Pivots found in more than one file
-filegrail ./case --content --json | jq -r '.identifiers[] | select(.files > 1) | "\(.type)\t\(.normalized)\t\(.files) files"'
+filegrail ./case --pivots --content --json | jq -r '.identifiers[] | select(.files > 1) | "\(.type)\t\(.normalized)\t\(.files) files"'
 ```
 
 Each command has its own schema version, which changes only when a field in that document changes meaning or is removed.

@@ -88,7 +88,7 @@ INVESTIGATE = (
         "DIRECTORY",
         (
             ("filegrail ~/case --pivots", "extract investigation pivots"),
-            ("filegrail ~/case --content", "inspect content and extract pivots"),
+            ("filegrail ~/case --pivots --content", "inspect content and extract pivots"),
             ("filegrail ~/case --cluster", "find files sharing authors or cameras"),
             ("filegrail ~/case --timeline", "reconstruct recorded events"),
             ("filegrail ~/case --unknown-only", "find files with no explained origin"),
