@@ -5,6 +5,48 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.22.0 - 2026-09-16
+
+### Added
+
+- **A PDF span that states its own text is read as that text.** A browser
+  printing to PDF draws the hyphen in an invoice number or a postcode with an
+  alternate glyph that its font maps to nothing, and says in the span around
+  it, with `/ActualText`, that the glyph is a hyphen. Read through the font
+  alone, such a number came back as two values, neither of which is on the
+  page. What the span states is what is read now.
+
+### Changed
+
+- **New logo and pictograms.** The HTML report draws the new mark in its
+  masthead and tab icon, and the README shows the compact vertical lockup.
+
+- **The README is reorganized around what a reader comes to find:** a quick
+  start, what `filegrail` reads and from where, the formats, the pivots, the
+  commands with common tasks, and `jq` examples for the JSON. The rules for
+  what each pivot type takes and leaves out moved to `docs/FORMATS.md`.
+
+### Fixed
+
+- **A PDF that places every glyph itself reads as words.** A browser printing
+  to PDF draws each glyph alone and moves the pen by its width, and every move
+  was being taken as a line break, so an address came back one letter a line
+  and invoices and receipts yielded none of their identifiers. The gap between
+  glyphs is measured now, from the widths the font states: no gap joins them,
+  a word's gap is a space, and anything else is a new line. A gap that cannot
+  be measured, in a font that states no widths, is still a break. Measured
+  against `pdftotext` on eighteen real documents, the identifiers found went
+  from 22 of 35 to 31, and the one invented value is gone.
+
+- **A simple font is read one byte at a time, whatever its `/ToUnicode`
+  declares.** A publishing tool can give a TrueType font a map written with
+  two-byte codes, and the text was being read in pairs, which lost every
+  letter the font drew - in one document, the whole page footer with its
+  email address and phone number.
+
+- **The README no longer lists RTF `\info` fields.** They were never read; the
+  RTF reader takes the application that wrote the file.
+
 ## 0.21.1 - 2026-09-16
 
 ### Fixed
