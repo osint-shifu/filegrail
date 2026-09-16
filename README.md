@@ -334,6 +334,7 @@ It can report:
 - conflicting origin URLs;
 - file-size mismatches;
 - filename-only matches;
+- a file reporting that it was created after it arrived here;
 - creation and modification dates in impossible order;
 - XMP editing steps out of sequence;
 - EXIF vs XMP differences;
@@ -667,18 +668,20 @@ Schemas are versioned independently so unrelated command changes do not force do
 | `1` | `clean` only: metadata survived in at least one copy, or would survive |
 | `2` | Invalid command input, such as a missing path, wrong argument count or unknown option |
 
-A scan document contains:
+Every scan document contains:
 
+- `schema`
+- `filegrail_version`
 - `root`
-- `home`
 - `summary`
 - `files`
-
-and, when requested:
-
-- `identifiers`
-- `shared_attributes`
 - `unsearched`
+
+and, depending on how the scan was run:
+
+- `home`, when the scan read another profile
+- `identifiers`, with `--pivots` or `--content`
+- `shared_attributes`, with `--cluster`
 
 Each file includes:
 

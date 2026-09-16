@@ -15,6 +15,15 @@ python -m pip install -e ".[dev]"
 pytest
 ruff check .
 ruff format --check .
+mypy
+```
+
+Those four are what CI runs on every push, on Linux, macOS and Windows. It runs
+one more job on generated input, which needs the extra that carries Hypothesis:
+
+```bash
+python -m pip install -e ".[dev,fuzz]"
+pytest tests/test_properties.py
 ```
 
 `filegrail` has **no runtime dependencies** and that is a deliberate constraint,

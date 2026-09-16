@@ -129,11 +129,11 @@ case-insensitive because writers disagree about `stRef:documentID` versus
 
 ### Structure
 
-A `Lineage` value per file — the identifiers it states — and a `link` between
-two files, carrying which relation joined them. Both belong in a new module
-rather than in `models.py`: a link is not a claim about where a file came from,
-it is a relation between two records, and the three-kind evidence model has no
-room for a fourth thing that is not a kind.
+The identifiers a file states, read back out of its records, and a `Link`
+between two files, carrying which relation joined them. The link belongs in a
+new module rather than in `models.py`: it is not a claim about where a file
+came from, it is a relation between two records, and the three-kind evidence
+model has no room for a fourth thing that is not a kind.
 
 ### Where it runs
 
