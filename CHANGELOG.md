@@ -5,6 +5,15 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.22.5 - 2026-09-16
+
+### Added
+
+- **A roadmap.** `ROADMAP.md`, linked from the README, lists the planned work
+  in order: relationships between files and identifiers backed by evidence,
+  their export as GraphML and CSV for graph and link-analysis tools, a
+  relationship view in the HTML report, and export as CASE JSON-LD.
+
 ## 0.22.4 - 2026-09-16
 
 ### Changed
