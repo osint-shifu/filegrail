@@ -21,3 +21,7 @@ htmlcov/
 
 # Local sample files for manual runs - never commit real documents
 test-data/
+
+# The design document is kept locally rather than published: it is a working
+# specification, not documentation for a reader of the repository.
+docs/DESIGN.md

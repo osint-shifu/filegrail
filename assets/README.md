@@ -1,6 +1,6 @@
 # Brand assets
 
-Construction rules and the colour meanings live in [`DESIGN.md`](../docs/DESIGN.md). This file is how to use them.
+How to use the brand assets this repository carries.
 
 Banner at the top of the README (absolute URL, so PyPI shows it too):
 
