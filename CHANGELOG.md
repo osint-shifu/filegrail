@@ -5,7 +5,7 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.17.1 - 2026-09-16
 
 ### Added
 
@@ -19,6 +19,12 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   the names, addresses and paths of the files it reads.
   `tools/build_example.py` writes the case and renders the page, so a later
   version can be shown the same way.
+
+### Changed
+
+- The README leads with the project's lockup, which follows the reader's
+  theme, and the banner it used to carry is now what GitHub shows as the
+  repository's social preview.
 
 ## 0.17.0 - 2026-09-16
 
