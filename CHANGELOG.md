@@ -5,6 +5,16 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.22.2 - 2026-09-16
+
+### Fixed
+
+- **The logo at the top of the README is larger, and not only wider.** The
+  vertical lockups filled half of their canvas, so widening the image in 0.22.1
+  mostly widened the margin around it. They are framed by their clear space
+  now, half the height of the mark on every side, and the name in the README
+  logo comes out about 300 pixels across, where it was about 175.
+
 ## 0.22.1 - 2026-09-16
 
 ### Changed

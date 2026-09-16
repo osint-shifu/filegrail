@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "filegrail"
-version = "0.22.1"
+version = "0.22.2"
 description = "Trace file origins. Extract metadata. Find investigative pivots."
 readme = "README.md"
 requires-python = ">=3.10"
