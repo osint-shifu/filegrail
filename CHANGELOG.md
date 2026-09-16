@@ -5,6 +5,21 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- An example report is published with the project and linked from the README:
+  https://osint-shifu.github.io/filegrail/example-report.html. The case it
+  reports on was invented for it: photographs that share one camera body,
+  documents that share an author, a PDF whose Info dictionary and XMP packet
+  disagree about when and by what it was made, an image whose Content
+  Credentials name a generative source, and a download that still carries the
+  address it came from. No real file is reported on, because a report carries
+  the names, addresses and paths of the files it reads.
+  `tools/build_example.py` writes the case and renders the page, so a later
+  version can be shown the same way.
+
 ## 0.17.0 - 2026-09-16
 
 ### Added
