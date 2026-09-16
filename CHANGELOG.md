@@ -5,6 +5,16 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.22.3 - 2026-09-16
+
+### Changed
+
+- **`--content` is shown as an addition to `--pivots`.** The examples in the
+  README, and those `filegrail` prints when run with no arguments, read
+  `--pivots --content`, and `--help` says what it adds: it also looks for
+  pivots in the text of supported documents. `--content` on its own still turns
+  `--pivots` on, so existing commands give the same results.
+
 ## 0.22.2 - 2026-09-16
 
 ### Fixed
