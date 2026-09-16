@@ -7,7 +7,7 @@
 
 **Trace file origins. Extract metadata. Find investigative pivots.**
 
-[![PyPI](https://img.shields.io/pypi/v/filegrail?style=flat-square&color=3775A9)](https://pypi.org/project/filegrail/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.22.0-3775A9?style=flat-square)](https://pypi.org/project/filegrail/)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-1f883d?style=flat-square)
 ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1f883d?style=flat-square)

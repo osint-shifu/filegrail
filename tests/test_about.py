@@ -42,6 +42,17 @@ def test_the_version_shown_is_the_pyproject_version():
     assert declared.group(1) == __version__
 
 
+def test_the_readme_badge_names_the_version_being_released():
+    """The badge states the version rather than asking PyPI for it at view
+    time: the image proxies of GitHub and PyPI cache that answer, and a new
+    release page went on showing a version several releases old."""
+    readme = (Path(__file__).resolve().parent.parent / "README.md").read_text("utf-8")
+    badge = re.search(r"img\.shields\.io/badge/pypi-v([0-9][0-9.]*)-", readme)
+
+    assert badge is not None, "README.md no longer carries the PyPI version badge"
+    assert badge.group(1) == __version__
+
+
 def test_it_says_what_it_is():
     screen = _screen()
 
