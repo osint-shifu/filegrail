@@ -93,7 +93,7 @@ def test_it_shows_a_short_way_in_rather_than_every_example():
 
     for start in ("filegrail suspicious.pdf", "filegrail ~/Downloads", "filegrail doctor"):
         assert start in screen, start
-    for flag in ("--identify", "--timeline"):
+    for flag in ("--pivots", "--timeline"):
         assert flag in screen, flag
 
 

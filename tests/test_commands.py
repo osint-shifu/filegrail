@@ -359,7 +359,7 @@ def test_clean_check_does_not_even_make_the_directory_it_would_write_to(tmp_path
 
 def test_content_lists_what_it_opened_every_document_to_find(tmp_path: Path, capsys):
     """`--content` pays to open and parse every document. Asking for the wider
-    corpus is asking to be shown it, so it does not also need `--identify`."""
+    corpus is asking to be shown it, so it does not also need `--pivots`."""
     case = tmp_path / "case"
     case.mkdir()
     (case / "letter.txt").write_text("write to ann.shaw@acme-legal.example", encoding="utf-8")
@@ -377,6 +377,6 @@ def test_a_scan_that_was_not_asked_for_content_does_not_read_any(tmp_path: Path,
     case.mkdir()
     (case / "letter.txt").write_text("write to ann.shaw@acme-legal.example", encoding="utf-8")
 
-    assert main(["scan", str(case), "--identify", "--json", "--home", str(tmp_path)]) == 0
+    assert main(["scan", str(case), "--pivots", "--json", "--home", str(tmp_path)]) == 0
 
     assert json.loads(capsys.readouterr().out)["identifiers"] == []

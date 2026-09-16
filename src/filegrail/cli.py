@@ -152,10 +152,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--unknown-only", action="store_true", help="List only files nothing was found for."
     )
     parser.add_argument(
-        "--identify",
+        "--pivots",
         action="store_true",
         help="List the emails, domains, addresses, hashes and coordinates found.",
     )
+    # The flag was `--identify` up to 0.17.1. A saved command keeps working; it
+    # stays out of the help so that the option has one name to learn.
+    parser.add_argument("--identify", dest="pivots", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "--cluster",
         action="store_true",
@@ -165,7 +168,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--content",
         action="store_true",
         help="Also read what the documents say, not only what they record "
-        "about themselves. Implies --identify.",
+        "about themselves. Implies --pivots.",
     )
     parser.add_argument(
         "--hash", action="store_true", dest="hash_files", help="Compute SHA-256 for each file."
@@ -445,10 +448,10 @@ def _scan(rest: list[str]) -> int:
     base = root if root.is_dir() else root.parent
     theme = detect(colour=args.colour)
 
-    # `--content` without `--identify` would pay for every document to be
+    # `--content` without `--pivots` would pay for every document to be
     # opened and parsed and then print a count of what it found. Asking for the
     # wider corpus is asking to be shown it.
-    listed = args.identify or args.content
+    listed = args.pivots or args.content
 
     written = args.out.resolve() if args.out else None
     if args.json:

@@ -48,7 +48,7 @@ ACTIONS = (
     Action("3", "chronological view", ("--timeline",)),
     Action("4", "every claim, not just the strongest", ("--verbose",)),
     Action("5", "summarise, without every field", ("--brief",)),
-    Action("7", "identifiers in the metadata", ("--identify",)),
+    Action("7", "identifiers in the metadata", ("--pivots",)),
     Action("9", "who and what made these files", ("--cluster",)),
     Action("i", "images only", ("--type", "image")),
     Action("d", "documents only", ("--type", "document")),

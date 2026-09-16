@@ -1,8 +1,8 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-logo-dark.png">
-  <img src="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-logo-light.png" alt="filegrail" width="380">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-stacked-dark.png">
+  <img src="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-stacked-light.png" alt="filegrail" width="220">
 </picture>
 
 **Local file provenance, metadata and forensic context analysis.**
@@ -246,10 +246,10 @@ PDF metadata is supported, but PDF body text is not extracted by `--content`.
 `filegrail` can detect **investigative pivots** (identifiers): structured values that may be useful for further OSINT, DFIR, threat-intelligence or attribution work.
 
 ```bash
-filegrail ./case --identify
+filegrail ./case --pivots
 ```
 
-`--identify` extracts supported pivots from metadata and provenance records.
+`--pivots` extracts supported pivots from metadata and provenance records.
 
 ```bash
 filegrail ./case --content
@@ -367,11 +367,11 @@ Instead it exposes the evidence category, source and match basis directly so the
 ### Extracting investigative pivots from metadata and content
 
 ```bash
-filegrail ./case --identify      # metadata and provenance
+filegrail ./case --pivots        # metadata and provenance
 filegrail ./case --content       # metadata, provenance and supported document text
 ```
 
-`--identify` extracts supported investigative pivots from metadata and provenance records.
+`--pivots` extracts supported investigative pivots from metadata and provenance records.
 
 `--content` extends the same extraction into supported document bodies and automatically enables pivot detection.
 
@@ -509,8 +509,8 @@ Investigative-pivot extraction, content inspection, hashing and clustering run o
 | `-v`, `--verbose` | Open every file: its full detail with every decoded field, and the full pivot lists |
 | `--brief` | Summary, key findings and a one-line file index |
 | `--timeline` | Chronological event view |
-| `--identify` | Extract investigative pivots from metadata and provenance |
-| `--content` | Also inspect supported document content; implies `--identify` |
+| `--pivots` | Extract investigative pivots from metadata and provenance |
+| `--content` | Also inspect supported document content; implies `--pivots` |
 | `--cluster` | Group files by shared cameras/authors |
 | `--unknown-only` | Show only files with no evidence found |
 | `--hash` | Compute SHA-256 for each file |
@@ -559,7 +559,7 @@ filegrail photo.jpg
 filegrail ./case --brief
 
 # Extract investigative pivots from metadata and provenance
-filegrail ./case --identify
+filegrail ./case --pivots
 
 # Also inspect supported document content
 filegrail ./case --content

@@ -52,7 +52,7 @@ POLICY = (
     "img-src data:; base-uri 'none'; form-action 'none'"
 )
 
-#: The mark, drawn in the page: the grail in the accent, the star in the ink.
+#: The mark, drawn in the page: the grail in the accent, the diamond in the ink.
 _MARK = (
     '<svg class="mark" viewBox="0 0 141 221" aria-hidden="true">'
     '<g transform="translate(-354,-82)">'
@@ -62,8 +62,8 @@ _MARK = (
     "482,283 L482,300 A3,3 0 0 1 479,303 L388,303 A3,3 0 0 1 385,300 L385,283 "
     "A3,3 0 0 1 388,280 L421.5,280 L421.5,262.6 A61.5,58 0 0 1 372,205 L372,179 "
     'L354,179 Z M396,179 L471,179 L471,205 A37.5,37.5 0 0 1 396,205 Z"/>'
-    '<path fill="var(--ink)" d="M433.5,198.5 Q435,211 447.5,212.5 Q435,214 433.5,226.5 '
-    'Q432,214 419.5,212.5 Q432,211 433.5,198.5 Z"/></g></svg>'
+    '<path fill="var(--ink)" d="M433.5,196.95 L449.05,212.5 L433.5,228.05 '
+    'L417.95,212.5 Z"/></g></svg>'
 )
 
 #: The same mark as the tab icon. A data URI: drawn by the browser, fetched from nowhere.
@@ -76,9 +76,8 @@ _FAVICON = (
     "L445.5,280 L479,280 A3,3 0 0 1 482,283 L482,300 A3,3 0 0 1 479,303 L388,303 "
     "A3,3 0 0 1 385,300 L385,283 A3,3 0 0 1 388,280 L421.5,280 L421.5,262.6 "
     "A61.5,58 0 0 1 372,205 L372,179 L354,179 Z M396,179 L471,179 L471,205 "
-    "A37.5,37.5 0 0 1 396,205 Z'/%3E%3Cpath fill='%23E6E8EB' d='M433.5,198.5 "
-    "Q435,211 447.5,212.5 Q435,214 433.5,226.5 Q432,214 419.5,212.5 "
-    "Q432,211 433.5,198.5 Z'/%3E%3C/g%3E%3C/svg%3E\">"
+    "A37.5,37.5 0 0 1 396,205 Z'/%3E%3Cpath fill='%23E6E8EB' d='M433.5,196.95 "
+    "L449.05,212.5 L433.5,228.05 L417.95,212.5 Z'/%3E%3C/g%3E%3C/svg%3E\">"
 )
 
 #: Files a pivot names before the rest go behind a summary: enough to see the

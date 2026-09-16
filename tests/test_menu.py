@@ -69,7 +69,7 @@ COMMANDS = [
     ("4", ["--verbose"]),
     ("5", ["--brief"]),
     ("6", ["--hash"]),
-    ("7", ["--identify"]),
+    ("7", ["--pivots"]),
     ("8", ["--redact", "--json"]),
     ("9", ["--cluster"]),
     ("i", ["--type", "image"]),

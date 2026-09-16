@@ -5,6 +5,17 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- `--identify` is now `--pivots`, the name the report already uses for what
+  it extracts, and the one its options line already printed. The old spelling
+  still works and no longer appears in `--help`.
+- The mark sets a diamond where it set a four-pointed star, and the README
+  opens with the vertical lockup. The HTML report draws the new mark in its
+  masthead and its tab icon; `assets/` carries the full set, in PNG and SVG.
+
 ## 0.17.1 - 2026-09-16
 
 ### Added

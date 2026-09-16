@@ -357,7 +357,7 @@ def notable(
         # leads, and one address across forty files is one of them.
         total = len(identifiers)
         noun = "identifier" if total == 1 else "identifiers"
-        tail = "" if listed else " (--identify to list them)"
+        tail = "" if listed else " (--pivots to list them)"
         raised.append(Alert(text=f"{total} unique {noun} extracted{tail}"))
 
     return raised

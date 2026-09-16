@@ -240,7 +240,7 @@ def test_identifiers_are_raised_with_a_way_to_see_them():
 
     raised = notable(records, found)
 
-    assert any("--identify" in alert.text for alert in raised)
+    assert any("--pivots" in alert.text for alert in raised)
 
 
 def test_identifiers_already_listed_are_not_advertised_again():
@@ -250,7 +250,7 @@ def test_identifiers_already_listed_are_not_advertised_again():
     raised = notable(records, found, listed=True)
 
     assert any("identifier" in alert.text for alert in raised)
-    assert not any("--identify" in alert.text for alert in raised)
+    assert not any("--pivots" in alert.text for alert in raised)
 
 
 # --- what an analyst calls a format ------------------------------------------
