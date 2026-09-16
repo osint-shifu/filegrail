@@ -274,7 +274,12 @@ def _difference(found: Correlated) -> Difference:
     if not (found.values and found.sources):
         return Difference(name, found.kind, [("", found.text)])
     left, right = found.values
-    (left_source, right_source) = (found.sources[0] or "", found.sources[1] or "")
+    # Where one block states both values it names both sides, and `PDF Info is
+    # two hours earlier than PDF Info` tells a reader nothing. Which of its two
+    # fields is the earlier one is the whole content of the finding, so the
+    # sides take their own names wherever the finding carries them.
+    named = found.fields or found.sources
+    (left_source, right_source) = (named[0] or "", named[1] or "")
     first, second = instant(left), instant(right)
     if first is None or second is None:
         return Difference(name, found.kind, [(left_source, left), (right_source, right)])

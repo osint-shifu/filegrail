@@ -139,6 +139,24 @@ def test_a_conflict_keeps_both_values_and_says_how_far_apart_two_moments_are():
     assert second.differences[0].delta == "12 years 6 months earlier"
 
 
+def test_a_block_contradicting_itself_names_the_fields_rather_than_itself_twice():
+    """One block states both values, so it stands on both sides of its own
+    disagreement. Naming the source there says `PDF Info is 2 hours earlier
+    than PDF Info`, and which of its two fields is the earlier one - the whole
+    content of the finding - is exactly what goes missing."""
+    export = _file(
+        "export.pdf",
+        _info(CreationDate="D:20260211184002Z", ModDate="D:20260211163315Z"),
+    )
+
+    conflict = analyse([export], Path("/case")).conflicts[0]
+    difference = {entry.field: entry for entry in conflict.differences}["CreationDate / ModDate"]
+
+    assert [source for source, _ in difference.values] == ["CreationDate", "ModDate"]
+    assert difference.delta is not None
+    assert conflict.sources == ["PDF Info"], "the block still names the conflict"
+
+
 def test_coverage_tells_a_store_that_was_found_from_an_attribute_that_can_be_read():
     found = Survey(
         checks=[

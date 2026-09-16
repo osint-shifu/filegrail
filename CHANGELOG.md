@@ -24,6 +24,12 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   `,publisher` on the end, which is a value nobody can go and look at. The
   place says the row and the column now, rather than the line.
 
+- **A block that contradicts itself no longer names itself on both sides.**
+  Where one block records both when a thing was made and when it was changed,
+  it stands on both sides of its own disagreement, and the report said `PDF
+  Info is 2 hours earlier than PDF Info`. The two sides take the names of the
+  fields now, which is what actually differs between them.
+
 ### Changed
 
 - **The README no longer counts the formats.** A test held the badge to the

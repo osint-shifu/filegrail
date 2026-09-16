@@ -317,6 +317,11 @@ class Finding:
     #: to split English on a comma to get them back.
     values: tuple[str, str] | None = None
 
+    #: What each side is called, where both values come from one block and it
+    #: is the field that differs rather than the source. `sources` then names
+    #: that block twice and tells the two apart not at all; this does.
+    fields: tuple[str, str] | None = None
+
     def to_dict(self) -> dict[str, object]:
         found: dict[str, object] = {"kind": self.kind, "text": self.text}
         if self.field:
@@ -325,6 +330,8 @@ class Finding:
             found["sources"] = list(self.sources)
         if self.values:
             found["values"] = list(self.values)
+        if self.fields:
+            found["fields"] = list(self.fields)
         if self.maintained:
             found["maintained"] = self.maintained
         return found
@@ -489,6 +496,7 @@ def _order_findings(record: FileRecord) -> list[Finding]:
                     field=f"{pair[0]} / {pair[1]}",
                     sources=(label(found), label(found)),
                     values=(made, changed),
+                    fields=(pair[0], pair[1]),
                 )
             )
     return findings
