@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sqlite3
 import struct
 import subprocess
 import sys
@@ -33,6 +34,13 @@ HERE = Path(__file__).resolve().parent.parent
 #: The scan the example is the output of.
 _COMMAND = (sys.executable, "-m", "filegrail.cli")
 CASE = Path("/tmp/filegrail-example/case")
+
+#: The profile the scan is pointed at, invented for the same reason the case
+#: is. A report's coverage section describes the machine the scan ran on, and
+#: without a profile of its own the published page describes the developer's:
+#: which browsers are installed, how many profiles each has, how much the
+#: desktop has opened lately, and the day the oldest trace on it was written.
+HOME = Path("/tmp/filegrail-example/home")
 PAGE = HERE / "docs" / "example-report.html"
 
 #: One fixed camera, so three photographs share a body rather than a model.
@@ -133,6 +141,102 @@ def _stamp(path: Path, moment: str) -> None:
     os.utime(path, (when.timestamp(), when.timestamp()))
 
 
+#: Chromium keeps a download in two tables, and the reader joins them: the row
+#: carries where the file was saved, the chain carries where it came from.
+_CHROMIUM = """
+CREATE TABLE downloads (
+  id INTEGER PRIMARY KEY, target_path LONGVARCHAR NOT NULL,
+  start_time INTEGER NOT NULL, total_bytes INTEGER NOT NULL,
+  state INTEGER NOT NULL, referrer VARCHAR NOT NULL,
+  tab_url VARCHAR NOT NULL, mime_type VARCHAR(255) NOT NULL);
+CREATE TABLE downloads_url_chains (
+  id INTEGER NOT NULL, chain_index INTEGER NOT NULL, url LONGVARCHAR NOT NULL);
+"""
+
+#: Chromium counts from 1601, in microseconds.
+_EPOCH_1601 = 11644473600
+
+
+def _chromium(profile: Path, rows: tuple[tuple[str, str, str], ...]) -> None:
+    profile.mkdir(parents=True)
+    database = sqlite3.connect(profile / "History")
+    database.executescript(_CHROMIUM)
+    for number, (target, url, when) in enumerate(rows, 1):
+        moment = datetime.strptime(when, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        database.execute(
+            "INSERT INTO downloads VALUES (?,?,?,?,?,?,?,?)",
+            (
+                number,
+                target,
+                int((moment.timestamp() + _EPOCH_1601) * 1_000_000),
+                4096,
+                1,
+                "https://portal.example.org/library",
+                url,
+                "application/octet-stream",
+            ),
+        )
+        database.execute("INSERT INTO downloads_url_chains VALUES (?,0,?)", (number, url))
+    database.commit()
+    database.close()
+
+
+def _recent(share: Path, rows: tuple[tuple[str, str, str], ...]) -> None:
+    """The desktop's recently-used list, in the shape the reader parses."""
+    bookmarks = "".join(
+        f'<bookmark href="file://{path}" added="{when}" modified="{when}" visited="{when}">'
+        '<info><metadata owner="http://freedesktop.org">'
+        "<bookmark:applications>"
+        f'<bookmark:application name="{application}" exec="&apos;{application.lower()} %u&apos;"'
+        ' count="1"/>'
+        "</bookmark:applications></metadata></info></bookmark>"
+        for path, when, application in rows
+    )
+    share.mkdir(parents=True, exist_ok=True)
+    (share / "recently-used.xbel").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<xbel version="1.0"'
+        ' xmlns:bookmark="http://www.freedesktop.org/standards/desktop-bookmarks">'
+        f"{bookmarks}</xbel>\n",
+        encoding="utf-8",
+    )
+
+
+def profile() -> Path:
+    """Write the trace stores the coverage section reports on.
+
+    Nothing here names a file in the case. These stores exist so that the
+    coverage table is read from something invented rather than from whatever
+    the machine building the page happens to hold, and so that the page comes
+    out the same every time it is built. What the case files themselves say is
+    carried in their own bytes, where the rest of the report reads it.
+    """
+    _chromium(
+        HOME / ".config" / "chromium" / "Default",
+        (
+            (
+                "/home/analyst/Downloads/tender_notice.zip",
+                "https://cdn.example.net/notices/tender_notice.zip",
+                "2026-04-03T09:14:52Z",
+            ),
+            (
+                "/home/analyst/Downloads/registry_extract.csv",
+                "https://portal.example.org/exports/registry_extract.csv",
+                "2026-04-09T16:02:07Z",
+            ),
+        ),
+    )
+    _recent(
+        HOME / ".local" / "share",
+        (
+            ("/home/analyst/Downloads/tender_notice.zip", "2026-04-09T08:30:00Z", "Ark"),
+            ("/home/analyst/Documents/meeting_notes.odt", "2026-04-10T11:45:00Z", "LibreOffice"),
+            ("/home/analyst/Downloads/registry_extract.csv", "2026-04-10T12:02:00Z", "Gnumeric"),
+        ),
+    )
+    return HOME
+
+
 def build() -> Path:
     """Write the case, and return the directory it is in."""
     shutil.rmtree(CASE.parent, ignore_errors=True)
@@ -191,9 +295,10 @@ def build() -> Path:
 
 def main() -> int:
     case = build()
+    home = profile()
     written = case.parent / "example-report.html"
     run = subprocess.run(
-        [*_COMMAND, str(case), "--content", "--html", "-o", str(written)],
+        [*_COMMAND, str(case), "--home", str(home), "--content", "--html", "-o", str(written)],
         cwd=HERE,
         env={**os.environ, "PYTHONPATH": str(HERE / "src")},
     )
