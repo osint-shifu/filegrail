@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-stacked-compact-dark.png">
-  <img src="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-stacked-compact-light.png" alt="filegrail" width="360">
+  <img src="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-stacked-compact-light.png" alt="filegrail" width="420">
 </picture>
 
 **Trace file origins. Extract metadata. Find investigative pivots.**
