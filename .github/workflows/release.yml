@@ -28,3 +28,23 @@ jobs:
           python -m build
           twine check dist/*
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+
+    # The release page carries the changelog's section for this version.
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/release_notes.py "$GITHUB_REF_NAME" > notes.md
+          gh release create "$GITHUB_REF_NAME" --title "filegrail ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag --latest

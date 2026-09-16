@@ -53,6 +53,19 @@ def test_the_readme_badge_names_the_version_being_released():
     assert badge.group(1) == __version__
 
 
+def test_the_changelog_has_notes_for_the_version_being_released():
+    """The release workflow publishes this section as the GitHub release, and it
+    runs after the package is already on PyPI: a missing section fails a release
+    that cannot be taken back."""
+    import runpy
+
+    tool = runpy.run_path(
+        str(Path(__file__).resolve().parent.parent / "tools" / "release_notes.py")
+    )
+
+    assert tool["notes"](__version__).strip()
+
+
 def test_it_says_what_it_is():
     screen = _screen()
 
