@@ -38,6 +38,7 @@ MAIL_HEADER = ("extension", "what comes out")
 ARCHIVE_HEADER = ("extensions", "what filegrail does with them")
 CONTENT_HEADER = ("extensions", "what is read")
 SIGNATURE_HEADER = ("what the bytes are", "extensions that carry it")
+PIVOT_HEADER = ("type", "taken", "not taken")
 
 _EXTENSION = re.compile(r"`(\.[a-z0-9]+)`")
 _NAME = re.compile(r"`([a-z0-9][a-z0-9-]*)`")
@@ -224,7 +225,7 @@ def test_the_readme_lists_exactly_what_content_reads():
     """A count in prose can be checked; a list of extensions can be checked
     against the reader itself, which is the stronger claim and the one the
     readme actually makes."""
-    listed = _backticked(README, "### Document content", "## Analysis")
+    listed = _backticked(README, "### Document content", "## Investigative pivots")
 
     assert listed == CONTENT_SUFFIXES, sorted(listed ^ CONTENT_SUFFIXES)
 
@@ -334,9 +335,10 @@ def test_the_readme_lists_exactly_what_clean_can_strip():
 
 # --- the identifier types --------------------------------------------------------
 #
-# Three lists have to agree: the types the extractor yields, the rows of the
-# readme's table, and the headings the report prints them under. The report
-# once knew eight and silently dropped the rest, and nothing here noticed.
+# Four lists have to agree: the types the extractor yields, the readme's list of
+# them, the rows of the format reference's rules table, and the headings the
+# report prints them under. The report once knew eight and silently dropped the
+# rest, and nothing here noticed.
 
 
 def _yielded_types() -> set[str]:
@@ -350,14 +352,28 @@ def _yielded_types() -> set[str]:
 
 
 def _readme_types() -> set[str]:
+    """The type names in the readme's list, one family to a line."""
+    text = README.read_text(encoding="utf-8")
+    section = text[text.index("## Investigative pivots") : text.index("## Analysis")]
     listed: set[str] = set()
-    for row in _readme_rows(README, "### Investigative pivot types")[1:]:
-        listed |= set(re.findall(r"`([a-z0-9_]+)`", row[0]))
+    for line in section.splitlines():
+        if line.startswith("- "):
+            listed |= set(re.findall(r"`([a-z0-9_]+)`", line))
     return listed
 
 
-def test_every_type_the_extractor_yields_is_in_the_readme_table():
+def _reference_types() -> set[str]:
+    """The type names in the first column of the format reference's rules table."""
+    return {name for row in _rows(PIVOT_HEADER) for name in re.findall(r"`([a-z0-9_]+)`", row[0])}
+
+
+def test_every_type_the_extractor_yields_is_listed_in_the_readme():
     assert _yielded_types() == _readme_types(), sorted(_yielded_types() ^ _readme_types())
+
+
+def test_every_type_the_extractor_yields_has_its_rules_in_the_format_reference():
+    assert _reference_types(), f"no table headed {PIVOT_HEADER} in {FORMATS.name}"
+    assert _yielded_types() == _reference_types(), sorted(_yielded_types() ^ _reference_types())
 
 
 def test_every_documented_type_has_a_heading_in_the_report():

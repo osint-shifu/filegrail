@@ -270,6 +270,55 @@ extension no row below names: there is no claim to contradict.
 
 ---
 
+## Investigative pivots
+
+What each pivot type takes from metadata and document text, and the look-alike values it leaves out.
+
+| Type | Taken | Not taken |
+|:---|:---|:---|
+| `url` | `http` and `https` addresses, normalized | |
+| `domain` | Every host behind a URL, an address or a UNC path, and bare names whose TLD is a real one | Anything shaped like a file name, and onion names, which are their own type |
+| `hostname` | Machine and server names that are not public domains: the machine a Windows shortcut was created on, the server in a UNC path and the hosts a `Received:` header names | IP addresses, public names, which are `domain`, and placeholders such as `localhost` or `server` |
+| `email` | Addresses whose TLD is a real one | The address inside a message ID; its host is still kept |
+| `message_id` | Message IDs from the `Message-ID`, `In-Reply-To` and `References` headers, so a reply and the message it answers share a value | The `Content-ID` of an attachment |
+| `ipv4` | Dotted quads, with private and reserved ranges marked as such | Version numbers, and digits in a field naming software |
+| `ipv6` | Addresses with all eight groups written out, or any form inside the brackets a URL places around one | A compressed address standing bare, which can resemble a scope operator in code |
+| `geo` | Coordinates written with a hemisphere letter, a degree sign, a `geo:` URI, a map URL or an explicit latitude label | A bare pair of decimals |
+| `md5` `sha1` `sha256` `sha512` | 32, 40, 64 and 128 hexadecimal digits, bare, and all but the longest also as colon-separated pairs; a digest of an address seen in the same scan is named for it | Digests in a field naming software, which may be build IDs |
+| `cve` | Vulnerability identifiers, case-insensitive | |
+| `cwe` | Weakness identifiers such as `CWE-79`, case-insensitive | |
+| `ghsa` | GitHub security advisory identifiers, normalized to lowercase after the prefix | |
+| `registry` | Windows Registry keys under any hive, long name or short, as one key | |
+| `path` | Windows paths using a drive letter, environment variable or UNC share | POSIX paths; a bare drive or variable |
+| `executable` | Bare names of Windows executables, scripts, installers or shortcuts, alone or inside a path or URL | Names with spaces, source files and anything ending in `com` |
+| `btc` | Bitcoin addresses whose checksum holds, including legacy and `bc1`; Bech32 values are normalized to lowercase | Mixed-case `bc1` spelling |
+| `bch` | Bitcoin Cash addresses in CashAddr form whose checksum holds, with or without the `bitcoincash:` prefix, normalized with it | Legacy Bitcoin Cash addresses, which are written the same as Bitcoin ones |
+| `ltc` `doge` | Litecoin and Dogecoin addresses whose checksum holds and whose version byte names the chain, including `ltc1`; Bech32 values are normalized to lowercase | A `3` address, which Litecoin once shared with Bitcoin and which is a `btc` |
+| `xmr` | Monero standard, integrated and subaddresses whose Keccak-256 checksum holds | |
+| `eth` | Ethereum addresses, mixed-case ones validated using EIP-55 and one-case values by shape, normalized to lowercase | Transaction hashes |
+| `vin` | Vehicle identification numbers when the North American check digit holds, and values beside a `VIN` label regardless | Other arbitrary seventeen-character strings |
+| `iban` | Account numbers whose country, length and mod-97 check agree, with spaces removed | |
+| `nip` `regon` | Polish tax and statistical numbers beside their label, or NIP behind an EU `PL` prefix | The same digits standing bare |
+| `onion` | Tor v3 addresses whose checksum holds, normalized to lowercase | |
+| `mac` | Hardware addresses in supported notations, normalized with colons | All-zero and broadcast addresses |
+| `sid` | Windows account and group SIDs such as `S-1-5-21-…` with a relative ID | Short well-known SIDs such as `S-1-5-18` |
+| `bic` | Bank identifier codes beside a `BIC` or `SWIFT` label, 8 or 11 characters, with a valid country code | The same code standing bare |
+| `secret` | Vendor-prefixed API keys and tokens, JWTs and private-key blocks; reported as type and fingerprint, never as the secret value | Credentials detected only because of a nearby field name |
+| `person` | Names in fields identifying who made a file - author, by-line, artist or mail display name - and names in text when preceded by supported honorifics | Arbitrary names in document text and common application placeholders |
+| `org` | Company or credit fields and names in text ending with supported legal forms such as `Sp. z o.o.`, `GmbH`, `Ltd`, `Inc` or `LLC` | Ambiguous `Source` fields |
+| `handle` | Accounts referenced through known-platform profile URLs, the owner in a GitHub repository or raw-file URL, and user-directory logins from the originating machine | Platform-owned pages and common system directories |
+| `postcode` | Polish postcode with town context and UK postcodes recognized by shape | Bare ambiguous postal-looking values and US ZIP codes |
+| `ssn` | US Social Security numbers beside their label and matching valid issuance shape; represented as a fingerprint, never the number | Bare values and ranges that were never issued |
+| `ein` | US Employer Identification Numbers beside their label and using an assigned prefix | The same digits standing bare |
+| `aba` | US bank routing numbers beside their label whose checksum and prefix are valid | Bare nine-digit values |
+| `crn` | UK company registration numbers beside a Companies House or company-number label | Bare ambiguous values |
+| `cik` | SEC filer identifiers beside a `CIK` label, normalized regardless of zero padding | |
+| `vat` | EU VAT identifiers beside a `VAT` label and using a recognized country | Polish VAT values, which are represented as `nip` |
+| `asn` | Autonomous system numbers such as `ASN 3356` or `AS3356` | Ambiguous uses of `AS` in normal text |
+| `tracker` | Analytics, tag-manager, advertising and affiliate identifiers recognized by prefix or provider context, including values found in loader and pixel URLs | Numbers without a known prefix or provider context |
+
+---
+
 ## Written from the specification
 
 Three readers have never been run against a file the originating software
