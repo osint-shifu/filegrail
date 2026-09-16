@@ -134,15 +134,8 @@ else here.
 | File | Use |
 | --- | --- |
 | `assets/filegrail-banner.png` | 2560×1280 README header and social preview |
-| `assets/filegrail-banner.svg` | 1280×360 header, vector |
-| `assets/filegrail-logo-dark.svg` | horizontal lockup, dark backgrounds |
-| `assets/filegrail-logo-light.svg` | horizontal lockup, light backgrounds |
-| `assets/filegrail-mark.svg` | square mark, dark backgrounds and favicon |
-| `assets/filegrail-mark-light.svg` | square mark, light backgrounds |
-| `assets/filegrail-mark-mono.svg` | single colour, for one-colour contexts |
 
-Light-background variants darken the same five hues for contrast on white; the
-monochrome variant uses Foreground `#d0d0d0`. Clear space is one bar-height - 6
+Clear space is one bar-height - 6
 units on the 64-unit grid - on every side. The wordmark is any monospace at
 weight 700, letter-spacing -2%, always lowercase.
 
