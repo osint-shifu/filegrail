@@ -98,6 +98,28 @@ def test_a_font_whose_glyphs_mean_nothing_here_is_dropped_rather_than_guessed(tm
     assert read_passages(path) is None
 
 
+def test_a_glyph_named_for_its_accent_draws_the_accented_letter(tmp_path: Path):
+    """A font that names its glyphs names them `oacute`, `zdotaccent`. Dropping
+    what is not plain ASCII does not lose a letter, it changes the word: `Łódź`
+    comes back as `d`, which reads as something else entirely."""
+    names = b"/Lslash /oacute /d /zacute /space /zdotaccent /cacute /Aogonek"
+    path = tmp_path / "polish.pdf"
+    path.write_bytes(
+        document(
+            [b"BT /F1 12 Tf 72 720 Td (" + bytes(range(1, 9)) + b") Tj ET"],
+            font=(
+                b"<< /Type /Font /Subtype /Type1 /BaseFont /X "
+                b"/Encoding << /Differences [1 " + names + b"] >> >>"
+            ),
+        )
+    )
+
+    found = read_passages(path)
+
+    assert found is not None
+    assert "Łódź żćĄ" in found[0].text
+
+
 def test_an_encrypted_document_is_refused(tmp_path: Path):
     """Its strings are ciphertext, and decoding them would be invention."""
     path = tmp_path / "locked.pdf"

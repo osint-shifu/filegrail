@@ -34,6 +34,7 @@ a document whose pages cannot be ordered is not reported on at all.
 from __future__ import annotations
 
 import re
+import unicodedata
 import zlib
 from collections.abc import Iterator
 from typing import NamedTuple
@@ -408,12 +409,36 @@ _GLYPHS = {
 }  # fmt: skip
 
 
+#: How a glyph name spells an accent, in the words Unicode uses for one. A name
+#: like `aogonek` is a letter and a mark, and what it draws is the character
+#: Unicode calls `LATIN SMALL LETTER A WITH OGONEK` - so what is kept here is
+#: the marks, and the several thousand letters they make are derived. Without
+#: this a Polish document loses every accented letter it has, and `Łódź` comes
+#: back as `d`: not a letter missing but a word that reads as another one.
+_MARKS = {
+    "acute": "ACUTE", "grave": "GRAVE", "circumflex": "CIRCUMFLEX",
+    "dieresis": "DIAERESIS", "tilde": "TILDE", "ring": "RING ABOVE",
+    "cedilla": "CEDILLA", "ogonek": "OGONEK", "caron": "CARON",
+    "breve": "BREVE", "macron": "MACRON", "slash": "STROKE", "bar": "STROKE",
+    "dotaccent": "DOT ABOVE", "hungarumlaut": "DOUBLE ACUTE",
+    "commaaccent": "COMMA BELOW", "stroke": "STROKE",
+}  # fmt: skip
+
+
 def _glyph(name: str) -> str | None:
     """What a glyph name draws, where this module can say."""
     if len(name) == 1 and name.isascii() and name.isprintable():
         return name
     if name in _GLYPHS:
         return _GLYPHS[name]
+    accented = re.fullmatch(r"([A-Za-z])([a-z]+)", name)
+    if accented is not None and accented.group(2) in _MARKS:
+        letter, mark = accented.group(1), _MARKS[accented.group(2)]
+        case = "CAPITAL" if letter.isupper() else "SMALL"
+        try:
+            return unicodedata.lookup(f"LATIN {case} LETTER {letter.upper()} WITH {mark}")
+        except KeyError:
+            return None
     match = re.fullmatch(r"uni([0-9A-Fa-f]{4})|u([0-9A-Fa-f]{4,6})", name)
     if match is not None:
         try:

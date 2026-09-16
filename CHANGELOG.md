@@ -5,6 +5,19 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.21.1 - 2026-09-16
+
+### Fixed
+
+- **A PDF that names its own glyphs no longer loses every accented letter.**
+  A font that lists its encoding names them `oacute`, `zdotaccent`, `Lslash`,
+  and only the unaccented ASCII names were being resolved - so a Polish
+  document came back with its accents dropped and `Łódź` read as `d`. That is
+  not a letter missing from a word, it is a different word, and the detectors
+  that look for a person or an organisation were being handed it. A glyph name
+  is resolved through the mark it spells now: a table of the accents, rather
+  than of the thousands of letters they make.
+
 ## 0.21.0 - 2026-09-16
 
 ### Added
