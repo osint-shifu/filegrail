@@ -31,6 +31,7 @@ from .sources import (
     read_quarantine,
     read_shortcuts,
     read_sidecar,
+    read_signature,
     read_sync,
     read_torrent,
     read_trash,
@@ -223,6 +224,10 @@ def scan(
                 if claim is not None:
                     record.evidence.append(claim)
             record.evidence.extend(read_xmp(path))
+        # Said of the bytes rather than of any store: a name is a claim, and
+        # this is the one reader that can contradict it.
+        if misnamed := read_signature(path):
+            record.evidence.append(misnamed)
         record.evidence.extend(read_mail(path))
         record.evidence.extend(history.get(path.name, []))
         record.evidence.extend(recent.get(str(path), []))

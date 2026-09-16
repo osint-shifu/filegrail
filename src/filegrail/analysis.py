@@ -356,6 +356,16 @@ def _findings(
             generated,
         )
 
+    misnamed = [item for record in ordered if (item := _misnamed(record))]
+    if misnamed:
+        add(
+            "signature",
+            "Extension does not match content",
+            True,
+            [("files", str(len(misnamed)))],
+            misnamed,
+        )
+
     if conflicts:
         metadata_only = all(
             difference.kind == ATTRIBUTION_CONFLICT
@@ -461,6 +471,21 @@ def _generated(record: FileRecord) -> Item | None:
         # chain is never validated here, so the claim travels with that said.
         facts.append(("signature", "not verified"))
         return Item(record.path, facts)
+    return None
+
+
+def _misnamed(record: FileRecord) -> Item | None:
+    """The file, if its own bytes are written in a format its name denies.
+
+    The pair travels with the item. A finding that named only the files would
+    leave a reader knowing that two of them are not what they are called, and
+    not what either of them is.
+    """
+    for found in record.evidence:
+        if found.source == "file-signature":
+            return Item(
+                record.path, [(name, found.fields[name]) for name in ("extension", "content")]
+            )
     return None
 
 

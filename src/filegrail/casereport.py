@@ -50,6 +50,11 @@ _LISTED: dict[str, int | None] = {
     "geo": SHOWN,
 }
 
+#: Findings whose items carry facts of their own. They are printed under each
+#: file rather than once for the finding, because they are what that file in
+#: particular was found to say.
+_PER_FILE = frozenset({"generated", "signature"})
+
 #: What each match basis means, for the ones a report actually uses.
 MATCHES = {
     "embedded": "decoded from the file's own bytes",
@@ -278,7 +283,7 @@ def _findings(page: _Page, case: Case, files: dict[str, CaseFile]) -> None:
         indent = page.head(mark, finding.ref, finding.title)
         page.add()
         facts = finding.facts
-        if finding.kind == "generated":
+        if finding.kind in _PER_FILE:
             facts = [fact for fact in facts if fact[0] != "files"]
         labels = [label for label, _ in facts]
         labels += [label for item in finding.items for label, _ in item.facts]
@@ -307,7 +312,7 @@ def _items(
     indent: int,
     width: int,
 ) -> None:
-    if finding.kind == "generated":
+    if finding.kind in _PER_FILE:
         for item in finding.items:
             entry = files[item.path]
             opening = " " * indent + "File".ljust(width) + f"{entry.ref}  "

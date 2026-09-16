@@ -111,6 +111,10 @@ SOURCE_CATEGORIES: dict[str, str] = {
     "xmp-history": METADATA,
     "iptc": METADATA,
     "document-metadata": METADATA,
+    # Which format the leading bytes are written in, said only where the name
+    # says another one. It is read out of the file and travels with the bytes,
+    # which is what makes it metadata rather than a statement about arrival.
+    "file-signature": METADATA,
     # Metadata read from a member and restated as a fact about the container.
     # Still metadata: it is what some file wrote about itself.
     "archive-content": METADATA,
@@ -152,6 +156,7 @@ SOURCE_MATCH: dict[str, str] = {
     "xmp-history": EMBEDDED,
     "iptc": EMBEDDED,
     "document-metadata": EMBEDDED,
+    "file-signature": EMBEDDED,
     "recent-documents": RECORDED_PATH,
     "windows-recent": NAME_AND_SIZE,
     "sync-folder": SYNC_ROOT,
@@ -190,6 +195,7 @@ SOURCE_PRIORITY: dict[str, int] = {
     "recent-documents": 35,
     "email-header": 30,
     "messenger-name": 25,
+    "file-signature": 20,
     "filesystem": 10,
 }
 
@@ -216,6 +222,7 @@ SOURCE_LABELS: dict[str, str] = {
     "iptc": "IPTC",
     "document-metadata": "document metadata",
     "archive-content": "archive content",
+    "file-signature": "file signature",
     "shell-history": "shell history",
     "messenger-name": "messenger file name",
     "recent-documents": "Recent Documents",

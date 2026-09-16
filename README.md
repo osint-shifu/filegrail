@@ -341,6 +341,18 @@ It can report:
 
 This is evidence correlation, not automatic attribution.
 
+### Extension and content
+
+A file's extension is a claim; the bytes under it are harder to argue with.
+
+Every scanned file whose extension `filegrail` has an expectation for is read a few bytes deep, and the format written there is held against the format the name claims.
+
+Where the two disagree, the file carries a `file signature` record naming both, and the files it happened in are listed together among the key findings.
+
+A format written under several names is not a disagreement: `.docx`, `.epub` and `.jar` are all zip archives, and each carries one legitimately.
+
+The recognized formats and the extensions that carry them are listed in [`docs/FORMATS.md`](docs/FORMATS.md).
+
 ### How a record was matched to a file
 
 Every evidence record includes the basis of its association with the file.

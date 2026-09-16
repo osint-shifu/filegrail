@@ -30,7 +30,7 @@ from pathlib import Path
 
 from . import __version__
 from .analysis import NOTHING, REVIEW, Case, CaseFile, Conflict, Finding, Pivots, named
-from .casereport import _ABSENT, _LISTED, MATCHES, _capital, _facts, _type_name
+from .casereport import _ABSENT, _LISTED, _PER_FILE, MATCHES, _capital, _facts, _type_name
 from .identify import PLACE, Identifier
 from .models import (
     ACTIVITY,
@@ -936,7 +936,7 @@ def _findings(case: Case, files: dict[str, CaseFile]) -> str:
 def _finding(case: Case, finding: Finding, files: dict[str, CaseFile]) -> str:
     warn = " warn" if finding.notable else ""
     facts = [(label, value) for label, value in finding.facts]
-    if finding.kind == "generated":
+    if finding.kind in _PER_FILE:
         facts = [fact for fact in facts if fact[0] != "files"]
     parts = [
         f'<div class="find" id="{finding.ref}">',
@@ -945,7 +945,7 @@ def _finding(case: Case, finding: Finding, files: dict[str, CaseFile]) -> str:
     ]
     if facts:
         parts.append(_fields([(_capital(label), value) for label, value in facts]))
-    if finding.kind == "generated":
+    if finding.kind in _PER_FILE:
         for item in finding.items:
             entry = files[item.path]
             pairs = [(_capital(label), value) for label, value in item.facts]

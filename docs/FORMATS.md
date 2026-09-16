@@ -220,6 +220,55 @@ may cost.
 
 ---
 
+## The name against the bytes
+
+An extension is a claim, and renaming a file is one command. Every scanned file
+whose extension appears below is read a few bytes deep, and the format written
+there is held against the format the name claims. Where the two disagree the
+file carries a `file signature` record saying which is which, and the files it
+happened in are named together under the key findings.
+
+Three things are not a disagreement. A format written under several names: a
+`.docx`, an `.epub` and a `.jar` are all zip archives, and every one of those
+carries it legitimately. Bytes that match no row below: what the file is was
+not established, which is not the same as establishing that it is misnamed. An
+extension no row below names: there is no claim to contradict.
+
+| What the bytes are | Extensions that carry it |
+|:---|:---|
+| JPEG | `.jfif` `.jpe` `.jpeg` `.jpg` |
+| PNG | `.png` |
+| GIF | `.gif` |
+| TIFF | `.tif` `.tiff` |
+| WebP | `.webp` |
+| PDF | `.pdf` |
+| RTF | `.rtf` |
+| ZIP | `.apk` `.docm` `.docx` `.epub` `.jar` `.kmz` `.odg` `.odp` `.ods` `.odt` `.pptm` `.pptx` `.xlsm` `.xlsx` `.xpi` `.zip` |
+| gzip | `.gz` `.svgz` `.tgz` |
+| bzip2 | `.bz2` `.tbz2` |
+| XZ | `.txz` `.xz` |
+| Zstandard | `.tzst` `.zst` |
+| 7-Zip | `.7z` |
+| RAR | `.rar` |
+| tar | `.tar` |
+| OLE compound file | `.doc` `.msg` `.msi` `.ppt` `.xls` |
+| ISO base media (MP4, MOV, HEIC) | `.3g2` `.3gp` `.avif` `.heic` `.heif` `.m4a` `.m4b` `.m4v` `.mov` `.mp4` |
+| Matroska (MKV, WebM) | `.mka` `.mks` `.mkv` `.webm` |
+| Ogg | `.oga` `.ogg` `.ogv` `.opus` |
+| FLAC | `.flac` |
+| MP3 | `.mp3` |
+| WAV | `.wav` |
+| AVI | `.avi` |
+| SQLite database | `.sqlite` `.sqlite3` |
+| ELF binary | `.elf` `.ko` `.so` |
+| Windows executable | `.cpl` `.dll` `.exe` `.ocx` `.scr` `.sys` |
+| Mach-O binary | `.bundle` `.dylib` |
+| HTML | `.htm` `.html` `.xhtml` |
+| SVG | `.svg` |
+| XML | `.atom` `.htm` `.html` `.plist` `.rss` `.svg` `.xhtml` `.xml` |
+
+---
+
 ## Written from the specification
 
 Three readers have never been run against a file the originating software

@@ -5,6 +5,27 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.20.0 - 2026-09-16
+
+### Added
+
+- **A file whose bytes are not the format its name claims now says so.** Every
+  scanned file whose extension `filegrail` has an expectation for is read a few
+  bytes deep, and where the format written there is not one that extension
+  carries, the file gets a `file signature` record naming both, and the files
+  it happened in are listed together under the key findings. A document that
+  opens as an executable and a photograph that is really a PDF are each one
+  rename away from looking ordinary in a file listing.
+
+  Only the disagreement is recorded. A format written under several names is
+  not one - a `.docx`, an `.epub` and a `.jar` are all zip archives, and each
+  carries one legitimately. Neither is a file whose bytes match nothing here,
+  nor an extension nothing here expects anything of: there is no claim to
+  contradict, and saying so of every plain-text file in a directory would be
+  noise standing in for a finding. Which formats are recognized, and which
+  extensions carry each of them, is in `docs/FORMATS.md` and held against the
+  reader by a test.
+
 ## 0.19.1 - 2026-09-16
 
 ### Fixed

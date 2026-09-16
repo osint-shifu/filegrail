@@ -26,6 +26,7 @@ from filegrail.sources.archives import ARCHIVE_SUFFIXES
 from filegrail.sources.c2pa import SUPPORTED_SUFFIXES as C2PA_SUFFIXES
 from filegrail.sources.content import SUFFIXES as CONTENT_SUFFIXES
 from filegrail.sources.embedded import SUFFIXES as EMBEDDED_SUFFIXES
+from filegrail.sources.signature import CARRIED_BY
 
 FORMATS = Path(__file__).resolve().parent.parent / "docs" / "FORMATS.md"
 
@@ -36,6 +37,7 @@ CROSS_HEADER = ("block", "where it is found", "what comes out")
 MAIL_HEADER = ("extension", "what comes out")
 ARCHIVE_HEADER = ("extensions", "what filegrail does with them")
 CONTENT_HEADER = ("extensions", "what is read")
+SIGNATURE_HEADER = ("what the bytes are", "extensions that carry it")
 
 _EXTENSION = re.compile(r"`(\.[a-z0-9]+)`")
 _NAME = re.compile(r"`([a-z0-9][a-z0-9-]*)`")
@@ -177,6 +179,18 @@ def test_nothing_is_documented_as_text_that_is_not_read_as_text():
 
     invented = documented - CONTENT_SUFFIXES
     assert not invented, f"documented as text but unread: {sorted(invented)}"
+
+
+def test_the_signature_table_says_exactly_what_the_reader_compares():
+    """The one table whose first column is a format name rather than a block:
+    it is what the report prints when a name and the bytes under it disagree,
+    and a reader looks the name up here to find out what carries it."""
+    documented = {
+        row[0]: set(_EXTENSION.findall(row[1])) for row in _rows(SIGNATURE_HEADER) if len(row) > 1
+    }
+
+    assert documented, f"no table headed {SIGNATURE_HEADER} in {FORMATS.name}"
+    assert documented == {name: set(suffixes) for name, suffixes in CARRIED_BY.items()}
 
 
 # --- the numbers in the prose -------------------------------------------------

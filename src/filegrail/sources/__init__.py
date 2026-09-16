@@ -14,6 +14,7 @@ from .recent import collect_recent_files
 from .shell import collect_shell_history
 from .shortcut import collect_windows_recent, read_shortcuts
 from .sidecar import read_sidecar
+from .signature import read_signature
 from .sync import SyncRoot, collect_sync_roots, read_sync
 from .torrent import Torrent, collect_torrents, is_torrent, read_torrent
 from .trash import collect_trash, read_trash
@@ -43,6 +44,7 @@ __all__ = [
     "is_torrent",
     "read_torrent",
     "read_sidecar",
+    "read_signature",
     "collect_trash",
     "read_trash",
     "is_archive",

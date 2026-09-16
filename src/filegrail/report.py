@@ -403,7 +403,11 @@ def _summarise(theme: Theme, record: EvidenceRecord) -> str:
         said.append(record.location)
     if moment := _stamp(shown(record.at)):
         said.append(moment)
-    return _facts_line(theme, said) if said else label(record)
+    if said:
+        return _facts_line(theme, said)
+    # Nothing of the five. A record that holds a sentence and no fields says it
+    # here rather than repeating the name of the column beside it.
+    return record.note or label(record)
 
 
 def _of(
