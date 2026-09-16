@@ -29,3 +29,12 @@ docs/DESIGN.md
 # A local mirror of the project instructions for agent tools that look for this
 # name. It says how to work in this checkout, not what the project is.
 AGENTS.md
+
+# Claude Code's own working directory: session state, settings and scratch
+# worktrees. It is about this checkout, not about the project - and a build
+# run here sweeps whatever it finds into the source distribution.
+.claude/
+
+# The working instructions for this checkout, kept local like the design
+# document. `.git/info/exclude` hides it from git but not from the build.
+CLAUDE.md
