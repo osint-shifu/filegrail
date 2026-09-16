@@ -208,6 +208,29 @@ def test_words_placed_a_space_apart_are_not_joined(tmp_path: Path):
     assert "Contact press@example.org" in found[0].text
 
 
+def test_a_glyph_the_writer_spells_out_reads_as_what_it_says(tmp_path: Path):
+    """A browser draws the hyphen in `INV-0007` with an alternate glyph that no
+    map can name, and says in the span around it that it is a hyphen. Without
+    the span the page holds `INV` and `0007`, and neither is the number on it."""
+    mapping = {code: chr(code) for code in b"INV07"} | {0x01: "\x00"}
+    font = b"<< /Type /Font /Subtype /TrueType /BaseFont /X /FirstChar 0 /LastChar 127 "
+    font += b"/Widths [" + b" 500" * 128 + b"] /ToUnicode {extra} >>"
+    drawn = b"(INV) Tj 15 0 Td /Span <</ActualText <FEFF002D>>> BDC (\\001) Tj EMC 5 0 Td (0007) Tj"
+    path = tmp_path / "numbered.pdf"
+    path.write_bytes(
+        document(
+            [b"BT /F1 10 Tf 72 720 Td " + drawn + b" ET"],
+            font=font,
+            extra=stream(tounicode(mapping)) + b"\nendstream",
+        )
+    )
+
+    found = read_passages(path)
+
+    assert found is not None
+    assert "INV-0007" in found[0].text
+
+
 def test_a_gap_that_cannot_be_measured_is_not_closed(tmp_path: Path):
     """A font that states no widths gives no way to tell where a glyph ends.
     Guessing that the next one follows it is how two pieces become a value."""

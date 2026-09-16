@@ -24,6 +24,11 @@ Three mappings are established, in this order:
   encoding agrees with ASCII for those positions far more often than not, and
   the values this tool looks for are written in them.
 
+Before any of them comes what the writer says outright. A span marked with
+`/ActualText` reads as that text whatever its glyphs map to, because it is how
+a writer names a glyph no map can: the alternate hyphen a browser draws inside
+a number is mapped to nothing, and stated there as a hyphen.
+
 What is refused: an encrypted document, a stream under a filter this module
 does not undo, a font whose glyphs resolve to nothing, and a file whose page
 tree cannot be walked. A page number is a fact a PDF really does record - it
@@ -38,6 +43,7 @@ import unicodedata
 import zlib
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
+from itertools import pairwise
 from typing import NamedTuple
 
 
@@ -676,6 +682,10 @@ def _show(content: bytes, fonts: dict[bytes, Font]) -> str:
     saved: list[_Pen] = []
     last: _Drawn | None = None  # the run drawn before, while nothing has moved the pen
     end: _Place | None = None  # where that run's last glyph ended, if it can be said
+    marked = 0  # how many marked spans are open
+    stated: str | None = None  # what the writer says the open span shows
+    stated_at = 0  # how many were open when that span began
+    said = False  # whether what it shows has been reported
     pending: list[tuple[bytes, str]] = []
     for token, kind in _tokens(content):
         if kind in ("string", "hex", "number", "name"):
@@ -692,22 +702,37 @@ def _show(content: bytes, fonts: dict[bytes, Font]) -> str:
                 last = None
             strings = [item for item in pending if item[1] in ("string", "hex")]
             drawn = _draw(pen, pending if token == b"TJ" else strings[-1:])
-            if drawn.text and out:
+            text = drawn.text
+            if stated is not None:
+                # The span's first run reports what the writer says it shows,
+                # and the rest report nothing but are still drawn where they are.
+                text = "" if said else stated
+                said = True
+            if text and out:
                 if last is not None:  # the pen is where the run before left it
                     gap = last.trail + drawn.lead
                     em = max(last.em, drawn.em)
                     out.append(" " if em > 0 and gap >= _WORD_GAP * em else "")
                 else:
                     out.append(_between(end, _place(pen, drawn.lead)))
-            out.append(drawn.text)
+            out.append(text)
             # A run that draws nothing readable still stands between its
             # neighbours, so it leaves nothing to join the next one to.
-            end = _place(pen, drawn.edge) if drawn.text and drawn.edge is not None else None
-            last = drawn if drawn.text else None
+            readable = bool(drawn.text if stated is None else stated)
+            end = _place(pen, drawn.edge) if readable and drawn.edge is not None else None
+            last = drawn if readable else None
             if drawn.advance is None:
                 pen.lost = True
             else:
                 pen.matrix = _multiply((1.0, 0.0, 0.0, 1.0, drawn.advance, 0.0), pen.matrix)
+        elif token in (b"BMC", b"BDC"):
+            marked += 1
+            if stated is None and token == b"BDC":
+                stated, stated_at, said = _actual_text(pending), marked, False
+        elif token == b"EMC":
+            if stated is not None and marked == stated_at:
+                stated = None
+            marked = max(marked - 1, 0)
         elif token == b"q":
             if len(saved) < _MAX_DEPTH:
                 saved.append(replace(pen))
@@ -748,6 +773,25 @@ def _show(content: bytes, fonts: dict[bytes, Font]) -> str:
 
 #: The text state set by a single number, and the name it has on the pen.
 _STATE = {b"Tc": "spacing", b"Tw": "words", b"Tz": "scale", b"TL": "leading", b"Ts": "rise"}
+
+
+def _actual_text(operands: list[tuple[bytes, str]]) -> str | None:
+    """What a marked span's glyphs show, where the writer states it.
+
+    A writer states it for a glyph no map can name: a browser draws the hyphen
+    in a number with an alternate shape of it and maps that shape to nothing.
+    The statement is a text string - UTF-16 behind a byte order mark, UTF-8
+    behind one, and one byte a character otherwise.
+    """
+    for (key, sort), (value, kind) in pairwise(operands):
+        if sort == "name" and key == b"/ActualText" and kind in ("string", "hex"):
+            raw = _hex(value) if kind == "hex" else _literal(value)
+            if raw.startswith(b"\xfe\xff"):
+                return raw[2:].decode("utf-16-be", "replace")
+            if raw.startswith(b"\xef\xbb\xbf"):
+                return raw[3:].decode("utf-8", "replace")
+            return raw.decode("latin-1")
+    return None
 
 
 class _Drawn(NamedTuple):
