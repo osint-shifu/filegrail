@@ -52,32 +52,22 @@ POLICY = (
     "img-src data:; base-uri 'none'; form-action 'none'"
 )
 
-#: The mark, drawn in the page: the grail in the accent, the diamond in the ink.
+#: The mark, drawn in the page in the accent.
 _MARK = (
-    '<svg class="mark" viewBox="0 0 141 221" aria-hidden="true">'
-    '<g transform="translate(-354,-82)">'
-    '<path fill="var(--accent)" fill-rule="evenodd" d="M354,155 L372,155 L372,130 '
-    "A48,48 0 0 1 420,82 L452,82 L452,106 L420,106 A24,24 0 0 0 396,130 L396,155 "
-    "L495,155 L495,205 A61.5,58 0 0 1 445.5,262.6 L445.5,280 L479,280 A3,3 0 0 1 "
-    "482,283 L482,300 A3,3 0 0 1 479,303 L388,303 A3,3 0 0 1 385,300 L385,283 "
-    "A3,3 0 0 1 388,280 L421.5,280 L421.5,262.6 A61.5,58 0 0 1 372,205 L372,179 "
-    'L354,179 Z M396,179 L471,179 L471,205 A37.5,37.5 0 0 1 396,205 Z"/>'
-    '<path fill="var(--ink)" d="M433.5,196.95 L449.05,212.5 L433.5,228.05 '
-    'L417.95,212.5 Z"/></g></svg>'
+    '<svg class="mark" viewBox="0 0 144 204" aria-hidden="true">'
+    '<path fill="var(--accent)" fill-rule="evenodd" d="M24,48 A48,48 0 0 1 72,0 H108 V24 '
+    "H72 A24,24 0 0 0 48,48 V72 H144 V96 A60,60 0 0 1 96,154.79 V180 H132 V204 H36 V180 "
+    'H72 V154.79 A60,60 0 0 1 24,96 H0 V72 H24 Z M48,96 H120 A36,36 0 0 1 48,96 Z"/></svg>'
 )
 
 #: The same mark as the tab icon. A data URI: drawn by the browser, fetched from nowhere.
 _FAVICON = (
     '<link rel="icon" href="data:image/svg+xml,'
-    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 141 221'%3E"
-    "%3Cg transform='translate(-354,-82)'%3E%3Cpath fill='%235FA89A' fill-rule='evenodd' "
-    "d='M354,155 L372,155 L372,130 A48,48 0 0 1 420,82 L452,82 L452,106 L420,106 "
-    "A24,24 0 0 0 396,130 L396,155 L495,155 L495,205 A61.5,58 0 0 1 445.5,262.6 "
-    "L445.5,280 L479,280 A3,3 0 0 1 482,283 L482,300 A3,3 0 0 1 479,303 L388,303 "
-    "A3,3 0 0 1 385,300 L385,283 A3,3 0 0 1 388,280 L421.5,280 L421.5,262.6 "
-    "A61.5,58 0 0 1 372,205 L372,179 L354,179 Z M396,179 L471,179 L471,205 "
-    "A37.5,37.5 0 0 1 396,205 Z'/%3E%3Cpath fill='%23E6E8EB' d='M433.5,196.95 "
-    "L449.05,212.5 L433.5,228.05 L417.95,212.5 Z'/%3E%3C/g%3E%3C/svg%3E\">"
+    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 144 204'%3E"
+    "%3Cpath fill='%235FA89A' fill-rule='evenodd' d='M24,48 A48,48 0 0 1 72,0 H108 V24 "
+    "H72 A24,24 0 0 0 48,48 V72 H144 V96 A60,60 0 0 1 96,154.79 V180 H132 V204 H36 V180 "
+    "H72 V154.79 A60,60 0 0 1 24,96 H0 V72 H24 Z M48,96 H120 A36,36 0 0 1 48,96 Z'/%3E"
+    '%3C/svg%3E">'
 )
 
 #: Files a pivot names before the rest go behind a summary: enough to see the
@@ -118,7 +108,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 
 .mast{padding:40px var(--gutter) 28px;border-bottom:1px solid var(--line);display:grid;
 grid-template-columns:auto 1fr auto;gap:28px;align-items:start}
-.mast .mark{width:44px;height:69px;flex:none}
+.mast .mark{width:49px;height:69px;flex:none}
 .mast .who{align-self:center}
 .mast .word{font-size:28px;font-weight:500;letter-spacing:-.5px;line-height:1;margin:2px 0 6px}
 .mast .word small{font-size:12px;font-weight:400;letter-spacing:.1em;color:var(--muted);
@@ -149,7 +139,7 @@ border-bottom:2px solid transparent;white-space:nowrap}
 .nav .sp{flex:1}
 .nav .home{display:none;align-items:center;height:48px;padding:0 14px 0 0}
 .js .nav.scrolled .home{display:inline-flex}
-.nav .home .mark{width:16px;height:25px}
+.nav .home .mark{width:18px;height:25px}
 .nav .home:hover{text-decoration:none}
 .btn[data-expand]{display:none}
 .js .btn[data-expand]{display:inline-flex}
