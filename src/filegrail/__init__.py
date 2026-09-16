@@ -1,6 +1,6 @@
 """filegrail - reconstruct where files came from, after the fact."""
 
-__version__ = "0.20.0"
+__version__ = "0.20.1"
 
 AUTHOR = "osint-shifu"
 REPOSITORY = "https://github.com/osint-shifu/filegrail"

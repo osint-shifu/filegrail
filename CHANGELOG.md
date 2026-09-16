@@ -5,6 +5,21 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.20.1 - 2026-09-16
+
+### Fixed
+
+- **The published example report no longer describes the machine that built
+  it.** The page is built from an invented case, and its evidence coverage
+  section was the one part of it that was not invented: it reported on the
+  developer's own profile - which browsers were installed, how many profiles
+  each had, how many files the desktop had opened lately, and the day the
+  oldest trace on it was written. The builder now writes a profile of its own
+  beside the case and scans with `--home`, so the coverage table is read from
+  something invented too. Nothing in that profile names a file in the case, so
+  the page reports the same files, findings, conflicts and pivots it did
+  before, and two builds of it now differ only in the moment they were made.
+
 ## 0.20.0 - 2026-09-16
 
 ### Added
