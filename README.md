@@ -590,6 +590,7 @@ It is not a monitoring agent, chain-of-custody system, full disk-forensics suite
 
 - [Format and detection reference](docs/FORMATS.md)
 - [Changelog](CHANGELOG.md)
+- [Roadmap](ROADMAP.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 
