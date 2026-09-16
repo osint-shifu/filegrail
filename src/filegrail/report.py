@@ -4,9 +4,9 @@ The default rendering is styled for a terminal and degrades to the identical
 layout in plain text when the output is piped or colour is unwanted, so the
 same command reads well by eye and greps cleanly.
 
-The layout is specified in `docs/DESIGN.md`. Two ideas carry it: a one-character left
-gutter groups the lines of an entry without a box, and colour is spent only on
-saying which class of source made a claim.
+Two ideas carry the layout: a one-character left gutter groups the lines of an
+entry without a box, and colour is spent only on saying which class of source
+made a claim.
 """
 
 from __future__ import annotations
