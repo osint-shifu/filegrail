@@ -5,6 +5,8 @@
   <img src="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-logo-light.png" alt="filegrail" width="380">
 </picture>
 
+**Local file provenance, metadata and forensic context analysis.**
+
 [![PyPI](https://img.shields.io/pypi/v/filegrail?style=flat-square&color=3775A9)](https://pypi.org/project/filegrail/)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square)
 ![68 formats](https://img.shields.io/badge/formats-68-8250df?style=flat-square)
@@ -763,13 +765,3 @@ It does not manufacture missing history.
 ## License
 
 Apache-2.0.
-
----
-
-<div align="center">
-
-**filegrail** - local file provenance, metadata and forensic context analysis.
-
-Trace origins. Reveal metadata. Correlate evidence.
-
-</div>
