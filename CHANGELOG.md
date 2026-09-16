@@ -5,6 +5,32 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.20.2 - 2026-09-16
+
+### Fixed
+
+- **Three things the README said about a scan document that were not so.**
+  `unsearched` was listed as a key that appears when it is asked for, and it
+  is in every document; `home` was listed as one that is always there, and it
+  appears only when the scan read another profile; `schema` and
+  `filegrail_version`, the first two keys of every document, were not listed
+  at all. Each optional key now names the option that produces it, which is
+  the question a reader had to answer by running the command twice.
+
+- **The list of what correlation can report was missing one of the conflicts
+  it reports.** A file stating that it was created after it arrived here has
+  been a `timeline_conflict` since the first release, and the one list a
+  reader checks to find out whether the tool would catch it did not say so.
+
+- `CONTRIBUTING.md` now asks for `mypy`, which CI has had a job of its own
+  for, and names the extra and the command behind the run against generated
+  input. Following the file as written left a contributor with a red CI and
+  nothing to have warned them.
+
+- The lineage spec described a `Lineage` value per file. Nothing by that name
+  was built: the identifiers are read back out of the records, and `Link` is
+  what the module carries.
+
 ## 0.20.1 - 2026-09-16
 
 ### Fixed
