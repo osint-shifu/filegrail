@@ -18,6 +18,13 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   has said where it was taken and still not said how it got here - the one
   question the archive could answer, for the one file the pass skipped.
 
+### Changed
+
+- **The README no longer counts the formats.** A test held the badge to the
+  readers, so the number could not drift, but the tables under it already say
+  which extensions have one. `docs/FORMATS.md` states the count for a reader
+  who wants it, and the test that holds it to the readers is still there.
+
 ## 0.18.1 - 2026-09-16
 
 ### Fixed

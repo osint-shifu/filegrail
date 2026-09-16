@@ -318,13 +318,6 @@ def test_the_readme_lists_exactly_what_clean_can_strip():
     assert listed == set(_STRIPPERS), sorted(listed ^ set(_STRIPPERS))
 
 
-def test_the_badge_agrees_too():
-    """It is the first number a reader sees, and the easiest to forget."""
-    badge = re.search(r"badge/formats-(\d+)", README.read_text(encoding="utf-8"))
-    assert badge is not None, "the readme no longer carries a format badge"
-    assert int(badge.group(1)) == len(_readable())
-
-
 # --- the identifier types --------------------------------------------------------
 #
 # Three lists have to agree: the types the extractor yields, the rows of the
