@@ -46,14 +46,16 @@ def tounicode(mapping: dict[int, str], width: int = 1) -> bytes:
 def document(
     pages: list[bytes],
     font: bytes = b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    extra: bytes = b"",
+    extra: bytes | list[bytes] = b"",
     catalogue: bytes = b"",
 ) -> bytes:
     """A PDF drawing `pages`, one content stream each, with one font.
 
     `extra` is an object appended after the font, for the tests that need the
-    font to point at one - a `/ToUnicode` CMap is an object of its own.
+    font to point at one - a `/ToUnicode` CMap is an object of its own. A
+    composite font points at two, and names the second `{extra2}`.
     """
+    extras = [extra] if isinstance(extra, bytes) else extra
     count = len(pages)
     # 1 catalogue, 2 page tree, then a page each, a content stream each, the
     # font, and whatever the caller appended.
@@ -70,9 +72,12 @@ def document(
             + b"/Resources << /Font << /F1 %d 0 R >> >> >>" % font_number
         )
     bodies.extend(stream(page) + b"\nendstream" for page in pages)
-    bodies.append(font.replace(b"{extra}", b"%d 0 R" % (font_number + 1)))
-    if extra:
-        bodies.append(extra)
+    bodies.append(
+        font.replace(b"{extra}", b"%d 0 R" % (font_number + 1)).replace(
+            b"{extra2}", b"%d 0 R" % (font_number + 2)
+        )
+    )
+    bodies.extend(body for body in extras if body)
 
     out = bytearray(b"%PDF-1.4\n")
     offsets = []

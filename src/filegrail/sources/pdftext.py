@@ -37,11 +37,13 @@ import re
 import unicodedata
 import zlib
 from collections.abc import Iterator
+from dataclasses import dataclass, replace
 from typing import NamedTuple
 
 
 class Font(NamedTuple):
-    """What a font's bytes mean, and how many of them make one character.
+    """What a font's bytes mean, how many make one character, and how far each
+    one moves the pen.
 
     The width is not decoration. A composite font is shown two bytes at a
     time, and reading those bytes singly looks up two codes that are not the
@@ -49,10 +51,16 @@ class Font(NamedTuple):
     A glyph index above 255 is ordinary in any subset font, so this is the
     difference between reading a document and reporting letters from the
     wrong places in it.
+
+    `advances` is each code's width in ems, and `missing` the width of a code
+    the font does not list. `missing` is `None` for a font that states no
+    widths at all, and then where its glyphs end cannot be said.
     """
 
     width: int
     table: dict[int, str]
+    advances: dict[int, float]
+    missing: float | None
 
 
 #: The largest document this reader opens. It is read whole - see `_whole` in
@@ -72,11 +80,26 @@ MAX_TEXT_BYTES = 1024 * 1024
 #: name millions; the table is built once and this is what it costs at most.
 MAX_OBJECTS = 200_000
 
-#: A kerning number in a `TJ` array moves the pen without drawing. Past this
-#: much - a fifth of an em - the gap is a space the writer chose not to draw,
-#: and joining the pieces without one glues two words into an address that was
-#: never in the document.
-_SPACE_KERN = -200
+#: How wide a gap, in ems, is a space the writer chose not to draw. Kerning
+#: inside a word stays under it, and a space between two words stays over it
+#: even squeezed to fill a line. Joining across a space glues two words into
+#: an address that was never in the document.
+_WORD_GAP = 0.15
+
+#: How far, in ems, the next glyph may sit off the line the last one ended on,
+#: or start back over it, and still be read as continuing it. A writer rounds
+#: where it puts a glyph, and a word broken at every rounding reports its
+#: pieces: `example.co` is a domain too.
+_SAME_LINE = 0.5
+_OVERLAP = 0.2
+
+#: How deep `q` saves are kept. A stream of saves nothing restores would
+#: otherwise grow without bound.
+_MAX_DEPTH = 256
+
+#: How many glyph widths one composite font may list. Its ranges are expanded,
+#: and a range over every code there is is ordinary; a million of them is not.
+_MAX_WIDTHS = 4 * 0x10000
 
 _OBJECT = re.compile(rb"(\d+)\s+\d+\s+obj\b(.*?)\bendobj", re.S)
 _ROOT = re.compile(rb"/Root\s+(\d+)\s+\d+\s+R")
@@ -266,11 +289,16 @@ def _leaves(
 
 
 def _entry(body: bytes, key: bytes) -> bytes:
-    """One dictionary entry's raw value: a reference, a name or a `<<...>>`."""
-    at = body.find(key)
-    if at == -1:
+    """One dictionary entry's raw value: a reference, a name, a number, an
+    array or a `<<...>>`.
+
+    The key has to end where a name ends. `/W` is not the start of `/WMode`,
+    nor of the `/WILIOO+Raleway` a subset font is called.
+    """
+    at = re.search(re.escape(key) + rb"(?=[\s/\[\]<>()%]|$)", body)
+    if at is None:
         return b""
-    rest = body[at + len(key) :].lstrip()
+    rest = body[at.end() :].lstrip()
     if rest.startswith(b"<<"):
         depth, index = 0, 0
         while index < len(rest) - 1:
@@ -286,7 +314,14 @@ def _entry(body: bytes, key: bytes) -> bytes:
                 continue
             index += 1
         return rest
-    match = re.match(rb"(\d+\s+\d+\s+R|/[^\s/\[\]<>]+|\[[^\]]*\])", rest)
+    if rest.startswith(b"["):  # a composite font's widths nest one array in another
+        depth = 0
+        for bracket in re.finditer(rb"[\[\]]", rest):
+            depth += 1 if bracket.group() == b"[" else -1
+            if depth == 0:
+                return rest[: bracket.end()]
+        return rest
+    match = re.match(rb"(\d+\s+\d+\s+R|/[^\s/\[\]<>]+|[-+]?(?:\d+\.?\d*|\.\d+))", rest)
     return match.group(1) if match else b""
 
 
@@ -330,6 +365,7 @@ def _mapping(font: bytes, objects: dict[int, bytes]) -> Font:
     # otherwise, which the `/ToUnicode` codespace below is allowed to correct.
     composite = b"/Type0" in font
     width = 2 if composite else 1
+    advances, missing = _widths(font, objects)
 
     unicode_map = _entry(font, b"/ToUnicode")
     if unicode_map:
@@ -338,14 +374,15 @@ def _mapping(font: bytes, objects: dict[int, bytes]) -> Font:
         if data:
             decoded, stated = _cmap(data)
             if decoded:
-                return Font(stated or width, decoded)
+                return Font(stated or width, decoded, advances, missing)
 
     if composite:
-        return Font(width, {})  # an identity encoding names glyphs, not letters
+        # An identity encoding names glyphs, not letters.
+        return Font(width, {}, advances, missing)
 
     encoding = _entry(font, b"/Encoding")
     if encoding.startswith(b"/"):
-        return Font(1, dict(_named(encoding)))
+        return Font(1, dict(_named(encoding)), advances, missing)
     if encoding:
         block = _resolve(encoding, objects) if not encoding.startswith(b"<<") else encoding
         base = _entry(block, b"/BaseEncoding") or b"/StandardEncoding"
@@ -353,8 +390,94 @@ def _mapping(font: bytes, objects: dict[int, bytes]) -> Font:
         differences = re.search(rb"/Differences\s*\[(.*?)\]", block, re.S)
         if differences is not None:
             table.update(_differences(differences.group(1)))
-        return Font(1, table)
-    return Font(1, {})
+        return Font(1, table, advances, missing)
+    return Font(1, {}, advances, missing)
+
+
+def _widths(font: bytes, objects: dict[int, bytes]) -> tuple[dict[int, float], float | None]:
+    """How far each code the font is shown moves the pen, in ems.
+
+    A simple font lists its widths from `/FirstChar` on. A composite font lists
+    them by glyph in its descendant's `/W`, and only an identity encoding shows
+    glyphs by the codes it is drawn with. A font that states neither has no
+    widths to measure with, and `None` says so.
+    """
+    if b"/Type0" in font:
+        if _entry(font, b"/Encoding") != b"/Identity-H":
+            return {}, None  # vertical, or codes that are not glyph numbers
+        descendants = _resolve(_entry(font, b"/DescendantFonts"), objects)
+        reference = _REFERENCE.search(descendants)
+        if reference is None:
+            return {}, None
+        descendant = objects.get(int(reference.group(1)), b"")
+        table = _cid_widths(_resolve(_entry(descendant, b"/W"), objects))
+        default = _float(_resolve(_entry(descendant, b"/DW"), objects))
+        if table is None:
+            return {}, None
+        return table, (1000.0 if default is None else default) / 1000
+
+    widths = _resolve(_entry(font, b"/Widths"), objects)
+    first = _integer(font, b"/FirstChar")
+    if not widths or first is None:
+        return {}, None  # one of the fonts every viewer carries, which states none
+    scale = 0.001
+    if b"/Type3" in font:  # its glyphs are drawn in a space of its own choosing
+        matrix = _numbers(_entry(font, b"/FontMatrix"))
+        if len(matrix) != 6:
+            return {}, None
+        scale = matrix[0]
+    descriptor = _resolve(_entry(font, b"/FontDescriptor"), objects)
+    missing = _float(_resolve(_entry(descriptor, b"/MissingWidth"), objects)) or 0.0
+    table = {first + index: value * scale for index, value in enumerate(_numbers(widths))}
+    return table, missing * scale
+
+
+def _cid_widths(array: bytes) -> dict[int, float] | None:
+    """A composite font's `/W`: a glyph and the widths from it on, or a range
+    of glyphs sharing one width. An absent array leaves every glyph at the
+    default, and one too large to expand is not guessed at."""
+    table: dict[int, float] = {}
+    if not array.lstrip().startswith(b"["):
+        return table
+    numbers: list[float] = []
+    work = 0
+    for match in re.finditer(rb"\[([^\[\]]*)\]|([-+]?(?:\d+\.?\d*|\.\d+))", array.lstrip()[1:]):
+        if match.group(1) is not None:
+            values = _numbers(match.group(1))
+            work += len(values)
+            if work > _MAX_WIDTHS:
+                return None
+            if numbers:
+                start = _glyph_number(numbers[-1])
+                table.update((start + offset, value / 1000) for offset, value in enumerate(values))
+            numbers = []
+            continue
+        numbers.append(float(match.group(2)))
+        if len(numbers) == 3:
+            low, high = _glyph_number(numbers[0]), _glyph_number(numbers[1])
+            work += max(high - low + 1, 0)
+            if work > _MAX_WIDTHS:
+                return None
+            table.update((code, numbers[2] / 1000) for code in range(low, high + 1))
+            numbers = []
+    return table
+
+
+def _glyph_number(value: float) -> int:
+    """A glyph number as a composite font can have one: two bytes, never less
+    than none. Twenty digits of one are a malformed file, not an overflow."""
+    return int(min(max(value, 0.0), 0xFFFF))
+
+
+def _numbers(value: bytes) -> list[float]:
+    return [float(number) for number in re.findall(rb"[-+]?(?:\d+\.?\d*|\.\d+)", value)]
+
+
+def _float(value: bytes) -> float | None:
+    try:
+        return float(value)
+    except ValueError:
+        return None
 
 
 def _named(encoding: bytes) -> Iterator[tuple[int, str]]:
@@ -497,22 +620,60 @@ def _utf16(target: bytes) -> str | None:
 # --- what the page draws ---------------------------------------------------------
 
 
+_Matrix = tuple[float, float, float, float, float, float]
+
+_IDENTITY: _Matrix = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+
+#: Where a piece of text is on the page: a point, the unit direction its line
+#: runs in, and how large an em is there - all in the page's own units.
+_Place = tuple[float, float, float, float, float]
+
+
+@dataclass
+class _Pen:
+    """Where the next glyph is drawn, and what decides how far it moves.
+
+    `q` and `Q` save and restore all of it but the text position, which the
+    format keeps apart from the rest of the graphics state. `lost` is set when
+    a run moved the pen by widths its font does not state, and cleared by the
+    next instruction that puts the pen somewhere of its own accord.
+    """
+
+    ctm: _Matrix = _IDENTITY
+    matrix: _Matrix = _IDENTITY
+    line: _Matrix = _IDENTITY
+    font: Font | None = None
+    size: float = 0.0
+    spacing: float = 0.0
+    words: float = 0.0
+    scale: float = 1.0
+    leading: float = 0.0
+    rise: float = 0.0
+    lost: bool = False
+
+
 def _show(content: bytes, fonts: dict[bytes, Font]) -> str:
     """The text the drawing instructions put on one page.
 
-    Where the break goes decides what gets reported. Inside a `TJ` array the
-    pieces are one run and are joined, because the numbers between them are
-    kerning and a document that draws `exam` `ple.com` has written one address;
-    past a fifth of an em the gap is a space the writer chose not to draw.
+    Where the break goes decides what gets reported, and the instructions say
+    where glyphs go rather than where words end. So the gap is measured, from
+    the right side of one glyph to the left side of the next: joined when
+    there is none, a space when it is a word's, a line of its own when the
+    next glyph is somewhere else. A writer that places every glyph itself - a
+    browser printing to PDF does - is read as the words it drew rather than as
+    one letter a line.
 
-    Every other boundary breaks the run. Joining across them was measured on
-    real documents and reported more values that were never written than it
-    recovered: a table whose columns sit on one baseline turns `0` and `works`
-    into a domain. A break costs at most a value that was split in two. A join
-    invents one, which is the more expensive of the two mistakes here.
+    A gap that cannot be measured is a break. A font that states no widths
+    gives no side to measure from, and joining across a move anyway was tried
+    on real documents: a table whose columns share a baseline turns `0` and
+    `works` into a domain, and that reported more values nobody wrote than
+    breaking there did.
     """
     out: list[str] = []
-    font: Font | None = None
+    pen = _Pen()
+    saved: list[_Pen] = []
+    last: _Drawn | None = None  # the run drawn before, while nothing has moved the pen
+    end: _Place | None = None  # where that run's last glyph ended, if it can be said
     pending: list[tuple[bytes, str]] = []
     for token, kind in _tokens(content):
         if kind in ("string", "hex", "number", "name"):
@@ -520,47 +681,206 @@ def _show(content: bytes, fonts: dict[bytes, Font]) -> str:
             continue
         if kind != "operator":
             continue
-        if token == b"Tf":
-            for value, sort in reversed(pending):
-                if sort == "name":
-                    font = fonts.get(value[1:])
-                    break
-        elif token in (b"Tj", b"'", b'"'):
-            for value, sort in reversed(pending):
-                if sort in ("string", "hex"):
-                    out.append(_text(value, sort, font))
-                    break
-            out.append(" ")
-        elif token == b"TJ":
-            for value, sort in pending:
-                if sort in ("string", "hex"):
-                    out.append(_text(value, sort, font))
-                elif sort == "number" and _kerned(value):
-                    out.append(" ")
-            out.append(" ")
-        elif token in (b"Td", b"TD", b"T*", b"Tm", b"ET"):
-            out.append("\n")
+        numbers = [_number(value) for value, sort in pending if sort == "number"]
+        if token in (b"Tj", b"'", b'"', b"TJ"):
+            if token in (b"'", b'"'):
+                if token == b'"' and len(numbers) >= 2:
+                    pen.words, pen.spacing = numbers[-2], numbers[-1]
+                _move(pen, 0.0, -pen.leading)
+                last = None
+            strings = [item for item in pending if item[1] in ("string", "hex")]
+            drawn = _draw(pen, pending if token == b"TJ" else strings[-1:])
+            if drawn.text and out:
+                if last is not None:  # the pen is where the run before left it
+                    gap = last.trail + drawn.lead
+                    em = max(last.em, drawn.em)
+                    out.append(" " if em > 0 and gap >= _WORD_GAP * em else "")
+                else:
+                    out.append(_between(end, _place(pen, drawn.lead)))
+            out.append(drawn.text)
+            # A run that draws nothing readable still stands between its
+            # neighbours, so it leaves nothing to join the next one to.
+            end = _place(pen, drawn.edge) if drawn.text and drawn.edge is not None else None
+            last = drawn if drawn.text else None
+            if drawn.advance is None:
+                pen.lost = True
+            else:
+                pen.matrix = _multiply((1.0, 0.0, 0.0, 1.0, drawn.advance, 0.0), pen.matrix)
+        elif token == b"q":
+            if len(saved) < _MAX_DEPTH:
+                saved.append(replace(pen))
+        elif token == b"Q":
+            if saved:
+                pen = replace(saved.pop(), matrix=pen.matrix, line=pen.line, lost=pen.lost)
+                last = None
+        elif token == b"cm" and len(numbers) >= 6:
+            pen.ctm = _multiply(_matrix(numbers), pen.ctm)
+            last = None
+        elif token == b"BT":
+            pen.matrix = pen.line = _IDENTITY
+            pen.lost = False
+            last = None
+        elif token == b"Tf":
+            names = [value for value, sort in pending if sort == "name"]
+            if names:
+                pen.font = fonts.get(names[-1][1:])
+            if numbers:
+                pen.size = numbers[-1]
+        elif token in (b"Td", b"TD") and len(numbers) >= 2:
+            if token == b"TD":
+                pen.leading = -numbers[-1]
+            _move(pen, numbers[-2], numbers[-1])
+            last = None
+        elif token == b"T*":
+            _move(pen, 0.0, -pen.leading)
+            last = None
+        elif token == b"Tm" and len(numbers) >= 6:
+            pen.matrix = pen.line = _matrix(numbers)
+            pen.lost = False
+            last = None
+        elif numbers and token in _STATE:
+            setattr(pen, _STATE[token], numbers[-1] / 100 if token == b"Tz" else numbers[-1])
         pending = []
     return "".join(out)
 
 
-def _kerned(value: bytes) -> bool:
+#: The text state set by a single number, and the name it has on the pen.
+_STATE = {b"Tc": "spacing", b"Tw": "words", b"Tz": "scale", b"TL": "leading", b"Ts": "rise"}
+
+
+class _Drawn(NamedTuple):
+    """One showing instruction, measured along its line from where it starts.
+
+    `edge` is the right side of the last glyph and `advance` where the pen is
+    left, both `None` when the font gives no widths. `lead` and `trail` are
+    the gaps before the first glyph and after the last, which need none: they
+    are kerning and spacing, stated in the instruction itself.
+    """
+
+    text: str
+    em: float
+    lead: float
+    trail: float
+    edge: float | None
+    advance: float | None
+
+
+def _draw(pen: _Pen, drawn: list[tuple[bytes, str]]) -> _Drawn:
+    """What one showing instruction draws, glyph by glyph.
+
+    The gap after a glyph is the spacing the text state adds to it, and in a
+    `TJ` array the kerning numbers too, so the gaps inside a run are known
+    whatever the font. A document that draws `exam` `ple.com` a hair apart has
+    written one address. One that sets its words out with character spacing,
+    as a typesetter filling a line does, has written several.
+    """
+    font = pen.font
+    em = abs(pen.size * pen.scale)
+    text: list[str] = []
+    lead, trail = 0.0, 0.0
+    drawing = False  # whether a glyph has been drawn yet, so a gap is between two
+    edge: float | None = None
+    advance: float | None = 0.0
+    for value, sort in drawn:
+        if sort == "number":
+            move = -_number(value) / 1000 * pen.size * pen.scale
+            advance = None if advance is None else advance + move
+            if drawing:
+                trail += move
+            else:
+                lead += move
+            continue
+        raw = _hex(value) if sort == "hex" else _literal(value)
+        for code, letter in _glyphs(raw, font):
+            if drawing and em > 0 and trail >= _WORD_GAP * em:
+                text.append(" ")
+            text.append(letter)
+            drawing = True
+            width = None if font is None else font.advances.get(code, font.missing)
+            if advance is None or width is None:
+                advance = edge = None
+            else:
+                advance += width * pen.size * pen.scale
+                edge = advance
+            trail = pen.spacing * pen.scale
+            if code == 32 and (font is None or font.width == 1):
+                trail += pen.words * pen.scale  # word spacing is for a one-byte space only
+            advance = None if advance is None else advance + trail
+    return _Drawn("".join(text), em, lead, trail, edge, advance)
+
+
+def _glyphs(raw: bytes, font: Font | None) -> Iterator[tuple[int, str]]:
+    """Each code a string is drawn with, and what it reads as through its font."""
+    for code in _codes(raw, 1 if font is None else font.width):
+        if font is not None and font.table:
+            yield code, font.table.get(code, "")
+        elif font is not None and font.width > 1:
+            yield code, ""  # a composite font whose codes mean nothing without its map
+        else:
+            # A font that states no encoding is read as ASCII and nothing else:
+            # see the module docstring. Anything outside that range is dropped.
+            yield code, chr(code) if 0x20 <= code <= 0x7E else ""
+
+
+def _between(end: _Place | None, start: _Place | None) -> str:
+    """What separates a run from the one before it, measured on the page."""
+    if end is None or start is None:
+        return "\n"
+    x, y, run_x, run_y, before = end
+    next_x, next_y, next_run_x, next_run_y, after = start
+    em = max(before, after)
+    if not em > 0 or run_x * next_run_x + run_y * next_run_y < 0.99:
+        return "\n"  # nothing to measure with, or a line turned another way
+    along = ((next_x - x) * run_x + (next_y - y) * run_y) / em
+    off = ((next_y - y) * run_x - (next_x - x) * run_y) / em
+    if not (abs(off) <= _SAME_LINE and along >= -_OVERLAP):
+        return "\n"
+    return " " if along >= _WORD_GAP else ""
+
+
+def _place(pen: _Pen, offset: float) -> _Place | None:
+    """A point this far along the pen's line, which way the line runs, and its
+    em - on the page, where runs drawn under different matrices can be compared."""
+    if pen.lost:
+        return None
+    a, b, c, d, e, f = _multiply((1.0, 0.0, 0.0, 1.0, offset, 0.0), _multiply(pen.matrix, pen.ctm))
+    length = (a * a + b * b) ** 0.5
+    if not length > 0:
+        return None
+    em = abs(pen.size) * (c * c + d * d) ** 0.5
+    return pen.rise * c + e, pen.rise * d + f, a / length, b / length, em
+
+
+def _move(pen: _Pen, x: float, y: float) -> None:
+    """Start the next line this far from the start of the current one."""
+    pen.line = _multiply((1.0, 0.0, 0.0, 1.0, x, y), pen.line)
+    pen.matrix = pen.line
+    pen.lost = False
+
+
+def _multiply(first: _Matrix, second: _Matrix) -> _Matrix:
+    a, b, c, d, e, f = first
+    p, q, r, s, t, u = second
+    return (
+        a * p + b * r,
+        a * q + b * s,
+        c * p + d * r,
+        c * q + d * s,
+        e * p + f * r + t,
+        e * q + f * s + u,
+    )
+
+
+def _matrix(numbers: list[float]) -> _Matrix:
+    a, b, c, d, e, f = numbers[-6:]
+    return (a, b, c, d, e, f)
+
+
+def _number(value: bytes) -> float:
     try:
-        return float(value) <= _SPACE_KERN
+        return float(value)
     except ValueError:
-        return False
-
-
-def _text(value: bytes, kind: str, font: Font | None) -> str:
-    """One drawn string, through the font that draws it."""
-    raw = _hex(value) if kind == "hex" else _literal(value)
-    if font is not None and font.table:
-        return "".join(font.table.get(code, "") for code in _codes(raw, font.width))
-    if font is not None and font.width > 1:
-        return ""  # a composite font whose codes mean nothing without its map
-    # A font that states no encoding is read as ASCII and nothing else: see
-    # the module docstring. Anything outside that range is dropped.
-    return "".join(chr(code) if 0x20 <= code <= 0x7E else "" for code in raw)
+        return 0.0
 
 
 def _codes(raw: bytes, width: int) -> Iterator[int]:

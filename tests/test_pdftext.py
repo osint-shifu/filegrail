@@ -140,6 +140,67 @@ def test_a_run_split_by_kerning_is_one_value(tmp_path: Path):
     assert "press@example.org" in found[0].text
 
 
+def test_glyphs_placed_one_at_a_time_read_as_the_word_they_make(tmp_path: Path):
+    """What a browser writes when it prints to PDF: every glyph drawn alone and
+    the pen moved on by exactly its width. Read move by move, an address comes
+    back one letter a line; the widths say that nothing lies between them."""
+    address = "press@example.org"
+    mapping = {3 + index: letter for index, letter in enumerate(dict.fromkeys(address))}
+    codes = {letter: code for code, letter in mapping.items()}
+    widths = {code: 400 + 25.5 * code for code in mapping}
+    drawn = b"".join(
+        b"<%04X> Tj %.4f 0 Td " % (codes[letter], widths[codes[letter]] / 100) for letter in address
+    )
+    path = tmp_path / "printed.pdf"
+    path.write_bytes(
+        document(
+            [b"BT /F1 10 Tf 1 0 0 -1 72 720 Tm " + drawn + b"ET"],
+            font=(
+                b"<< /Type /Font /Subtype /Type0 /BaseFont /X /Encoding /Identity-H "
+                b"/DescendantFonts [{extra2}] /ToUnicode {extra} >>"
+            ),
+            extra=[
+                stream(tounicode(mapping, width=2)) + b"\nendstream",
+                b"<< /Type /Font /Subtype /CIDFontType2 /BaseFont /X /W [3 ["
+                + b" ".join(b"%g" % widths[code] for code in mapping)
+                + b"]] >>",
+            ],
+        )
+    )
+
+    found = read_passages(path)
+
+    assert found is not None
+    assert "press@example.org" in found[0].text
+
+
+def test_words_placed_a_space_apart_are_not_joined(tmp_path: Path):
+    """The same writer leaves the space undrawn and starts the next word a
+    space further on. Joined, `Contact` and the address are one address."""
+    font = b"<< /Type /Font /Subtype /TrueType /BaseFont /X /FirstChar 32 /LastChar 126 "
+    font += b"/Widths [" + b" 500" * 95 + b"] /Encoding /WinAnsiEncoding >>"
+    path = tmp_path / "spaced.pdf"
+    words = b"72 720 Td (Contact) Tj ET BT /F1 10 Tf 109.8 720 Td (press@example.org) Tj"
+    path.write_bytes(document([b"BT /F1 10 Tf " + words + b" ET"], font=font))
+
+    found = read_passages(path)
+
+    assert found is not None
+    assert "Contact press@example.org" in found[0].text
+
+
+def test_a_gap_that_cannot_be_measured_is_not_closed(tmp_path: Path):
+    """A font that states no widths gives no way to tell where a glyph ends.
+    Guessing that the next one follows it is how two pieces become a value."""
+    path = tmp_path / "unmeasured.pdf"
+    path.write_bytes(document([b"BT /F1 12 Tf 72 720 Td (press@exam) Tj 60 0 Td (ple.org) Tj ET"]))
+
+    found = read_passages(path)
+
+    assert found is not None
+    assert "press@example.org" not in found[0].text
+
+
 def test_a_document_too_large_to_hold_is_not_read_in_part(tmp_path: Path):
     """Half a PDF is not a shorter PDF. The page tree lives at the end."""
     import filegrail.sources.content as reader
