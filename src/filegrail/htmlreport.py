@@ -2,15 +2,16 @@
 
 The same `analysis.Case` the terminal report lays out, with the same sections,
 numbers and findings, for a reader who wants to click from a file to its
-conflict and back, search a large case, or print it. Dark by default; the print
-stylesheet is light.
+conflict and back, search a large case, or print it. Dark by default, with a
+light theme a button away and a light print stylesheet.
 
 The page is built to be opened on the machine that holds the case and forwarded
 from there, so it can say nothing to anybody else by being opened:
 
 - a Content-Security-Policy that allows no network request of any kind, so even
   a value that slipped past escaping could not fetch anything;
-- no external stylesheet, script, font or image, and no `url()` anywhere;
+- no external stylesheet, script, font or image, and no `url()` anywhere; the
+  mark in the masthead and the tab icon are inline drawings;
 - the only links are to anchors in the page itself - a URL found in a file is
   printed as text, never as something to follow;
 - no data embedded in a script: what the page holds is what it shows, so a
@@ -22,17 +23,27 @@ escaped before it is written.
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import datetime
 from html import escape
 from pathlib import Path
 
 from . import __version__
 from .analysis import NOTHING, REVIEW, Case, CaseFile, Conflict, Finding, Pivots, named
-from .casereport import _ABSENT, _LISTED, MATCHES, _capital, _facts, _folder, _type_name
-from .identify import Identifier
-from .models import ACTIVITY, CATEGORIES, METADATA, ORIGIN, category
+from .casereport import _ABSENT, _LISTED, MATCHES, _capital, _facts, _type_name
+from .identify import PLACE, Identifier
+from .models import (
+    ACTIVITY,
+    CATEGORIES,
+    EMBEDDED,
+    FILE_ATTRIBUTE,
+    ORIGIN,
+    RECORDED_PATH,
+    EvidenceRecord,
+    category,
+)
 from .overview import inventory
-from .report import _format, _relative, _size
+from .report import _format, _relative, _size, _stamp, shown
 from .scan import Unsearched
 
 #: Nothing leaves the page: no fetch, no image, no font, no frame, no form.
@@ -41,204 +52,352 @@ POLICY = (
     "img-src data:; base-uri 'none'; form-action 'none'"
 )
 
+#: The mark, drawn in the page: the grail in the accent, the star in the ink.
+_MARK = (
+    '<svg class="mark" viewBox="0 0 141 221" aria-hidden="true">'
+    '<g transform="translate(-354,-82)">'
+    '<path fill="var(--accent)" fill-rule="evenodd" d="M354,155 L372,155 L372,130 '
+    "A48,48 0 0 1 420,82 L452,82 L452,106 L420,106 A24,24 0 0 0 396,130 L396,155 "
+    "L495,155 L495,205 A61.5,58 0 0 1 445.5,262.6 L445.5,280 L479,280 A3,3 0 0 1 "
+    "482,283 L482,300 A3,3 0 0 1 479,303 L388,303 A3,3 0 0 1 385,300 L385,283 "
+    "A3,3 0 0 1 388,280 L421.5,280 L421.5,262.6 A61.5,58 0 0 1 372,205 L372,179 "
+    'L354,179 Z M396,179 L471,179 L471,205 A37.5,37.5 0 0 1 396,205 Z"/>'
+    '<path fill="var(--ink)" d="M433.5,198.5 Q435,211 447.5,212.5 Q435,214 433.5,226.5 '
+    'Q432,214 419.5,212.5 Q432,211 433.5,198.5 Z"/></g></svg>'
+)
+
+#: The same mark as the tab icon. A data URI: drawn by the browser, fetched from nowhere.
+_FAVICON = (
+    '<link rel="icon" href="data:image/svg+xml,'
+    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 141 221'%3E"
+    "%3Cg transform='translate(-354,-82)'%3E%3Cpath fill='%235FA89A' fill-rule='evenodd' "
+    "d='M354,155 L372,155 L372,130 A48,48 0 0 1 420,82 L452,82 L452,106 L420,106 "
+    "A24,24 0 0 0 396,130 L396,155 L495,155 L495,205 A61.5,58 0 0 1 445.5,262.6 "
+    "L445.5,280 L479,280 A3,3 0 0 1 482,283 L482,300 A3,3 0 0 1 479,303 L388,303 "
+    "A3,3 0 0 1 385,300 L385,283 A3,3 0 0 1 388,280 L421.5,280 L421.5,262.6 "
+    "A61.5,58 0 0 1 372,205 L372,179 L354,179 Z M396,179 L471,179 L471,205 "
+    "A37.5,37.5 0 0 1 396,205 Z'/%3E%3Cpath fill='%23E6E8EB' d='M433.5,198.5 "
+    "Q435,211 447.5,212.5 Q435,214 433.5,226.5 Q432,214 419.5,212.5 "
+    "Q432,211 433.5,198.5 Z'/%3E%3C/g%3E%3C/svg%3E\">"
+)
+
+#: Files a pivot names before the rest go behind a summary: enough to see the
+#: shape of the group, few enough to keep the row a row.
+_HOLDERS = 6
+
+#: Places a pivot shows of the twenty it keeps. Grouping them by file and
+#: source collapses the repeats, so more of them fit in fewer lines.
+_SAMPLE = 8
+
+#: Bases that tie a record to this exact file rather than to a name it shares.
+_STRONG = frozenset({EMBEDDED, FILE_ATTRIBUTE, RECORDED_PATH})
+
 _STYLE = """
-:root{color-scheme:dark;--bg:#0f1216;--panel:#161a20;--panel2:#1d222a;--line:#2a313b;
---text:#d8dce2;--muted:#8e96a1;--faint:#626a75;--origin:#5faf87;--metadata:#6f97c0;
---activity:#d7af5f;--review:#e0895f;--link:#9cc3e6;
---mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+:root{color-scheme:dark;
+--bg:#0F1115;--surface:#151920;--surface-2:#1B2027;--line:#262A31;--line-2:#333944;
+--ink:#E6E8EB;--ink-2:#C3C8CE;--muted:#9AA1A9;--faint:#6B727B;
+--accent:#5FA89A;--accent-ink:#0F1115;--accent-soft:rgba(95,168,154,.14);
+--origin:#5FA89A;--metadata:#7FA3C7;--activity:#C9A66B;--alert:#D08770;
+--alert-soft:rgba(208,135,112,.14);
+--mono:"IBM Plex Mono","JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+--r:6px;--gutter:clamp(20px,4vw,56px)}
+[data-theme=light]{color-scheme:light;
+--bg:#F4F5F6;--surface:#FFFFFF;--surface-2:#EEF0F2;--line:#DDE0E4;--line-2:#C9CDD3;
+--ink:#0F1115;--ink-2:#2C3138;--muted:#5D646C;--faint:#8A9098;
+--accent:#2F8677;--accent-ink:#FFFFFF;--accent-soft:rgba(47,134,119,.12);
+--origin:#2F8677;--metadata:#3E6F9E;--activity:#8E6E2E;--alert:#B5563A;
+--alert-soft:rgba(181,86,58,.12)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);
-font:14px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
-.mono,dd,td.value,.ref{font-family:var(--mono)}
-header.masthead{padding:28px 32px 18px;border-bottom:1px solid var(--line)}
-.brand{font:600 12px/1 var(--mono);letter-spacing:.14em;color:var(--muted)}
-h1{margin:8px 0 14px;font-size:22px;font-weight:600;letter-spacing:.01em}
-dl{margin:0}
-.meta,.props{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 18px}
-.meta dt,.props dt{color:var(--muted)}
-.meta dd,.props dd{margin:0;overflow-wrap:anywhere}
-nav{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:6px 16px;
-align-items:center;padding:10px 32px;background:rgba(15,18,22,.96);
+html{scroll-padding-top:120px}
+body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.55 var(--mono);
+font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline;text-underline-offset:3px}
+code{font:inherit}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+::selection{background:var(--accent);color:var(--accent-ink)}
+
+.mast{padding:40px var(--gutter) 28px;border-bottom:1px solid var(--line);display:grid;
+grid-template-columns:auto 1fr auto;gap:28px;align-items:start}
+.mast .mark{width:44px;height:69px;flex:none}
+.mast .who{align-self:center}
+.mast .word{font-size:28px;font-weight:500;letter-spacing:-.5px;line-height:1;margin:2px 0 6px}
+.mast .word small{font-size:12px;font-weight:400;letter-spacing:.1em;color:var(--muted);
+margin-left:12px;vertical-align:middle}
+.mast .tag{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.facts{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr;gap:4px 16px;
+font-size:12px;margin:24px 0 0;max-width:860px;padding:16px 0 0;
+border-top:1px solid var(--line)}
+.facts dt{color:var(--muted)}
+.facts dd{margin:0;color:var(--ink-2);overflow-wrap:anywhere}
+.mast-actions{display:none;gap:8px;align-items:center}
+.js .mast-actions{display:flex}
+.btn{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px;
+border:1px solid var(--line-2);border-radius:var(--r);color:var(--ink-2);font-size:12px;
+white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--ink)}
+.btn.icon{width:30px;padding:0;justify-content:center;font-size:14px}
+
+.nav{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);
+padding:0 var(--gutter);display:flex;align-items:center;gap:6px;height:48px;overflow-x:auto}
+.nav a{color:var(--muted);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+padding:0 10px;height:48px;display:inline-flex;align-items:center;gap:8px;
+border-bottom:2px solid transparent;white-space:nowrap}
+.nav a b{font-weight:400;color:var(--faint)}
+.nav a:hover{color:var(--ink);text-decoration:none}
+.nav a.on{color:var(--ink);border-bottom-color:var(--accent)}
+.nav a.on b{color:var(--accent)}
+.nav .sp{flex:1}
+.nav .home{display:none;align-items:center;height:48px;padding:0 14px 0 0}
+.js .nav.scrolled .home{display:inline-flex}
+.nav .home .mark{width:16px;height:25px}
+.nav .home:hover{text-decoration:none}
+.btn[data-expand]{display:none}
+.js .btn[data-expand]{display:inline-flex}
+.nav .btn{margin-right:8px}
+.h .btn{margin-left:auto}
+.search{position:relative;flex:none;display:none}
+.js .search{display:block}
+.search input{height:30px;width:260px;background:var(--surface);border:1px solid var(--line-2);
+border-radius:var(--r);color:var(--ink);padding:0 30px 0 10px;font:inherit;font-size:12px}
+.search input:focus{outline:none;border-color:var(--accent)}
+.search kbd{position:absolute;right:8px;top:7px;font-size:10px;color:var(--faint);
+border:1px solid var(--line-2);border-radius:3px;padding:0 4px;line-height:14px}
+.search .hits{position:absolute;right:34px;top:8px;font-size:11px;color:var(--accent)}
+
+main{padding:0 var(--gutter) 80px}
+section{padding:44px 0 8px;border-bottom:1px solid var(--line)}
+section:last-of-type{border-bottom:0}
+.h{display:flex;align-items:baseline;gap:14px;margin:0 0 18px;flex-wrap:wrap}
+.h h2{margin:0;font-size:12px;font-weight:500;letter-spacing:.22em;text-transform:uppercase}
+.h .n{color:var(--accent);font-size:12px}
+.h .n b{font-weight:400;color:var(--muted)}
+h3{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+font-weight:400;margin:22px 0 8px}
+p.note{color:var(--muted);font-size:12px;margin:12px 0 0;max-width:92ch}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.card{background:var(--surface);padding:16px 18px 14px;display:flex;flex-direction:column;
+gap:6px;color:inherit;position:relative}
+a.card:hover{background:var(--surface-2);text-decoration:none}
+.card .v{font-size:26px;line-height:1;font-weight:500;letter-spacing:-.5px}
+.card .v .of{color:var(--faint);font-size:16px}
+.card .k{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.card .s{font-size:11px;color:var(--faint);overflow-wrap:anywhere}
+.card.alert .v{color:var(--alert)}
+.card.accent .v{color:var(--accent)}
+.card.origin .v{color:var(--origin)}
+.card.metadata .v{color:var(--metadata)}
+.card.activity .v{color:var(--activity)}
+a.card:after{content:"\\2192";position:absolute;right:14px;top:14px;color:var(--faint);
+font-size:12px}
+a.card:hover:after{color:var(--accent)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin:14px 0 0}
+
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{text-align:left;font-weight:400;font-size:10.5px;letter-spacing:.14em;
+text-transform:uppercase;color:var(--muted);padding:8px 12px 8px 0;
+border-bottom:1px solid var(--line-2);white-space:nowrap;user-select:none}
+.tbl th[data-sort]{cursor:pointer}
+.tbl th[data-sort]:hover,.tbl th[data-sort]:focus{color:var(--ink);outline:none}
+.tbl th .dir{color:var(--accent);margin-left:4px;font-size:10px}
+.tbl td{padding:9px 12px 9px 0;border-bottom:1px solid var(--line);vertical-align:top;
+color:var(--ink-2)}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tbody tr:hover td{background:var(--surface)}
+.tbl td.num,.tbl th.num{text-align:right;padding-right:12px;white-space:nowrap}
+.tbl th.num{letter-spacing:.04em}
+.tbl .id{color:var(--muted);white-space:nowrap}
+.tbl .path{color:var(--ink);overflow-wrap:anywhere;min-width:18em}
+.tbl .val{color:var(--ink);overflow-wrap:anywhere;min-width:16em;max-width:26em}
+.tbl .dim{color:var(--faint)}
+.tbl .where{color:var(--faint);overflow-wrap:break-word;min-width:26em}
+.tbl .found{max-width:22em}
+.tbl details{margin-top:4px}
+.tbl summary{cursor:pointer;color:var(--accent)}
+.tbl tr[hidden]{display:none}
+.tbl tr.hit td{background:var(--accent-soft)}
+.wrap{overflow-x:auto}
+.wrap>table.index,.wrap>table.pivots{min-width:860px}
+
+.cat{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.06em;
+color:var(--ink-2);white-space:nowrap}
+.cat:before{content:"";width:8px;height:8px;border-radius:2px;background:var(--c,var(--faint));
+flex:none}
+.cat.origin{--c:var(--origin)}
+.cat.metadata{--c:var(--metadata)}
+.cat.activity{--c:var(--activity)}
+.cat.none{--c:transparent;box-shadow:inset 0 0 0 1px var(--line-2);color:var(--faint)}
+.cat.none:before{box-shadow:inset 0 0 0 1px var(--line-2)}
+.dots{display:inline-flex;gap:4px;vertical-align:middle}
+.dots i{width:8px;height:8px;border-radius:2px;background:var(--line-2)}
+.dots i.o{background:var(--origin)}
+.dots i.m{background:var(--metadata)}
+.dots i.a{background:var(--activity)}
+.flag{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;
+border-radius:3px;background:var(--alert-soft);color:var(--alert);font-weight:500}
+.pill{display:inline-block;font-size:10.5px;letter-spacing:.08em;padding:1px 7px;
+border-radius:999px;border:1px solid var(--line-2);color:var(--muted);white-space:nowrap}
+.pill.match{border-color:transparent;background:var(--surface-2);color:var(--ink-2)}
+.pill.strong{border-color:var(--accent);background:none;color:var(--accent)}
+.chips{display:none;flex-wrap:wrap;gap:6px;margin:0 0 16px}
+.js .chips{display:flex}
+.chip{height:26px;padding:0 10px;border:1px solid var(--line-2);border-radius:999px;
+font-size:11px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.chip b{font-weight:400;color:var(--faint)}
+.chip:hover{color:var(--ink);border-color:var(--ink-2)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip.on b{color:var(--accent-ink);opacity:.7}
+.copy{display:none;color:var(--faint);margin-left:6px;vertical-align:middle;opacity:0}
+.js .copy{display:inline}
+tr:hover .copy,.rec:hover .copy,dd:hover .copy,.pair:hover .copy,.facts dd:hover .copy{opacity:1}
+.copy:hover,.copy:focus{color:var(--accent);opacity:1;outline:none}
+.copy.ok{color:var(--accent);opacity:1}
+
+.find{display:grid;grid-template-columns:44px 1fr;gap:0 16px;padding:14px 0;
 border-bottom:1px solid var(--line)}
-nav a{color:var(--muted);font-size:13px}nav a:hover{color:var(--text)}
-.tools{margin-left:auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center;
-color:var(--muted);font-size:13px}
-.tools input[type=search]{background:var(--panel);border:1px solid var(--line);
-color:var(--text);padding:5px 9px;border-radius:4px;min-width:14em;font:inherit}
-main{max-width:1180px;margin:0 auto;padding:4px 32px 48px}
-section{margin-top:38px}
-h2{font-size:13px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
-font-weight:600;border-bottom:1px solid var(--line);padding-bottom:7px;margin:0 0 16px}
-h3{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
-font-weight:600;margin:24px 0 10px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;
-padding:11px 14px}
-.card .n{font-size:21px;font-weight:600;font-variant-numeric:tabular-nums}
-.card .l{color:var(--muted);font-size:12px}
-.card.review{border-color:var(--review)}.card.review .n{color:var(--review)}
-.obj{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--faint);
-border-radius:6px;padding:12px 16px;margin:10px 0;break-inside:avoid}
-.obj.review{border-left-color:var(--review)}
-.obj h4{margin:0 0 9px;font-size:15px;font-weight:600;overflow-wrap:anywhere}
-.ref{font-size:12px;font-weight:600;color:var(--muted);margin-right:10px}
-.obj.review .ref{color:var(--review)}
-ul.files{list-style:none;margin:10px 0 0;padding:0}
-ul.files li{padding:2px 0;overflow-wrap:anywhere}
-.path{color:var(--faint);font-size:12px;overflow-wrap:anywhere}
-.note{color:var(--muted);margin:10px 0 0}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line);
-padding:6px 8px;white-space:nowrap}
-td{border-bottom:1px solid var(--panel2);padding:6px 8px;vertical-align:top}
-td.value{overflow-wrap:anywhere}
-td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-td.ref,td.source{white-space:nowrap;font-family:var(--mono)}
-td.name{min-width:16em;overflow-wrap:break-word}
-td.field{min-width:8em;overflow-wrap:break-word}
-.wide>table.index{min-width:720px}
-tr.review td:first-child{box-shadow:inset 3px 0 var(--review)}
-tr.nothing{color:var(--muted)}
-.wide{overflow-x:auto}
-.origin{color:var(--origin)}.metadata{color:var(--metadata)}.activity{color:var(--activity)}
-.state{font:600 11px/1.6 var(--mono);padding:0 6px;border-radius:3px;
-border:1px solid var(--line);white-space:nowrap}
-.state.found,.state.readable{color:var(--origin);border-color:var(--origin)}
-.state.partial{color:var(--activity);border-color:var(--activity)}
-.state.missing{color:var(--faint)}
-.delta{color:var(--review)}
-details{background:var(--panel);border:1px solid var(--line);border-radius:6px;
-margin:10px 0;break-inside:avoid}
-details.review{border-left:3px solid var(--review)}
-summary{cursor:pointer;padding:10px 16px;font-weight:600;overflow-wrap:anywhere}
-details>.body{padding:2px 16px 14px}
-details.list{background:none;border:0;margin:8px 0 0}
-details.list>summary{padding:0;font-weight:400;color:var(--muted)}
-h5{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
-margin:16px 0 6px;font-weight:600}
-.record{margin:6px 0 10px;padding-left:12px;border-left:1px solid var(--line)}
-.record .name{font-weight:600;margin-bottom:3px}
-footer{margin-top:52px;border-top:1px solid var(--line);padding-top:12px;
-color:var(--faint);font-size:12px}
-.hidden{display:none!important}
-.tabs{display:none;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.js .tabs{display:flex}
-.tabs button{font:inherit;font-size:13px;color:var(--muted);background:var(--panel);
-border:1px solid var(--line);border-radius:4px;padding:4px 10px;cursor:pointer}
-.tabs button[aria-selected=true]{color:var(--text);border-color:var(--link)}
-.tabs .count{color:var(--faint);font-variant-numeric:tabular-nums}
-.js .panel.inactive{display:none}.searching .panel.inactive{display:block}
-.holder{display:inline-block;margin-right:12px}
-.wide>table.pivots{min-width:760px}
-a.card{display:block;color:inherit}a.card:hover{border-color:var(--muted);text-decoration:none}
-th.sort{cursor:pointer;user-select:none}th.sort:hover,th.sort:focus{color:var(--text);outline:none}
-th[aria-sort=ascending]::after{content:" \25B2";font-size:9px}
-th[aria-sort=descending]::after{content:" \25BC";font-size:9px}
-.copy{display:none;margin-left:7px;font:11px/1.4 var(--mono);color:var(--muted);background:none;
-border:1px solid var(--line);border-radius:3px;padding:0 5px;cursor:pointer;vertical-align:1px}
-.js .copy{display:inline-block}.copy:hover{color:var(--text);border-color:var(--muted)}
-.chip{border:1px solid var(--line);border-radius:4px;padding:2px 4px 2px 8px;color:var(--text)}
-.chip button{font:inherit;color:var(--muted);background:none;border:0;cursor:pointer}
-@media (max-width:720px){header.masthead,nav,main{padding-left:16px;padding-right:16px}
-.tools{margin-left:0}}
-@media print{:root{color-scheme:light;--bg:#fff;--panel:#fff;--panel2:#e6e6e6;--line:#bdbdbd;
---text:#111;--muted:#4d4d4d;--faint:#6b6b6b;--link:#111;--review:#9c3d14;--origin:#2c6b4b;
---metadata:#2c5a88;--activity:#7d5f18}
-body{font-size:10.5px}nav,.tools,.copy,.tabs{display:none!important}.panel.inactive{display:block!important}a{color:inherit}
-.obj,details,tr,.card{break-inside:avoid}thead{display:table-header-group}
-h2{break-after:avoid}}
+.find:last-child{border-bottom:0}
+.find .fid{color:var(--accent)}
+.find .t{color:var(--ink);overflow-wrap:anywhere}
+.find .t.warn:before{content:"!";display:inline-flex;align-items:center;justify-content:center;
+width:16px;height:16px;border-radius:3px;background:var(--alert-soft);color:var(--alert);
+margin-right:8px;font-size:11px;vertical-align:1px}
+.find .files{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;
+color:var(--muted)}
+.find .files a{color:var(--ink-2)}
+.find details .files{display:grid;gap:2px;margin-top:8px}
+.find .note{color:var(--muted);font-size:12px;margin-top:6px;max-width:92ch}
+.find details{margin-top:6px}
+.find summary{color:var(--accent);font-size:12px;cursor:pointer}
+
+.tabs{display:none;flex-wrap:wrap;gap:2px 0;border-bottom:1px solid var(--line-2);
+margin-bottom:14px}
+.js .tabs{display:flex}
+.tabs button{padding:8px 12px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tabs button b{font-weight:400;color:var(--faint);margin-left:6px}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+.tabs button.on b{color:var(--accent)}
+.js .pane{display:none}
+.js .pane.on{display:block}
+.pane:before{content:attr(data-label);display:none;font-size:10px;letter-spacing:.14em;
+text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+.holder{display:block;white-space:nowrap}
+
+.file{border:1px solid var(--line);border-radius:var(--r);margin:0 0 14px;background:var(--surface)}
+.file>summary{list-style:none;display:grid;grid-template-columns:44px 1fr auto;gap:16px;
+align-items:center;padding:12px 16px;cursor:pointer}
+.file>summary::-webkit-details-marker{display:none}
+.file>summary .id{color:var(--muted)}
+.file>summary .name{color:var(--ink);overflow-wrap:anywhere}
+.file>summary .meta{color:var(--faint);font-size:11px;display:flex;gap:14px;align-items:center;
+flex-wrap:wrap}
+.file>summary .chev{color:var(--faint)}
+.file[open]>summary .chev{transform:rotate(90deg)}
+.file[open]>summary{border-bottom:1px solid var(--line)}
+.file.review{border-left:2px solid var(--alert)}
+.rec{display:grid;grid-template-columns:96px 1fr;gap:0 20px;padding:12px 16px;
+border-bottom:1px solid var(--line)}
+.rec>.fields{grid-column:2}
+.rec:last-child{border-bottom:0}
+.rec .cat{align-self:start;margin-top:2px}
+.rec .src{color:var(--ink);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rec .note{color:var(--muted);margin-top:2px}
+.rec.silent,.rec.silent .src{color:var(--faint)}
+.fields{display:grid;grid-template-columns:minmax(120px,max-content) 1fr;gap:3px 18px;
+margin:8px 0 0;font-size:12px}
+.fields dt{color:var(--muted);white-space:nowrap}
+.fields dd{margin:0;color:var(--ink-2);overflow-wrap:anywhere}
+.extra{display:grid;grid-template-columns:96px 1fr;gap:0 20px;padding:12px 16px;
+border-top:1px dashed var(--line);font-size:12px}
+.extra .k{color:var(--muted);letter-spacing:.14em;text-transform:uppercase;font-size:10.5px;
+padding-top:2px}
+.extra ul{margin:0;padding:0;list-style:none;display:grid;gap:4px}
+.extra li{color:var(--ink-2);overflow-wrap:anywhere}
+
+.conf{display:grid;grid-template-columns:44px 1fr;gap:0 16px;padding:14px 0;
+border-bottom:1px solid var(--line)}
+.conf:last-child{border-bottom:0}
+.conf .cid{color:var(--alert)}
+.conf .t{color:var(--ink);overflow-wrap:anywhere}
+.conf .field{color:var(--muted);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+margin:12px 0 0}
+.conf .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,18em),1fr));
+gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);
+overflow:hidden;margin-top:6px;font-size:12px}
+.conf .pair>div{background:var(--surface);padding:10px 14px}
+.conf .pair .src{color:var(--muted);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+margin-bottom:4px}
+.conf .pair .v{color:var(--ink);overflow-wrap:anywhere}
+.conf .delta{margin-top:8px;color:var(--alert)}
+
+.notes{display:grid;gap:8px;margin:0;padding:0;list-style:none;color:var(--ink-2);
+font-size:12px;max-width:92ch}
+footer{padding:24px var(--gutter);border-top:1px solid var(--line);display:flex;
+justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:11px;letter-spacing:.14em;
+text-transform:uppercase;color:var(--faint)}
+
+@media (max-width:820px){
+.mast{grid-template-columns:auto 1fr}
+.mast-actions{grid-column:1/-1}
+.rec{grid-template-columns:1fr}
+.rec .cat{margin-bottom:4px}
+.rec>.fields{grid-column:1}
+.extra{grid-template-columns:1fr}
+.search input{width:150px}
+}
+@media print{
+:root{color-scheme:light;--bg:#fff;--surface:#fff;--surface-2:#f2f3f5;--line:#d5d8dd;
+--line-2:#b8bcc3;--ink:#000;--ink-2:#222;--muted:#555;--faint:#777;--accent:#2F8677;
+--origin:#2F8677;--metadata:#3E6F9E;--activity:#8E6E2E;--alert:#B5563A}
+body{font-size:10.5px}
+.nav,.mast-actions,.copy,.chips,.tabs,.chev,a.card:after{display:none!important}
+.file>summary{cursor:default}
+details.file:not([open])>*:not(summary){display:block}
+.js .pane,.pane{display:block!important}
+.pane:before{display:block}
+section{break-inside:avoid-page;padding:22px 0 6px}
+.file,.conf,.find,.card,tr{break-inside:avoid}
+thead{display:table-header-group}
+a{color:inherit}
+}
 """
 
 _SCRIPT = """
 (function () {
-  document.documentElement.classList.add('js');
+  var root = document.documentElement;
+  root.classList.add('js');
   var each = function (list, visit) { Array.prototype.forEach.call(list, visit); };
-  var tools = document.getElementById('tools');
-  var box = document.getElementById('search');
-  var review = document.getElementById('only-review');
-  var chip = document.getElementById('filter');
-  var said = document.getElementById('filter-text');
-  var filter = '';
-  var names = {
-    evidence: 'files with evidence', origin: 'files with an origin record',
-    metadata: 'files with metadata', activity: 'files with an activity record'
-  };
-  var items = Array.prototype.slice.call(document.querySelectorAll('[data-search]'));
+  var one = function (selector) { return document.querySelector(selector); };
+  var all = function (selector) { return document.querySelectorAll(selector); };
 
-  function matches(item) {
-    if (!filter || !item.hasAttribute('data-found')) { return true; }
-    if (filter === 'evidence') { return item.dataset.state !== 'nothing'; }
-    return (' ' + item.dataset.found + ' ').indexOf(' ' + filter + ' ') !== -1;
+  var theme = one('#theme');
+  function wear(name) {
+    root.setAttribute('data-theme', name);
+    theme.textContent = name === 'light' ? '\\u25D1' : '\\u25D0';
+    theme.title = name === 'light' ? 'Dark theme' : 'Light theme';
+    theme.setAttribute('aria-label', theme.title);
+    try { localStorage.setItem('filegrail-theme', name); } catch (error) { /* private mode */ }
   }
-  function apply() {
-    var wanted = box ? box.value.trim().toLowerCase() : '';
-    var only = review && review.checked;
-    items.forEach(function (item) {
-      var shown = !wanted || item.textContent.toLowerCase().indexOf(wanted) !== -1;
-      if (only && item.dataset.state && item.dataset.state !== 'review') { shown = false; }
-      shown = shown && matches(item);
-      item.classList.toggle('hidden', !shown);
-      if (shown && wanted && item.tagName === 'DETAILS') { item.open = true; }
+  if (theme) {
+    var kept = null;
+    try { kept = localStorage.getItem('filegrail-theme'); } catch (error) { kept = null; }
+    wear(kept === 'light' ? 'light' : 'dark');
+    theme.addEventListener('click', function () {
+      wear(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
     });
-    document.body.classList.toggle('searching', !!wanted);
-    if (chip) {
-      chip.classList.toggle('hidden', !filter);
-      said.textContent = names[filter] || '';
-    }
   }
-  if (tools) { tools.classList.remove('hidden'); }
-  if (box) { box.addEventListener('input', apply); }
-  if (review) { review.addEventListener('change', apply); }
-  each(document.querySelectorAll('a[data-filter]'), function (card) {
-    card.addEventListener('click', function () { filter = card.dataset.filter; apply(); });
-  });
-  var clear = document.getElementById('filter-clear');
-  if (clear) { clear.addEventListener('click', function () { filter = ''; apply(); }); }
+  var printer = one('#print');
+  if (printer) { printer.addEventListener('click', function () { window.print(); }); }
 
-  each(document.querySelectorAll('.tabs'), function (list) {
-    var tabs = list.querySelectorAll('button[data-panel]');
-    each(tabs, function (tab) {
-      tab.addEventListener('click', function () {
-        each(tabs, function (other) {
-          var chosen = other === tab;
-          other.setAttribute('aria-selected', chosen ? 'true' : 'false');
-          var panel = document.getElementById(other.dataset.panel);
-          if (panel) { panel.classList.toggle('inactive', !chosen); }
-        });
-      });
-    });
-  });
-
-  each(document.querySelectorAll('table.sortable'), function (table) {
-    if (!table.tHead || !table.tBodies.length) { return; }
-    var heads = table.tHead.rows[0].cells;
-    each(heads, function (head, column) {
-      head.tabIndex = 0;
-      head.classList.add('sort');
-      function key(row) {
-        var cell = row.cells[column];
-        if (!cell) { return ''; }
-        var raw = cell.getAttribute('data-value');
-        return raw === null ? cell.textContent.trim().toLowerCase() : parseFloat(raw);
-      }
-      function sort() {
-        var body = table.tBodies[0];
-        var rows = Array.prototype.slice.call(body.rows);
-        var rising = head.getAttribute('aria-sort') !== 'ascending';
-        each(heads, function (other) { other.removeAttribute('aria-sort'); });
-        head.setAttribute('aria-sort', rising ? 'ascending' : 'descending');
-        rows.sort(function (a, b) {
-          var x = key(a), y = key(b);
-          var order = (typeof x === 'number' && typeof y === 'number')
-            ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true });
-          return rising ? order : -order;
-        });
-        rows.forEach(function (row) { body.appendChild(row); });
-      }
-      head.addEventListener('click', sort);
-      head.addEventListener('keydown', function (event) {
-        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); sort(); }
-      });
+  each(all('[data-expand]'), function (button) {
+    button.addEventListener('click', function () {
+      var held = button.closest('section');
+      var blocks = held ? held.querySelectorAll('details') : [];
+      var opening = Array.prototype.some.call(blocks, function (block) { return !block.open; });
+      each(blocks, function (block) { block.open = opening; });
+      button.textContent = (opening ? '\\u229F Collapse' : '\\u229E Expand') + ' all';
     });
   });
 
@@ -246,9 +405,13 @@ _SCRIPT = """
     var button = event.target.closest ? event.target.closest('button.copy') : null;
     if (!button) { return; }
     var value = button.previousElementSibling ? button.previousElementSibling.textContent : '';
-    function done(word) {
-      button.textContent = word;
-      setTimeout(function () { button.textContent = 'copy'; }, 1200);
+    function done(mark) {
+      button.textContent = mark;
+      button.classList.add('ok');
+      setTimeout(function () {
+        button.textContent = '\\u29C9';
+        button.classList.remove('ok');
+      }, 1000);
     }
     function fallback() {
       var area = document.createElement('textarea');
@@ -258,30 +421,181 @@ _SCRIPT = """
       var copied = false;
       try { copied = document.execCommand('copy'); } catch (error) { copied = false; }
       document.body.removeChild(area);
-      done(copied ? 'copied' : 'failed');
+      done(copied ? '\\u2713' : '\\u2717');
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(value).then(function () { done('copied'); }, fallback);
+      navigator.clipboard.writeText(value).then(function () { done('\\u2713'); }, fallback);
     } else {
       fallback();
     }
   });
+
+  var rows = Array.prototype.slice.call(all('#index tbody tr'));
+  var counted = one('#shown');
+  function filter(wanted) {
+    each(all('.chip'), function (chip) {
+      chip.classList.toggle('on', chip.dataset.filter === wanted);
+    });
+    var left = 0;
+    rows.forEach(function (row) {
+      var keep = wanted === 'all' || (row.dataset.f || '').split(' ').indexOf(wanted) !== -1;
+      row.hidden = !keep;
+      if (keep) { left += 1; }
+    });
+    if (counted) { counted.textContent = left; }
+  }
+  document.addEventListener('click', function (event) {
+    if (!event.target.closest) { return; }
+    var chip = event.target.closest('[data-filter]');
+    if (chip) { filter(chip.dataset.filter); }
+  });
+
+  function show(name) {
+    each(all('.tabs button'), function (tab) {
+      var chosen = tab.dataset.panel === name;
+      tab.classList.toggle('on', chosen);
+      tab.setAttribute('aria-selected', chosen ? 'true' : 'false');
+    });
+    each(all('.pane'), function (pane) { pane.classList.toggle('on', pane.id === name); });
+  }
+  each(all('.tabs button'), function (tab) {
+    tab.addEventListener('click', function () { show(tab.dataset.panel); });
+  });
+
+  each(all('.tbl th[data-sort]'), function (head) {
+    head.tabIndex = 0;
+    function sort() {
+      var table = head.closest('table');
+      var body = table.tBodies[0];
+      var column = Array.prototype.indexOf.call(head.parentNode.children, head);
+      var numeric = head.dataset.sort === 'num';
+      var rising = head.dataset.dir !== 'asc';
+      each(table.querySelectorAll('th'), function (other) {
+        delete other.dataset.dir;
+        var arrow = other.querySelector('.dir');
+        if (arrow) { arrow.remove(); }
+      });
+      head.dataset.dir = rising ? 'asc' : 'desc';
+      head.insertAdjacentHTML('beforeend',
+        '<span class="dir">' + (rising ? '\\u25B2' : '\\u25BC') + '</span>');
+      function key(row) {
+        var cell = row.children[column];
+        if (!cell) { return numeric ? 0 : ''; }
+        if (numeric) { return parseFloat(cell.dataset.value || 0) || 0; }
+        return cell.textContent.trim().toLowerCase();
+      }
+      Array.prototype.slice.call(body.rows).sort(function (a, b) {
+        var x = key(a), y = key(b);
+        var order = numeric
+          ? x - y
+          : String(x).localeCompare(String(y), undefined, {numeric: true});
+        return rising ? order : -order;
+      }).forEach(function (row) { body.appendChild(row); });
+    }
+    head.addEventListener('click', sort);
+    head.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); sort(); }
+    });
+  });
+
+  var box = one('#search');
+  var hits = one('#hits');
+  function searchable() {
+    return rows.concat(
+      Array.prototype.slice.call(all('.find')),
+      Array.prototype.slice.call(all('.conf')),
+      Array.prototype.slice.call(all('.rec')),
+      Array.prototype.slice.call(all('.pivot'))
+    );
+  }
+  if (box) {
+    box.addEventListener('input', function () {
+      var wanted = box.value.trim().toLowerCase();
+      var found = 0;
+      var pane = null;
+      searchable().forEach(function (item) {
+        item.classList.remove('hit');
+        if (!wanted) { return; }
+        if (item.textContent.toLowerCase().indexOf(wanted) === -1) { return; }
+        item.classList.add('hit');
+        found += 1;
+        var block = item.closest('details');
+        if (block) { block.open = true; }
+        var holder = item.closest('.pane');
+        if (holder && !pane) { pane = holder.id; }
+      });
+      if (pane) { show(pane); }
+      if (hits) { hits.textContent = wanted ? found + ' hits' : ''; }
+      if (!wanted) { filter('all'); return; }
+      var left = 0;
+      rows.forEach(function (row) {
+        row.hidden = !row.classList.contains('hit');
+        if (!row.hidden) { left += 1; }
+      });
+      if (counted) { counted.textContent = left; }
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === '/' && document.activeElement !== box) {
+        event.preventDefault();
+        box.focus();
+      }
+      if (event.key === 'Escape' && document.activeElement === box) {
+        box.value = '';
+        box.dispatchEvent(new Event('input'));
+        box.blur();
+      }
+    });
+  }
+
+  var links = Array.prototype.slice.call(all('.nav a[href^="#"]'));
+  if (window.IntersectionObserver) {
+    var watch = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) { return; }
+        links.forEach(function (link) {
+          link.classList.toggle('on', link.getAttribute('href') === '#' + entry.target.id);
+        });
+      });
+    }, {rootMargin: '-45% 0px -50% 0px'});
+    links.forEach(function (link) {
+      var section = document.getElementById(link.getAttribute('href').slice(1));
+      if (section) { watch.observe(section); }
+    });
+  }
+
+  var top = document.getElementById('top');
+  var bar = document.querySelector('.nav');
+  if (top && bar && window.IntersectionObserver) {
+    new IntersectionObserver(function (entries) {
+      bar.classList.toggle('scrolled', !entries[0].isIntersecting);
+    }, {threshold: 0}).observe(top);
+  }
+
+  function opened() {
+    if (!location.hash) { return; }
+    var target = document.getElementById(location.hash.slice(1));
+    if (!target) { return; }
+    var block = target.closest('details');
+    if (block) { block.open = true; }
+    var holder = target.closest('.pane');
+    if (holder) { show(holder.id); }
+  }
+  window.addEventListener('hashchange', opened);
+  opened();
 })();
 """
 
-#: Values in a file's detail that are said about the record, not taken from it.
-_PLAIN = frozenset({"Match"})
-
+#: Section key, the heading it prints, and the short word the nav gives it.
 _SECTIONS = (
-    ("summary", "Summary"),
-    ("findings", "Key findings"),
-    ("files", "Files"),
-    ("relationships", "Relationships"),
-    ("pivots", "Investigative pivots"),
-    ("detail", "File detail"),
-    ("coverage", "Evidence coverage"),
-    ("conflicts", "Conflicts"),
-    ("notes", "Report notes"),
+    ("summary", "Summary", "Summary"),
+    ("findings", "Key findings", "Findings"),
+    ("files", "Files", "Files"),
+    ("relationships", "Relationships", "Related"),
+    ("pivots", "Investigative pivots", "Pivots"),
+    ("detail", "File detail", "Detail"),
+    ("coverage", "Evidence coverage", "Coverage"),
+    ("conflicts", "Conflicts", "Conflicts"),
+    ("notes", "Report notes", "Notes"),
 )
 
 
@@ -295,80 +609,166 @@ def render_html(
     unsearched: Unsearched | None = None,
     filtered: str = "",
     redacted: bool = False,
+    output: Path | None = None,
     now: datetime | None = None,
 ) -> str:
     """The whole page. A section with nothing in it is not written."""
     files = {entry.record.path: entry for entry in case.files}
     moment = (now or datetime.now().astimezone()).strftime("%Y-%m-%d %H:%M %Z").strip()
+    detailed = {entry.record.path for entry in case.files if _wants_detail(entry, verbose)}
+    panes = (
+        {kind for kind, _count in case.pivots.by_type}
+        if case.pivots is not None and identifiers is not None and case.pivots.total
+        else set()
+    )
     sections = {
         "summary": _summary(case),
         "findings": _findings(case, files),
         "coverage": _coverage(case, unsearched),
-        "conflicts": _conflicts(case, files),
-        "files": _files(case),
+        "conflicts": _conflicts(case, files, detailed),
+        "files": _files(case, detailed, panes),
         "relationships": _relationships(case, files),
         "pivots": _pivots(case, files, identifiers),
-        "detail": _details(case, files, verbose=verbose),
+        "detail": _details(case, files, detailed, verbose=verbose),
         "notes": _notes(case),
     }
-    present = [(key, title) for key, title in _SECTIONS if sections[key]]
+    counted = _counts(case, detailed)
+    present = [(key, title, short) for key, title, short in _SECTIONS if sections[key]]
+
+    options = [
+        ("--content", content),
+        ("--pivots", identifiers is not None),
+        ("--redact", redacted),
+        ("--verbose", verbose),
+    ]
+    enabled = " ".join(name for name, on in options if on) or "none"
+    facts = [("target", str(case.root))]
+    if home:
+        facts.append(("profile", f"{home} · external"))
+    records = [entry.record for entry in case.files]
+    contents = inventory(records)
+    facts.append(("scanned", f"{moment} · {len(records):,} files · {_size(contents.size)}"))
+    facts.append(("options", enabled))
+    if output is not None:
+        facts.append(("report", str(output)))
 
     head = [
         "<!doctype html>",
-        '<html lang="en">',
+        '<html lang="en" data-theme="dark">',
         "<head>",
         '<meta charset="utf-8">',
         f'<meta http-equiv="Content-Security-Policy" content="{POLICY}">',
         '<meta name="referrer" content="no-referrer">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        '<meta name="color-scheme" content="dark light">',
         f"<title>filegrail · {_e(Path(case.root).name or str(case.root))}</title>",
+        _FAVICON,
         f"<style>{_STYLE}</style>",
         "</head>",
         "<body>",
     ]
-    meta = [("Target", str(case.root))]
-    if home:
-        meta.append(("Profile", f"{home} · external"))
-    meta.append(("Generated", moment))
     masthead = [
-        '<header class="masthead">',
-        f'<div class="brand">FILEGRAIL {_e(__version__)}</div>',
-        "<h1>Investigation report</h1>",
-        _props(meta, css="meta"),
+        '<header class="mast" id="top">',
+        _MARK,
+        '<div class="who">',
+        '<div class="word">filegrail '
+        f"<small>v{_e(__version__)} · investigation report</small></div>",
+        '<div class="tag">Trace origins · Extract metadata · Discover pivots</div>',
+        "</div>",
+        '<div class="mast-actions">',
+        '<button class="btn" id="print" type="button">⎙ Print / PDF</button>',
+        '<button class="btn icon" id="theme" type="button" '
+        'title="Light theme" aria-label="Light theme">◐</button>',
+        "</div>",
+        _fields(facts, css="facts", copy=frozenset({"target", "profile", "report"})),
         "</header>",
     ]
-    links = " ".join(f'<a href="#{key}">{_e(title)}</a>' for key, title in present)
+    links = "".join(
+        f'<a href="#{key}">{_e(short)}'
+        + (f" <b>{counted[key]}</b>" if counted.get(key) else "")
+        + "</a>"
+        for key, _title, short in present
+    )
+    upwards = (
+        '<a class="home" href="#top" title="Back to the top" '
+        f'aria-label="Back to the top">{_MARK}</a>'
+    )
     nav = [
-        f"<nav>{links}",
-        '<div class="tools hidden" id="tools">',
-        '<input type="search" id="search" placeholder="Search the report" aria-label="Search">',
-        '<label><input type="checkbox" id="only-review"> only files to review</label>',
-        '<span class="chip hidden" id="filter">showing <span id="filter-text"></span>',
-        '<button type="button" id="filter-clear">clear</button></span>',
-        "</div></nav>",
+        f'<nav class="nav">{upwards}{links}<span class="sp"></span>',
+        '<label class="search"><input id="search" type="search" '
+        'placeholder="search paths, values, fields" aria-label="Search the report" '
+        'autocomplete="off" spellcheck="false">'
+        '<span class="hits" id="hits"></span><kbd>/</kbd></label>',
+        "</nav>",
     ]
     body = ["<main>"]
-    for key, title in present:
-        body.append(f'<section id="{key}"><h2>{_e(title)}</h2>{sections[key]}</section>')
+    for key, title, _short in present:
+        body.append(_section(key, title, sections[key], _note(key, case, detailed)))
     if filtered:
         said = "No file matched" if not case.files else "Limited to"
         body.append(f'<p class="note">{_e(said)} {_e(filtered)}.</p>')
-    options = [
-        ("content", content),
-        ("pivots", identifiers is not None),
-        ("redaction", redacted),
-        ("verbose", verbose),
-    ]
-    enabled = ", ".join(name for name, on in options if on) or "none"
-    body.append(
-        "<footer>"
-        f"filegrail {_e(__version__)} · generated {_e(moment)} · options: {_e(enabled)} · "
-        "this page makes no network requests and loads nothing from outside itself"
-        "</footer>"
-    )
     body.append("</main>")
+    footer = [
+        "<footer>",
+        f"<span>filegrail v{_e(__version__)} · Apache-2.0</span>",
+        f"<span>generated {_e(moment)}</span>",
+        "<span>this page makes no network requests</span>",
+        "</footer>",
+    ]
     tail = [f"<script>{_SCRIPT}</script>", "</body>", "</html>"]
-    return "\n".join(head + masthead + nav + body + tail) + "\n"
+    return "\n".join(head + masthead + nav + body + footer + tail) + "\n"
+
+
+# --- the frame -------------------------------------------------------------------
+
+
+def _counts(case: Case, detailed: set[str]) -> dict[str, str]:
+    """The number the nav prints beside a section, where a number helps."""
+    said = {
+        "findings": f"{len(case.findings)}" if case.findings else "",
+        "files": f"{len(case.files)}" if case.files else "",
+        "detail": f"{len(detailed)}" if detailed else "",
+        "conflicts": f"{len(case.conflicts)}" if case.conflicts else "",
+    }
+    if case.pivots is not None and case.pivots.total:
+        said["pivots"] = f"{case.pivots.total}"
+    return said
+
+
+def _note(key: str, case: Case, detailed: set[str]) -> str:
+    """What the section heading says beside its name: the count, and what it counts."""
+    if key == "findings" and case.findings:
+        return f"{len(case.findings)}"
+    if key == "files" and case.files:
+        return f'{len(case.files):,} <b>· showing <span id="shown">{len(case.files):,}</span></b>'
+    if key == "detail" and detailed:
+        return f"{len(detailed):,} <b>· files that need it</b>"
+    if key == "conflicts" and case.conflicts:
+        return f"{len(case.conflicts)}"
+    if key == "relationships" and case.relationships:
+        return f"{case.relationships:,}"
+    if key == "pivots" and case.pivots is not None:
+        return f"{case.pivots.total:,} <b>· {case.pivots.across:,} in more than one file</b>"
+    if key == "coverage":
+        stores = [source for source in case.coverage if source.store]
+        if stores:
+            found = sum(1 for source in stores if source.state == "found")
+            return f"{found} <b>of {len(stores)} trace stores</b>"
+    return ""
+
+
+def _section(key: str, title: str, body: str, note: str) -> str:
+    """A section, with the control for what it holds only where there is something to open."""
+    counted = f'<span class="n">{note}</span>' if note else ""
+    tools = (
+        '<button class="btn" type="button" data-expand>⊞ Expand all</button>'
+        if "<details" in body
+        else ""
+    )
+    return (
+        f'<section id="{key}"><div class="h"><h2>{_e(title)}</h2>{counted}{tools}</div>'
+        f"{body}</section>"
+    )
 
 
 # --- pieces ----------------------------------------------------------------------
@@ -387,9 +787,9 @@ def _link(ref: str) -> str:
     return f'<a href="#{_anchor(ref)}">{_e(ref)}</a>'
 
 
-def _props(
+def _fields(
     pairs: list[tuple[str, str]],
-    css: str = "props",
+    css: str = "fields",
     copy: bool | frozenset[str] = False,
     plain: frozenset[str] = frozenset(),
 ) -> str:
@@ -405,238 +805,262 @@ def _props(
 
 def _value(value: str) -> str:
     """A value and a button that copies it: the text shown, never a second copy of it."""
-    return f'<span class="v">{_e(value)}</span><button class="copy" type="button">copy</button>'
+    return (
+        f'<span class="v">{_e(value)}</span>'
+        '<button class="copy" type="button" title="copy" aria-label="copy">⧉</button>'
+    )
 
 
 def _name(entry: CaseFile) -> str:
     return Path(entry.record.path).name
 
 
-def _file_item(case: Case, entry: CaseFile) -> str:
-    folder = _folder(case, entry.record)
-    path = f' <span class="path">{_e(folder)}</span>' if folder else ""
-    return f"<li>{_link(entry.ref)} {_e(_name(entry))}{path}</li>"
+def _file_link(entry: CaseFile) -> str:
+    """The number and the name as one link: four characters make a poor target."""
+    return f'<a href="#{_anchor(entry.ref)}">{_e(entry.ref)} {_e(_name(entry))}</a>'
+
+
+def _match(found: EvidenceRecord) -> str:
+    """The basis a record was tied to the file by, and whether it is an exact one."""
+    strong = " strong" if found.matched_by in _STRONG else ""
+    return f'<span class="pill match{strong}">{_e(found.matched_by)}</span>'
+
+
+def _card(
+    value: str,
+    label: str,
+    said: str = "",
+    section: str | None = None,
+    chosen: str = "",
+    css: str = "",
+) -> str:
+    """One number in the summary, and what it opens when it opens something."""
+    inner = f'<span class="v">{value}</span><span class="k">{_e(label)}</span>'
+    if said:
+        inner += f'<span class="s">{_e(said)}</span>'
+    classes = f"card {css}".strip()
+    if section is None:
+        return f'<div class="{classes}">{inner}</div>'
+    picked = f' data-filter="{chosen}"' if chosen else ""
+    return f'<a class="{classes}" href="#{section}"{picked}>{inner}</a>'
+
+
+def _sources(entries: list[CaseFile], name: str) -> str:
+    """What is behind a category card: the sources that account for most of it."""
+    counted: Counter[str] = Counter()
+    for entry in entries:
+        counted.update(entry.found[name])
+    return " · ".join(label for label, _times in counted.most_common(3))
 
 
 def _summary(case: Case) -> str:
+    if not case.files:
+        return ""
     records = [entry.record for entry in case.files]
     contents = inventory(records)
-    holding = {name: sum(1 for entry in case.files if entry.found[name]) for name in CATEGORIES}
-    known = sum(1 for record in records if record.evidence)
+    holding = {name: [entry for entry in case.files if entry.found[name]] for name in CATEGORIES}
+    review = [entry for entry in case.files if entry.state == REVIEW]
+    quiet = [entry for entry in case.files if entry.state == NOTHING]
     fields = sum(len(conflict.differences) for conflict in case.conflicts)
     files = "files" if case.files else None
 
-    #: Label, value, colour, the section it opens and the filter it sets there.
-    cards: list[tuple[str, str, str, str | None, str | None]] = [
-        ("Files", f"{len(records):,}", "", files, ""),
-        ("File types", f"{len(contents.types):,}", "", files, ""),
-        ("Total size", _size(contents.size), "", files, ""),
-        ("Files with evidence", f"{known:,} / {len(records):,}", "", files, "evidence"),
-        ("Origin", f"{holding[ORIGIN]:,}", "origin", files, "origin"),
-        ("Metadata", f"{holding[METADATA]:,}", "metadata", files, "metadata"),
-        ("Activity", f"{holding[ACTIVITY]:,}", "activity", files, "activity"),
-        (
-            "Conflicts",
-            f"{len(case.conflicts)} files / {fields} fields" if case.conflicts else "0",
-            "review" if case.conflicts else "",
-            "conflicts" if case.conflicts else None,
-            None,
-        ),
-        (
-            "Relationships",
-            f"{case.relationships:,}",
-            "",
-            "relationships" if case.relationships else None,
-            None,
-        ),
+    cards = [
+        _card(
+            f"{len(records):,}",
+            "files scanned",
+            f"{len(contents.types):,} types · {_size(contents.size)}",
+            files,
+            "all",
+        )
     ]
-    if case.pivots is not None:
-        section = "pivots" if case.pivots.total else None
-        cards += [
-            ("Investigative pivots", f"{case.pivots.total:,}", "", section, None),
-            ("Shared pivots", f"{case.pivots.across:,}", "", section, None),
-            ("Cross-corpus pivots", f"{case.pivots.cross_corpus:,}", "", section, None),
-        ]
+    for name in CATEGORIES:
+        entries = holding[name]
+        if not entries:
+            continue
+        cards.append(
+            _card(f"{len(entries):,}", f"with {name}", _sources(entries, name), files, name, name)
+        )
+    if review:
+        said = f"{len(case.conflicts)} conflicts · {fields} fields" if case.conflicts else ""
+        cards.append(_card(f"{len(review):,}", "need a second look", said, files, "flag", "alert"))
+    if quiet:
+        cards.append(
+            _card(
+                f"{len(quiet):,}",
+                "no evidence found",
+                "see coverage before reading as absence",
+                files,
+                "none",
+            )
+        )
+    if case.relationships:
+        cards.append(
+            _card(
+                f"{case.relationships:,}",
+                "relationships",
+                "identifiers files carry about each other",
+                "relationships",
+            )
+        )
+    if case.pivots is not None and case.pivots.total:
+        said = f"{case.pivots.across:,} in more than one file"
+        if case.pivots.cross_corpus:
+            said += f" · {case.pivots.cross_corpus:,} in both corpora"
+        cards.append(_card(f"{case.pivots.total:,}", "pivots", said, "pivots", "", "accent"))
     stores = [source for source in case.coverage if source.store]
     if stores:
         found = sum(1 for source in stores if source.state == "found")
-        cards.append(("Trace stores found", f"{found} / {len(stores)}", "", "coverage", None))
-
-    shown = []
-    for label, value, css, section, chosen in cards:
-        colour = f" {css}" if css in CATEGORIES else ""
-        inner = f'<div class="n{colour}">{_e(value)}</div><div class="l">{_e(label)}</div>'
-        classes = "card review" if css == "review" else "card"
-        if section is None:
-            shown.append(f'<div class="{classes}">{inner}</div>')
-            continue
-        chosen_filter = f' data-filter="{chosen}"' if chosen is not None else ""
-        shown.append(f'<a class="{classes}" href="#{section}"{chosen_filter}>{inner}</a>')
-    return f'<div class="cards">{"".join(shown)}</div>'
+        said = f"history begins {case.begins}" if case.begins else ""
+        cards.append(
+            _card(
+                f'{found}<span class="of">/{len(stores)}</span>',
+                "trace stores found",
+                said,
+                "coverage",
+            )
+        )
+    legend = (
+        '<div class="legend">'
+        '<span class="cat origin">origin · how it got here</span>'
+        '<span class="cat metadata">metadata · what it says about itself</span>'
+        '<span class="cat activity">activity · what happened to it here</span>'
+        '<span><span class="flag">!</span> wants a second look</span>'
+        "</div>"
+    )
+    return f'<div class="cards">{"".join(cards)}</div>{legend}'
 
 
 def _findings(case: Case, files: dict[str, CaseFile]) -> str:
-    written = []
-    for finding in case.findings:
-        written.append(_finding(case, finding, files))
-    return "".join(written)
+    return "".join(_finding(case, finding, files) for finding in case.findings)
 
 
 def _finding(case: Case, finding: Finding, files: dict[str, CaseFile]) -> str:
-    css = "review" if finding.notable else ""
+    warn = " warn" if finding.notable else ""
     facts = [(label, value) for label, value in finding.facts]
     if finding.kind == "generated":
         facts = [fact for fact in facts if fact[0] != "files"]
     parts = [
-        f'<article class="obj {css}" id="{finding.ref}" data-search>',
-        f'<h4><span class="ref">{finding.ref}</span>{_e(finding.title)}</h4>',
-        _props([(_capital(label), value) for label, value in facts]),
+        f'<div class="find" id="{finding.ref}">',
+        f'<a class="fid" href="#{finding.ref}">{finding.ref}</a><div>',
+        f'<div class="t{warn}">{_e(finding.title)}</div>',
     ]
+    if facts:
+        parts.append(_fields([(_capital(label), value) for label, value in facts]))
     if finding.kind == "generated":
         for item in finding.items:
             entry = files[item.path]
+            pairs = [(_capital(label), value) for label, value in item.facts]
             parts.append(
-                f'<dl class="props"><dt>File</dt><dd>{_link(entry.ref)} {_e(_name(entry))}</dd>'
-                + "".join(
-                    f"<dt>{_e(_capital(label))}</dt><dd>{_e(value)}</dd>"
-                    for label, value in item.facts
-                )
-                + "</dl>"
+                f'<div class="files">{_file_link(entry)}</div>{_fields(pairs)}'
+                if pairs
+                else f'<div class="files">{_file_link(entry)}</div>'
             )
     elif finding.items:
-        listed = "".join(_file_item(case, files[item.path]) for item in finding.items)
+        listed = " ".join(_file_link(files[item.path]) for item in finding.items)
         if finding.kind in _LISTED:
-            parts.append(f'<ul class="files">{listed}</ul>')
+            parts.append(f'<div class="files">{listed}</div>')
         else:
-            count = len(finding.items)
             parts.append(
-                f'<details class="list"><summary>{count} files</summary>'
-                f'<ul class="files">{listed}</ul></details>'
+                f"<details><summary>{len(finding.items)} files</summary>"
+                f'<div class="files">{listed}</div></details>'
             )
     if finding.kind == "no-trace":
         said = "This does not mean the files were never downloaded or transferred."
         if case.begins:
             said += f" Available trace history begins on {case.begins}."
-        parts.append(f'<p class="note">{_e(said)}</p>')
+        parts.append(f'<div class="note">{_e(said)}</div>')
     if finding.see:
         target = "conflicts" if finding.see == "CONFLICTS" else "coverage"
-        parts.append(f'<p class="note">See <a href="#{target}">{_e(finding.see.lower())}</a>.</p>')
-    parts.append("</article>")
+        parts.append(
+            f'<div class="note">See <a href="#{target}">{_e(finding.see.lower())}</a>.</div>'
+        )
+    parts.append("</div></div>")
     return "".join(parts)
 
 
-def _coverage(case: Case, unsearched: Unsearched | None) -> str:
-    missed = [(path, "could not be read") for path in (unsearched.unreadable if unsearched else [])]
-    missed += [(path, "skipped by name") for path in (unsearched.by_name if unsearched else [])]
-    if not case.coverage and not missed:
-        return ""
-    rows = []
-    for source in case.coverage:
-        state = source.state if source.state in ("found", "readable", "partial") else "missing"
-        rows.append(
-            f'<tr><td><span class="state {state}">{_e(source.state)}</span></td>'
-            f"<td>{_e(source.name)}</td><td>{_e(source.detail)}</td>"
-            f'<td class="value">{_e(source.since or "")}</td></tr>'
-        )
-    for path, why in missed:
-        rows.append(
-            f'<tr><td><span class="state missing">{_e(why)}</span></td>'
-            f'<td class="value">{_e(_relative(path, case.root))}</td><td></td><td></td></tr>'
-        )
-    table = (
-        '<div class="wide"><table class="sortable"><thead><tr>'
-        "<th>Status</th><th>Source</th><th>Detail</th>"
-        f"<th>Since</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
-    )
-    notes = []
-    if case.begins:
-        notes.append(f"Observable trace history begins on {case.begins}.")
-    if case.coverage:
-        notes.append(
-            "Absence of origin evidence is not proof that a file was never downloaded, "
-            "copied or otherwise transferred to this machine."
-        )
-    return table + "".join(f'<p class="note">{_e(said)}</p>' for said in notes)
-
-
-def _conflicts(case: Case, files: dict[str, CaseFile]) -> str:
-    return "".join(_conflict(conflict, files) for conflict in case.conflicts)
-
-
-def _conflict(conflict: Conflict, files: dict[str, CaseFile]) -> str:
-    entry = files[conflict.path]
-    rows = []
-    for difference in conflict.differences:
-        span = len(difference.values) + (1 if difference.delta else 0)
-        for number, (source, value) in enumerate(difference.values):
-            field = (
-                f'<td class="field" rowspan="{span}">{_e(difference.field)}</td>'
-                if number == 0
-                else ""
-            )
-            said = _e(source or "value")
-            rows.append(
-                f'<tr>{field}<td class="source">{said}</td>'
-                f'<td class="value">{_value(value)}</td></tr>'
-            )
-        if difference.delta:
-            first_source = difference.values[0][0] or "the first"
-            second_source = difference.values[-1][0] or "the second"
-            said = f"{second_source} is {difference.delta} than {first_source}"
-            rows.append(
-                f'<tr><td class="source">Difference</td>'
-                f'<td class="value delta">{_e(said)}</td></tr>'
-            )
-    sources = [
-        ("Sources", " ↔ ".join(conflict.sources)),
-        ("Fields", str(len(conflict.differences))),
-    ]
-    return (
-        f'<article class="obj review" id="{conflict.ref}" data-search>'
-        f'<h4><span class="ref">{conflict.ref}</span>{_link(entry.ref)} {_e(_name(entry))}</h4>'
-        + _props(sources)
-        + '<div class="wide"><table><thead><tr><th>Field</th><th>Source</th><th>Value</th></tr>'
-        f"</thead><tbody>{''.join(rows)}</tbody></table></div></article>"
-    )
-
-
-def _references(entry: CaseFile, kinds: dict[str, str]) -> str:
-    said = [_link(ref) for ref in entry.findings if kinds[ref] != "no-trace"]
-    said += [_link(ref) for ref in entry.conflicts]
-    pivots = f' <span class="path">{_e(" · ".join(entry.pivots))}</span>' if entry.pivots else ""
-    return " ".join(said) + pivots
-
-
-def _files(case: Case) -> str:
+def _files(case: Case, detailed: set[str], panes: set[str]) -> str:
     if not case.files:
         return ""
     kinds = {finding.ref: finding.kind for finding in case.findings}
     rows = []
-    for number, entry in enumerate(case.files, 1):
-        folder = _folder(case, entry.record)
-        path = f'<div class="path">{_value(folder)}</div>' if folder else ""
-        mark = "!" if entry.state == REVIEW else "·" if entry.state == NOTHING else ""
-        held = " ".join(name for name in CATEGORIES if entry.found[name])
-        found = "".join(
-            f'<td class="{name}">{_e(" · ".join(entry.found[name]) or "—")}</td>'
-            for name in CATEGORIES
+    for entry in case.files:
+        record = entry.record
+        marks = ["flag"] if entry.state == REVIEW else []
+        marks += [name for name in CATEGORIES if entry.found[name]]
+        if entry.state == NOTHING:
+            marks.append("none")
+        number = _e(entry.ref)
+        opens = (
+            f'<a href="#detail-{entry.ref[1:]}">{number}</a>' if record.path in detailed else number
         )
-        size = entry.record.size
+        flag = '<span class="flag">!</span>' if entry.state == REVIEW else ""
+        dots = '<span class="dots" title="origin · metadata · activity">' + "".join(
+            f'<i class="{name[0]}"></i>' if entry.found[name] else "<i></i>" for name in CATEGORIES
+        )
+        origin = record.origin
+        arrived = (
+            f'<span class="cat origin">{_e(named(origin))}</span> {_match(origin)}'
+            if origin is not None
+            else '<span class="dim">·</span>'
+        )
         rows.append(
-            f'<tr id="{_anchor(entry.ref)}" class="{entry.state}" data-search '
-            f'data-state="{entry.state}" data-found="{held}">'
-            f'<td class="ref" data-value="{number}">{_e(mark)} {_e(entry.ref)}</td>'
-            f'<td class="name">{_e(_name(entry))}{path}</td>'
-            f"<td>{_e(_format(entry.record.path))}</td>"
-            f'<td class="num" data-value="{size}">{_e(_size(size))}</td>{found}'
-            f"<td>{_references(entry, kinds)}</td></tr>"
+            f'<tr id="{_anchor(entry.ref)}" data-f="{" ".join(marks)}">'
+            f'<td class="id">{opens}</td><td>{flag}</td>'
+            f'<td class="path">{_value(_relative(record.path, case.root))}</td>'
+            f"<td>{_e(_format(record.path))}</td>"
+            f'<td class="num" data-value="{record.size}">{_e(_size(record.size))}</td>'
+            f'<td class="dim">{_e(_stamp(shown(record.mtime)))}</td>'
+            f"<td>{dots}</span></td><td>{arrived}</td>"
+            f"<td>{_found_in(entry, kinds, panes)}</td></tr>"
         )
     return (
-        '<div class="wide"><table class="index sortable"><thead><tr>'
-        "<th>#</th><th>File</th><th>Type</th><th>Size</th>"
-        "<th>Origin</th><th>Metadata</th><th>Activity</th><th>References</th></tr></thead>"
+        f'<div class="chips">{_chips(case)}</div>'
+        '<div class="wrap"><table class="tbl index" id="index"><thead><tr>'
+        '<th data-sort="text">#</th><th></th><th data-sort="text">path</th>'
+        '<th data-sort="text">type</th><th data-sort="num" class="num">size</th>'
+        '<th data-sort="text">modified</th><th>evidence</th>'
+        '<th data-sort="text">origin</th>'
+        '<th data-sort="text">findings &amp; pivots</th></tr></thead>'
         f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
+
+
+def _chips(case: Case) -> str:
+    """The filters over the file index, each with what it would leave."""
+    counted = [("all", "all", len(case.files))]
+    review = sum(1 for entry in case.files if entry.state == REVIEW)
+    if review:
+        counted.append(("flag", "second look", review))
+    for name in CATEGORIES:
+        held = sum(1 for entry in case.files if entry.found[name])
+        if held:
+            counted.append((name, name, held))
+    quiet = sum(1 for entry in case.files if entry.state == NOTHING)
+    if quiet:
+        counted.append(("none", "no evidence", quiet))
+    return "".join(
+        f'<button type="button" class="chip{" on" if key == "all" else ""}" '
+        f'data-filter="{key}">{_e(label)} <b>{times:,}</b></button>'
+        for key, label, times in counted
+    )
+
+
+def _found_in(entry: CaseFile, kinds: dict[str, str], panes: set[str]) -> str:
+    """The findings and conflicts a file is named in, then the pivot types found in it.
+
+    Each of them leads somewhere: a finding to its paragraph, a pivot type to
+    the tab that lists every pivot of that type and the files it was found in.
+    """
+    said = [_link(ref) for ref in entry.findings if kinds[ref] != "no-trace"]
+    said += [_link(ref) for ref in entry.conflicts]
+    found = [
+        f'<a href="#pivots-type-{kind}">{_e(_type_name(kind))}</a>'
+        if kind in panes
+        else _e(_type_name(kind))
+        for kind in entry.pivots
+    ]
+    pivots = f'<span class="dim">{" · ".join(found)}</span>' if found else ""
+    return " ".join(said + ([pivots] if pivots else []))
 
 
 def _relationships(case: Case, files: dict[str, CaseFile]) -> str:
@@ -644,16 +1068,16 @@ def _relationships(case: Case, files: dict[str, CaseFile]) -> str:
     for entry in case.files:
         for link in entry.record.links:
             others = [files[path] for path in link.others if path in files]
-            related = " ".join(f"{_link(other.ref)} {_e(_name(other))}" for other in others)
+            related = " ".join(_file_link(other) for other in others)
             rows.append(
-                f"<tr><td>{_link(entry.ref)} {_e(_name(entry))}</td><td>{_e(link.kind)}</td>"
+                f'<tr><td class="path">{_file_link(entry)}</td><td>{_e(link.kind)}</td>'
                 f"<td>{related or _e(f'{link.count} files')}</td></tr>"
             )
     if not rows:
         return ""
     return (
-        '<div class="wide"><table class="sortable"><thead><tr><th>File</th>'
-        "<th>Relationship</th><th>Related</th>"
+        '<div class="wrap"><table class="tbl"><thead><tr><th data-sort="text">file</th>'
+        '<th data-sort="text">relationship</th><th>related</th>'
         f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
     )
 
@@ -686,20 +1110,17 @@ def _pivots(case: Case, files: dict[str, CaseFile], identifiers: list[Identifier
 
     tabs = "".join(
         f'<button type="button" role="tab" data-panel="{key}" '
+        f'class="{"on" if number == 0 else ""}" '
         f'aria-selected="{"true" if number == 0 else "false"}">'
-        f'{_e(label)} <span class="count">{count:,}</span></button>'
+        f"{_e(label)} <b>{count:,}</b></button>"
         for number, (key, label, count, _table) in enumerate(panels)
     )
-    shown = "".join(
-        f'<div class="panel{"" if number == 0 else " inactive"}" id="{key}" role="tabpanel">'
-        f"<h3>{_e(label)} · {count:,}</h3>{table}</div>"
-        for number, (key, label, count, table) in enumerate(panels)
+    shown_panels = "".join(
+        f'<div class="pane{" on" if number == 0 else ""}" id="{key}" role="tabpanel" '
+        f'data-label="{_e(label)}">{table}</div>'
+        for number, (key, label, _count, table) in enumerate(panels)
     )
-    lead = (
-        '<p class="note">Every pivot with the files it was found in and where, one tab a type. '
-        "The search box searches them all.</p>"
-    )
-    return f'{lead}<div class="tabs" role="tablist">{tabs}</div>{shown}'
+    return f'<div class="tabs" role="tablist">{tabs}</div>{shown_panels}'
 
 
 def _pivot_table(
@@ -712,31 +1133,70 @@ def _pivot_table(
             entry.holders.items(),
             key=lambda pair: (-pair[1], files[pair[0]].ref if pair[0] in files else pair[0]),
         )
-        found_in = " ".join(_holder(files, path, times) for path, times in holders)
-        sample = entry.where[:5]
-        places = "<br>".join(_e(place) for place in sample)
-        if entry.count > len(sample):
-            places += f"<div>{len(sample)} of {entry.count:,} occurrences shown</div>"
-        opening = f'<tr id="{ref}" data-search>' if ref else "<tr data-search>"
-        leading = f'<td class="ref">{_e(ref or "")}</td><td>{_e(_type_name(entry.type))}</td>'
+        named_here = [_holder(files, path, times) for path, times in holders[:_HOLDERS]]
+        found_in = " ".join(named_here)
+        left = len(holders) - len(named_here)
+        if left:
+            rest = " ".join(_holder(files, path, times) for path, times in holders[_HOLDERS:])
+            found_in += f"<details><summary>+{left:,} more</summary>{rest}</details>"
+        places = _places(entry.where[:_SAMPLE])
+        opening = f'<tr class="pivot" id="{ref}">' if ref else '<tr class="pivot">'
+        leading = (
+            f'<td class="id">{_e(ref or "")}</td><td>{_e(_type_name(entry.type))}</td>'
+            if across
+            else ""
+        )
         rows.append(
-            opening + (leading if across else "") + f'<td class="value">{_value(entry.value)}</td>'
+            opening + leading + f'<td class="val">{_value(entry.value)}</td>'
             f'<td class="num" data-value="{entry.files}">{entry.files:,}</td>'
             f'<td class="num" data-value="{entry.count}">{entry.count:,}</td>'
-            f'<td>{found_in}</td><td class="path">{places}</td></tr>'
+            f'<td class="where">{places}</td><td class="found">{found_in}</td></tr>'
         )
-    heads = "<th>#</th><th>Type</th>" if across else ""
+    heads = '<th data-sort="text">#</th><th data-sort="text">type</th>' if across else ""
     return (
-        f'<div class="wide"><table class="sortable pivots"><thead><tr>{heads}'
-        "<th>Value</th><th>Files</th><th>Occurrences</th><th>Found in</th>"
-        f"<th>Where (sample)</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+        f'<div class="wrap"><table class="tbl pivots"><thead><tr>{heads}'
+        '<th data-sort="text">value</th><th data-sort="num" class="num">files</th>'
+        '<th data-sort="num" class="num">times</th><th>where (sample)</th>'
+        f"<th>found in</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
     )
+
+
+def _places(sample: list[str]) -> str:
+    """Where a value was found, one line a file and source.
+
+    A value sitting five times in one file says that file's name once and then
+    the five spots inside it, rather than five lines that differ by a number.
+    """
+    grouped: dict[tuple[str, str], list[str]] = {}
+    for place in sample:
+        held, _, rest = place.partition(PLACE)
+        source, _, spot = rest.partition(PLACE)
+        grouped.setdefault((held, source), []).append(spot)
+    lines = []
+    for (held, source), spots in grouped.items():
+        said = PLACE.join(part for part in (held, source) if part)
+        kept = [spot for spot in spots if spot]
+        if kept:
+            said += PLACE + _spots(kept)
+        lines.append(_e(said))
+    return "<br>".join(lines)
+
+
+def _spots(spots: list[str]) -> str:
+    """`lines 2, 3, 4` where the spots are numbered the same way, else as they are."""
+    if len(spots) > 1:
+        heads = {spot.rsplit(" ", 1)[0] for spot in spots}
+        tails = [spot.rsplit(" ", 1)[-1] for spot in spots]
+        head = heads.pop() if len(heads) == 1 else None
+        if head and head.isalpha() and head.islower() and all(t.isdigit() for t in tails):
+            return f"{head}s {', '.join(tails)}"
+    return ", ".join(spots)
 
 
 def _holder(files: dict[str, CaseFile], path: str, times: int) -> str:
     """A file a pivot was found in, as a link to it, and how often when more than once."""
     held = files.get(path)
-    name = f"{_link(held.ref)} {_e(Path(path).name)}" if held else _e(Path(path).name)
+    name = _file_link(held) if held else _e(Path(path).name)
     often = f" ×{times:,}" if times > 1 else ""
     return f'<span class="holder">{name}{often}</span>'
 
@@ -745,75 +1205,170 @@ def _dense(pivots: Pivots, files: dict[str, CaseFile]) -> str:
     rows = []
     for dense in pivots.dense:
         held = files.get(dense.path)
-        name = f"{_link(held.ref)} {_e(Path(dense.path).name)}" if held else _e(dense.path)
+        name = _file_link(held) if held else _e(dense.path)
         kinds = " · ".join(f"{_type_name(kind)} {count:,}" for kind, count in dense.by_type)
         rows.append(
-            f"<tr data-search><td>{name}</td>"
+            f'<tr class="pivot"><td class="path">{name}</td>'
             f'<td class="num" data-value="{dense.places}">{dense.places:,}</td>'
             f"<td>{_e(kinds)}</td></tr>"
         )
     return (
-        '<div class="wide"><table class="sortable"><thead><tr><th>File</th>'
-        "<th>Pivot locations</th><th>By type</th></tr></thead>"
+        '<div class="wrap"><table class="tbl"><thead><tr><th data-sort="text">file</th>'
+        '<th data-sort="num" class="num">places</th><th>by type</th></tr></thead>'
         f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
 
 
-def _details(case: Case, files: dict[str, CaseFile], *, verbose: bool) -> str:
+def _wants_detail(entry: CaseFile, verbose: bool) -> bool:
+    """A file gets a block of its own when there is something to read in it."""
+    wanted = entry.state == REVIEW or entry.found[ORIGIN] or entry.found[ACTIVITY]
+    return bool(wanted) or (verbose and entry.state != NOTHING)
+
+
+def _details(case: Case, files: dict[str, CaseFile], detailed: set[str], *, verbose: bool) -> str:
     findings = {finding.ref: finding for finding in case.findings}
     conflicts = {conflict.ref: conflict for conflict in case.conflicts}
     parts = []
     for entry in case.files:
-        wanted = entry.state == REVIEW or entry.found[ORIGIN] or entry.found[ACTIVITY]
-        if not (wanted or (verbose and entry.state != NOTHING)):
+        if entry.record.path not in detailed:
             continue
-        record = entry.record
-        facts = [("Type", _format(record.path)), ("Size", _size(record.size))]
-        if folder := _folder(case, record):
-            facts.append(("Path", folder))
-        body = [_props(facts, copy=frozenset({"Path"}))]
-        for name in CATEGORIES:
-            held = [found for found in record.evidence if category(found) == name]
-            body.append(f'<h5 class="{name}">{_e(name)}</h5>')
-            if not held:
-                body.append(f'<p class="note">{_e(_ABSENT[name])}</p>')
-                continue
-            for found in held:
-                body.append(
-                    f'<div class="record"><div class="name">{_e(named(found))}</div>'
-                    f"{_props(_facts(found, name, verbose=verbose), copy=True, plain=_PLAIN)}</div>"
-                )
-        notes = []
-        for ref in entry.conflicts:
-            conflict = conflicts[ref]
-            fields = " · ".join(difference.field for difference in conflict.differences)
-            notes.append(
-                f"{_e(' and '.join(conflict.sources))} disagree on {_e(fields)} ({_link(ref)})"
-            )
-        for ref in entry.findings:
-            finding = findings[ref]
-            if finding.kind in ("conflicts", "no-trace"):
-                continue
-            others = [files[item.path] for item in finding.items if item.path != record.path]
-            said = f"{_e(finding.title)} ({_link(ref)})"
-            if others and len(others) <= 6:
-                said += ": " + " · ".join(f"{_link(o.ref)} {_e(_name(o))}" for o in others)
-            elif others:
-                said += f": with {len(others)} other files"
-            notes.append(said)
-        if notes:
-            body.append("<h5>Analytical notes</h5>")
+        parts.append(_detail(case, entry, files, findings, conflicts, verbose=verbose))
+    return "".join(parts)
+
+
+def _detail(
+    case: Case,
+    entry: CaseFile,
+    files: dict[str, CaseFile],
+    findings: dict[str, Finding],
+    conflicts: dict[str, Conflict],
+    *,
+    verbose: bool,
+) -> str:
+    record = entry.record
+    body = []
+    for name in CATEGORIES:
+        held = [found for found in record.evidence if category(found) == name]
+        if not held:
             body.append(
-                '<ul class="files">' + "".join(f"<li>{note}</li>" for note in notes) + "</ul>"
+                f'<div class="rec silent"><span class="cat none">{_e(name)}</span>'
+                f'<div><div class="note">{_e(_ABSENT[name])}</div></div></div>'
             )
-        css = "review" if entry.state == REVIEW else ""
-        held_in = " ".join(name for name in CATEGORIES if entry.found[name])
-        parts.append(
-            f'<details class="{css}" id="detail-{entry.ref[1:]}" open data-search '
-            f'data-state="{entry.state}" data-found="{held_in}">'
-            f"<summary>{_e(entry.ref)} {_e(_name(entry))}</summary>"
-            f'<div class="body">{"".join(body)}</div></details>'
+            continue
+        for found in held:
+            facts = [
+                (label, value)
+                for label, value in _facts(found, name, verbose=verbose)
+                if label != "Match"
+            ]
+            body.append(
+                f'<div class="rec"><span class="cat {name}">{_e(name)}</span>'
+                f'<div><div class="src">{_e(named(found))} {_match(found)}</div>'
+                + (f'<div class="note">{_e(found.note)}</div>' if found.note else "")
+                + "</div>"
+                + (_fields(facts, copy=True) if facts else "")
+                + "</div>"
+            )
+    notes = []
+    for ref in entry.conflicts:
+        conflict = conflicts[ref]
+        fields = " · ".join(difference.field for difference in conflict.differences)
+        notes.append(
+            f"{_e(' and '.join(conflict.sources))} disagree on {_e(fields)} ({_link(ref)})"
         )
+    for ref in entry.findings:
+        finding = findings[ref]
+        if finding.kind in ("conflicts", "no-trace"):
+            continue
+        others = [files[item.path] for item in finding.items if item.path != record.path]
+        said = f"{_e(finding.title)} ({_link(ref)})"
+        if others and len(others) <= 6:
+            said += ": " + " · ".join(_file_link(other) for other in others)
+        elif others:
+            said += f": with {len(others)} other files"
+        notes.append(said)
+    if notes:
+        body.append(
+            '<div class="extra"><span class="k">notes</span><ul>'
+            + "".join(f"<li>{note}</li>" for note in notes)
+            + "</ul></div>"
+        )
+    flag = ' <span class="flag">!</span>' if entry.state == REVIEW else ""
+    refs = " ".join(_link(ref) for ref in entry.findings + entry.conflicts)
+    meta = f"{_e(_size(record.size))} · {_e(_format(record.path))}"
+    review = " review" if entry.state == REVIEW else ""
+    return (
+        f'<details class="file{review}" id="detail-{entry.ref[1:]}"'
+        f"{' open' if entry.state == REVIEW else ''}>"
+        f'<summary><span class="id">{_e(entry.ref)}</span>'
+        f'<span class="name">{_e(_relative(record.path, case.root))}{flag}</span>'
+        f'<span class="meta">{meta} {refs}<span class="chev">›</span></span></summary>'
+        f"{''.join(body)}</details>"
+    )
+
+
+def _coverage(case: Case, unsearched: Unsearched | None) -> str:
+    missed = [(path, "could not be read") for path in (unsearched.unreadable if unsearched else [])]
+    missed += [(path, "skipped by name") for path in (unsearched.by_name if unsearched else [])]
+    if not case.coverage and not missed:
+        return ""
+    states = {"found": "origin", "readable": "origin", "partial": "activity"}
+    rows = []
+    for source in case.coverage:
+        state = states.get(source.state, "none")
+        rows.append(
+            f'<tr><td class="path">{_e(source.name)}</td>'
+            f'<td><span class="cat {state}">{_e(source.state)}</span></td>'
+            f"<td>{_e(source.detail)}</td>"
+            f'<td class="dim">{_e(source.since or "·")}</td></tr>'
+        )
+    for path, why in missed:
+        rows.append(
+            f'<tr><td class="path">{_e(_relative(path, case.root))}</td>'
+            f'<td><span class="cat none">{_e(why)}</span></td>'
+            f'<td class="dim">·</td><td class="dim">·</td></tr>'
+        )
+    table = (
+        '<div class="wrap"><table class="tbl"><thead><tr><th data-sort="text">source</th>'
+        '<th data-sort="text">state</th><th>coverage</th><th data-sort="text">horizon</th>'
+        f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
+    if case.begins:
+        said = f"Observable trace history begins on {case.begins}."
+        return f'{table}<p class="note">{_e(said)}</p>'
+    return table
+
+
+def _conflicts(case: Case, files: dict[str, CaseFile], detailed: set[str]) -> str:
+    return "".join(_conflict(conflict, files, detailed) for conflict in case.conflicts)
+
+
+def _conflict(conflict: Conflict, files: dict[str, CaseFile], detailed: set[str]) -> str:
+    entry = files[conflict.path]
+    detail = f' <a href="#detail-{entry.ref[1:]}">detail</a>' if conflict.path in detailed else ""
+    fields = " · ".join(difference.field for difference in conflict.differences)
+    said = f"{' and '.join(conflict.sources) or 'Two records'} disagree on {fields}"
+    parts = [
+        f'<div class="conf" id="{conflict.ref}">',
+        f'<a class="cid" href="#{conflict.ref}">{conflict.ref}</a><div>',
+        f'<div class="t">{_file_link(entry)} · {_e(said)}{detail}</div>',
+    ]
+    for difference in conflict.differences:
+        pair = "".join(
+            f'<div><div class="src">{_e(source or "value")}</div>'
+            f'<div class="v">{_value(value)}</div></div>'
+            for source, value in difference.values
+        )
+        parts.append(
+            f'<div class="field">{_e(difference.field)}</div><div class="pair">{pair}</div>'
+        )
+        if difference.delta:
+            first = difference.values[0][0] or "the first"
+            second = difference.values[-1][0] or "the second"
+            parts.append(
+                f'<div class="delta">{_e(f"{second} is {difference.delta} than {first}")}</div>'
+            )
+    parts.append("</div></div>")
     return "".join(parts)
 
 
@@ -821,11 +1376,11 @@ def _notes(case: Case) -> str:
     records = [entry.record for entry in case.files]
     parts = [
         "<h3>Evidence categories</h3>",
-        _props(
+        _fields(
             [
-                ("Origin", "How a file reached the examined environment."),
-                ("Metadata", "What the file records about itself."),
-                ("Activity", "What happened to the file locally."),
+                ("origin", "How a file reached the examined environment."),
+                ("metadata", "What the file records about itself."),
+                ("activity", "What happened to the file locally."),
             ]
         ),
     ]
@@ -833,13 +1388,6 @@ def _notes(case: Case) -> str:
     if used:
         parts.append("<h3>Match basis</h3>")
         parts.append(
-            _props([(basis, meaning) for basis, meaning in MATCHES.items() if basis in used])
+            _fields([(basis, meaning) for basis, meaning in MATCHES.items() if basis in used])
         )
-    parts.append("<h3>Interpretation</h3>")
-    parts.append(
-        '<ul class="files">'
-        "<li>No origin evidence is not proof that a file was never downloaded or transferred.</li>"
-        "<li>Recorded authors, organizations, devices and identifiers are values the files carry, "
-        "not verified identity.</li></ul>"
-    )
     return "".join(parts)

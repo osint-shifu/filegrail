@@ -63,8 +63,10 @@ def test_the_page_is_dark_self_contained_and_reaches_nothing_outside_itself():
     assert "color-scheme:dark" in page
     assert "default-src 'none'" in page
     assert "@media print" in page
-    assert not re.search(r"""\b(?:src|href|action)\s*=\s*["'](?!#)""", page)
-    assert "<link" not in page and "@import" not in page and "url(" not in page
+    outward = r"""\b(?:src|href|action)\s*=\s*["'](?!#|data:image/svg\+xml,)"""
+    assert not re.search(outward, page)
+    assert page.count("<link") == 1 and 'rel="icon" href="data:image/svg+xml,' in page
+    assert "@import" not in page and "url(" not in page
     assert "https://example.org/holiday.jpg" in page
 
 
@@ -100,7 +102,7 @@ def test_the_cards_open_what_they_count_and_the_index_sorts_by_raw_values():
 
     assert 'href="#files" data-filter="origin"' in page
     assert 'href="#conflicts"' in page
-    assert 'class="index sortable"' in page
+    assert 'class="tbl index" id="index"' in page
     assert 'data-value="1024"' in page
 
 

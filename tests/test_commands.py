@@ -47,6 +47,18 @@ def test_html_is_printed_like_json_and_never_alongside_it(tmp_path: Path, capsys
     assert main([str(tmp_path), "--html", "--json"]) == 2
 
 
+def test_the_report_can_be_written_to_a_file_it_then_names(tmp_path: Path, capsys):
+    (tmp_path / "a.txt").write_text("a", encoding="utf-8")
+    out = tmp_path / "report.html"
+
+    assert main([str(tmp_path), "--html", "-o", str(out)]) == 0
+
+    assert capsys.readouterr().out == ""
+    page = out.read_text(encoding="utf-8")
+    assert page.startswith("<!doctype html>")
+    assert str(out.resolve()) in page
+
+
 def test_help_lists_a_command(capsys):
     assert main(["help", "explain"]) == 0
 

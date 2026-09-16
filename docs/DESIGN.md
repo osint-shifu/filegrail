@@ -133,7 +133,8 @@ else here.
 
 | File | Use |
 | --- | --- |
-| `assets/filegrail-banner.svg` | 1280×360 README header |
+| `assets/filegrail-banner.png` | 2560×1280 README header and social preview |
+| `assets/filegrail-banner.svg` | 1280×360 header, vector |
 | `assets/filegrail-logo-dark.svg` | horizontal lockup, dark backgrounds |
 | `assets/filegrail-logo-light.svg` | horizontal lockup, light backgrounds |
 | `assets/filegrail-mark.svg` | square mark, dark backgrounds and favicon |
@@ -401,16 +402,21 @@ files whose arrival or handling was recorded, and every file under `-v`.
 ### As a page
 
 `--html` prints the same report as one HTML page: the same sections, numbers
-and references, with every number an anchor. It is dark by default and prints
-light. A Content-Security-Policy allows no network request, nothing is loaded
-from outside the page, a URL found in a file is text rather than a link, and no
-data sits in a script that the page does not show, so a redacted scan cannot
-leave what it redacted behind in hidden JSON.
+and references, with every number an anchor. It is dark by default, carries a
+light theme on a button, and prints light. Written to a file with `-o`, the
+page names that file beside the target it was made from. A Content-Security-Policy allows no
+network request and nothing is loaded from outside the page - the mark in the
+masthead and the tab icon are drawn in it - a URL found in a file is text
+rather than a link, and no data sits in a script that the page does not show,
+so a redacted scan cannot leave what it redacted behind in hidden JSON.
 
-Tables sort by any column. A summary card opens the section it counts, with
-the file index filtered to match. A value is never a link out of the page:
-beside it is a copy button, which copies the text shown, so opening an address
-found in a case is always a separate, deliberate act somewhere else.
+Tables sort by any column. A summary card opens the section it counts, and the
+chips over the file index leave only the files a filter names. The search box
+takes `/` from anywhere on the page and searches the tab panels too. `Expand
+all files` sits in the menu bar and again on the file detail it opens. A value
+is never a link out of the page: beside it is a copy button, which copies the
+text shown, so opening an address found in a case is always a separate,
+deliberate act somewhere else.
 
 ## 6. Layout & Spacing
 

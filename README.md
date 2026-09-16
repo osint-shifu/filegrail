@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-banner.png" alt="filegrail - file provenance, metadata analysis, investigative pivots" width="820">
+
 # filegrail
 
 **Local file provenance, metadata and forensic context analysis.**
@@ -512,6 +514,7 @@ Investigative-pivot extraction, content inspection, hashing and clustering run o
 | `--hash` | Compute SHA-256 for each file |
 | `-j`, `--json` | JSON output |
 | `--html` | The report as one self-contained HTML page, to redirect to a file |
+| `-o`, `--out FILE` | Write the report to this file instead of standard output |
 | `--redact` | Redact credentials before printing |
 | `--type NAME` | Filter by `archive`, `audio`, `document`, `image`, `mail`, `text` or `video` |
 | `--ext LIST` | Filter by extensions, e.g. `--ext jpg,pdf` |

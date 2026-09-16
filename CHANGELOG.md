@@ -5,6 +5,62 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `-o FILE` writes the report to a file rather than to standard output, in
+  every form the scan prints: the terminal report, `--json` and `--html`. The
+  HTML page then names the file it is, beside the target it was made from.
+
+### Changed
+
+- The HTML report is laid out in the project's own visual language: the mark
+  and the wordmark in the masthead, under them the target, the profile, the
+  scan and the options it ran with, set off by a rule; a menu bar that stays
+  in view and follows the section being read; summary cards over a legend of
+  the three evidence categories; and a file index that gives each file a dot
+  per category, its type, size and modification time, and the origin record
+  with the basis it was matched on. It still loads nothing from outside
+  itself: the mark in the masthead and the tab icon are drawn in the page.
+
+- The HTML report carries a light theme on a button, next to one that prints
+  it. `Expand all` sits on each section that has something to open, and opens
+  and closes only that section; a file that wants a second look starts open.
+
+- Chips over the file index leave only the files a filter names, and the
+  search box takes `/` from anywhere on the page. The pivot tabs wrap onto as
+  many rows as they need, so a case with many types keeps none of them behind
+  a scrollbar.
+
+- A pivot names the first few files it was found in and keeps the rest behind
+  `+N more`; the sample of where it was found now comes before that list, so
+  the long column no longer starves the short one of width. Each file it
+  names takes a line of its own, and what opens the rest - the `+N more` in a
+  pivot, the file count in a key finding - carries the accent colour. The
+  two count columns are headed `times` and `places`,
+  which gives their width back to what is actually read.
+
+- The places a pivot was found in are grouped by file and by source, so a
+  value sitting five times in one file reads as one line carrying the five
+  line numbers, rather than five lines that differ by a number. Eight of the
+  twenty places a pivot keeps are shown, which after grouping takes fewer
+  lines than five took before.
+
+- More of the report leads somewhere: the pivot types found in a file link to
+  the tab that lists every pivot of that type, a conflict links to the record
+  that carries it as well as to the file's row, and a summary card is a link
+  or it is not shown at all. The file index column that held both is named
+  `findings & pivots`.
+
+- A file's number and its name are one link, and a list a key finding folds
+  away opens as a column, one file to a line. Once the masthead has scrolled
+  out of view the mark appears in the menu bar and leads back to the top.
+
+- The HTML report's notes no longer repeat how to read the report, and no
+  section introduces itself. What each evidence category and each match basis
+  means stays.
+
 ## 0.16.0 - 2026-09-16
 
 ### Changed

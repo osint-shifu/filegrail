@@ -131,6 +131,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print the report as one self-contained HTML page, to redirect to a file.",
     )
     parser.add_argument(
+        "-o",
+        "--out",
+        dest="out",
+        type=Path,
+        metavar="FILE",
+        help="Write the report to this file instead of standard output.",
+    )
+    parser.add_argument(
         "--brief",
         action="store_true",
         help="Stop at the summary, the key findings and a one-line index of the files.",
@@ -442,70 +450,77 @@ def _scan(rest: list[str]) -> int:
     # wider corpus is asking to be shown it.
     listed = args.identify or args.content
 
+    written = args.out.resolve() if args.out else None
     if args.json:
-        print(
-            render_json(
-                records,
-                base,
-                identify=listed,
-                content=args.content,
-                cluster=args.cluster,
-                home=home,
-                unsearched=missed,
-            )
+        report = render_json(
+            records,
+            base,
+            identify=listed,
+            content=args.content,
+            cluster=args.cluster,
+            home=home,
+            unsearched=missed,
         )
     elif args.html:
         case, found = _case(records, base, home, content=args.content, listed=listed)
-        print(
-            render_html(
-                case,
-                verbose=args.verbose,
-                identifiers=found,
-                content=args.content,
-                home=home,
-                unsearched=missed,
-                filtered=describe(args.families, args.extensions),
-                redacted=args.redact,
-            ),
-            end="",
+        report = render_html(
+            case,
+            verbose=args.verbose,
+            identifiers=found,
+            content=args.content,
+            home=home,
+            unsearched=missed,
+            filtered=describe(args.families, args.extensions),
+            redacted=args.redact,
+            output=written,
         )
     elif args.timeline:
-        print(render_timeline(records, base, theme=theme, home=home))
+        report = render_timeline(records, base, theme=theme, home=home)
     elif root.is_dir():
         case, found = _case(records, base, home, content=args.content, listed=listed)
-        print(
-            render_case(
-                case,
-                theme=theme,
-                verbose=args.verbose,
-                brief=args.brief,
-                limit=_limit(args),
-                identifiers=found,
-                content=args.content,
-                cluster=args.cluster,
-                home=home,
-                unsearched=missed,
-                filtered=describe(args.families, args.extensions),
-            )
+        report = render_case(
+            case,
+            theme=theme,
+            verbose=args.verbose,
+            brief=args.brief,
+            limit=_limit(args),
+            identifiers=found,
+            content=args.content,
+            cluster=args.cluster,
+            home=home,
+            unsearched=missed,
+            filtered=describe(args.families, args.extensions),
         )
     else:
-        print(
-            render_text(
-                records,
-                base,
-                verbose=args.verbose,
-                brief=args.brief,
-                limit=_limit(args),
-                stats=stats,
-                theme=theme,
-                filtered=describe(args.families, args.extensions),
-                identify=listed,
-                content=args.content,
-                cluster=args.cluster,
-                home=home,
-                unsearched=missed,
-            )
+        report = render_text(
+            records,
+            base,
+            verbose=args.verbose,
+            brief=args.brief,
+            limit=_limit(args),
+            stats=stats,
+            theme=theme,
+            filtered=describe(args.families, args.extensions),
+            identify=listed,
+            content=args.content,
+            cluster=args.cluster,
+            home=home,
+            unsearched=missed,
         )
+    return _emit(report, written)
+
+
+def _emit(report: str, out: Path | None) -> int:
+    """The report, to the file it was asked for or to standard output."""
+    said = report if report.endswith("\n") else report + "\n"
+    if out is None:
+        print(said, end="")
+        return 0
+    try:
+        out.write_text(said, encoding="utf-8")
+    except OSError as error:
+        print(f"filegrail: cannot write {out}: {error}", file=sys.stderr)
+        return 2
     return 0
 
 

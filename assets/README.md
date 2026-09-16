@@ -3,12 +3,10 @@
 Construction rules and the colour meanings live in [`DESIGN.md`](../docs/DESIGN.md).
 This file is how to use them.
 
-Banner (works on both GitHub themes):
+Banner at the top of the README (absolute URL, so PyPI shows it too):
 
 ```markdown
-<p align="center">
-  <img src="assets/filegrail-banner.svg" alt="filegrail — trace origins, extract metadata" width="820">
-</p>
+<img src="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-banner.png" alt="filegrail" width="820">
 ```
 
 Lockup that follows the reader's theme:
@@ -32,7 +30,8 @@ Mark only (docs, favicon, social avatar):
 
 | File | Use |
 | --- | --- |
-| `filegrail-banner.svg` | 1280x360 README header |
+| `filegrail-banner.png` | 2560x1280 README header and social preview |
+| `filegrail-banner.svg` | 1280x360 header, vector |
 | `filegrail-logo-dark.svg` | horizontal lockup, dark backgrounds |
 | `filegrail-logo-light.svg` | horizontal lockup, light backgrounds |
 | `filegrail-mark.svg` | square mark, dark backgrounds / favicon |
