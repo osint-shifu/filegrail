@@ -315,6 +315,26 @@ def test_a_text_file_is_addressed_by_line(tmp_path: Path):
     assert _places(note) == ["line 1", "line 3", "line 4"]
 
 
+def test_a_table_is_addressed_by_row_and_column(tmp_path: Path):
+    """A row read as one line runs its columns together.
+
+    The separator ends up inside the value: a URL in one column takes the `,`
+    and the column after it, which is a value nobody can go and look at. Read
+    as cells, the value is the cell and the place names the column it sat in.
+    """
+    table = tmp_path / "contacts.csv"
+    table.write_text(
+        "name,source_url,role\nK. Dabrowa,https://social.example.net/@kdabrowa,signed\n",
+        encoding="utf-8",
+    )
+
+    found = {passage.place: passage.text for passage in read_passages(table)}
+
+    assert found["row 2 · column 2"] == "https://social.example.net/@kdabrowa"
+    assert "signed" not in found["row 2 · column 2"]
+    assert found["row 2 · column 3"] == "signed"
+
+
 def test_markup_is_addressed_by_the_line_of_the_file(tmp_path: Path):
     """`HTMLParser` reports the line the markup was on, which is a line of the
     file rather than a line of the text that came out of it."""

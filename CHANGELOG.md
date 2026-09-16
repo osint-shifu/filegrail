@@ -18,6 +18,12 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   has said where it was taken and still not said how it got here - the one
   question the archive could answer, for the one file the pass skipped.
 
+- **A table is read a cell at a time.** A `.csv` or `.tsv` row read as one
+  line runs its columns together, and a value at the end of one took the
+  separator and the column after it: a URL arrived in the report with
+  `,publisher` on the end, which is a value nobody can go and look at. The
+  place says the row and the column now, rather than the line.
+
 ### Changed
 
 - **The README no longer counts the formats.** A test held the badge to the

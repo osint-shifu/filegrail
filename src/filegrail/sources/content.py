@@ -37,6 +37,7 @@ Deliberately not read, with reasons:
 from __future__ import annotations
 
 import codecs
+import csv
 import json
 import re
 import zipfile
@@ -106,6 +107,11 @@ PLAIN_SUFFIXES = {
 #: Data formats read twice: once by line like any text, once for the
 #: positions they carry as structure rather than prose.
 GEOJSON_SUFFIXES = {".geojson"}
+
+#: Formats whose rows are cells rather than prose, and what separates them.
+#: Read by line, a value in one column takes the separator and its neighbour
+#: with it - a URL ending in `/` swallows the `,` and the column after it.
+TABULAR_SUFFIXES = {".csv": ",", ".tsv": "\t"}
 
 #: Markup read twice for the same reason. A track and a map file are XML, so
 #: their names and links come out like any markup; the positions need a
@@ -191,6 +197,7 @@ _UNREADABLE = (
     LookupError,
     zipfile.BadZipFile,
     NotImplementedError,
+    csv.Error,
 )
 
 
@@ -208,7 +215,8 @@ def read_passages(path: Path) -> list[Passage] | None:
     try:
         if suffix in PLAIN_SUFFIXES:
             text = _decode(_head(path))
-            found = _lines(text)
+            delimiter = TABULAR_SUFFIXES.get(suffix)
+            found = _lines(text) if delimiter is None else _cells(text, delimiter)
             if suffix in GEOJSON_SUFFIXES:
                 found += _features(text)
         elif suffix in MARKUP_SUFFIXES:
@@ -251,6 +259,24 @@ def _bounded(found: list[Passage]) -> list[Passage]:
 def _lines(text: str) -> list[Passage]:
     """One passage per line, because a line is what a text file has."""
     return [Passage(f"line {number}", line) for number, line in enumerate(text.split("\n"), 1)]
+
+
+def _cells(text: str, delimiter: str) -> list[Passage]:
+    """One passage per cell, because a cell is what a table has.
+
+    A row read as one line runs its columns together, and a value at the end of
+    one takes the separator and the next column with it. The cell is also the
+    more exact place to report: a reader given a row and a column can go and
+    look at the value, where a line number leaves them searching it again.
+
+    `splitlines(True)` keeps the line endings, so a quoted field that spans
+    several lines stays one cell and the count stays a count of rows.
+    """
+    found = []
+    for number, row in enumerate(csv.reader(text.splitlines(True), delimiter=delimiter), 1):
+        for index, cell in enumerate(row, 1):
+            found.append(Passage(f"row {number} · column {index}", cell))
+    return found
 
 
 def _head(path: Path) -> bytes:

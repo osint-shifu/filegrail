@@ -221,7 +221,8 @@ Content scanning is limited to 1 MB of text per file and 64 members of a package
 | Extensions | Content read | Location reported as |
 | --- | --- | --- |
 | `.txt` `.text` `.md` `.markdown` `.rst` `.log` | Text by line | `line 12` |
-| `.csv` `.tsv` `.json` `.ndjson` `.jsonl` `.ipynb` `.yaml` `.yml` `.toml` `.ini` `.cfg` `.conf` `.vcf` `.ics` `.canvas` | Text/data by line | `line 12` |
+| `.json` `.ndjson` `.jsonl` `.ipynb` `.yaml` `.yml` `.toml` `.ini` `.cfg` `.conf` `.vcf` `.ics` `.canvas` | Text/data by line | `line 12` |
+| `.csv` `.tsv` | Each cell of each row, so a value never runs into the column beside it | `row 4 · column 3` |
 | `.html` `.htm` `.xhtml` `.xml` `.svg` `.graphml` | Visible text and relevant URLs/attributes | `line 12` |
 | `.gpx` `.kml` | Names and links as markup, plus every named point and the start and end of every track as geo positions | `line 12`, `waypoint 3`, `track 1 start`, `placemark 2` |
 | `.geojson` | Text by line, plus every point and the start and end of every line as geo positions | `line 12`, `feature 1`, `feature 1 end` |

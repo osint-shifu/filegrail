@@ -199,7 +199,8 @@ separate acts, and neither half says that alone.
 | Extensions | What is read |
 |:---|:---|
 | `.txt` `.text` `.md` `.markdown` `.rst` `.log` | The file, a line at a time, and the line is what a value is reported against |
-| `.csv` `.tsv` `.json` `.ndjson` `.jsonl` `.ipynb` `.yaml` `.yml` `.toml` `.ini` `.cfg` `.conf` `.vcf` `.ics` `.canvas` | The same. Data formats are text, and an export out of an application is exactly the sort of file an examiner is handed |
+| `.json` `.ndjson` `.jsonl` `.ipynb` `.yaml` `.yml` `.toml` `.ini` `.cfg` `.conf` `.vcf` `.ics` `.canvas` | The same. Data formats are text, and an export out of an application is exactly the sort of file an examiner is handed |
+| `.csv` `.tsv` | A cell at a time rather than a line, because a row read whole runs its columns together and a value at the end of one takes the separator and the next column with it. The place names the row and the column, which is where a reader can go and look |
 | `.html` `.htm` `.xhtml` `.xml` `.svg` `.graphml` | The text, and the addresses in `href`, `src` and their kin, by the line of the file. `<script>` and `<style>` are left out - a colour is a short hex digest and a bundler writes hosts nobody typed - and a namespace declaration is markup rather than something the document said |
 | `.gpx` `.kml` | The text and the links as markup, and then the positions the file carries as structure: every named point, and the start and the end of every track or line, each written as a `geo:` URI so the coordinate detector takes it on its own and a bare pair of decimals is still never believed. KML puts the longitude first; the reader turns it around. Not read: `gx:Track`, polygons and multi-geometries |
 | `.geojson` | By line like any data, and a second time for the features: every `Point`, and the start and the end of every `LineString`, longitude first there too. A file the budget cuts short keeps its lines and contributes no positions |
