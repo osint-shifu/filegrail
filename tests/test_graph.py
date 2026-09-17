@@ -193,3 +193,43 @@ def test_normalized_values_create_derived_relationships():
         "domain:portal.example.org",
         "URL host",
     ) in relationships
+
+
+def test_author_and_camera_relationships_reuse_cluster_attributes():
+    path = "/case/photo.jpg"
+    record = _record(
+        path,
+        EvidenceRecord(
+            source="device-metadata",
+            block="exif",
+            at="2026-09-17T09:00:00Z",
+            fields={
+                "Artist": "Jan Kowalski",
+                "Make": "Canon",
+                "Model": "EOS R5",
+                "BodySerialNumber": "ABC123",
+            },
+        ),
+    )
+
+    graph = json.loads(render_json([record], Path("/case"), identify=True))["graph"]
+    nodes = {node["id"]: node for node in graph["nodes"]}
+    edges = {(edge["target"], edge["kind"]): edge for edge in graph["relationships"]}
+
+    assert nodes["person:jan kowalski"]["value"] == "Jan Kowalski"
+    assert nodes["device:abc123"]["value"] == "ABC123"
+    assert nodes["camera_model:canon eos r5"]["value"] == "Canon EOS R5"
+    assert ("person:jan kowalski", "author") in edges
+    assert ("device:abc123", "camera body") in edges
+    assert ("camera_model:canon eos r5", "camera model") in edges
+    assert edges[("device:abc123", "camera body")]["evidence"] == [
+        {
+            "source": "device-metadata",
+            "place": "EXIF · BodySerialNumber",
+            "corpus": "metadata",
+            "count": 1,
+            "category": "metadata",
+            "match": {"method": "embedded"},
+            "at": "2026-09-17T09:00:00Z",
+        }
+    ]

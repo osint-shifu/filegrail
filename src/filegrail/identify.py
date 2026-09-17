@@ -838,6 +838,11 @@ def _plain(name: str) -> str:
     return " ".join(name.strip().strip("\"'").split()).casefold()
 
 
+def normalize_name(name: str) -> str:
+    """The public normalization shared by person nodes in the graph."""
+    return _plain(name)
+
+
 def _names(value: str) -> Iterator[str]:
     """The names in a field, which XMP and Office write `;`-separated."""
     for part in value.split(";"):

@@ -5,7 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .identify import IN_METADATA, PLACE, Identifier, IdentifierEvidence, normalize_url
+from .cluster import AUTHOR, DEVICE, MODEL, attributes
+from .identify import (
+    IN_METADATA,
+    PLACE,
+    Identifier,
+    IdentifierEvidence,
+    normalize_name,
+    normalize_url,
+)
 from .models import ORIGIN, FileRecord, category, label
 
 HAS_IDENTIFIER = "has identifier"
@@ -15,6 +23,9 @@ DIGEST_OF = "digest of"
 EMAIL_DOMAIN = "email domain"
 URL_HOST = "URL host"
 CONTENT_HASH = "content hash"
+CAMERA_BODY = "camera body"
+CAMERA_MODEL = "camera model"
+AUTHORSHIP = "author"
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,11 +157,47 @@ def build_graph(records: list[FileRecord], identifiers: list[Identifier]) -> Gra
     relationships.extend(_origin_urls(records, by_value))
     relationships.extend(_derived_values(identifiers, by_value))
     relationships.extend(_content_hashes(records, nodes))
+    relationships.extend(_file_attributes(records, nodes))
 
     return Graph(
         tuple(sorted(nodes.values(), key=lambda node: node.id)),
         tuple(sorted(relationships, key=lambda edge: (edge.source, edge.target, edge.kind))),
     )
+
+
+def _file_attributes(records: list[FileRecord], nodes: dict[str, Node]) -> list[Relationship]:
+    """Connect files to author and camera values already used by clustering."""
+    relationships = []
+    for record in records:
+        for attribute in attributes(record):
+            node_type, kind, normalized = _attribute_identity(attribute.axis, attribute.name)
+            target = f"{node_type}:{normalized}"
+            nodes.setdefault(target, Node(target, node_type, attribute.name, normalized))
+            found = attribute.evidence
+            evidence = RelationshipEvidence(
+                source=found.source,
+                category=category(found),
+                match=found.matched_by,
+                place=attribute.basis,
+                corpus=IN_METADATA,
+                count=1,
+                at=found.at,
+            )
+            relationships.append(
+                Relationship(file_node_id(record.path), target, kind, 1, (evidence,))
+            )
+    return relationships
+
+
+def _attribute_identity(axis: str, value: str) -> tuple[str, str, str]:
+    if axis == AUTHOR:
+        return "person", AUTHORSHIP, normalize_name(value)
+    normalized = " ".join(value.split()).casefold()
+    if axis == DEVICE:
+        return "device", CAMERA_BODY, normalized
+    if axis == MODEL:
+        return "camera_model", CAMERA_MODEL, normalized
+    raise ValueError(f"unknown shared attribute axis: {axis}")  # pragma: no cover
 
 
 def _content_hashes(records: list[FileRecord], nodes: dict[str, Node]) -> list[Relationship]:

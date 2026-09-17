@@ -18,7 +18,9 @@ the edge retains the full count. Origin URLs and referrers have specific edges;
 derived edges connect an email or URL to its domain and a recognized digest to
 the clear email address it identifies. With `--hash`, files with identical
 content meet at one shared SHA-256 node instead of producing a quadratic list
-of file-to-file edges.
+of file-to-file edges. The author, camera model and camera body serial already
+used by clustering are also nodes, with their metadata block and field on the
+edge.
 
 Every relationship `filegrail` finds between files, identifiers and devices records its kind, its direction and its evidence: source, category, match basis, place, count and, where the evidence has one, time.
 

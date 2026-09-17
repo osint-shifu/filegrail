@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-from .models import BLOCK_LABELS, FileRecord, label
+from .models import BLOCK_LABELS, EvidenceRecord, FileRecord, label
 from .overview import AUTHOR_FIELDS
 
 #: A name in a field meant for one: text a person or a program wrote down.
@@ -73,6 +73,16 @@ class Group:
         return {"axis": self.axis, "name": self.name, "basis": self.basis, "paths": self.paths}
 
 
+@dataclass(frozen=True, slots=True)
+class Attribute:
+    """One author or camera value and the evidence record carrying it."""
+
+    axis: str
+    name: str
+    basis: str
+    evidence: EvidenceRecord
+
+
 def cluster(records: list[FileRecord]) -> list[Group]:
     """Group the scanned files by every identifying value they share."""
     found: dict[tuple[str, str], list[str]] = {}
@@ -81,11 +91,11 @@ def cluster(records: list[FileRecord]) -> list[Group]:
     # are the same team typed twice - and it is shown as it was first seen.
     spelled: dict[tuple[str, str], str] = {}
     for record in records:
-        for axis, name, basis in _names(record):
-            key = (axis, name.casefold())
+        for attribute in attributes(record):
+            key = (attribute.axis, attribute.name.casefold())
             paths = found.setdefault(key, [])
-            bases.setdefault(key, basis)
-            spelled.setdefault(key, name)
+            bases.setdefault(key, attribute.basis)
+            spelled.setdefault(key, attribute.name)
             if record.path not in paths:
                 paths.append(record.path)
     groups = [Group(key[0], spelled[key], paths, bases[key]) for key, paths in found.items()]
@@ -109,7 +119,7 @@ def _model(fields: dict[str, str]) -> str | None:
     return model
 
 
-def _names(record: FileRecord) -> Iterator[tuple[str, str, str]]:
+def attributes(record: FileRecord) -> Iterator[Attribute]:
     """Every identifying value this file carries, the axis it sits on, and the
     field it was read from."""
     for found in record.evidence:
@@ -117,15 +127,15 @@ def _names(record: FileRecord) -> Iterator[tuple[str, str, str]]:
         for field in AUTHOR_FIELDS.get(found.block or "", ()):
             for name in (found.fields.get(field) or "").split(_AUTHOR_SEPARATOR):
                 if name.strip():
-                    yield AUTHOR, name.strip(), f"{block}{_BASIS}{field}"
+                    yield Attribute(AUTHOR, name.strip(), f"{block}{_BASIS}{field}", found)
 
         for field in _SERIAL_FIELDS:
             serial = (found.fields.get(field) or "").strip()
             if serial:
-                yield DEVICE, serial, f"{block}{_BASIS}{field}"
+                yield Attribute(DEVICE, serial, f"{block}{_BASIS}{field}", found)
                 break
 
         model = _model(found.fields)
         if model:
             named = _MODEL if _MAKE not in found.fields else f"{_MAKE} + {_MODEL}"
-            yield MODEL, model, f"{block}{_BASIS}{named}"
+            yield Attribute(MODEL, model, f"{block}{_BASIS}{named}", found)
