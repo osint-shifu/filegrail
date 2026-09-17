@@ -91,10 +91,22 @@ class _Text(NamedTuple):
     #: Meaningless for content, which records nothing.
     acquired: bool
 
+    #: Machine-readable evidence coordinates. `source` above is the label used
+    #: in the report; these are kept separately so graph relationships do not
+    #: have to recover structured evidence from presentation text.
+    source_id: str
+    category: str | None
+    match: str | None
+    at: str | None
+
 
 #: Occurrences are counted exactly; the sampled list of places is capped so one
 #: value repeated across a huge tree cannot dominate the output.
 MAX_SAMPLES = 20
+
+#: Exact places kept for one identifier in one file. The relationship retains
+#: its full occurrence count when a long list is shortened.
+MAX_RELATION_PLACES = 100
 
 #: How a file and the field it was found in are joined into one place
 #: string. It goes into `--json` in exactly this form, so it is a constant
@@ -106,6 +118,19 @@ PLACE = " · "
 #: a file is not one of the evidence sources - nothing wrote it down about the
 #: file - so it is named for what it is.
 CONTENT_SOURCE = "content"
+
+
+@dataclass(frozen=True, slots=True)
+class IdentifierEvidence:
+    """One checkable place that ties an identifier to a file."""
+
+    source: str
+    category: str | None
+    match: str | None
+    place: str
+    corpus: str
+    at: str | None
+
 
 EMAIL_RE = re.compile(
     r"\b[A-Za-z0-9._%+\-]+@([A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?"
@@ -657,6 +682,11 @@ class Identifier:
     #: where `where` is only a sample.
     holders: dict[str, int] = field(default_factory=dict)
 
+    #: Checkable evidence for each file relationship. Kept out of `to_dict`
+    #: because the existing identifier list is a stable summary; the graph is
+    #: the machine-readable shape for per-file relationships.
+    evidence: dict[str, dict[IdentifierEvidence, int]] = field(default_factory=dict)
+
     def to_dict(self) -> dict[str, object]:
         data: dict[str, object] = {
             "type": self.type,
@@ -874,10 +904,34 @@ def _texts(records: list[FileRecord], *, content: bool = False) -> Iterator[_Tex
                 ("location", found.location),
             ):
                 if value:
-                    yield _Text(name, record.path, source, label, value, IN_METADATA, arrival)
+                    yield _Text(
+                        name,
+                        record.path,
+                        source,
+                        label,
+                        value,
+                        IN_METADATA,
+                        arrival,
+                        found.source,
+                        category(found),
+                        found.matched_by,
+                        found.at,
+                    )
             for label, value in found.fields.items():
                 if value:
-                    yield _Text(name, record.path, source, label, str(value), IN_METADATA, arrival)
+                    yield _Text(
+                        name,
+                        record.path,
+                        source,
+                        label,
+                        str(value),
+                        IN_METADATA,
+                        arrival,
+                        found.source,
+                        category(found),
+                        found.matched_by,
+                        found.at,
+                    )
         if content:
             # One yield per passage rather than one per file. Scanning them
             # apart is what lets a value carry the line, slide or chapter it
@@ -892,6 +946,10 @@ def _texts(records: list[FileRecord], *, content: bool = False) -> Iterator[_Tex
                     passage.text,
                     IN_CONTENT,
                     False,
+                    CONTENT_SOURCE,
+                    None,
+                    None,
+                    None,
                 )
 
 
@@ -917,6 +975,17 @@ def extract(records: list[FileRecord], *, content: bool = False) -> list[Identif
             entry.holders[source.path] = entry.holders.get(source.path, 0) + 1
             entry.corpora.add(source.corpus)
             entry.acquired = entry.acquired or source.acquired
+            evidence = IdentifierEvidence(
+                source=source.source_id,
+                category=source.category,
+                match=source.match,
+                place=f"{source.source}{PLACE}{source.where}",
+                corpus=source.corpus,
+                at=source.at,
+            )
+            places = entry.evidence.setdefault(source.path, {})
+            if evidence in places or len(places) < MAX_RELATION_PLACES:
+                places[evidence] = places.get(evidence, 0) + 1
             if place not in entry.where:
                 if len(entry.where) < MAX_SAMPLES:
                     entry.where.append(place)

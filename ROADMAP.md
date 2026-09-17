@@ -10,6 +10,12 @@ Planned work, in the order it will be done. Released changes are listed in [CHAN
 
 ### Relationships backed by evidence
 
+The first relationship is implemented in scan JSON: `--pivots` and `--content`
+connect every file to its normalized identifiers. Each edge keeps its source,
+exact place, corpus and occurrence count, plus category, match basis and time
+where the underlying evidence has them. A long list of places is bounded while
+the edge retains the full count.
+
 Every relationship `filegrail` finds between files, identifiers and devices records its kind, its direction and its evidence: source, category, match basis, place, count and, where the evidence has one, time.
 
 For every file, the places where an identifier was found are kept, not only a sample for the whole scan. Where a limit shortens a list, the relationship still states how many there were.
