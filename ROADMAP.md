@@ -20,7 +20,8 @@ the clear email address it identifies. With `--hash`, files with identical
 content meet at one shared SHA-256 node instead of producing a quadratic list
 of file-to-file edges. The author, camera model and camera body serial already
 used by clustering are also nodes, with their metadata block and field on the
-edge.
+edge. Archive and torrent matches record the container path directly and become
+membership edges without parsing a prose note.
 
 Every relationship `filegrail` finds between files, identifiers and devices records its kind, its direction and its evidence: source, category, match basis, place, count and, where the evidence has one, time.
 

@@ -131,6 +131,7 @@ def test_a_scan_gives_a_matching_file_its_torrent(tmp_path: Path):
     assert len(found) == 1
     assert category(found[0]) == ORIGIN
     assert found[0].priority > 0
+    assert found[0].container == str(tmp_path / "a.torrent")
 
 
 def test_a_file_whose_size_disagrees_is_not_claimed(tmp_path: Path):
@@ -172,6 +173,7 @@ def test_a_scan_pairs_against_the_clients_store(tmp_path: Path):
     record = next(iter(scan(tree, use_shell_history=False, home=home)))
 
     assert [o.source for o in record.evidence] == ["torrent"]
+    assert record.evidence[0].container == str(store / "abcdef.torrent")
 
 
 def test_the_survey_reports_a_client_store(tmp_path: Path):

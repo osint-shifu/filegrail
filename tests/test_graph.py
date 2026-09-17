@@ -233,3 +233,37 @@ def test_author_and_camera_relationships_reuse_cluster_attributes():
             "at": "2026-09-17T09:00:00Z",
         }
     ]
+
+
+def test_container_paths_create_membership_relationships_without_parsing_notes():
+    archive = "/downloads/pack.zip"
+    torrent = "/profile/BT_backup/release.torrent"
+    records = [
+        _record(
+            "/case/report.pdf",
+            EvidenceRecord(
+                source="archive-member",
+                match="container-member",
+                note="wording may change",
+                container=archive,
+            ),
+        ),
+        _record(
+            "/case/film.mkv",
+            EvidenceRecord(
+                source="torrent",
+                match="name+size",
+                container=torrent,
+            ),
+        ),
+    ]
+
+    graph = json.loads(render_json(records, Path("/case")))["graph"]
+    relationships = {
+        (edge["source"], edge["target"], edge["kind"]): edge for edge in graph["relationships"]
+    }
+
+    archive_edge = relationships[("file:/case/report.pdf", f"file:{archive}", "member of archive")]
+    torrent_edge = relationships[("file:/case/film.mkv", f"file:{torrent}", "listed in torrent")]
+    assert archive_edge["evidence"][0]["match"] == {"method": "container-member"}
+    assert torrent_edge["evidence"][0]["match"] == {"method": "name+size"}

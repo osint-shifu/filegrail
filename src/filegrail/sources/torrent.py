@@ -111,7 +111,7 @@ def read_torrent(path: Path) -> Torrent | None:
     if not members:
         return None
 
-    return Torrent(record=_record(raw, document, info), members=members)
+    return Torrent(record=_record(path, raw, document, info), members=members)
 
 
 def _members(info: dict[bytes, Any]) -> dict[str, set[int]]:
@@ -137,7 +137,9 @@ def _members(info: dict[bytes, Any]) -> dict[str, set[int]]:
     return {name: sizes for name, sizes in members.items() if name}
 
 
-def _record(raw: bytes, document: dict[bytes, Any], info: dict[bytes, Any]) -> EvidenceRecord:
+def _record(
+    path: Path, raw: bytes, document: dict[bytes, Any], info: dict[bytes, Any]
+) -> EvidenceRecord:
     name = _text(info.get(b"name"))
     fields: dict[str, str] = {}
     if name:
@@ -159,6 +161,7 @@ def _record(raw: bytes, document: dict[bytes, Any], info: dict[bytes, Any]) -> E
         url=_magnet(raw, name),
         tool=_text(document.get(b"created by")),
         note=f"listed in the torrent {name}" if name else "listed in a torrent",
+        container=str(path),
         fields=fields,
     )
 

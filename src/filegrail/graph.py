@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .cluster import AUTHOR, DEVICE, MODEL, attributes
@@ -26,6 +27,8 @@ CONTENT_HASH = "content hash"
 CAMERA_BODY = "camera body"
 CAMERA_MODEL = "camera model"
 AUTHORSHIP = "author"
+ARCHIVE_MEMBER = "member of archive"
+TORRENT_MEMBER = "listed in torrent"
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,11 +161,38 @@ def build_graph(records: list[FileRecord], identifiers: list[Identifier]) -> Gra
     relationships.extend(_derived_values(identifiers, by_value))
     relationships.extend(_content_hashes(records, nodes))
     relationships.extend(_file_attributes(records, nodes))
+    relationships.extend(_container_memberships(records, nodes))
 
     return Graph(
         tuple(sorted(nodes.values(), key=lambda node: node.id)),
         tuple(sorted(relationships, key=lambda edge: (edge.source, edge.target, edge.kind))),
     )
+
+
+def _container_memberships(records: list[FileRecord], nodes: dict[str, Node]) -> list[Relationship]:
+    """Connect matched members to an explicitly recorded archive or torrent."""
+    relationships = []
+    kinds = {"archive-member": ARCHIVE_MEMBER, "torrent": TORRENT_MEMBER}
+    for record in records:
+        for found in record.evidence:
+            kind = kinds.get(found.source)
+            if kind is None or found.container is None:
+                continue
+            target = file_node_id(found.container)
+            nodes.setdefault(target, Node(target, "file", found.container))
+            evidence = RelationshipEvidence(
+                source=found.source,
+                category=category(found),
+                match=found.matched_by,
+                place=f"{label(found)}{PLACE}{Path(record.path).name}",
+                corpus=IN_METADATA,
+                count=1,
+                at=found.at,
+            )
+            relationships.append(
+                Relationship(file_node_id(record.path), target, kind, 1, (evidence,))
+            )
+    return relationships
 
 
 def _file_attributes(records: list[FileRecord], nodes: dict[str, Node]) -> list[Relationship]:

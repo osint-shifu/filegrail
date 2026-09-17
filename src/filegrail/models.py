@@ -363,6 +363,11 @@ class EvidenceRecord:
     #: advance which one matters, so nothing decoded is thrown away.
     fields: dict[str, str] = field(default_factory=dict)
 
+    #: The archive or torrent whose member this file matched. Kept as a path,
+    #: not recovered later from a prose note, so graph consumers can connect
+    #: the two without guessing which same-named container was meant.
+    container: str | None = None
+
     @property
     def category(self) -> str:
         return category(self)

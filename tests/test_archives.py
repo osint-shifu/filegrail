@@ -107,6 +107,7 @@ def test_extracted_files_inherit_the_archive_origin(tmp_path: Path):
         assert best is not None
         assert best.source == "archive-member"
         assert best.url == "https://example.org/pack.zip"
+        assert best.container == str(archive)
         assert "extracted from pack.zip" in best.note
 
 

@@ -203,19 +203,21 @@ def _about_the_archive(record: EvidenceRecord, member: str) -> EvidenceRecord:
     )
 
 
-def inherited_origin(record: EvidenceRecord, archive_name: str) -> EvidenceRecord:
+def inherited_origin(record: EvidenceRecord, archive_path: str) -> EvidenceRecord:
     """Rewrite an archive's own origin as one for a file that came out of it.
 
     The member did not arrive the way the archive did; it arrived *inside* the
     thing that arrived that way. The match basis is what keeps the difference
     visible, because the URL on the record is the archive's and not the file's.
     """
+    archive_name = Path(archive_path).name
     note = f"extracted from {archive_name}"
     return replace(
         record,
         source="archive-member",
         match=CONTAINER_MEMBER,
         match_note=f"member of {archive_name}, matched by name and exact size",
+        container=archive_path,
         bytes=None,
         mime=None,
         sha256=None,

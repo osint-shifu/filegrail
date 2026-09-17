@@ -284,11 +284,10 @@ def _attach_archive_records(
         if not members:
             continue
         leading = max(found, key=lambda record: record.priority)
-        archive_name = Path(archive_path).name
         for name, sizes in members.items():
             for size in sizes:
                 for record in by_signature.get((name, size), []):
-                    record.evidence.append(inherited_origin(leading, archive_name))
+                    record.evidence.append(inherited_origin(leading, archive_path))
 
 
 def _attach_torrent_records(

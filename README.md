@@ -549,7 +549,8 @@ and an evidence-backed `graph` (with `--pivots`, `--content` or `--hash`), and
 `shared_attributes` (with `--cluster`). The first graph relationship connects a
 file to every normalized pivot it carries and keeps the source, exact place,
 corpus and count behind that edge, plus category, match basis and time where the
-underlying evidence has them.
+underlying evidence has them. A matched archive or torrent member also adds a
+graph automatically because its evidence records the container path explicitly.
 
 Each file includes `path`, `size`, `mtime`, `btime`, `sha256`, `links` and `evidence`. Evidence records include their `category`, `source`, `match` and decoded fields. Correlation results are stored under `correlation`.
 
