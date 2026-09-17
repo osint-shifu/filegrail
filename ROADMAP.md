@@ -61,12 +61,14 @@ Scan JSON records the options the scan was run with, such as `--pivots`, `--cont
 
 ### Graph export as GraphML and CSV
 
-The graph as a file that other tools can import:
+Implemented as `--graphml` and `--graph-csv`, with `-o` for a destination file:
 
 - **GraphML**: one file with typed attributes on nodes and relationships, for tools such as Gephi, yEd, Cytoscape, Neo4j (APOC) and NetworkX;
 - **CSV edge list**: one relationship per row, with both nodes, their types and the evidence, for table imports such as Maltego, Neo4j `LOAD CSV`, Cytoscape and spreadsheets.
 
-The export includes the scan options and evidence coverage. `--redact` applies to it, and secrets and US Social Security numbers remain fingerprints.
+`--redact` applies before the graph is built, and secrets and US Social Security
+numbers remain fingerprints. Scan options and evidence coverage will be added
+with the JSON coverage work above.
 
 ### Relationship explorer in the HTML report
 

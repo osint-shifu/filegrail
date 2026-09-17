@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import xml.etree.ElementTree as ElementTree
 from pathlib import Path
 
 import pytest
@@ -45,6 +46,26 @@ def test_html_is_printed_like_json_and_never_alongside_it(tmp_path: Path, capsys
     assert main([str(tmp_path), "--html"]) == 0
     assert capsys.readouterr().out.startswith("<!doctype html>")
     assert main([str(tmp_path), "--html", "--json"]) == 2
+
+
+def test_graph_exports_are_separate_outputs(tmp_path: Path, capsys):
+    (tmp_path / "author.txt").write_text("analyst@example.org", encoding="utf-8")
+
+    assert main([str(tmp_path), "--graphml", "--content"]) == 0
+    assert capsys.readouterr().out.startswith("<?xml")
+    assert main([str(tmp_path), "--graph-csv", "--content"]) == 0
+    assert capsys.readouterr().out.startswith("source_id,source_type")
+    assert main([str(tmp_path), "--graphml", "--json"]) == 2
+
+
+def test_graph_export_can_be_written_to_a_file(tmp_path: Path, capsys):
+    (tmp_path / "author.txt").write_text("analyst@example.org", encoding="utf-8")
+    out = tmp_path / "graph.graphml"
+
+    assert main([str(tmp_path), "--graphml", "--content", "-o", str(out)]) == 0
+
+    assert capsys.readouterr().out == ""
+    assert ElementTree.fromstring(out.read_text(encoding="utf-8")).tag.endswith("graphml")
 
 
 def test_the_report_can_be_written_to_a_file_it_then_names(tmp_path: Path, capsys):

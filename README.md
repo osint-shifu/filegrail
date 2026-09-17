@@ -421,6 +421,8 @@ A normal scan reads embedded metadata and available local provenance records. Pi
 | `--redact` | Redact credentials before printing |
 | `-j`, `--json` | JSON output |
 | `--html` | Self-contained HTML output |
+| `--graphml` | Evidence graph as GraphML; enables pivot extraction |
+| `--graph-csv` | One evidence-backed graph relationship per CSV row; enables pivot extraction |
 | `-o`, `--out FILE` | Write the report to a file instead of standard output |
 | `--no-recurse` | Do not scan subdirectories |
 | `--no-skip` | Include normally skipped build, cache and vendor directories |
@@ -440,6 +442,8 @@ A normal scan reads embedded metadata and available local provenance records. Pi
 | Build a chronological timeline | `filegrail ./case --timeline` |
 | Investigate a copied profile or mounted image | `filegrail /mnt/evidence --home /mnt/profile` |
 | Export JSON with SHA-256 for every file | `filegrail ./case --hash --json > report.json` |
+| Export the investigation graph for Gephi, yEd or Cytoscape | `filegrail ./case --graphml -o graph.graphml` |
+| Export graph relationships for Neo4j or a spreadsheet | `filegrail ./case --graph-csv -o relationships.csv` |
 | Create a report with credentials redacted | `filegrail ./case --pivots --content --redact --html -o report.html` |
 | Check what metadata would remain before publishing | `filegrail clean ./publish --check` |
 

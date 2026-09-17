@@ -131,6 +131,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print the report as one self-contained HTML page, to redirect to a file.",
     )
     parser.add_argument(
+        "--graphml",
+        action="store_true",
+        help="Export the evidence graph as GraphML. Enables --pivots.",
+    )
+    parser.add_argument(
+        "--graph-csv",
+        action="store_true",
+        help="Export one evidence-backed graph relationship per CSV row. Enables --pivots.",
+    )
+    parser.add_argument(
         "-o",
         "--out",
         dest="out",
@@ -408,8 +418,13 @@ def _home(args: argparse.Namespace) -> Path | None | int:
 
 def _scan(rest: list[str]) -> int:
     args = build_parser().parse_args(rest)
-    if args.json and args.html:
-        print("filegrail: --json and --html are two outputs; choose one", file=sys.stderr)
+    outputs = [args.json, args.html, args.graphml, args.graph_csv, args.timeline]
+    if sum(outputs) > 1:
+        print(
+            "filegrail: --json, --html, --graphml, --graph-csv and --timeline "
+            "are separate outputs; choose one",
+            file=sys.stderr,
+        )
         return 2
     root = args.path.resolve()
     if not root.exists():
@@ -451,7 +466,7 @@ def _scan(rest: list[str]) -> int:
     # `--content` without `--pivots` would pay for every document to be
     # opened and parsed and then print a count of what it found. Asking for the
     # wider corpus is asking to be shown it.
-    listed = args.pivots or args.content
+    listed = args.pivots or args.content or args.graphml or args.graph_csv
 
     written = args.out.resolve() if args.out else None
     if args.json:
@@ -464,6 +479,12 @@ def _scan(rest: list[str]) -> int:
             home=home,
             unsearched=missed,
         )
+    elif args.graphml or args.graph_csv:
+        from .graph import build_graph
+        from .graph_export import render_graph_csv, render_graphml
+
+        graph = build_graph(records, extract(records, content=args.content))
+        report = render_graphml(graph) if args.graphml else render_graph_csv(graph)
     elif args.html:
         case, found = _case(records, base, home, content=args.content, listed=listed)
         report = render_html(
