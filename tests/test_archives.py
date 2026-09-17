@@ -28,6 +28,18 @@ def _make_zip(path: Path, entries: dict[str, str | bytes]) -> None:
             archive.writestr(name, content)
 
 
+def _mark_members_encrypted(raw: bytes) -> bytes:
+    """Set the encrypted flag in every local and central ZIP header."""
+    body = bytearray(raw)
+    for magic, field in ((b"PK\x03\x04", 6), (b"PK\x01\x02", 8)):
+        at = 0
+        while (at := body.find(magic, at)) >= 0:
+            flags = int.from_bytes(body[at + field : at + field + 2], "little")
+            body[at + field : at + field + 2] = (flags | 1).to_bytes(2, "little")
+            at += 4
+    return bytes(body)
+
+
 def test_recognises_archive_suffixes():
     assert is_archive(Path("a.zip"))
     assert is_archive(Path("a.TGZ"))
@@ -67,6 +79,15 @@ def test_corrupt_archive_returns_no_members(tmp_path: Path):
     broken = tmp_path / "broken.zip"
     broken.write_bytes(b"not really a zip")
     assert list_members(broken) == {}
+
+
+def test_encrypted_member_does_not_end_archive_inspection(tmp_path: Path):
+    archive = tmp_path / "locked.zip"
+    _make_zip(archive, {"photo.jpg": b"not important"})
+    archive.write_bytes(_mark_members_encrypted(archive.read_bytes()))
+
+    assert list_members(archive) == {"photo.jpg": {13}}
+    assert scan(archive, home=tmp_path, use_shell_history=False)
 
 
 def test_extracted_files_inherit_the_archive_origin(tmp_path: Path):

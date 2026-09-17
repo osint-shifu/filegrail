@@ -278,3 +278,19 @@ def test_no_reader_takes_a_zip_member_without_a_bound():
     for module in (containers, documents):
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert "archive.read(" not in source, module.__name__
+
+
+def test_an_encrypted_property_part_is_declined(tmp_path: Path):
+    document = tmp_path / "locked.docx"
+    with zipfile.ZipFile(document, "w") as archive:
+        archive.writestr("docProps/core.xml", CORE_XML)
+    body = bytearray(document.read_bytes())
+    for magic, field in ((b"PK\x03\x04", 6), (b"PK\x01\x02", 8)):
+        at = 0
+        while (at := body.find(magic, at)) >= 0:
+            flags = int.from_bytes(body[at + field : at + field + 2], "little")
+            body[at + field : at + field + 2] = (flags | 1).to_bytes(2, "little")
+            at += 4
+    document.write_bytes(body)
+
+    assert read_embedded_metadata(document) is None

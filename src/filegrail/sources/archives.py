@@ -166,7 +166,7 @@ def _read_member(name: str, extract: Callable[[], bytes]) -> list[EvidenceRecord
         copy = Path(room) / f"member{suffix}"
         try:
             copy.write_bytes(extract())
-        except _UNREADABLE:
+        except (*_UNREADABLE, RuntimeError):
             return []
 
         found = []

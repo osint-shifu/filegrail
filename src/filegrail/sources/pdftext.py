@@ -40,11 +40,12 @@ from __future__ import annotations
 
 import re
 import unicodedata
-import zlib
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from itertools import pairwise
 from typing import NamedTuple
+
+from .compression import decompress_zlib
 
 
 class Font(NamedTuple):
@@ -81,6 +82,11 @@ MAX_PAGES = 512
 #: How much text is taken before the reader stops walking pages. The caller
 #: bounds the result too - this stops the work, not just the output.
 MAX_TEXT_BYTES = 1024 * 1024
+
+#: The most one decoded PDF stream may occupy. Page contents, CMaps and object
+#: streams are normally far smaller; the bound prevents a tiny Flate stream
+#: from expanding until the process runs out of memory.
+MAX_STREAM_BYTES = 4 * 1024 * 1024
 
 #: How many objects one document may hold. A malformed or hostile file can
 #: name millions; the table is built once and this is what it costs at most.
@@ -208,13 +214,15 @@ def _stream(body: bytes, objects: dict[int, bytes]) -> bytes | None:
     filters = re.findall(rb"/([A-Za-z0-9]+Decode)", header)
     for name in filters:
         if name == b"FlateDecode":
-            try:
-                data = zlib.decompress(data)
-            except zlib.error:
-                try:  # a writer that miscounted the length leaves a short tail
-                    data = zlib.decompressobj().decompress(data)
-                except zlib.error:
-                    return None
+            inflated = decompress_zlib(data, MAX_STREAM_BYTES)
+            if inflated is None:
+                # A writer that miscounted /Length can leave a short tail. The
+                # old reader accepted what could be decoded, so preserve that
+                # tolerance while applying the same output limit.
+                inflated = decompress_zlib(data, MAX_STREAM_BYTES, require_eof=False)
+            if inflated is None:
+                return None
+            data = inflated
         else:
             return None  # an image codec, or a filter nothing here undoes
     if filters and (predictor := _integer(header, b"/Predictor")) and predictor >= 10:

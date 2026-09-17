@@ -32,6 +32,12 @@ def read_part(archive: zipfile.ZipFile, name: str, limit: int = MAX_PART_BYTES) 
     which needs no agreement between what the archive claims and what it
     actually contains.
     """
-    with archive.open(name) as handle:
-        payload = handle.read(limit + 1)
+    try:
+        with archive.open(name) as handle:
+            payload = handle.read(limit + 1)
+    except RuntimeError:
+        # `zipfile` uses RuntimeError, rather than a dedicated exception, when
+        # a member is encrypted and no password was supplied. FileGrail never
+        # guesses or prompts for credentials, so that part is simply unreadable.
+        return None
     return None if len(payload) > limit else payload

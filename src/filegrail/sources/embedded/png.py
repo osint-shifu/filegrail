@@ -9,9 +9,10 @@ which is provenance of the most direct kind.
 from __future__ import annotations
 
 import struct
-import zlib
 from collections.abc import Iterator
 from pathlib import Path
+
+from ..compression import decompress_zlib
 
 SUFFIXES = {".png", ".apng"}
 
@@ -56,7 +57,7 @@ def read_xmp_packet(path: Path) -> str | None:
             continue
         try:
             return _decode_itxt(rest, limit=_MAX_CHUNK)
-        except (zlib.error, ValueError, IndexError):
+        except (ValueError, IndexError):
             return None
     return None
 
@@ -95,10 +96,13 @@ def _absorb(chunk_type: bytes, payload: bytes, found: dict[str, str]) -> None:
         if chunk_type == b"tEXt":
             value = rest.decode("latin-1", "replace")
         elif chunk_type == b"zTXt":
-            value = zlib.decompress(rest[1:], bufsize=_MAX_VALUE).decode("latin-1", "replace")
+            inflated = decompress_zlib(rest[1:], _MAX_VALUE)
+            if inflated is None:
+                return
+            value = inflated.decode("latin-1", "replace")
         else:
             value = _decode_itxt(rest)
-    except (zlib.error, ValueError, IndexError):
+    except (ValueError, IndexError):
         return
 
     value = value.strip()
@@ -115,5 +119,8 @@ def _decode_itxt(rest: bytes, limit: int = _MAX_VALUE) -> str:
     for _ in range(2):  # skip the language tag and the translated keyword
         _, _, body = body.partition(b"\x00")
     if compressed:
-        body = zlib.decompress(body, bufsize=limit)
+        inflated = decompress_zlib(body, limit)
+        if inflated is None:
+            raise ValueError("iTXt value exceeds its decompression budget")
+        body = inflated
     return body.decode("utf-8", "replace")
