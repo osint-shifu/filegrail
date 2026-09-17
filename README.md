@@ -545,7 +545,7 @@ Each command has its own schema version. The version changes only when a field c
 Every scan document contains `schema`, `filegrail_version`, `root`, `summary`, `files` and `unsearched`.
 
 Depending on the scan, it can also contain `home` (with `--home`), `identifiers`
-and an evidence-backed `graph` (with `--pivots` or `--content`), and
+and an evidence-backed `graph` (with `--pivots`, `--content` or `--hash`), and
 `shared_attributes` (with `--cluster`). The first graph relationship connects a
 file to every normalized pivot it carries and keeps the source, exact place,
 corpus and count behind that edge, plus category, match basis and time where the

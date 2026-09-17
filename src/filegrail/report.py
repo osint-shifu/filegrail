@@ -1780,11 +1780,13 @@ def render_json(
         },
     }
     payload["unsearched"] = (unsearched or Unsearched()).to_dict()
+    identifiers = []
     if identify:
-        from .graph import build_graph
-
         identifiers = extract(records, content=content)
         payload["identifiers"] = [entry.to_dict() for entry in identifiers]
+    if identify or any(record.sha256 for record in records):
+        from .graph import build_graph
+
         payload["graph"] = build_graph(records, identifiers).to_dict()
     if cluster:
         payload["shared_attributes"] = [group.to_dict() for group in group_sources(records)]

@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -98,3 +99,97 @@ def test_graph_is_absent_without_pivots():
     payload = json.loads(render_json([_record("/case/a.txt")], Path("/case")))
 
     assert "graph" not in payload
+
+
+def test_identical_files_share_one_content_hash_node_without_pairwise_edges():
+    digest = "a" * 64
+    first = _record("/case/a.bin")
+    second = _record("/case/b.bin")
+    first.sha256 = digest
+    second.sha256 = digest
+
+    graph = json.loads(render_json([first, second], Path("/case")))["graph"]
+
+    assert [node for node in graph["nodes"] if node["type"] == "sha256"] == [
+        {
+            "id": f"sha256:{digest}",
+            "type": "sha256",
+            "value": digest,
+            "normalized": digest,
+        }
+    ]
+    edges = [edge for edge in graph["relationships"] if edge["kind"] == "content hash"]
+    assert {edge["source"] for edge in edges} == {"file:/case/a.bin", "file:/case/b.bin"}
+    assert {edge["target"] for edge in edges} == {f"sha256:{digest}"}
+    assert all(edge["evidence"][0]["source"] == "computed-hash" for edge in edges)
+
+
+def test_origin_url_and_referrer_have_semantic_relationships():
+    path = "/case/report.pdf"
+    record = _record(
+        path,
+        EvidenceRecord(
+            source="browser-download",
+            url="https://files.example.org/report.pdf",
+            referrer="https://portal.example.org/case/42",
+            at="2026-09-17T10:00:00Z",
+        ),
+    )
+
+    graph = json.loads(render_json([record], Path("/case"), identify=True))["graph"]
+    semantic = {
+        edge["kind"]: edge
+        for edge in graph["relationships"]
+        if edge["kind"] in {"origin URL", "referrer"}
+    }
+
+    assert semantic["origin URL"]["target"] == "url:https://files.example.org/report.pdf"
+    assert semantic["referrer"]["target"] == "url:https://portal.example.org/case/42"
+    assert semantic["origin URL"]["evidence"] == [
+        {
+            "source": "browser-download",
+            "place": "browser download · url",
+            "corpus": "metadata",
+            "count": 1,
+            "category": "origin",
+            "match": {"method": "recorded-path"},
+            "at": "2026-09-17T10:00:00Z",
+        }
+    ]
+
+
+def test_normalized_values_create_derived_relationships():
+    address = "analyst@example.org"
+    digest = hashlib.sha256(address.encode()).hexdigest()
+    record = _record(
+        "/case/notes.txt",
+        EvidenceRecord(
+            source="document-metadata",
+            fields={
+                "Author": address,
+                "Homepage": "https://portal.example.org/team",
+                "Digest": digest,
+            },
+        ),
+    )
+
+    graph = json.loads(render_json([record], Path("/case"), identify=True))["graph"]
+    relationships = {
+        (edge["source"], edge["target"], edge["kind"]) for edge in graph["relationships"]
+    }
+
+    assert (
+        f"sha256:{digest}",
+        "email:analyst@example.org",
+        "digest of",
+    ) in relationships
+    assert (
+        "email:analyst@example.org",
+        "domain:example.org",
+        "email domain",
+    ) in relationships
+    assert (
+        "url:https://portal.example.org/team",
+        "domain:portal.example.org",
+        "URL host",
+    ) in relationships

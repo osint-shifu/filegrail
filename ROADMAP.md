@@ -14,7 +14,11 @@ The first relationship is implemented in scan JSON: `--pivots` and `--content`
 connect every file to its normalized identifiers. Each edge keeps its source,
 exact place, corpus and occurrence count, plus category, match basis and time
 where the underlying evidence has them. A long list of places is bounded while
-the edge retains the full count.
+the edge retains the full count. Origin URLs and referrers have specific edges;
+derived edges connect an email or URL to its domain and a recognized digest to
+the clear email address it identifies. With `--hash`, files with identical
+content meet at one shared SHA-256 node instead of producing a quadratic list
+of file-to-file edges.
 
 Every relationship `filegrail` finds between files, identifiers and devices records its kind, its direction and its evidence: source, category, match basis, place, count and, where the evidence has one, time.
 
@@ -24,7 +28,7 @@ Planned relationships:
 
 - file to identifier, with the source and place, such as `page 3` or `XMP · dc:creator`;
 - file to the URL it was downloaded from and to its referrer, from origin records;
-- file to file with identical content (SHA-256, with `--hash`);
+- file to a shared content digest (SHA-256, with `--hash`);
 - file to camera, by serial number or model, and file to author;
 - digest to the address it is a digest of;
 - email address to domain, and URL to host and domain, marked as derived from the value itself rather than from a file.
