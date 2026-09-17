@@ -551,6 +551,8 @@ file to every normalized pivot it carries and keeps the source, exact place,
 corpus and count behind that edge, plus category, match basis and time where the
 underlying evidence has them. A matched archive or torrent member also adds a
 graph automatically because its evidence records the container path explicitly.
+Resolved XMP derivation links do the same and name the exact fields matched at
+both ends.
 
 Each file includes `path`, `size`, `mtime`, `btime`, `sha256`, `links` and `evidence`. Evidence records include their `category`, `source`, `match` and decoded fields. Correlation results are stored under `correlation`.
 

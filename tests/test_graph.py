@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from filegrail.identify import MAX_RELATION_PLACES
+from filegrail.lineage import attach_lineage
 from filegrail.models import EvidenceRecord, FileRecord
 from filegrail.report import render_json
 
@@ -267,3 +268,45 @@ def test_container_paths_create_membership_relationships_without_parsing_notes()
     torrent_edge = relationships[("file:/case/film.mkv", f"file:{torrent}", "listed in torrent")]
     assert archive_edge["evidence"][0]["match"] == {"method": "container-member"}
     assert torrent_edge["evidence"][0]["match"] == {"method": "name+size"}
+
+
+def test_xmp_lineage_uses_only_the_fields_that_created_the_link():
+    parent = _record(
+        "/case/master.jpg",
+        EvidenceRecord(
+            source="xmp",
+            block="xmp",
+            fields={
+                "xmpMM:DocumentID": "xmp.did:1111AAAA",
+                "xmpMM:OriginalDocumentID": "xmp.did:unrelated",
+            },
+        ),
+    )
+    child = _record(
+        "/case/export.jpg",
+        EvidenceRecord(
+            source="xmp",
+            block="xmp",
+            fields={
+                "xmpMM:DocumentID": "xmp.did:2222BBBB",
+                "xmpMM:DerivedFrom/stRef:documentID": "xmp.did:1111AAAA",
+                "xmpMM:OriginalDocumentID": "xmp.did:another-value",
+            },
+        ),
+    )
+    attach_lineage([parent, child])
+
+    graph = json.loads(render_json([parent, child], Path("/case")))["graph"]
+    edge = next(
+        edge
+        for edge in graph["relationships"]
+        if edge["source"] == "file:/case/export.jpg"
+        and edge["target"] == "file:/case/master.jpg"
+        and edge["kind"] == "derived from"
+    )
+
+    assert [item["place"] for item in edge["evidence"]] == [
+        "XMP · xmpMM:DerivedFrom/stRef:documentID",
+        "XMP · xmpMM:DocumentID",
+    ]
+    assert all("OriginalDocumentID" not in item["place"] for item in edge["evidence"])

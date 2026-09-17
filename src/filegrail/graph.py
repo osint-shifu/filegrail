@@ -15,7 +15,20 @@ from .identify import (
     normalize_name,
     normalize_url,
 )
-from .models import ORIGIN, FileRecord, category, label
+from .lineage import (
+    COMMON_ANCESTOR,
+    DERIVED_FROM,
+    DESCENDS_FROM,
+    DOCUMENT,
+    FROM_DOCUMENT,
+    FROM_INSTANCE,
+    INSTANCE,
+    ORIGINAL,
+    ORIGINAL_OF,
+    SAME_DOCUMENT,
+    SOURCE_OF,
+)
+from .models import ORIGIN, EvidenceRecord, FileRecord, category, label
 
 HAS_IDENTIFIER = "has identifier"
 ORIGIN_URL = "origin URL"
@@ -162,10 +175,84 @@ def build_graph(records: list[FileRecord], identifiers: list[Identifier]) -> Gra
     relationships.extend(_content_hashes(records, nodes))
     relationships.extend(_file_attributes(records, nodes))
     relationships.extend(_container_memberships(records, nodes))
+    relationships.extend(_lineage_relationships(records))
 
     return Graph(
         tuple(sorted(nodes.values(), key=lambda node: node.id)),
         tuple(sorted(relationships, key=lambda edge: (edge.source, edge.target, edge.kind))),
+    )
+
+
+def _lineage_relationships(records: list[FileRecord]) -> list[Relationship]:
+    """Restate resolved XMP links with the exact fields that matched."""
+    by_path = {record.path: record for record in records}
+    relationships = []
+    for record in records:
+        for link in record.links:
+            for other_path in link.others:
+                other = by_path.get(other_path)
+                if other is None:  # pragma: no cover - links are made from this list
+                    continue
+                evidence = _lineage_evidence(record, other, link.kind)
+                relationships.append(
+                    Relationship(
+                        file_node_id(record.path),
+                        file_node_id(other.path),
+                        link.kind,
+                        1,
+                        evidence,
+                    )
+                )
+    return relationships
+
+
+_LINEAGE_PAIRS = {
+    DERIVED_FROM: ((FROM_INSTANCE, INSTANCE), (FROM_DOCUMENT, DOCUMENT)),
+    SOURCE_OF: ((INSTANCE, FROM_INSTANCE), (DOCUMENT, FROM_DOCUMENT)),
+    SAME_DOCUMENT: ((DOCUMENT, DOCUMENT),),
+    DESCENDS_FROM: ((ORIGINAL, DOCUMENT),),
+    ORIGINAL_OF: ((DOCUMENT, ORIGINAL),),
+    COMMON_ANCESTOR: ((ORIGINAL, ORIGINAL),),
+}
+
+
+def _lineage_evidence(
+    source: FileRecord, target: FileRecord, kind: str
+) -> tuple[RelationshipEvidence, ...]:
+    source_record, source_fields = _xmp_fields(source)
+    target_record, target_fields = _xmp_fields(target)
+    if source_record is None or target_record is None:
+        return ()  # pragma: no cover - lineage only links two XMP records
+
+    evidence = []
+    for source_name, target_name in _LINEAGE_PAIRS[kind]:
+        left = source_fields.get(source_name.lower())
+        right = target_fields.get(target_name.lower())
+        if left is None or right is None or left[1].strip() != right[1].strip():
+            continue
+        evidence.append(_xmp_evidence(source_record, left[0]))
+        evidence.append(_xmp_evidence(target_record, right[0]))
+    return tuple(evidence)
+
+
+def _xmp_fields(
+    record: FileRecord,
+) -> tuple[EvidenceRecord | None, dict[str, tuple[str, str]]]:
+    for found in record.evidence:
+        if found.source == "xmp":
+            return found, {name.lower(): (name, value) for name, value in found.fields.items()}
+    return None, {}
+
+
+def _xmp_evidence(found: EvidenceRecord, field: str) -> RelationshipEvidence:
+    return RelationshipEvidence(
+        source=found.source,
+        category=category(found),
+        match=found.matched_by,
+        place=f"{label(found)}{PLACE}{field}",
+        corpus=IN_METADATA,
+        count=1,
+        at=found.at,
     )
 
 

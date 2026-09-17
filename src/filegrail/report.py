@@ -1785,7 +1785,8 @@ def render_json(
         identifiers = extract(records, content=content)
         payload["identifiers"] = [entry.to_dict() for entry in identifiers]
     if identify or any(
-        record.sha256 or any(found.container for found in record.evidence) for record in records
+        record.sha256 or record.links or any(found.container for found in record.evidence)
+        for record in records
     ):
         from .graph import build_graph
 
