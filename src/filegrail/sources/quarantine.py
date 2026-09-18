@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from ..models import EvidenceRecord
+from ..models import FILE_ATTRIBUTE, EvidenceRecord
 from ..util import iso, read_xattr
 
 QUARANTINE_DB = "Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2"
@@ -147,6 +147,7 @@ def read_quarantine(path: Path, events: Events) -> list[EvidenceRecord]:
             if known
             else "quarantined on download; the event is no longer in the database",
             fields={"EventIdentifier": identifier} if identifier else {},
+            match=FILE_ATTRIBUTE,
         )
     ]
 

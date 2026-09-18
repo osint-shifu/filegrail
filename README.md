@@ -9,7 +9,7 @@
 
 **Provenance. Metadata. Investigative Pivots.**
 
-[![PyPI](https://img.shields.io/badge/pypi-v0.25.3-3775A9?style=flat-square)](https://pypi.org/project/filegrail/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.26.0-3775A9?style=flat-square)](https://pypi.org/project/filegrail/)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-1f883d?style=flat-square)
 ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1f883d?style=flat-square)
@@ -404,7 +404,7 @@ A telemetry track can reveal movement even when ordinary GPS metadata is absent.
 | --- | --- | --- |
 | **EXIF** | `.jpg` `.jpeg` `.jpe` `.tif` `.tiff` `.dng` `.nef` `.cr2` `.arw` `.orf` `.rw2` `.webp` `.heic` `.heif` `.avif` | Camera, lens, software, capture time and GPS; JPEG JFIF/JFXX and ICC profile metadata |
 | **Photoshop resources** | `.jpg` `.jpeg` `.jpe` `.tif` `.tiff` `.psd` `.psb` | Resolution, JPEG settings, embedded-thumbnail descriptors, paths, workflow URLs and version information |
-| **PNG text** | `.png` `.apng` | Software, creation time, author and other text stored in the image |
+| **PNG text** | `.png` `.apng` | Software, creation time, author and other text stored in the image; camera, capture time and the other EXIF tags of an `eXIf` chunk |
 | **ISO BMFF** | `.mp4` `.m4v` `.mov` `.qt` `.3gp` `.m4a` `.heic` `.heif` `.avif` | Encoder or recording device, creation time and location; GoPro firmware, lens and camera serial; a GPMF or CAMM telemetry track summarised as device, streams and GPS track |
 | **Matroska** | `.mkv` `.mk3d` `.webm` `.mka` | Writing application, creation date and tags |
 | **RIFF/BWF** | `.wav` `.wave` `.rmi` `.avi` | Info fields such as title and software, recorder information, coding history and ID3 tags where present |

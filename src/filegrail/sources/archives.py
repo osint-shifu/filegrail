@@ -111,8 +111,8 @@ def read_contents(path: Path) -> list[EvidenceRecord]:
         with _opened(path) as archive:
             if archive is None:
                 return []
-            for name, extract in archive:
-                if len(found) >= _MAX_READ:
+            for opened, (name, extract) in enumerate(archive):
+                if opened >= _MAX_READ:
                     break
                 found.extend(_read_member(name, extract))
     except _UNREADABLE:

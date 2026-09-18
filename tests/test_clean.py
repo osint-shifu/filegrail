@@ -411,3 +411,20 @@ def test_a_check_still_reports_a_name_already_taken(tmp_path: Path):
     (out / "holiday.jpg").write_bytes(b"someone else's file")
 
     assert "already there" in clean_file(photo, out, write=False).note
+
+
+def test_a_package_with_an_encrypted_member_is_declined_rather_than_crashed(tmp_path: Path):
+    from tests.test_archives import _mark_members_encrypted
+
+    document = tmp_path / "locked.docx"
+    with zipfile.ZipFile(document, "w") as archive:
+        archive.writestr("docProps/core.xml", "<cp:coreProperties/>")
+        archive.writestr("word/document.xml", "<w:document/>")
+    document.write_bytes(_mark_members_encrypted(document.read_bytes()))
+    out = tmp_path / "clean"
+    out.mkdir()
+
+    result = clean_file(document, out)
+
+    assert result.written is None
+    assert "could not be taken apart" in (result.note or "")

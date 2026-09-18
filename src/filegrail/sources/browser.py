@@ -115,10 +115,13 @@ def _firefox_downloads(database: Path) -> Iterator[tuple[str, EvidenceRecord]]:
               ON dest_attr.id = dest.anno_attribute_id
              AND dest_attr.name = 'downloads/destinationFileURI'
             JOIN moz_places AS place ON place.id = dest.place_id
-            LEFT JOIN moz_annos AS meta ON meta.place_id = dest.place_id
-            LEFT JOIN moz_anno_attributes AS meta_attr
-              ON meta_attr.id = meta.anno_attribute_id
-             AND meta_attr.name = 'downloads/metaData'
+            LEFT JOIN (
+              SELECT note.place_id, note.content
+              FROM moz_annos AS note
+              JOIN moz_anno_attributes AS note_attr
+                ON note_attr.id = note.anno_attribute_id
+               AND note_attr.name = 'downloads/metaData'
+            ) AS meta ON meta.place_id = dest.place_id
             """
         ).fetchall()
     except sqlite3.OperationalError:

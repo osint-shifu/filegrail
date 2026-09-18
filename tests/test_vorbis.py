@@ -183,3 +183,46 @@ def test_a_flac_with_no_comment_block_makes_no_claim(tmp_path: Path):
     audio.write_bytes(b"fLaC" + b"\x80" + (34).to_bytes(3, "big") + b"\x00" * 34)
 
     assert read_embedded_metadata(audio) is None
+
+
+def _ogg_page(payload: bytes, sequence: int, first: bool = False) -> bytes:
+    """One Ogg page carrying `payload` in one lacing table."""
+    segments = bytes([255] * (len(payload) // 255) + [len(payload) % 255])
+    header = (
+        b"OggS\x00"
+        + (b"\x02" if first else b"\x00")
+        + b"\x00" * 8
+        + struct.pack("<IIi", 1, sequence, 0)
+        + bytes([len(segments)])
+        + segments
+    )
+    return header + payload
+
+
+def test_a_speex_stream_keeps_its_comments_in_the_second_page(tmp_path: Path):
+    """Speex has no marker before its comment header: the second packet is the
+    comment block itself."""
+    audio = tmp_path / "memo.spx"
+    audio.write_bytes(
+        _ogg_page(b"Speex   " + b"\x00" * 72, 0, first=True)
+        + _ogg_page(comments(b"Encoded with Speex 1.2", b"ARTIST=Field recorder"), 1)
+    )
+
+    assert read_comments(audio)["ARTIST"] == "Field recorder"
+
+
+def test_an_ogg_flac_stream_keeps_its_comments_behind_a_block_header(tmp_path: Path):
+    """Ogg FLAC wraps the FLAC metadata blocks: the comment block arrives on
+    the second page with its 4-byte block header in front."""
+    block = comments(b"reference libFLAC 1.4.3", b"TITLE=Interview take 3")
+    audio = tmp_path / "take.oga"
+    audio.write_bytes(
+        _ogg_page(
+            b"\x7fFLAC\x01\x00\x00\x01fLaC" + b"\x00" + (34).to_bytes(3, "big") + b"\x00" * 34,
+            0,
+            first=True,
+        )
+        + _ogg_page(b"\x84" + len(block).to_bytes(3, "big") + block, 1)
+    )
+
+    assert read_comments(audio)["TITLE"] == "Interview take 3"

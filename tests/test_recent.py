@@ -68,3 +68,13 @@ def test_it_is_activity_and_not_origin():
     """An application opening a file did not put it there, and a report that
     files it under origin says it did."""
     assert category(EvidenceRecord(source="recent-documents", tool="GIMP")) == ACTIVITY
+
+
+def test_a_time_with_an_offset_keeps_its_offset(tmp_path: Path):
+    """`+02:00` is a zone. Stamping a Z onto it turns 21:02 local into a moment
+    two hours later than the one recorded."""
+    body = XBEL.replace('added="2026-08-24T19:02:11Z"', 'added="2026-08-24T21:02:11+02:00"', 1)
+
+    found = collect_recent_files(home=_home(tmp_path, body))
+
+    assert found["/case/a photo.jpg"][0].at == "2026-08-24T21:02:11+02:00"

@@ -459,7 +459,7 @@ def _time_findings(record: FileRecord) -> list[Finding]:
         (o.at for o in record.evidence if category(o) == METADATA and o.at), default=None
     )
 
-    if arrived and authored and authored > arrived:
+    if arrived and authored and _created_after(authored, arrived):
         return [
             Finding(
                 TIMELINE_CONFLICT,
@@ -467,6 +467,19 @@ def _time_findings(record: FileRecord) -> list[Finding]:
             )
         ]
     return []
+
+
+#: Two clocks wrote the two moments. A file that reports being created this
+#: much after it was downloaded is skew between them, not a file made after it
+#: arrived.
+_CLOCK_SKEW = timedelta(minutes=5)
+
+
+def _created_after(authored: str, arrived: str) -> bool:
+    first, second = instant(authored), instant(arrived)
+    if first is None or second is None:
+        return authored > arrived
+    return first[0] - second[0] > _CLOCK_SKEW
 
 
 def _order_findings(record: FileRecord) -> list[Finding]:

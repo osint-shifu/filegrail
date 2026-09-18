@@ -83,3 +83,41 @@ def test_reading_does_not_modify_the_profile(tmp_path: Path):
     collect_browser_downloads(home=tmp_path)
 
     assert database.read_bytes() == before
+
+
+FIREFOX_SCHEMA = """
+CREATE TABLE moz_places (id INTEGER PRIMARY KEY, url LONGVARCHAR);
+CREATE TABLE moz_anno_attributes (id INTEGER PRIMARY KEY, name VARCHAR(32));
+CREATE TABLE moz_annos (
+  id INTEGER PRIMARY KEY, place_id INTEGER NOT NULL, anno_attribute_id INTEGER,
+  content LONGVARCHAR, dateAdded INTEGER DEFAULT 0);
+"""
+
+
+def test_a_firefox_download_with_its_metadata_is_one_record(tmp_path: Path):
+    """The destination and the metadata are two annotations on one place. The
+    record is the download, once, with the size the metadata carries."""
+    from filegrail.sources.browser import _firefox_downloads
+
+    database = tmp_path / "places.sqlite"
+    connection = sqlite3.connect(database)
+    connection.executescript(FIREFOX_SCHEMA)
+    connection.execute("INSERT INTO moz_places VALUES (1, 'https://cdn.example.org/real.zip')")
+    connection.execute("INSERT INTO moz_anno_attributes VALUES (1, 'downloads/destinationFileURI')")
+    connection.execute("INSERT INTO moz_anno_attributes VALUES (2, 'downloads/metaData')")
+    connection.execute(
+        "INSERT INTO moz_annos VALUES (1, 1, 1, 'file:///data/evidence.zip', 1788173373000000)"
+    )
+    connection.execute(
+        'INSERT INTO moz_annos VALUES (2, 1, 2, \'{"fileSize":30209,"state":1}\', 0)'
+    )
+    connection.commit()
+    connection.close()
+
+    found = list(_firefox_downloads(database))
+
+    assert len(found) == 1
+    target, origin = found[0]
+    assert target == "/data/evidence.zip"
+    assert origin.url == "https://cdn.example.org/real.zip"
+    assert origin.bytes == 30209

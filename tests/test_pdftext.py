@@ -262,3 +262,18 @@ def test_nothing_is_reported_for_a_file_that_is_not_a_pdf(tmp_path: Path):
     path.write_bytes(b"this is not a document at all")
 
     assert read_pages(path.read_bytes()) == []
+
+
+def test_a_page_tree_deeper_than_the_interpreter_stack_is_walked_or_cut_never_raised():
+    from filegrail.sources.pdftext import _leaves
+
+    depth = 5000
+    objects = {
+        number: b"<< /Type /Pages /Kids [%d 0 R] /Count 1 >>" % (number + 1)
+        for number in range(1, depth)
+    }
+    objects[depth] = b"<< /Type /Page /Contents 9 0 R >>"
+
+    pages = list(_leaves(1, objects, set(), b""))
+
+    assert len(pages) <= 1

@@ -706,3 +706,21 @@ def test_two_steps_at_the_same_moment_are_not_backwards():
     )
 
     assert not correlate(record).findings
+
+
+def test_a_creation_time_seconds_after_arrival_is_clock_skew_not_a_conflict():
+    """Two clocks wrote the two moments. A file that reports being created a
+    few seconds after it was downloaded is not a file made after it arrived."""
+    from filegrail.correlate import TIMELINE_CONFLICT
+
+    close = _record(
+        _download("https://x.test/a", at="2026-08-24T12:00:00Z"),
+        EvidenceRecord(source="document-metadata", tool="Writer", at="2026-08-24T12:00:40Z"),
+    )
+    later = _record(
+        _download("https://x.test/a", at="2026-08-24T12:00:00Z"),
+        EvidenceRecord(source="document-metadata", tool="Writer", at="2026-08-24T12:20:00Z"),
+    )
+
+    assert TIMELINE_CONFLICT not in [f.kind for f in correlate(close).findings]
+    assert TIMELINE_CONFLICT in [f.kind for f in correlate(later).findings]

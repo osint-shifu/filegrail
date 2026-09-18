@@ -17,6 +17,7 @@ bookmark per file. Plain XML, so no dependency and no guessing.
 
 from __future__ import annotations
 
+import re
 import xml.etree.ElementTree as ElementTree
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -109,4 +110,6 @@ def _timestamp(value: str | None) -> str | None:
         from ..util import iso
 
         return iso(float(value))
-    return value if value.endswith("Z") else f"{value.rstrip('Z')}Z"
+    if value.endswith("Z") or re.search(r"[+-]\d\d:?\d\d$", value):
+        return value
+    return f"{value}Z"

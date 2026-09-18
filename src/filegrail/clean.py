@@ -39,7 +39,7 @@ from .sources.xmp import read_xmp
 #: package, and one whose members name a compression this interpreter cannot
 #: undo. Both used to leave `clean` as a traceback, taking with them any copies
 #: it had already written and telling nobody the job had stopped half done.
-_MALFORMED = (ValueError, struct.error, zipfile.BadZipFile, NotImplementedError)
+_MALFORMED = (ValueError, struct.error, zipfile.BadZipFile, NotImplementedError, RuntimeError)
 
 #: JPEG markers that carry metadata rather than image data. `APP1` holds Exif
 #: and XMP, `APP13` the Photoshop resource block IPTC lives in, `APP11` the

@@ -238,3 +238,12 @@ def test_the_name_match_says_what_it_was_matched_against(carved: Path, tmp_path:
     found = read_quarantine(carved / "evidence.zip", collect_quarantine_events(tmp_path))
 
     assert found[0].match_note == ("the database recorded the URL and no path to match instead")
+
+
+def test_the_attribute_is_a_file_attribute_and_not_a_name_match(carved: Path, tmp_path: Path):
+    """The attribute sits on this file. Only the fallback by name is weak."""
+    _tag(carved / "evidence.zip", f"0083;{STAMP};Safari;{EVENT}")
+
+    found = read_quarantine(carved / "evidence.zip", collect_quarantine_events(tmp_path))
+
+    assert found[0].matched_by == "file-attribute"

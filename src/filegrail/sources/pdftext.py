@@ -283,23 +283,30 @@ def _pages(raw: bytes, objects: dict[int, bytes]) -> Iterator[bytes]:
 def _leaves(
     number: int, objects: dict[int, bytes], seen: set[int], inherited: bytes
 ) -> Iterator[bytes]:
-    """Every page under one node, depth first, with what it inherits attached."""
-    if number in seen or len(seen) > MAX_OBJECTS:
-        return  # a tree that points at itself is malformed, not infinite work
-    seen.add(number)
-    body = objects.get(number)
-    if body is None:
-        return
-    # Resources are inherited down the tree, so a page that states none is
-    # drawn with its parent's fonts and has to be read with them.
-    resources = _entry(body, b"/Resources") or inherited
-    kids = re.search(rb"/Kids\s*\[(.*?)\]", body, re.S)
-    if kids is not None:
-        for child in _REFERENCE.finditer(kids.group(1)):
-            yield from _leaves(int(child.group(1)), objects, seen, resources)
-        return
-    if _TYPE_PAGE.search(body):
-        yield body + b"\n/filegrail-resources " + resources
+    """Every page under one node, depth first, with what it inherits attached.
+
+    The tree is walked with a stack of its own: a chain of nodes deeper than
+    the interpreter's recursion limit is malformed, and must be cut, not raised.
+    """
+    stack = [(number, inherited)]
+    while stack:
+        number, inherited = stack.pop()
+        if number in seen or len(seen) > MAX_OBJECTS:
+            continue  # a tree that points at itself is malformed, not infinite work
+        seen.add(number)
+        body = objects.get(number)
+        if body is None:
+            continue
+        # Resources are inherited down the tree, so a page that states none is
+        # drawn with its parent's fonts and has to be read with them.
+        resources = _entry(body, b"/Resources") or inherited
+        kids = re.search(rb"/Kids\s*\[(.*?)\]", body, re.S)
+        if kids is not None:
+            children = [int(child.group(1)) for child in _REFERENCE.finditer(kids.group(1))]
+            stack.extend((child, resources) for child in reversed(children))
+            continue
+        if _TYPE_PAGE.search(body):
+            yield body + b"\n/filegrail-resources " + resources
 
 
 def _entry(body: bytes, key: bytes) -> bytes:

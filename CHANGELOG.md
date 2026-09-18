@@ -5,6 +5,26 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.26.0 - 2026-09-18
+
+### Added
+
+- PNG: the `eXIf` chunk is read, so a screenshot or a phone picture saved as PNG names its camera and capture time.
+- Vorbis comments in Speex and Ogg FLAC streams, which carry no marker in front of the comment header.
+
+### Fixed
+
+- Firefox downloads were counted twice when the download had metadata, which doubled the timeline and forged an agreement between two copies of one record.
+- A `docx`, `xlsx` or `pptx` with an encrypted member crashed `clean` instead of being declined.
+- The macOS quarantine attribute was reported as a name match; it is an attribute of the file and is now marked as one.
+- A PNG `Creation Time` in RFC 1123 form is read as a moment instead of being copied raw.
+- A file reporting a creation time seconds after its download is no longer a timeline conflict; two clocks are allowed five minutes of skew.
+- An IPTC datastream typed LONG in a TIFF was cut to a quarter of its length.
+- A PDF page tree deeper than the interpreter's stack no longer raises; it is walked with a stack of its own.
+- The recently-used list keeps a timestamp's own offset instead of stamping a Z onto it.
+- `summary.with_origin` in scan JSON counts files with an origin record, not files with any evidence.
+- The archive read budget bounds the members opened, not the findings kept.
+
 ## 0.25.3 - 2026-09-18
 
 ### Changed

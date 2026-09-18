@@ -16,6 +16,7 @@ import struct
 import xml.etree.ElementTree as ElementTree
 import zipfile
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from ...models import EvidenceRecord
@@ -389,20 +390,40 @@ def _from_movie(path: Path, suffix: str) -> EvidenceRecord | None:
     )
 
 
+def _png_exif(path: Path) -> exif.Exif | None:
+    raw = png.read_exif_chunk(path)
+    if not raw:
+        return None
+    try:
+        return exif._parse_tiff(raw)
+    except (struct.error, ValueError):
+        return None
+
+
 def _from_png(path: Path, suffix: str) -> EvidenceRecord | None:
     if suffix not in png.SUFFIXES:
         return None
     text = png.read_png_text(path)
-    if not text:
+    if not text and not png.read_exif_chunk(path):
         return None
 
     tool = _first(text, png.SOFTWARE_KEYS)
-    created = _first(text, png.DATE_KEYS)
+    created = _normalise(_first(text, png.DATE_KEYS))
     author = _first(text, png.AUTHOR_KEYS)
 
     notes = []
     if author:
         notes.append(f"author {author}")
+    # PNG 1.5 added an `eXIf` chunk with the same TIFF payload as a JPEG's
+    # APP1, and phones and screenshot tools write one.
+    tags = _png_exif(path)
+    if tags:
+        device = exif.camera(tags)
+        tool = tool or device
+        if device and tool and device.lower() not in tool.lower():
+            tool = f"{device} (processed with {tool})"
+        created = created or _exif_time(tags.get(exif.DATETIME_ORIGINAL) or tags.get(exif.DATETIME))
+        notes.append("EXIF chunk present")
     generation = _first(text, png.GENERATOR_KEYS)
     if generation:
         notes.append(f"generation parameters recorded: {_clip(generation)}")
@@ -411,6 +432,8 @@ def _from_png(path: Path, suffix: str) -> EvidenceRecord | None:
     # here it would be a second copy of the same evidence, clipped mid-element
     # and unreadable as either markup or a value.
     fields = {name: value for name, value in text.items() if name != png.XMP_KEYWORD}
+    if tags:
+        fields.update(_exif_fields(tags))
 
     return _origin(
         "document-metadata",
@@ -863,6 +886,14 @@ def _exif_time(value: object) -> str | None:
 def _normalise(value: str | None) -> str | None:
     if not value:
         return None
+    if "," in value:  # RFC 1123, as libpng's own example writes `Creation Time`
+        try:
+            parsed = parsedate_to_datetime(value.strip())
+        except (TypeError, ValueError, IndexError):
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
     for pattern in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y"):
         try:
             parsed = datetime.strptime(value.strip()[: len(pattern) + 6].rstrip("Z"), pattern)

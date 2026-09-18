@@ -141,3 +141,20 @@ def test_the_terminal_report_does_not_leak_into_the_document(case: Path, capsys)
 
     assert set(document["summary"]) == {"total", "with_origin"}
     assert not {"inventory", "findings", "attention", "overview"} & set(document)
+
+
+def test_with_origin_counts_files_with_an_origin_record(tmp_path: Path):
+    """A file whose only evidence is its own EXIF has metadata, not an origin."""
+    import json
+
+    from filegrail.models import EvidenceRecord, FileRecord
+    from filegrail.report import render_json
+
+    traced = FileRecord(path="/case/a.jpg", size=1, mtime="2026-01-01T00:00:00Z")
+    traced.evidence.append(EvidenceRecord(source="browser-download", url="https://x.test/a"))
+    described = FileRecord(path="/case/b.jpg", size=1, mtime="2026-01-01T00:00:00Z")
+    described.evidence.append(EvidenceRecord(source="device-metadata", tool="Camera"))
+
+    document = json.loads(render_json([traced, described], tmp_path))
+
+    assert document["summary"] == {"total": 2, "with_origin": 1}

@@ -287,3 +287,25 @@ def test_reads_a_raw_iim_datastream_from_tiff_tag_33723(tmp_path: Path):
 
     assert claim.fields["By-line"] == "Berenice Abbott"
     assert claim.location == "New York"
+
+
+def test_a_datastream_stored_as_longs_is_read_in_full(tmp_path: Path):
+    """Some writers type tag 33723 as LONG. The count is then in 4-byte units,
+    and reading it as bytes leaves three quarters of the block behind."""
+    iim = _dataset(80, b"Berenice Abbott") + _dataset(90, b"New York")
+    iim += b"\x00" * (-len(iim) % 4)
+    values_at = 8 + 2 + 12 + 4
+    raw = tmp_path / "plate.tiff"
+    raw.write_bytes(
+        b"MM\x00\x2a"
+        + struct.pack(">I", 8)
+        + struct.pack(">H", 1)
+        + struct.pack(">HHII", 0x83BB, 4, len(iim) // 4, values_at)  # tag 33723, LONG
+        + struct.pack(">I", 0)
+        + iim
+    )
+
+    claim = read_iptc(raw)
+
+    assert claim.fields["By-line"] == "Berenice Abbott"
+    assert claim.location == "New York"

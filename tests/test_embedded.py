@@ -373,3 +373,68 @@ def test_pdf_incremental_update_uses_the_latest_info_dictionary(tmp_path: Path):
     assert origin is not None
     assert origin.tool == "New Writer"
     assert origin.fields["Author"] == "New Author"
+
+
+def _png_chunk(category: bytes, payload: bytes) -> bytes:
+    import struct
+    import zlib
+
+    return (
+        struct.pack(">I", len(payload))
+        + category
+        + payload
+        + struct.pack(">I", zlib.crc32(category + payload))
+    )
+
+
+def _png(path: Path, *extra: bytes) -> None:
+    import struct
+
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0))
+        + b"".join(extra)
+        + _png_chunk(b"IDAT", b"\x00")
+        + _png_chunk(b"IEND", b"")
+    )
+
+
+def test_a_png_creation_time_written_as_rfc_1123_is_read_as_a_moment(tmp_path: Path):
+    """libpng's own example writes `Creation Time` in the RFC 1123 form."""
+    image = tmp_path / "chart.png"
+    _png(image, _png_chunk(b"tEXt", b"Creation Time\x00Mon, 24 Aug 2026 19:02:11 GMT"))
+
+    origin = read_embedded_metadata(image)
+
+    assert origin is not None
+    assert origin.at == "2026-08-24T19:02:11Z"
+
+
+def test_a_png_exif_chunk_names_the_camera_and_the_capture_time(tmp_path: Path):
+    """PNG 1.5 gave the format an `eXIf` chunk, and phones and screenshot
+    tools write one. It carries a plain TIFF header, like APP1 in a JPEG."""
+    import struct
+
+    entries = [
+        (0x010F, b"Pentax\x00"),
+        (0x0110, b"K-3 III\x00"),
+        (0x9003, b"2026:08:24 19:02:11\x00"),
+    ]
+    base = 8 + 2 + len(entries) * 12 + 4
+    directory = struct.pack(">H", len(entries))
+    values = b""
+    for tag, raw in entries:
+        directory += struct.pack(">HHII", tag, 2, len(raw), base + len(values))
+        values += raw
+    tiff = b"MM\x00\x2a" + struct.pack(">I", 8) + directory + struct.pack(">I", 0) + values
+    image = tmp_path / "shot.png"
+    _png(image, _png_chunk(b"eXIf", tiff), _png_chunk(b"tEXt", b"Software\x00Snapper 2"))
+
+    origin = read_embedded_metadata(image)
+
+    assert origin is not None
+    assert origin.fields["Software"] == "Snapper 2"
+    assert origin.fields["Make"] == "Pentax"
+    assert origin.fields["Model"] == "K-3 III"
+    assert origin.at == "2026-08-24T19:02:11Z"
+    assert "Pentax" in (origin.tool or "")

@@ -1782,7 +1782,11 @@ def render_json(
         "files": [_file_json(record) for record in records],
         "summary": {
             "total": len(records),
-            "with_origin": sum(1 for record in records if record.evidence),
+            "with_origin": sum(
+                1
+                for record in records
+                if any(category(found) == ORIGIN for found in record.evidence)
+            ),
         },
     }
     if run is not None:

@@ -150,9 +150,12 @@ def _tiff_tag(data: bytes) -> bytes:
         (count,) = struct.unpack_from(endian + "H", data, offset)
         for index in range(min(count, _MAX_ENTRIES)):
             entry = offset + 2 + index * 12
-            tag, _kind, length, at = struct.unpack_from(endian + "HHII", data, entry)
-            if tag == _TIFF_IPTC_TAG and 0 < length <= _MAX_BLOCK:
-                return data[at : at + length]
+            tag, kind, length, at = struct.unpack_from(endian + "HHII", data, entry)
+            # Writers type the tag UNDEFINED or BYTE, and some LONG; the
+            # count is then in four-byte units.
+            size = length * (4 if kind == 4 else 1)
+            if tag == _TIFF_IPTC_TAG and 0 < size <= _MAX_BLOCK:
+                return data[at : at + size]
     except struct.error:
         return b""
     return b""

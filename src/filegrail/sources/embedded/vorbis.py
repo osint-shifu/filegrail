@@ -17,6 +17,7 @@ actually read.
 from __future__ import annotations
 
 import struct
+from collections.abc import Iterator
 from pathlib import Path
 
 FLAC_SUFFIXES = {".flac"}
@@ -31,6 +32,7 @@ _MARKERS = (b"\x03vorbis", b"OpusTags", b"\x7fFLAC")
 
 _COMMENT_BLOCK = 4
 _MAX_BLOCKS = 32
+_MAX_PAGES = 64
 _MAX_COMMENTS = 256
 _MAX_BLOCK = 2 * 1024 * 1024
 
@@ -80,11 +82,46 @@ def _flac(data: bytes) -> dict[str, str]:
 
 
 def _ogg(data: bytes) -> dict[str, str]:
-    for marker in _MARKERS:
+    """The second packet of the stream is the comment header.
+
+    Vorbis and Opus open it with a marker; Speex does not, and Ogg FLAC wraps
+    it in a FLAC block header. So the pages are walked to the second packet,
+    and the marker is what says how much of it to skip.
+    """
+    pages = list(_pages(data))
+    if len(pages) >= 2:
+        first, second = pages[0], pages[1]
+        for marker in _MARKERS:
+            if second.startswith(marker):
+                return _comments(second, len(marker), len(second))
+        if first.startswith(b"\x7fFLAC") and len(second) > 4:
+            if second[0] & 0x7F == _COMMENT_BLOCK:
+                return _comments(second, 4, len(second))
+        if first.startswith(b"Speex   "):
+            return _comments(second, 0, len(second))
+    for marker in _MARKERS:  # a stream whose pages could not be walked
         at = data.find(marker)
         if at >= 0:
             return _comments(data, at + len(marker), len(data))
     return {}
+
+
+def _pages(data: bytes) -> Iterator[bytes]:
+    """The payload of each Ogg page, in order, while the pages are well formed."""
+    at = 0
+    for _ in range(_MAX_PAGES):
+        if data[at : at + 4] != _OGG_MAGIC or at + 27 > len(data):
+            return
+        segments = data[at + 26]
+        table = data[at + 27 : at + 27 + segments]
+        if len(table) < segments:
+            return
+        size = sum(table)
+        start = at + 27 + segments
+        if start + size > len(data):
+            return
+        yield data[start : start + size]
+        at = start + size
 
 
 def _comments(data: bytes, at: int, end: int) -> dict[str, str]:

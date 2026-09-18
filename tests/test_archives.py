@@ -163,3 +163,16 @@ def test_inheritance_can_be_disabled(tmp_path: Path):
     record = scan(case, home=tmp_path, use_shell_history=False, follow_archives=False)[0]
 
     assert record.evidence == []
+
+
+def test_the_archive_read_budget_bounds_members_opened_not_findings(tmp_path: Path, monkeypatch):
+    from filegrail.sources import archives
+
+    archive = tmp_path / "many.zip"
+    _make_zip(archive, {f"blob-{n}.bin": b"x" for n in range(60)})
+    opened = []
+    monkeypatch.setattr(archives, "_read_member", lambda name, extract: opened.append(name) or [])
+
+    archives.read_contents(archive)
+
+    assert len(opened) <= archives._MAX_READ

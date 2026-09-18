@@ -18,6 +18,7 @@ SUFFIXES = {".png", ".apng"}
 
 _MAGIC = b"\x89PNG\r\n\x1a\n"
 _TEXT_CHUNKS = (b"tEXt", b"zTXt", b"iTXt")
+_EXIF_CHUNK = b"eXIf"
 _STOP_CHUNKS = (b"IDAT", b"IEND")
 _MAX_CHUNK = 1024 * 1024
 _MAX_VALUE = 4096
@@ -39,6 +40,13 @@ def read_png_text(path: Path) -> dict[str, str]:
     for chunk_type, payload in _text_chunks(path):
         _absorb(chunk_type, payload, found)
     return found
+
+
+def read_exif_chunk(path: Path) -> bytes:
+    """The TIFF-shaped payload of the `eXIf` chunk, or nothing."""
+    for _chunk_type, payload in _chunks(path, (_EXIF_CHUNK,)):
+        return payload
+    return b""
 
 
 def read_xmp_packet(path: Path) -> str | None:
@@ -64,6 +72,11 @@ def read_xmp_packet(path: Path) -> str | None:
 
 def _text_chunks(path: Path) -> Iterator[tuple[bytes, bytes]]:
     """Every text chunk of a PNG, as (type, payload), until the image data."""
+    yield from _chunks(path, _TEXT_CHUNKS)
+
+
+def _chunks(path: Path, wanted: tuple[bytes, ...]) -> Iterator[tuple[bytes, bytes]]:
+    """The chunks of `wanted` types, as (type, payload), until the image data."""
     try:
         with path.open("rb") as handle:
             if handle.read(8) != _MAGIC:
@@ -75,7 +88,7 @@ def _text_chunks(path: Path) -> Iterator[tuple[bytes, bytes]]:
                 length, chunk_type = struct.unpack(">I4s", header)
                 if chunk_type in _STOP_CHUNKS:
                     return
-                if chunk_type in _TEXT_CHUNKS and length <= _MAX_CHUNK:
+                if chunk_type in wanted and length <= _MAX_CHUNK:
                     yield chunk_type, handle.read(length)
                     handle.read(4)  # CRC
                     continue
