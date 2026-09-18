@@ -88,6 +88,42 @@ rest.
 
 The same graph expressed in the CASE/UCO ontology used to exchange digital forensic results. `filegrail` keeps zero runtime dependencies.
 
+## Evidence depth
+
+The next round deepens what a scan knows about a file before widening the list of formats. Formats come last, and only the ones that turn up in real material.
+
+### Real files behind every reader
+
+Readers written against a specification alone are checked against files produced by the software the specification describes, and the defects those files reveal are fixed. The corpus test already runs over `test-data/`; what is missing is the files.
+
+### Where a value was found
+
+Every evidence record can say where in the file it was read: the archive member, the embedded object or stream, the metadata namespace and path, the logical place such as a page or a slide, and the byte range where one is reliable. The `place` a person reads stays; the structured location is added beside it, in scan JSON without a schema change.
+
+### Files inside files
+
+Embedded objects are read as children of the file that carries them: an archive member, an OLE object in a document, an attachment in a message, a file embedded in a PDF, each with its own evidence and its own location, connected to its parent as a relationship of the graph. Depth, count, size and total work are bounded by one budget, so a container cannot make a scan run without end.
+
+### Content Credentials in every container that carries them
+
+C2PA manifests are read from TIFF and DNG, WAV and AVI, MP4, MOV, M4A, HEIF and AVIF, and ID3, using the container readers that already exist. Ingredients and actions are read in their current form, and the `c2pa.ai-disclosure` assertion and the IPTC AI fields are reported as declared AI provenance: a declaration, never a verdict about the content. The claim signature stays unverified and the report keeps saying so.
+
+### Deeper Office and PDF evidence
+
+From Office documents: external relationships, attached templates and linked workbooks, the original name and path of embedded objects, and DDE fields, each reported as an observation. From PDF: what each incremental update changed, object by object, so a document edited after signing shows which objects the edit replaced or added.
+
+### What a media file says about how it was made
+
+From MP4, MOV, Matroska and RIFF: the encoder chain, the recording device, timecode, and the language of subtitle and audio tracks. Codec profiles, colour and bit rates are left out; they describe the picture, not where it came from.
+
+### Format identification from the bytes
+
+The signature check grows into format identification: the format and its version from the file's bytes, named by the PRONOM registry and its persistent identifiers, from a versioned snapshot of the registry compiled into the package. The extension stays a claim the bytes confirm or contradict.
+
+### Formats that turn up in real material
+
+Canon CR3 and Fujifilm RAF, TNEF `winmail.dat`, and the member list of 7z and RAR archives without unpacking them. Each is added only once a real file is available to check it against.
+
 ## Later
 
 ### Comparing two scans

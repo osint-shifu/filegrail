@@ -21,7 +21,7 @@ answers:
 
 ## Metadata blocks
 
-**93 file extensions** have a reader. Twenty-one named metadata blocks, plus four
+**93 file extensions** have a reader. Twenty-one named metadata blocks, plus three
 that turn up in any container that will carry them.
 
 The first column is the `block` value you get in `--json`. It is what to filter

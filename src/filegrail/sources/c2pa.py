@@ -402,7 +402,7 @@ def _ingredient(assertion: dict[str, Any]) -> dict[str, str] | None:
 
     Version 1 spells the identifiers `document_id` and `instance_id`; later
     versions drop the underscore and make the title optional. Either way, an
-    ingredient that carries its own manifest is a step in a chain of custody
+    ingredient that carries its own manifest is a step in the provenance chain
     and one that does not is a plain file the generator opened.
     """
     found: dict[str, str] = {}
