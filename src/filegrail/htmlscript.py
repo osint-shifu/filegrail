@@ -17,7 +17,6 @@ SCRIPT = """
   var theme = one('#theme');
   function wear(name) {
     root.setAttribute('data-theme', name);
-    theme.textContent = name === 'light' ? '\\u25D1' : '\\u25D0';
     theme.title = name === 'light' ? 'Dark theme' : 'Light theme';
     theme.setAttribute('aria-label', theme.title);
     try { localStorage.setItem('filegrail-theme', name); } catch (error) { /* private mode */ }
@@ -49,27 +48,13 @@ SCRIPT = """
     unfolded = [];
   });
 
-  each(all('[data-expand]'), function (button) {
-    button.addEventListener('click', function () {
-      var held = button.closest('section');
-      var blocks = held ? held.querySelectorAll('details') : [];
-      var opening = Array.prototype.some.call(blocks, function (block) { return !block.open; });
-      each(blocks, function (block) { block.open = opening; });
-      button.textContent = (opening ? '\\u229F Collapse' : '\\u229E Expand') + ' all';
-    });
-  });
-
   document.addEventListener('click', function (event) {
     var button = event.target.closest ? event.target.closest('button.copy') : null;
     if (!button) { return; }
     var value = button.previousElementSibling ? button.previousElementSibling.textContent : '';
-    function done(mark) {
-      button.textContent = mark;
-      button.classList.add('ok');
-      setTimeout(function () {
-        button.textContent = '\\u29C9';
-        button.classList.remove('ok');
-      }, 1000);
+    function done(copied) {
+      button.classList.add(copied ? 'ok' : 'no');
+      setTimeout(function () { button.classList.remove('ok', 'no'); }, 1000);
     }
     function fallback() {
       var area = document.createElement('textarea');
@@ -79,10 +64,10 @@ SCRIPT = """
       var copied = false;
       try { copied = document.execCommand('copy'); } catch (error) { copied = false; }
       document.body.removeChild(area);
-      done(copied ? '\\u2713' : '\\u2717');
+      done(copied);
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(value).then(function () { done('\\u2713'); }, fallback);
+      navigator.clipboard.writeText(value).then(function () { done(true); }, fallback);
     } else {
       fallback();
     }

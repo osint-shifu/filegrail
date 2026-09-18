@@ -21,7 +21,14 @@ MAX_NODES = 120
 
 WIDTH = 960
 HEIGHT = 560
-_MARGIN = 36
+#: Room for a label centred under a node at the edge, and for one below the
+#: bottom row.
+_MARGIN_X = 120
+_MARGIN_Y = 44
+
+#: Nodes closer than this in the finished picture are pushed apart: two dots
+#: on top of each other read as one.
+_MIN_GAP = 38.0
 _ITERATIONS = 90
 
 #: Node types drawn before identifiers of the same degree: a person or a
@@ -102,12 +109,13 @@ def _layout(nodes: list[Drawn], edges: list[tuple[int, int]]) -> None:
     if count == 1:
         nodes[0].x, nodes[0].y = WIDTH / 2, HEIGHT / 2
         return
-    area = (WIDTH - 2 * _MARGIN) * (HEIGHT - 2 * _MARGIN)
+    area = (WIDTH - 2 * _MARGIN_X) * (HEIGHT - 2 * _MARGIN_Y)
     k = math.sqrt(area / count)
     xs = [WIDTH / 2 + math.cos(2 * math.pi * at / count) * (WIDTH / 3) for at in range(count)]
     ys = [HEIGHT / 2 + math.sin(2 * math.pi * at / count) * (HEIGHT / 3) for at in range(count)]
     heat = WIDTH / 8
     cooling = heat / (_ITERATIONS + 1)
+    reach = 3 * k
 
     for _ in range(_ITERATIONS):
         dx = [0.0] * count
@@ -117,6 +125,8 @@ def _layout(nodes: list[Drawn], edges: list[tuple[int, int]]) -> None:
                 ddx = xs[a] - xs[b]
                 ddy = ys[a] - ys[b]
                 dist = math.hypot(ddx, ddy) or 0.01
+                if dist > reach:
+                    continue  # far apart already; unbounded repulsion only scatters
                 push = k * k / dist
                 dx[a] += ddx / dist * push
                 dy[a] += ddy / dist * push
@@ -131,21 +141,57 @@ def _layout(nodes: list[Drawn], edges: list[tuple[int, int]]) -> None:
             dy[a] -= ddy / dist * pull
             dx[b] += ddx / dist * pull
             dy[b] += ddy / dist * pull
-        # A mild pull to the centre keeps disconnected components from drifting apart.
+        # A pull to the centre keeps disconnected components together.
         for at in range(count):
-            dx[at] -= (xs[at] - WIDTH / 2) * 0.02
-            dy[at] -= (ys[at] - HEIGHT / 2) * 0.02
+            dx[at] -= (xs[at] - WIDTH / 2) * 0.06
+            dy[at] -= (ys[at] - HEIGHT / 2) * 0.06
             length = math.hypot(dx[at], dy[at]) or 0.01
             step = min(length, heat)
-            xs[at] = min(WIDTH - _MARGIN, max(_MARGIN, xs[at] + dx[at] / length * step))
-            ys[at] = min(HEIGHT - _MARGIN, max(_MARGIN, ys[at] + dy[at] / length * step))
+            # Unclamped: a frame applied mid-flight presses whatever the hubs
+            # push outwards into a row along the edge. The frame is applied
+            # once, below, by scaling.
+            xs[at] += dx[at] / length * step
+            ys[at] += dy[at] / length * step
         heat -= cooling
 
-    # Fill the frame: the layout tends to leave the corners empty.
+    # Fit the frame at one scale for both axes, centred, so a cluster keeps
+    # its shape; then push apart whatever still sits on top of something.
     low_x, high_x = min(xs), max(xs)
     low_y, high_y = min(ys), max(ys)
     span_x = (high_x - low_x) or 1.0
     span_y = (high_y - low_y) or 1.0
+    scale = min((WIDTH - 2 * _MARGIN_X) / span_x, (HEIGHT - 2 * _MARGIN_Y) / span_y)
+    offset_x = (WIDTH - span_x * scale) / 2
+    offset_y = (HEIGHT - span_y * scale) / 2
+    xs = [offset_x + (x - low_x) * scale for x in xs]
+    ys = [offset_y + (y - low_y) * scale for y in ys]
+    _separate(xs, ys)
     for at, node in enumerate(nodes):
-        node.x = round(_MARGIN + (xs[at] - low_x) / span_x * (WIDTH - 2 * _MARGIN), 1)
-        node.y = round(_MARGIN + (ys[at] - low_y) / span_y * (HEIGHT - 2 * _MARGIN), 1)
+        node.x = round(xs[at], 1)
+        node.y = round(ys[at], 1)
+
+
+def _separate(xs: list[float], ys: list[float]) -> None:
+    count = len(xs)
+    for _ in range(40):
+        moved = False
+        for a in range(count):
+            for b in range(a + 1, count):
+                ddx = xs[a] - xs[b]
+                ddy = ys[a] - ys[b]
+                dist = math.hypot(ddx, ddy)
+                if dist >= _MIN_GAP:
+                    continue
+                if dist < 0.01:
+                    ddx, ddy, dist = 1.0, 0.0, 1.0
+                shove = (_MIN_GAP - dist) / 2 / dist
+                xs[a] += ddx * shove
+                ys[a] += ddy * shove
+                xs[b] -= ddx * shove
+                ys[b] -= ddy * shove
+                moved = True
+        if not moved:
+            break
+    for at in range(count):
+        xs[at] = min(WIDTH - _MARGIN_X, max(_MARGIN_X, xs[at]))
+        ys[at] = min(HEIGHT - _MARGIN_Y, max(_MARGIN_Y, ys[at]))

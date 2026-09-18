@@ -36,6 +36,7 @@ from .analysis import NOTHING, REVIEW, Case, CaseFile, Conflict, Finding, Pivots
 from .casereport import _ABSENT, _LISTED, _PER_FILE, _capital, _facts, _type_name
 from .graph import Graph, Node, Relationship, build_graph
 from .graphlayout import HEIGHT, WIDTH, Picture, picture
+from .htmlicons import ICONS
 from .htmlscript import SCRIPT
 from .htmlstyle import STYLE
 from .identify import PLACE, Identifier
@@ -198,18 +199,13 @@ def render_html(
         f"<style>{STYLE}</style>",
         "</head>",
         "<body>",
+        ICONS,
     ]
     masthead = [
         '<header class="mast" id="top">',
         _MARK,
         '<div class="who">',
         f'<h1 class="word">filegrail <small>v{_e(__version__)} · investigation report</small></h1>',
-        '<div class="tag">Trace origins · Extract metadata · Discover pivots</div>',
-        "</div>",
-        '<div class="mast-actions">',
-        '<button class="btn" id="print" type="button">⎙ Print / PDF</button>',
-        '<button class="btn icon" id="theme" type="button" '
-        'title="Light theme" aria-label="Light theme">◐</button>',
         "</div>",
         _fields(facts, css="facts", copy=frozenset({"target", "profile", "report"})),
         "</header>",
@@ -229,7 +225,17 @@ def render_html(
         '<label class="search"><input id="search" type="search" '
         'placeholder="search paths, values, fields" aria-label="Search the report" '
         'autocomplete="off" spellcheck="false">'
+        '<svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>'
         '<span class="hits" id="hits"></span><kbd>/</kbd></label>',
+        '<div class="mast-actions">',
+        '<button class="btn icon" id="print" type="button" title="Print / PDF" '
+        'aria-label="Print / PDF"><svg class="ic" aria-hidden="true">'
+        '<use href="#i-print"/></svg></button>',
+        '<button class="btn icon" id="theme" type="button" title="Light theme" '
+        'aria-label="Light theme"><svg class="ic moon" aria-hidden="true">'
+        '<use href="#i-moon"/></svg><svg class="ic sun" aria-hidden="true">'
+        '<use href="#i-sun"/></svg></button>',
+        "</div>",
         "</nav>",
     ]
     body = ["<main>"]
@@ -303,17 +309,9 @@ def _note(key: str, case: Case, detailed: set[str], relationship_count: int) -> 
 
 
 def _section(key: str, title: str, body: str, note: str) -> str:
-    """A section, with the control for what it holds only where there is something to open."""
+    """A section: its heading, the count beside it, and what it holds."""
     counted = f'<span class="n">{note}</span>' if note else ""
-    tools = (
-        '<button class="btn" type="button" data-expand>⊞ Expand all</button>'
-        if "<details" in body
-        else ""
-    )
-    return (
-        f'<section id="{key}"><div class="h"><h2>{_e(title)}</h2>{counted}{tools}</div>'
-        f"{body}</section>"
-    )
+    return f'<section id="{key}"><div class="h"><h2>{_e(title)}</h2>{counted}</div>{body}</section>'
 
 
 # --- pieces ----------------------------------------------------------------------
@@ -398,7 +396,10 @@ def _value(value: str) -> str:
     """A value and a button that copies it: the text shown, never a second copy of it."""
     return (
         f'<span class="v">{_e(value)}</span>'
-        '<button class="copy" type="button" title="copy" aria-label="copy">⧉</button>'
+        '<button class="copy" type="button" title="copy" aria-label="copy">'
+        '<svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg>'
+        '<svg class="ic ok" aria-hidden="true"><use href="#i-check"/></svg>'
+        '<svg class="ic no" aria-hidden="true"><use href="#i-x"/></svg></button>'
     )
 
 
@@ -779,7 +780,8 @@ def _relationships(graph: Graph, files: dict[str, CaseFile]) -> str:
             f'<tr class="relationship" data-source="{_e(edge.source)}" '
             f'data-target="{_e(edge.target)}" data-kind="{_e(edge.kind)}">'
             f"<td>{_relationship_node(source, files)}</td>"
-            '<td class="arrow" aria-label="points to">→</td>'
+            '<td class="arrow" aria-label="points to">'
+            '<svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></td>'
             f'<td class="kind">{_e(edge.kind)}{often}</td>'
             f"<td>{_relationship_node(target, files)}</td>"
             f"<td>{_relationship_evidence(edge)}</td></tr>"
@@ -799,8 +801,8 @@ def _relationships(graph: Graph, files: dict[str, CaseFile]) -> str:
     )
     table = (
         '<div class="wrap"><table class="tbl relationships" id="relationship-table">'
-        '<thead><tr><th data-sort="text">source</th><th></th>'
-        '<th data-sort="text">relationship</th><th data-sort="text">target</th>'
+        '<thead><tr><th data-sort="text">from</th><th></th>'
+        '<th data-sort="text">relation</th><th data-sort="text">to</th>'
         f"<th>evidence</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
     )
     return _figure(picture(graph), files) + controls + table
@@ -933,7 +935,8 @@ def _relationship_node(node: Node, files: dict[str, CaseFile]) -> str:
         value = _value(node.value)
     focus = (
         f'<button class="rel-focus" type="button" data-rel-focus="{_e(node.id)}" '
-        f'title="Focus this node" aria-label="Focus {_e(node.value)}">◎</button>'
+        f'title="Focus this node" aria-label="Focus {_e(node.value)}">'
+        '<svg class="ic" aria-hidden="true"><use href="#i-focus"/></svg></button>'
     )
     return (
         '<div class="rel-node">'
@@ -1190,7 +1193,8 @@ def _detail(
         f"{' open' if entry.state == REVIEW else ''}>"
         f'<summary><span class="id">{_e(entry.ref)}</span>'
         f'<span class="name">{_e(_relative(record.path, case.root))}{flag}</span>'
-        f'<span class="meta">{meta} {refs}<span class="chev">›</span></span></summary>'
+        f'<span class="meta">{meta} {refs}'
+        '<svg class="chev" aria-hidden="true"><use href="#i-chevron"/></svg></span></summary>'
         f"{''.join(body)}</details>"
     )
 
@@ -1218,7 +1222,7 @@ def _coverage(case: Case, unsearched: Unsearched | None) -> str:
         )
     table = (
         '<div class="wrap"><table class="tbl"><thead><tr><th data-sort="text">source</th>'
-        '<th data-sort="text">state</th><th>coverage</th><th data-sort="text">horizon</th>'
+        '<th data-sort="text">state</th><th>coverage</th><th data-sort="text">earliest record</th>'
         f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
     )
     if case.begins:
