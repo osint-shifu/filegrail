@@ -46,7 +46,7 @@ on when you want the PDFs rather than everything a file said about itself.
 | `svg-metadata` | `.svg` | Generator, plus an embedded RDF block where an editor left one |
 | `notebook-kernel` | `.ipynb` | Kernel name and language runtime version |
 | `web-document` | `.html` `.htm` `.xhtml` | Declared author, publisher, dates, canonical URL, Open Graph, Twitter Cards, bounded JSON-LD, Microdata and RDFa |
-| `c2pa` | `.jpg` `.jpeg` `.png` | JUMBF manifest: producing application, creation data, digital source type, and whether the manifest's own hash still covers the file |
+| `c2pa` | `.jpg` `.jpeg` `.png` | JUMBF manifest: producing application, creation data, digital source type, actions, ingredients with their relationship, and whether the manifest's own hash still covers the file |
 
 Mail is not in this table because a message's metadata is its delivery record
 rather than a block inside a container; it has a section of its own further

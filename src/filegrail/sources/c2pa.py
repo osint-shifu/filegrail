@@ -52,6 +52,18 @@ _DATA_HASH = "c2pa.hash.data"
 #: assertion itself leaves it out, which real manifests routinely do.
 _CLAIM_PREFIX = "c2pa.claim"
 
+#: Ingredient assertions are labelled `c2pa.ingredient`, `.v2`, `.v3`, and a
+#: manifest with several of them numbers the labels: `c2pa.ingredient__1`.
+_INGREDIENT_PREFIX = "c2pa.ingredient"
+
+#: A manifest store holds one superbox per manifest, each labelled with its
+#: URN. The last one is the active manifest - the one describing the file as
+#: it is now - and earlier ones are the history it was built on.
+_MANIFEST_LABEL = "urn:"
+
+_MAX_ACTIONS = 32
+_MAX_INGREDIENTS = 16
+
 _HASHES = {"sha256": hashlib.sha256, "sha384": hashlib.sha384, "sha512": hashlib.sha512}
 
 #: A megabyte at a time, so a large asset is never held in memory to hash it.
@@ -82,25 +94,32 @@ def read_c2pa_manifest(path: Path) -> EvidenceRecord | None:
     if not jumbf:
         return None
 
-    payloads: list[tuple[str | None, dict[str, Any]]] = []
+    payloads: list[tuple[str | None, dict[str, Any], int]] = []
     try:
         _walk(jumbf, 0, len(jumbf), 0, payloads)
     except (CborError, struct.error, ValueError):
         return None
+    if not payloads:
+        return None
+
+    # Only the active manifest is summarised. An earlier manifest's generator
+    # would describe an ingredient, not this file.
+    manifests = sorted({index for _, _, index in payloads})
+    active = [(label, payload) for label, payload, index in payloads if index == manifests[-1]]
 
     inherited = None
-    for label, payload in payloads:
+    for label, payload in active:
         if label and label.startswith(_CLAIM_PREFIX):
             inherited = payload.get("alg")
             break
 
     binding = None
-    for label, payload in payloads:
+    for label, payload in active:
         if label == _DATA_HASH:
             binding = _binding(path, payload, inherited)
             break
 
-    return _summarise([payload for _, payload in payloads], binding)
+    return _summarise(active, binding, len(manifests))
 
 
 # --- container extraction ----------------------------------------------------
@@ -160,8 +179,8 @@ def _walk(
     offset: int,
     end: int,
     depth: int,
-    found: list[tuple[str | None, dict[str, Any]]],
-    label: str | None = None,
+    found: list[tuple[str | None, dict[str, Any], int]],
+    manifest: int = 0,
 ) -> None:
     """Collect every decodable CBOR payload, under the label it was filed as.
 
@@ -174,6 +193,7 @@ def _walk(
     if depth > _MAX_DEPTH:
         return
 
+    label: str | None = None
     boxes = 0
     while offset + 8 <= end and boxes < _MAX_BOXES:
         boxes += 1
@@ -193,16 +213,18 @@ def _walk(
 
         box_end = offset + length
         if box_type == _JUMBF_SUPERBOX:
-            _walk(data, body, box_end, depth + 1, found)
+            _walk(data, body, box_end, depth + 1, found, manifest)
         elif box_type == _JUMBF_DESCRIPTION:
             label = _label(data, body, box_end) or label
+            if label and label.startswith(_MANIFEST_LABEL):
+                manifest = max(index for _, _, index in found) + 1 if found else 1
         elif box_type == _JUMBF_CBOR:
             try:
                 value = loads(data[body:box_end])
             except CborError:
                 value = None
             if isinstance(value, dict):
-                found.append((label, value))
+                found.append((label, value, manifest))
         else:
             pass  # binary payloads: icons, thumbnails, signatures
 
@@ -307,16 +329,28 @@ def _feed(handle: BinaryIO, digest: _Hash, count: int) -> None:
 # --- interpretation ----------------------------------------------------------
 
 
-def _summarise(claims: list[dict[str, Any]], binding: str | None = None) -> EvidenceRecord | None:
+def _summarise(
+    payloads: list[tuple[str | None, dict[str, Any]]],
+    binding: str | None = None,
+    manifests: int = 1,
+) -> EvidenceRecord | None:
     generator = None
     software = None
     when = None
     source_type = None
     source_uri = None
+    actions: list[str] = []
+    ingredients: list[dict[str, str]] = []
 
-    for claim in claims:
+    for label, claim in payloads:
         generator = generator or _generator_name(claim)
+        if label and label.split("__", 1)[0].startswith(_INGREDIENT_PREFIX):
+            if len(ingredients) < _MAX_INGREDIENTS and (ingredient := _ingredient(claim)):
+                ingredients.append(ingredient)
+            continue
         for action in _actions(claim):
+            if (name := _string(action.get("action"))) and len(actions) < _MAX_ACTIONS:
+                actions.append(name)
             when = when or _string(action.get("when"))
             # The label and the value it was read from come from one action,
             # so the field never names a different source type than the note.
@@ -327,10 +361,17 @@ def _summarise(claims: list[dict[str, Any]], binding: str | None = None) -> Evid
     tool = generator or software
     if generator and software and software not in generator:
         tool = f"{generator} ({software})"
-    if not tool and not when and not source_type:
+    if not tool and not when and not source_type and not ingredients:
         return None
 
-    notes = [note for note in (source_type, binding, "signature not verified") if note]
+    parents = [item.get("title") for item in ingredients if item.get("relationship") == "parentOf"]
+    lineage = None
+    if parents:
+        lineage = f"derived from {parents[0]}" if parents[0] else "derived from an ingredient"
+    history = f"{manifests} manifests" if manifests > 1 else None
+    notes = [
+        note for note in (source_type, lineage, history, binding, "signature not verified") if note
+    ]
     # Under the manifest's own names, so what the claim said can be checked
     # without reading it back out of a sentence.
     fields = {
@@ -342,9 +383,43 @@ def _summarise(claims: list[dict[str, Any]], binding: str | None = None) -> Evid
         )
         if value
     }
+    if actions:
+        fields["actions"] = ", ".join(actions)
+    if manifests > 1:
+        fields["manifests"] = str(manifests)
+    if ingredients:
+        fields["ingredients"] = str(len(ingredients))
+        for index, ingredient in enumerate(ingredients, 1):
+            for name, value in ingredient.items():
+                fields[f"Ingredient[{index}]:{name}"] = value
     return EvidenceRecord(
         source="c2pa", block="c2pa", tool=tool, at=when, note="; ".join(notes), fields=fields
     )
+
+
+def _ingredient(assertion: dict[str, Any]) -> dict[str, str] | None:
+    """What an ingredient assertion says about the asset it was built from.
+
+    Version 1 spells the identifiers `document_id` and `instance_id`; later
+    versions drop the underscore and make the title optional. Either way, an
+    ingredient that carries its own manifest is a step in a chain of custody
+    and one that does not is a plain file the generator opened.
+    """
+    found: dict[str, str] = {}
+    for name in ("title", "format", "relationship"):
+        if text := _string(assertion.get(name)):
+            found[name] = text
+    for name, spelled in (
+        ("document_id", "documentID"),
+        ("documentID", "documentID"),
+        ("instance_id", "instanceID"),
+        ("instanceID", "instanceID"),
+    ):
+        if spelled not in found and (text := _string(assertion.get(name))):
+            found[spelled] = text
+    if any(key in assertion for key in ("c2pa_manifest", "activeManifest", "claim_signature")):
+        found["manifest"] = "own manifest"
+    return found or None
 
 
 def _generator_name(claim: dict[str, Any]) -> str | None:

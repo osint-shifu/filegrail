@@ -125,6 +125,7 @@ def test_reads_an_ai_generated_png(tmp_path: Path):
         "claim_generator": "OpenAI Media Service API",
         "softwareAgent": "gpt-image 2.0",
         "digitalSourceType": IPTC + "trainedAlgorithmicMedia",
+        "actions": "c2pa.created",
     }
 
 
@@ -268,3 +269,73 @@ def test_a_manifest_that_is_not_decodable_cbor_does_not_end_the_scan(tmp_path: P
     _png_with(image, _manifest(b"\x5f\x00\xff"))
 
     assert read_c2pa_manifest(image) is None
+
+
+def _store(*manifests: bytes) -> bytes:
+    return _box(b"jumb", _description(b"c2pa", "c2pa") + b"".join(manifests))
+
+
+def _manifest_box(urn: str, claim: bytes, assertions: tuple = ()) -> bytes:
+    store = b"".join(
+        _box(b"jumb", _description(b"c2as", label) + _box(b"cbor", payload))
+        for label, payload in assertions
+    )
+    body = _description(b"c2ma", urn)
+    if store:
+        body += _box(b"jumb", _description(b"c2as", "c2pa.assertions") + store)
+    body += _box(b"jumb", _description(b"c2cl", "c2pa.claim.v2") + _box(b"cbor", claim))
+    return _box(b"jumb", body)
+
+
+def test_active_manifest_lists_its_actions_and_ingredients(tmp_path: Path):
+    """The last manifest in the store describes the file; the earlier one is
+    the history of the ingredient it was edited from."""
+    original = _manifest_box(
+        "urn:uuid:1111", _cbor({"claim_generator_info": {"name": "Camera Firmware"}})
+    )
+    actions = _cbor(
+        {
+            "actions": [
+                {"action": "c2pa.opened", "when": Tagged(0, "2026-08-01T10:00:00Z")},
+                {"action": "c2pa.color_adjustments"},
+                {"action": "c2pa.resized"},
+            ]
+        }
+    )
+    parent = _cbor(
+        {
+            "title": "IMG_0001.jpg",
+            "format": "image/jpeg",
+            "relationship": "parentOf",
+            "document_id": "xmp.did:1111",
+            "c2pa_manifest": {"url": "self#jumbf=/c2pa/urn:uuid:1111", "hash": b"\x00"},
+        }
+    )
+    component = _cbor({"title": "logo.png", "relationship": "componentOf"})
+    edited = _manifest_box(
+        "urn:uuid:2222",
+        _cbor({"claim_generator_info": {"name": "Photo Editor", "version": "9.1"}}),
+        (
+            ("c2pa.actions.v2", actions),
+            ("c2pa.ingredient.v2", parent),
+            ("c2pa.ingredient.v2__1", component),
+        ),
+    )
+    image = tmp_path / "edited.png"
+    _png_with(image, _store(original, edited))
+
+    found = read_c2pa_manifest(image)
+
+    assert found is not None
+    assert found.tool == "Photo Editor 9.1"
+    assert found.at == "2026-08-01T10:00:00Z"
+    assert found.note == "derived from IMG_0001.jpg; 2 manifests; signature not verified"
+    assert found.fields["actions"] == "c2pa.opened, c2pa.color_adjustments, c2pa.resized"
+    assert found.fields["manifests"] == "2"
+    assert found.fields["ingredients"] == "2"
+    assert found.fields["Ingredient[1]:title"] == "IMG_0001.jpg"
+    assert found.fields["Ingredient[1]:relationship"] == "parentOf"
+    assert found.fields["Ingredient[1]:documentID"] == "xmp.did:1111"
+    assert found.fields["Ingredient[1]:manifest"] == "own manifest"
+    assert found.fields["Ingredient[2]:title"] == "logo.png"
+    assert "Ingredient[2]:manifest" not in found.fields

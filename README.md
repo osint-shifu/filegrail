@@ -176,7 +176,7 @@ Original field names are kept in the report.
 | **SVG metadata** | `.svg` | Generating application and author |
 | **Jupyter notebook** | `.ipynb` | Kernel, language version and author |
 | **Web document** | `.html` `.htm` `.xhtml` | Author, publisher, dates, canonical URL, Open Graph, Twitter Cards, JSON-LD, Microdata and RDFa |
-| **C2PA** | `.jpg` `.jpeg` `.png` | Producing application, creation data, digital source type such as a generative AI model, and whether the file still matches its manifest |
+| **C2PA** | `.jpg` `.jpeg` `.png` | Producing application, creation data, digital source type such as a generative AI model, the recorded actions and ingredients, and whether the file still matches its manifest |
 
 XMP, XMP history and IPTC are not tied to one format and are read wherever a supported file carries them.
 
