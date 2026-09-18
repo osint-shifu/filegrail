@@ -441,6 +441,20 @@ _SCRIPT = """
   }
   var printer = one('#print');
   if (printer) { printer.addEventListener('click', function () { window.print(); }); }
+  // A closed block prints closed whatever the stylesheet says, because the
+  // browser keeps its contents out of the layout. Open them for the printer
+  // and close them again afterwards.
+  var unfolded = [];
+  window.addEventListener('beforeprint', function () {
+    unfolded = Array.prototype.filter.call(all('details'), function (block) {
+      return !block.open;
+    });
+    unfolded.forEach(function (block) { block.open = true; });
+  });
+  window.addEventListener('afterprint', function () {
+    unfolded.forEach(function (block) { block.open = false; });
+    unfolded = [];
+  });
 
   each(all('[data-expand]'), function (button) {
     button.addEventListener('click', function () {
