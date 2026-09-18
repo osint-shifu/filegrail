@@ -5,6 +5,12 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.30.5 - 2026-09-18
+
+### Changed
+
+- The README masthead now separates the mark from navigation with whitespace, sharpens the text hierarchy and gives each status badge a distinct semantic colour.
+
 ## 0.30.4 - 2026-09-18
 
 ### Changed
