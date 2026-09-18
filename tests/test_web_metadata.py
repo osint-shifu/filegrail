@@ -145,3 +145,37 @@ def test_utf16_bom_is_not_mistaken_for_a_binary_file(tmp_path: Path):
 
     assert found is not None
     assert found.fields["author"] == "李明"
+
+
+def test_microdata_and_rdfa_values_are_read_from_body_elements(tmp_path: Path):
+    page = tmp_path / "post.html"
+    page.write_text(
+        """<html><head>
+<meta property="og:image" content="https://cdn.example.org/lead.jpg">
+</head><body>
+<article itemscope itemtype="https://schema.org/BlogPosting">
+  <h1 itemprop="headline">Field <em>notes</em></h1>
+  <span itemprop="author">Jan Kowalski</span>
+  <time itemprop="datePublished" datetime="2026-09-18T08:00:00Z">18 Sept</time>
+  <a itemprop="url" href="https://example.org/post/7">permalink</a>
+</article>
+<div vocab="https://schema.org/" typeof="Article">
+  <span property="publisher">Example Press</span>
+  <link property="license" href="https://creativecommons.org/licenses/by/4.0/">
+</div>
+</body></html>""",
+        encoding="utf-8",
+    )
+
+    found = read_embedded_metadata(page)
+
+    assert found is not None
+    assert found.note == "author Jan Kowalski; publisher Example Press; title Field notes"
+    assert found.at == "2026-09-18T08:00:00Z"
+    assert found.fields["microdata:@type"] == "https://schema.org/BlogPosting"
+    assert found.fields["microdata:headline"] == "Field notes"
+    assert found.fields["microdata:datePublished"] == "2026-09-18T08:00:00Z"
+    assert found.fields["microdata:url"] == "https://example.org/post/7"
+    assert found.fields["rdfa:@type"] == "Article"
+    assert found.fields["rdfa:license"] == "https://creativecommons.org/licenses/by/4.0/"
+    assert "rdfa:image" not in found.fields

@@ -22,6 +22,8 @@ _MAX_BYTES = 2 * 1024 * 1024
 _MAX_VALUE = 4096
 _MAX_JSON_LD = 16
 _MAX_JSON_LD_CHARS = 256 * 1024
+_MAX_SEMANTIC_CAPTURES = 256
+_MAX_CAPTURE_CHARS = 4096
 
 _CHARSET = re.compile(rb"charset\s*=\s*['\"]?\s*([a-z0-9._-]+)", re.IGNORECASE)
 
@@ -83,6 +85,40 @@ _JSON_LD_KEYS = (
     "contentUrl",
     "embedUrl",
 )
+
+_SEMANTIC_KEYS = {
+    name.casefold(): name
+    for name in (
+        "author",
+        "creator",
+        "publisher",
+        "copyrightHolder",
+        "copyrightYear",
+        "license",
+        "headline",
+        "name",
+        "url",
+        "datePublished",
+        "dateModified",
+        "dateCreated",
+        "uploadDate",
+        "image",
+        "video",
+        "audio",
+        "contentUrl",
+        "embedUrl",
+        "mainEntityOfPage",
+    )
+}
+
+
+@dataclass(slots=True)
+class _Capture:
+    tag: str
+    prefix: str
+    names: tuple[str, ...]
+    parts: list[str] = field(default_factory=list)
+    size: int = 0
 
 
 @dataclass(slots=True)
@@ -147,6 +183,8 @@ class _WebMetadata(HTMLParser):
         self._json_ld: list[list[str]] = []
         self._json_ld_active: list[str] | None = None
         self._json_ld_size = 0
+        self._captures: list[_Capture] = []
+        self._capture_count = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
@@ -172,6 +210,8 @@ class _WebMetadata(HTMLParser):
             self._json_ld_size = 0
             self._json_ld.append(self._json_ld_active)
 
+        self._semantic_start(tag, values)
+
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         self.handle_starttag(tag, attrs)
         self.handle_endtag(tag)
@@ -184,6 +224,7 @@ class _WebMetadata(HTMLParser):
                 self._title_parts.clear()
         elif tag.lower() == "script":
             self._json_ld_active = None
+        self._semantic_end(tag.lower())
 
     def handle_data(self, data: str) -> None:
         if self._title:
@@ -194,6 +235,12 @@ class _WebMetadata(HTMLParser):
                 kept = data[:remaining]
                 self._json_ld_active.append(kept)
                 self._json_ld_size += len(kept)
+        for capture in self._captures:
+            remaining = _MAX_CAPTURE_CHARS - capture.size
+            if remaining > 0:
+                kept = data[:remaining]
+                capture.parts.append(kept)
+                capture.size += len(kept)
 
     def finish(self) -> None:
         for parts in self._json_ld:
@@ -214,9 +261,81 @@ class _WebMetadata(HTMLParser):
         if collapsed:
             self.fields[name] = collapsed[:_MAX_VALUE]
 
+    def _semantic_start(self, tag: str, values: dict[str, str]) -> None:
+        itemtype = values.get("itemtype")
+        if itemtype:
+            self._keep("microdata:@type", itemtype)
+        rdftype = values.get("typeof")
+        if rdftype:
+            self._keep("rdfa:@type", rdftype)
+
+        for attribute, prefix in (("itemprop", "microdata"), ("property", "rdfa")):
+            names = _semantic_names(values.get(attribute))
+            if not names:
+                continue
+            direct = _semantic_value(tag, values)
+            if direct is not None:
+                for name in names:
+                    self._keep(f"{prefix}:{name}", direct)
+            elif self._capture_count < _MAX_SEMANTIC_CAPTURES:
+                self._capture_count += 1
+                self._captures.append(_Capture(tag, prefix, names))
+
+    def _semantic_end(self, tag: str) -> None:
+        for index in range(len(self._captures) - 1, -1, -1):
+            capture = self._captures[index]
+            if capture.tag != tag:
+                continue
+            self._captures.pop(index)
+            value = "".join(capture.parts)
+            for name in capture.names:
+                self._keep(f"{capture.prefix}:{name}", value)
+            return
+
 
 def _tokens(value: str | None) -> set[str]:
     return {token.lower() for token in value.split()} if value else set()
+
+
+# Open Graph and its extensions use `property` too.  Those names are kept under
+# their own spelling by `_META_KEYS`; they are not RDFa vocabulary terms.
+_SOCIAL_PREFIXES = {
+    "og",
+    "article",
+    "book",
+    "profile",
+    "music",
+    "video",
+    "fb",
+    "twitter",
+    "al",
+    "place",
+    "product",
+}
+
+
+def _semantic_names(value: str | None) -> tuple[str, ...]:
+    if not value:
+        return ()
+    found = []
+    for raw in value.split():
+        local = raw.rstrip("/").rsplit("/", 1)[-1].rsplit("#", 1)[-1]
+        if ":" in local:
+            prefix, local = local.rsplit(":", 1)
+            if prefix.lower() in _SOCIAL_PREFIXES:
+                continue
+        if canonical := _SEMANTIC_KEYS.get(local.casefold()):
+            found.append(canonical)
+    return tuple(dict.fromkeys(found))
+
+
+def _semantic_value(tag: str, values: dict[str, str]) -> str | None:
+    for attribute in ("content", "resource", "href", "src", "datetime", "data", "value"):
+        if value := values.get(attribute):
+            return value
+    if tag in {"meta", "link", "img", "audio", "video", "source", "object", "time", "data"}:
+        return ""
+    return None
 
 
 def _jsonld_fields(value: object) -> dict[str, str]:

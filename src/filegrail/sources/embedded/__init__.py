@@ -125,11 +125,31 @@ def _from_web(path: Path, suffix: str) -> EvidenceRecord | None:
             "dc.creator",
             "dcterms.creator",
             "jsonld:author",
+            "microdata:author",
+            "microdata:creator",
+            "rdfa:author",
+            "rdfa:creator",
         ),
     )
-    publisher = _first(fields, ("publisher", "og:site_name", "jsonld:publisher"))
-    title = _first(fields, ("title", "og:title", "twitter:title", "jsonld:headline", "jsonld:name"))
-    canonical = _first(fields, ("canonical", "og:url", "jsonld:url"))
+    publisher = _first(
+        fields,
+        ("publisher", "og:site_name", "jsonld:publisher", "microdata:publisher", "rdfa:publisher"),
+    )
+    title = _first(
+        fields,
+        (
+            "title",
+            "og:title",
+            "twitter:title",
+            "jsonld:headline",
+            "jsonld:name",
+            "microdata:headline",
+            "microdata:name",
+            "rdfa:headline",
+            "rdfa:name",
+        ),
+    )
+    canonical = _first(fields, ("canonical", "og:url", "jsonld:url", "microdata:url", "rdfa:url"))
     published = _first(
         fields,
         (
@@ -140,6 +160,10 @@ def _from_web(path: Path, suffix: str) -> EvidenceRecord | None:
             "dcterms.date",
             "date",
             "jsonld:datePublished",
+            "microdata:datePublished",
+            "microdata:dateCreated",
+            "rdfa:datePublished",
+            "rdfa:dateCreated",
         ),
     )
 
