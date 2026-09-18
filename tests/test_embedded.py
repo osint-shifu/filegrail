@@ -345,3 +345,31 @@ def test_pdf_structure_reports_updates_attachments_actions_and_signatures(tmp_pa
     assert origin.fields["AcroForm"] == "present"
     assert origin.fields["URI[1]"] == "https://example.org/x"
     assert "Launch" not in origin.fields
+
+
+def test_pdf_incremental_update_uses_the_latest_info_dictionary(tmp_path: Path):
+    """A superseded Info object remains in the bytes but is no longer current."""
+    from tests.pdf import document
+
+    first = document(
+        [b"BT (page) Tj ET"],
+        extra=b"<< /Producer (Old Writer) /Author (Old Author) >>",
+    )
+    first = first.replace(b"trailer\n<<", b"trailer\n<< /Info 6 0 R", 1)
+    previous = first.rfind(b"xref")
+    new_info = b"7 0 obj\n<< /Producer (New Writer) /Author (New Author) >>\nendobj\n"
+    new_xref = len(first) + len(new_info)
+    update = (
+        new_info
+        + b"xref\n7 1\n%010d 00000 n \n" % len(first)
+        + b"trailer\n<< /Size 8 /Root 1 0 R /Info 7 0 R /Prev %d >>\n" % previous
+        + b"startxref\n%d\n%%%%EOF\n" % new_xref
+    )
+    path = tmp_path / "updated.pdf"
+    path.write_bytes(first + update)
+
+    origin = read_embedded_metadata(path)
+
+    assert origin is not None
+    assert origin.tool == "New Writer"
+    assert origin.fields["Author"] == "New Author"

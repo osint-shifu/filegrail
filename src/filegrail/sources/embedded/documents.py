@@ -88,6 +88,7 @@ _PDF_ENTRY = re.compile(
     rb"/(Producer|Creator|Author|Title|Subject|Keywords|CreationDate|ModDate|Trapped)\s*"
     rb"(?:\((?P<literal>(?:\\.|[^\\)])*)\)|<(?P<hex>[0-9A-Fa-f\s]*)>)"
 )
+_PDF_INFO_REF = re.compile(rb"/Info\s+(\d+)\s+(\d+)\s+R\b")
 
 _DC = "http://purl.org/dc/elements/1.1/"
 _DCTERMS = "http://purl.org/dc/terms/"
@@ -140,16 +141,7 @@ def _read_pdf(path: Path) -> EvidenceRecord | None:
             whole = head
 
     inflated = _inflated_streams(whole)
-    found: dict[str, str] = {}
-    for match in _PDF_ENTRY.finditer(head + inflated):
-        key = match.group(1).decode("ascii")
-        if match.group("hex") is not None:
-            value = _decode_pdf_hex(match.group("hex"))
-        else:
-            value = _decode_pdf_string(match.group("literal"))
-        # An empty /Producer () is common; do not let it mask a later real one.
-        if value and key not in found:
-            found[key] = value
+    found = _pdf_info_fields(whole, head + inflated)
 
     tool = found.get("Producer") or found.get("Creator")
     if found.get("Producer") and found.get("Creator") not in (None, found.get("Producer")):
@@ -164,6 +156,39 @@ def _read_pdf(path: Path) -> EvidenceRecord | None:
         "; ".join(notes) or None,
         found,
     )
+
+
+def _pdf_info_fields(raw: bytes, fallback: bytes) -> dict[str, str]:
+    """Decode the current Info object, falling back where it cannot be resolved."""
+    candidates = fallback
+    references = _PDF_INFO_REF.findall(raw)
+    if references:
+        number, generation = references[-1]
+        object_pattern = re.compile(
+            rb"(?:^|[\r\n])\s*"
+            + re.escape(number)
+            + rb"\s+"
+            + re.escape(generation)
+            + rb"\s+obj\b(.*?)endobj",
+            re.DOTALL,
+        )
+        objects = object_pattern.findall(raw)
+        if objects:
+            candidates = objects[-1]
+
+    found: dict[str, str] = {}
+    for match in _PDF_ENTRY.finditer(candidates):
+        key = match.group(1).decode("ascii")
+        if match.group("hex") is not None:
+            value = _decode_pdf_hex(match.group("hex"))
+        else:
+            value = _decode_pdf_string(match.group("literal"))
+        # An empty /Producer () is common; do not let it mask a later real one.
+        if value and key not in found:
+            found[key] = value
+    if not found and candidates is not fallback:
+        return _pdf_info_fields(b"", fallback)
+    return found
 
 
 def _pdf_structure(raw: bytes, inflated: bytes, fields: dict[str, str]) -> list[str]:

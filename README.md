@@ -7,7 +7,7 @@
 
 **Trace file origins. Extract metadata. Find investigative pivots.**
 
-[![PyPI](https://img.shields.io/badge/pypi-v0.24.0-3775A9?style=flat-square)](https://pypi.org/project/filegrail/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.25.0-3775A9?style=flat-square)](https://pypi.org/project/filegrail/)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-1f883d?style=flat-square)
 ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1f883d?style=flat-square)
@@ -465,13 +465,13 @@ A normal scan reads embedded metadata and available local provenance records. Pi
 
 - summary and key findings;
 - evidence coverage, before the files are read;
-- a timeline of every dated record, with a density strip over the span of the case;
+- a timeline of every dated record, with a density strip over the span of the case that narrows the list to one period;
 - a file index with filters;
 - every decoded field of every file that carries evidence;
-- a picture of the evidence graph, and a relationship explorer with node search and the evidence behind each edge;
+- a picture of the evidence graph that pans, zooms and exports as SVG, node details on click, and a relationship explorer with node search, filters and the evidence behind each edge;
 - investigative pivots;
 - conflicts between sources;
-- sortable tables;
+- sortable tables that copy as tab-separated text;
 - links between files, findings, conflicts and pivots;
 - full-report search;
 - dark and light themes following the system setting, and a print layout that keeps every table and every piece of evidence.

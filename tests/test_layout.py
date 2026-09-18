@@ -121,6 +121,24 @@ def _every_view(theme: Theme) -> dict[str, str]:
     }
 
 
+def test_terminal_timeline_orders_offsets_by_the_instant_they_represent():
+    records = [
+        _record(
+            "later.jpg",
+            EvidenceRecord(source="c2pa", tool="later actual", at="2026-01-01T00:00:00Z"),
+        ),
+        _record(
+            "earlier.jpg",
+            EvidenceRecord(source="c2pa", tool="earlier actual", at="2026-01-01T00:30:00+02:00"),
+        ),
+    ]
+
+    report = render_timeline(records, ROOT, theme=_theme())
+
+    assert report.index("earlier.jpg") < report.index("later.jpg")
+    assert report.index("2025-12-31 22:30:00") < report.index("2026-01-01 00:00:00")
+
+
 # --- the window ---------------------------------------------------------------
 
 

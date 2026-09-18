@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Sequence
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -93,6 +94,34 @@ def shown(moment: str | None) -> str | None:
     if not moment:
         return None
     return f"{moment[:19]}Z" if moment.endswith("Z") else moment[:19]
+
+
+def _timeline_key(moment: str | None) -> tuple[bool, float, str]:
+    """Sort an ISO timestamp by its instant, with malformed values last."""
+    if not moment:
+        return True, 0.0, ""
+    value = moment[:-1] + "+00:00" if moment.endswith("Z") else moment
+    try:
+        parsed = datetime.fromisoformat(value)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return False, parsed.timestamp(), moment
+    except (OSError, OverflowError, ValueError):
+        return True, 0.0, moment
+
+
+def _timeline_value(moment: str | None) -> str | None:
+    """Display aware timestamps in UTC so their printed order stays chronological."""
+    if not moment:
+        return None
+    value = moment[:-1] + "+00:00" if moment.endswith("Z") else moment
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return shown(moment)
+    if parsed.tzinfo is None:
+        return shown(moment)
+    return parsed.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 #: Width of the label column inside an entry, so values line up across labels.
@@ -1152,7 +1181,7 @@ def render_timeline(
     events = [
         (found.at, record, found) for record in records for found in record.evidence if found.at
     ]
-    events.sort(key=lambda event: event[0])
+    events.sort(key=lambda event: _timeline_key(event[0]))
 
     lines = _chrome(theme, "timeline", [("target", _where(theme, root, home))])
     if not events:
@@ -1161,7 +1190,7 @@ def render_timeline(
 
     rows: list[tuple[str, ...]] = [
         (
-            _stamp(shown(at)),
+            _stamp(_timeline_value(at)),
             category(found),
             _relative(record.path, root),
             _named(found),

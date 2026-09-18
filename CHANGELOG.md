@@ -5,15 +5,23 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.25.0 - 2026-09-18
 
 ### Added
 
-- HTML report: a timeline of dated records and a picture of the evidence graph.
+- HTML report: a timeline of dated records, with a density strip that narrows the list to one period.
+- HTML report: a picture of the evidence graph with pan, zoom, fit and SVG export; a node's details list what it is connected to, link to the files and open its pivot; the relationship table has its own filter and sort.
+- HTML report: every table copies as tab-separated text; a floating button returns to the top.
 
 ### Changed
 
-- HTML report redesigned: numbered sections, icon controls in the navigation, tighter hierarchy and rhythm; the markup and hooks are unchanged.
+- HTML report redesigned: numbered sections, icon controls in the navigation, tighter hierarchy, corners and rhythm.
+
+### Fixed
+
+- PDF metadata: an incremental update now uses the current referenced Info dictionary instead of a superseded one left in the file.
+- WOFF metadata: declared table and metadata lengths are bounded before their payloads are read.
+- Timelines: timestamps with different UTC offsets are ordered by their actual instant and displayed consistently in UTC.
 
 ## 0.24.0 - 2026-09-18
 

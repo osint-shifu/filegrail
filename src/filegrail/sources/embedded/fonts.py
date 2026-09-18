@@ -151,19 +151,29 @@ def _woff(handle: BinaryIO) -> Font | None:
     font = Font(container=f"WOFF ({kind})")
     for at in range(0, len(directory) - 19, 20):
         tag, offset, compressed, original, _ = struct.unpack_from(">4sIIII", directory, at)
-        if tag not in _WANTED or not original or original > _MAX_TABLE:
+        if (
+            tag not in _WANTED
+            or not original
+            or original > _MAX_TABLE
+            or compressed > _MAX_TABLE
+            or compressed > original
+        ):
             continue
         handle.seek(offset)
         data = handle.read(compressed)
+        if len(data) != compressed:
+            continue
         if compressed < original:
             inflated = decompress_zlib(data, original)
             if inflated is None:
                 continue
             data = inflated
         _absorb(tag, data, font)
-    if meta_at and meta_length and meta_original <= _MAX_META:
+    if meta_at and meta_length and meta_length <= _MAX_META and 0 < meta_original <= _MAX_META:
         handle.seek(meta_at)
         packed = handle.read(meta_length)
+        if len(packed) != meta_length:
+            return font if font else None
         metadata = decompress_zlib(packed, meta_original) if meta_length < meta_original else packed
         if metadata:
             font.meta = _metadata(metadata)

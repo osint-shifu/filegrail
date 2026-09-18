@@ -27,14 +27,14 @@ import math
 import re
 from collections import Counter
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 
 from . import __version__
 from .analysis import NOTHING, REVIEW, Case, CaseFile, Conflict, Finding, Pivots, named
 from .casereport import _ABSENT, _LISTED, _PER_FILE, _capital, _facts, _type_name
-from .graph import Graph, Node, Relationship, build_graph
+from .graph import Graph, Node, Relationship, build_graph, identifier_node_id
 from .graphlayout import HEIGHT, WIDTH, Picture, picture
 from .htmlicons import ICONS
 from .htmlscript import SCRIPT
@@ -56,7 +56,7 @@ from .models import (
     category,
 )
 from .overview import inventory
-from .report import _format, _relative, _size, _stamp, shown
+from .report import _format, _relative, _size, _stamp, _timeline_key, _timeline_value, shown
 from .scan import Unsearched
 
 #: Nothing leaves the page: no fetch, no image, no font, no frame, no form.
@@ -148,6 +148,11 @@ def render_html(
     )
     records = [entry.record for entry in case.files]
     graph = build_graph(records, identifiers or [])
+    pivot_refs = (
+        {identifier_node_id(entry): ref for ref, entry in case.pivots.shared}
+        if panes and case.pivots is not None
+        else {}
+    )
     relationship_count = len(graph.relationships)
     coverage = _coverage(case, unsearched)
     conflicts = _conflicts(case, files, detailed)
@@ -161,7 +166,7 @@ def render_html(
         "timeline": _timeline(case, files),
         "conflicts": conflicts,
         "files": _files(case, detailed, panes),
-        "relationships": _relationships(graph, files),
+        "relationships": _relationships(graph, files, pivot_refs),
         "pivots": _pivots(case, files, identifiers),
         "detail": _details(case, files, detailed),
         "notes": _notes(case),
@@ -252,6 +257,11 @@ def render_html(
         said = "No file matched" if not case.files else "Limited to"
         body.append(f'<p class="note">{_e(said)} {_e(filtered)}.</p>')
     body.append("</main>")
+    body.append(
+        '<button class="btn icon to-top" id="to-top" type="button" title="Back to top" '
+        'aria-label="Back to top" hidden><svg class="ic" aria-hidden="true">'
+        '<use href="#i-up"/></svg></button>'
+    )
     footer = [
         "<footer>",
         f"<span>filegrail v{_e(__version__)} · Apache-2.0</span>",
@@ -292,7 +302,7 @@ def _note(key: str, case: Case, detailed: set[str], relationship_count: int) -> 
     if key == "conflicts" and case.conflicts:
         return f"{len(case.conflicts)}"
     if key == "relationships" and relationship_count:
-        return f"{relationship_count:,} <b>· graph edges</b>"
+        return f'<span id="relationship-shown">{relationship_count:,}</span> <b>· graph edges</b>'
     if key == "timeline" and _dated(case):
         files = len(
             {entry.record.path for entry in case.files for f in entry.record.evidence if f.at}
@@ -312,6 +322,17 @@ def _section(key: str, title: str, body: str, note: str) -> str:
     """A section: its heading, the count beside it, and what it holds."""
     counted = f'<span class="n">{note}</span>' if note else ""
     return f'<section id="{key}"><div class="h"><h2>{_e(title)}</h2>{counted}</div>{body}</section>'
+
+
+def _copyable_table(table: str) -> str:
+    """A table with one screen-only action in its top right corner: copy the visible rows as TSV."""
+    return (
+        '<div class="table-block"><div class="table-actions">'
+        '<button class="btn icon table-copy" type="button" title="Copy table">'
+        '<svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg>'
+        '<span class="vh table-copy-label">Copy table</span></button></div>'
+        f"{table}</div>"
+    )
 
 
 # --- pieces ----------------------------------------------------------------------
@@ -611,8 +632,7 @@ def _files(case: Case, detailed: set[str], panes: set[str]) -> str:
             f"<td>{dots}</span></td><td>{arrived}</td>"
             f"<td>{_found_in(entry, kinds, panes)}</td></tr>"
         )
-    return (
-        f'<div class="chips">{_chips(case)}</div>'
+    table = _copyable_table(
         '<div class="wrap"><table class="tbl index" id="index"><thead><tr>'
         '<th data-sort="text">#</th><th></th><th data-sort="text">path</th>'
         '<th data-sort="text">type</th><th data-sort="num" class="num">size</th>'
@@ -621,6 +641,7 @@ def _files(case: Case, detailed: set[str], panes: set[str]) -> str:
         '<th data-sort="text">findings &amp; pivots</th></tr></thead>'
         f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
+    return f'<div class="chips">{_chips(case)}</div>{table}'
 
 
 def _chips(case: Case) -> str:
@@ -682,7 +703,7 @@ def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
             for found in entry.record.evidence
             if found.at
         ),
-        key=lambda event: event[0] or "",
+        key=lambda event: _timeline_key(event[0]),
     )
     if not events:
         return ""
@@ -690,7 +711,9 @@ def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
     rows = []
     day = None
     for at, entry, found in events[:_MAX_EVENTS]:
-        stamp = _stamp(shown(at)) if at else ""
+        stamp = _stamp(_timeline_value(at)) if at else ""
+        invalid, moment, _ = _timeline_key(at)
+        moment_attr = "" if invalid else f' data-moment="{moment:.3f}"'
         today, _, clock = stamp.partition(" ")
         if today != day:
             day = today
@@ -699,7 +722,8 @@ def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
         verb = EVENT_VERBS.get(found.source, CATEGORY_VERBS[kind])
         detail = found.url or found.tool or found.note or ""
         rows.append(
-            f'<tr class="event" data-f="{_e(kind)}"><td class="dim">{_e(clock or stamp)}</td>'
+            f'<tr class="event" data-f="{_e(kind)}"{moment_attr}>'
+            f'<td class="dim">{_e(clock or stamp)}</td>'
             f'<td><span class="cat {_e(kind)}">{_e(kind)}</span></td>'
             f"<td>{_e(verb)}</td><td>{_e(named(found))} {_match(found)}</td>"
             f"<td>{_file_link(entry)}</td>"
@@ -712,36 +736,83 @@ def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
             "the rest are in the JSON and in each file's detail.</p>"
         )
     return (
-        strip + '<div class="wrap"><table class="tbl timeline" id="timeline-table"><thead><tr>'
-        '<th data-sort="text">time</th><th>category</th><th data-sort="text">event</th>'
-        '<th data-sort="text">source</th><th data-sort="text">file</th><th>detail</th>'
-        f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>" + note
+        strip
+        + _copyable_table(
+            '<div class="wrap"><table class="tbl timeline" id="timeline-table"><thead><tr>'
+            '<th data-sort="text">time</th><th>category</th><th data-sort="text">event</th>'
+            '<th data-sort="text">source</th><th data-sort="text">file</th><th>detail</th>'
+            f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+        )
+        + note
     )
 
 
 def _density(events: Sequence[tuple[str | None, CaseFile, EvidenceRecord]]) -> str:
-    """One tick per dated record along the span of the case, coloured by category."""
-    moments = []
+    """A bounded overview that keeps coincident records visible as counted bars."""
+    moments: list[tuple[float, str]] = []
     for at, _, found in events:
-        try:
-            moment = datetime.fromisoformat((at or "").replace("Z", "+00:00")).timestamp()
-        except ValueError:
+        invalid, moment, _ = _timeline_key(at)
+        if invalid:
             continue
         moments.append((moment, category(found)))
     if len(moments) < 2:
         return ""
     first, last = moments[0][0], moments[-1][0]
     span = (last - first) or 1.0
-    ticks = "".join(
-        f'<line class="{kind}" x1="{(moment - first) / span * 1000:.1f}" '
-        f'x2="{(moment - first) / span * 1000:.1f}" y1="6" y2="26"/>'
-        for moment, kind in moments
-    )
+    slots = min(96, max(12, len(moments)))
+    grouped: dict[int, Counter[str]] = {}
+    for moment, kind in moments:
+        slot = min(slots - 1, int((moment - first) / span * slots))
+        grouped.setdefault(slot, Counter())[kind] += 1
+    peak = max(count for counts in grouped.values() for count in counts.values())
+    step = 960 / slots
+    width = max(4.0, min(12.0, step * 0.72))
+    lanes = {"origin": 27, "metadata": 51, "activity": 75}
+    bars = []
+    for slot, counts in sorted(grouped.items()):
+        start = first + span * slot / slots
+        end = first + span * (slot + 1) / slots
+        total = sum(counts.values())
+        x = 20 + (slot + 0.5) * step - width / 2
+        parts = [
+            f"{counts[kind]:,} {kind} record" + ("" if counts[kind] == 1 else "s")
+            for kind in CATEGORIES
+            if counts[kind]
+        ]
+        label = ", ".join(parts)
+        marks = []
+        for kind in CATEGORIES:
+            count = counts[kind]
+            if not count:
+                continue
+            height = 5 + 13 * count / peak
+            marks.append(
+                f'<rect class="{_e(kind)}" x="{x:.1f}" y="{lanes[kind] - height:.1f}" '
+                f'width="{width:.1f}" height="{height:.1f}" rx="1.5"/>'
+            )
+        bars.append(
+            f'<g class="time-bin" role="button" tabindex="0" aria-pressed="false" '
+            f'data-from="{start:.3f}" data-to="{end:.3f}" data-count="{total}" '
+            f'aria-label="{_e(label)}">{"".join(marks)}<title>{_e(label)}</title></g>'
+        )
+    legend = "".join(f'<span class="cat {_e(kind)}">{_e(kind)}</span>' for kind in CATEGORIES)
+    middle_at = datetime.fromtimestamp((first + last) / 2, timezone.utc)
+    middle = middle_at.strftime("%Y-%m-%d %H:%M:%S")
     return (
-        '<figure class="density"><svg viewBox="0 0 1000 32" preserveAspectRatio="none" '
-        f'aria-label="Dated records over time">{ticks}</svg>'
-        f"<figcaption><span>{_e(_stamp(shown(events[0][0])))}</span>"
-        f"<span>{_e(_stamp(shown(events[-1][0])))}</span></figcaption></figure>"
+        '<figure class="density"><div class="timeline-tools">'
+        f'<div class="timeline-legend">{legend}</div><div class="timeline-state">'
+        f'<span id="timeline-shown">{len(moments):,} dated records</span>'
+        '<button class="btn compact" id="timeline-clear" type="button" hidden>'
+        "Clear range</button></div></div>"
+        '<svg viewBox="0 0 1000 86" preserveAspectRatio="none" '
+        f'aria-label="Dated records over time"><g class="lane-grid">'
+        '<line x1="20" x2="980" y1="27" y2="27"/><line x1="20" x2="980" '
+        'y1="51" y2="51"/><line x1="20" x2="980" y1="75" y2="75"/>'
+        f"</g>{''.join(bars)}</svg><figcaption>"
+        f"<span>{_e(_stamp(_timeline_value(events[0][0])))}</span>"
+        f"<span>{_e(middle)}</span>"
+        f"<span>{_e(_stamp(_timeline_value(events[-1][0])))}</span>"
+        "</figcaption></figure>"
     )
 
 
@@ -749,7 +820,7 @@ def _clip(value: str, width: int) -> str:
     return value if len(value) <= width else value[: width - 1] + "…"
 
 
-def _relationships(graph: Graph, files: dict[str, CaseFile]) -> str:
+def _relationships(graph: Graph, files: dict[str, CaseFile], pivot_refs: dict[str, str]) -> str:
     """An offline explorer over the same graph JSON and exports use."""
     if not graph.relationships:
         return ""
@@ -759,10 +830,18 @@ def _relationships(graph: Graph, files: dict[str, CaseFile]) -> str:
         edge.target for edge in graph.relationships
     }
     kinds = Counter(edge.kind for edge in graph.relationships)
+    kind_types: dict[str, set[str]] = {}
+    for edge in graph.relationships:
+        kind_types.setdefault(edge.kind, set()).add(nodes[edge.target].type)
+    kind_markers = {
+        kind: next(iter(types)) if len(types) == 1 else "mixed"
+        for kind, types in kind_types.items()
+    }
     chips = ['<button type="button" class="chip on" data-rel-kind="all">all</button>']
     chips.extend(
         f'<button type="button" class="chip" data-rel-kind="{_e(kind)}">'
-        f"{_e(kind)} <b>{count:,}</b></button>"
+        f'<i class="t-{_e(kind_markers[kind])}">'
+        f"</i>{_e(kind)} <b>{count:,}</b></button>"
         for kind, count in sorted(kinds.items())
     )
 
@@ -788,24 +867,63 @@ def _relationships(graph: Graph, files: dict[str, CaseFile]) -> str:
         )
 
     controls = (
-        '<div class="rel-controls">'
+        '<div class="graph-toolbar"><div class="rel-controls">'
         '<label for="relationship-find" class="rel-find">Find node'
-        '<input id="relationship-find" type="search" placeholder="narrow the list" '
+        '<input id="relationship-find" type="search" '
+        'placeholder="type a name, path or value" '
         'autocomplete="off" spellcheck="false"></label>'
         '<label for="relationship-node">Focus node'
         '<select id="relationship-node"><option value="">All connected nodes</option>'
         f"{_relationship_options(graph, connected, files)}</select></label>"
-        f'<span class="rel-count" id="relationship-shown">{len(rows):,} relationships</span>'
-        "</div>"
+        '</div><div class="graph-tools" role="group" aria-label="Graph view controls">'
+        '<button class="btn icon" id="graph-zoom-out" type="button" '
+        'title="Zoom out" aria-label="Zoom out">−</button>'
+        '<output id="graph-zoom-value" aria-live="polite">100%</output>'
+        '<button class="btn icon" id="graph-zoom-in" type="button" '
+        'title="Zoom in" aria-label="Zoom in">+</button>'
+        '<button class="btn compact" id="graph-fit" type="button" title="Fit graph to view">'
+        "Fit</button>"
+        '<button class="btn compact" id="graph-export" type="button" '
+        'title="Export the current graph view as SVG">Export SVG</button>'
+        '<button class="btn compact" id="graph-reset" type="button" '
+        'title="Reset view and filters">Reset</button></div></div>'
+        '<div class="graph-filterbar">'
         f'<div class="rel-kinds" aria-label="Relationship type filters">{"".join(chips)}</div>'
+        "</div>"
     )
-    table = (
+    table = _copyable_table(
         '<div class="wrap"><table class="tbl relationships" id="relationship-table">'
         '<thead><tr><th data-sort="text">from</th><th></th>'
         '<th data-sort="text">relation</th><th data-sort="text">to</th>'
         f"<th>evidence</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
     )
-    return _figure(picture(graph), files) + controls + table
+    table_tools = (
+        '<div class="relationship-table-tools">'
+        '<label for="relationship-table-find"><span class="vh">Filter results</span>'
+        '<input id="relationship-table-find" type="search" '
+        'placeholder="from, relation, to or evidence" autocomplete="off" spellcheck="false">'
+        "</label>"
+        '<label for="relationship-sort"><span class="vh">Sort by</span>'
+        '<select id="relationship-sort">'
+        '<option value="relation-asc">Relation A–Z</option>'
+        '<option value="relation-desc">Relation Z–A</option>'
+        '<option value="from-asc">From A–Z</option>'
+        '<option value="from-desc">From Z–A</option>'
+        '<option value="to-asc">To A–Z</option>'
+        '<option value="to-desc">To Z–A</option>'
+        "</select></label>"
+        '<button class="btn compact" id="relationship-table-clear" type="button">'
+        "Clear filters</button></div>"
+    )
+    return (
+        '<div class="graph-panel">'
+        + controls
+        + _figure(picture(graph), files, pivot_refs)
+        + '</div><div class="relationship-bar"><h3>Relationship evidence</h3>'
+        + table_tools
+        + "</div>"
+        + table
+    )
 
 
 #: Nodes that get a label in the picture; the rest name themselves on hover.
@@ -813,7 +931,7 @@ _MAX_LABELS = 48
 _LABELLED_TYPES = frozenset({"file", "person", "org", "handle", "device", "camera_model"})
 
 
-def _figure(drawn: Picture | None, files: dict[str, CaseFile]) -> str:
+def _figure(drawn: Picture | None, files: dict[str, CaseFile], pivot_refs: dict[str, str]) -> str:
     """The graph as a picture: the connected part of it, up to a fixed size.
 
     Clicking a node focuses it in the explorer below, so the picture is a way
@@ -850,6 +968,25 @@ def _figure(drawn: Picture | None, files: dict[str, CaseFile]) -> str:
         held = files.get(node.value) if node.type == "file" else None
         label = f"{held.ref} {_name(held)}" if held else _clip(node.value, 28)
         title = f"{_node_type(node.type)} · {node.value} · {node.degree:,} relationships"
+        data = (
+            f' data-node-type="{_e(_node_type(node.type))}"'
+            f' data-node-value="{_e(node.value)}" data-node-degree="{node.degree}"'
+        )
+        if held is not None:
+            record = held.record
+            evidence = sum(len(found) for found in held.found.values())
+            origin = named(record.origin) if record.origin is not None else "none"
+            link = f"#detail-{held.ref[1:]}" if _wants_detail(held) else f"#{_anchor(held.ref)}"
+            data += (
+                f' data-file-ref="{_e(held.ref)}" data-file-name="{_e(_name(held))}"'
+                f' data-file-path="{_e(record.path)}" data-file-format="{_e(_format(record.path))}"'
+                f' data-file-size="{_e(_size(record.size))}"'
+                f' data-file-modified="{_e(_stamp(shown(record.mtime)))}"'
+                f' data-file-evidence="{evidence}" data-file-state="{_e(held.state)}"'
+                f' data-file-origin="{_e(origin)}" data-file-link="{_e(link)}"'
+            )
+        elif node.id in pivot_refs:
+            data += f' data-pivot-link="#{_e(pivot_refs[node.id])}"'
         text = (
             f'<text x="{node.x}" y="{node.y + radius + 11}">{_e(label)}</text>'
             if node.id in labelled
@@ -857,18 +994,42 @@ def _figure(drawn: Picture | None, files: dict[str, CaseFile]) -> str:
         )
         marks.append(
             f'<g class="node t-{_e(node.type)}" data-graph-node="{_e(node.id)}" '
-            f'data-rel-focus="{_e(node.id)}" tabindex="0" role="button">'
+            f'data-rel-focus="{_e(node.id)}"{data} tabindex="0" role="button">'
             f'<circle cx="{node.x}" cy="{node.y}" r="{radius}"/>{text}'
             f"<title>{_e(title)}</title></g>"
         )
-    said = f"{len(drawn.nodes):,} nodes and {len(drawn.edges):,} relationships drawn"
+    said = f"{len(drawn.nodes):,} nodes drawn"
     if drawn.left_out:
         said += f"; {drawn.left_out:,} more connected nodes are in the table below"
     return (
-        f'<figure class="graph"><svg viewBox="0 0 {WIDTH} {HEIGHT}" role="img" '
-        'aria-label="Evidence graph">'
-        + f'<g class="edges">{lines}</g><g class="nodes">{"".join(marks)}</g></svg>'
-        f"<figcaption>{_e(said)} · click a node to focus it</figcaption></figure>"
+        '<figure class="graph"><div class="graph-canvas">'
+        f'<svg id="evidence-graph" viewBox="0 0 {WIDTH} {HEIGHT}" '
+        'role="img" aria-label="Evidence graph" tabindex="0">'
+        + '<g class="graph-viewport">'
+        + f'<g class="edges">{lines}</g><g class="nodes">{"".join(marks)}</g></g></svg>'
+        '<aside class="graph-detail" id="graph-detail" hidden>'
+        '<div class="graph-detail-head"><span id="graph-detail-type"></span>'
+        '<button type="button" id="graph-detail-close" aria-label="Close node details">×</button>'
+        '</div><strong id="graph-detail-value"></strong><dl>'
+        '<div><dt>Relationships</dt><dd id="graph-detail-degree"></dd></div>'
+        '<div class="file-only"><dt>File</dt><dd id="graph-detail-file"></dd></div>'
+        '<div class="file-only"><dt>Path</dt><dd id="graph-detail-path"></dd></div>'
+        '<div class="file-only"><dt>Format</dt><dd id="graph-detail-format"></dd></div>'
+        '<div class="file-only"><dt>Size</dt><dd id="graph-detail-size"></dd></div>'
+        '<div class="file-only"><dt>Modified</dt><dd id="graph-detail-modified"></dd></div>'
+        '<div class="file-only"><dt>Evidence</dt><dd id="graph-detail-evidence"></dd></div>'
+        '<div class="file-only"><dt>State</dt><dd id="graph-detail-state"></dd></div>'
+        '<div class="file-only"><dt>Origin</dt><dd id="graph-detail-origin"></dd></div>'
+        '</dl><div class="graph-detail-connected"><h4>Connected to</h4>'
+        '<ul id="graph-detail-connected"></ul></div>'
+        '<div class="graph-detail-actions">'
+        '<a class="btn compact file-only" id="graph-detail-open">Open file detail</a>'
+        '<a class="btn compact pivot-only" id="graph-detail-pivot" hidden>Open pivot</a>'
+        "</div></aside></div>"
+        "<figcaption><span>"
+        f"{_e(said)} · click a node to focus it</span>"
+        '<span id="graph-inspector" aria-live="polite">Drag to pan · scroll to zoom</span>'
+        "</figcaption></figure>"
     )
 
 
@@ -1039,7 +1200,7 @@ def _pivot_table(
             f'<td class="where">{places}</td><td class="found">{found_in}</td></tr>'
         )
     heads = '<th data-sort="text">#</th><th data-sort="text">type</th>' if across else ""
-    return (
+    return _copyable_table(
         f'<div class="wrap"><table class="tbl pivots"><thead><tr>{heads}'
         '<th data-sort="text">value</th><th data-sort="num" class="num">files</th>'
         '<th data-sort="num" class="num">times</th><th>where (sample)</th>'
@@ -1098,7 +1259,7 @@ def _dense(pivots: Pivots, files: dict[str, CaseFile]) -> str:
             f'<td class="num" data-value="{dense.places}">{dense.places:,}</td>'
             f"<td>{_e(kinds)}</td></tr>"
         )
-    return (
+    return _copyable_table(
         '<div class="wrap"><table class="tbl"><thead><tr><th data-sort="text">file</th>'
         '<th data-sort="num" class="num">places</th><th>by type</th></tr></thead>'
         f"<tbody>{''.join(rows)}</tbody></table></div>"
@@ -1220,7 +1381,7 @@ def _coverage(case: Case, unsearched: Unsearched | None) -> str:
             f'<td><span class="cat none">{_e(why)}</span></td>'
             f'<td class="dim">·</td><td class="dim">·</td></tr>'
         )
-    table = (
+    table = _copyable_table(
         '<div class="wrap"><table class="tbl"><thead><tr><th data-sort="text">source</th>'
         '<th data-sort="text">state</th><th>coverage</th><th data-sort="text">earliest record</th>'
         f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"

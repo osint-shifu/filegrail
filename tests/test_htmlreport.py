@@ -8,11 +8,16 @@ to arrive in the page as text, and nothing in the page may reach outside it.
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from filegrail.analysis import analyse
 from filegrail.htmlreport import render_html
+from filegrail.htmlscript import SCRIPT
 from filegrail.identify import extract
 from filegrail.models import EvidenceRecord, FileRecord
 
@@ -72,6 +77,23 @@ def test_the_page_is_dark_self_contained_and_reaches_nothing_outside_itself():
     assert "https://example.org/holiday.jpg" in page
 
 
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_the_script_is_valid_javascript(tmp_path: Path):
+    """A separator written as '\\n' in Python is a newline inside a JS string literal."""
+    script = tmp_path / "report.js"
+    script.write_text(SCRIPT, encoding="utf-8")
+
+    checked = subprocess.run(["node", "--check", str(script)], capture_output=True, text=True)
+
+    assert checked.returncode == 0, checked.stderr
+
+
+def test_author_styles_do_not_reveal_elements_marked_hidden():
+    page = _page(_corpus())
+
+    assert "[hidden]{display:none!important}" in page
+
+
 def test_every_value_that_came_out_of_a_file_is_escaped():
     hostile = "<script>alert(1)</script>"
     record = _file(
@@ -106,6 +128,15 @@ def test_the_cards_open_what_they_count_and_the_index_sorts_by_raw_values():
     assert 'href="#conflicts"' in page
     assert 'class="tbl index" id="index"' in page
     assert 'data-value="1024"' in page
+
+
+def test_every_rendered_table_has_one_copy_action():
+    page = _page(_corpus())
+
+    assert page.count("<table") > 1
+    assert page.count('class="btn icon table-copy" type="button" title="Copy table"') == page.count(
+        "<table"
+    )
 
 
 def test_a_copy_button_copies_the_value_shown_and_keeps_no_copy_of_its_own():
@@ -158,6 +189,14 @@ def test_relationship_explorer_uses_the_evidence_backed_graph():
     assert "browser-download" in section
     assert "recorded-path" in section
     assert "URL host" in section and "derived" in section
+    assert section.count('id="relationship-shown"') == 1
+    assert "relationships drawn" not in section
+    assert 'class="rel-count"' not in section
+    assert 'class="graph-legend"' not in section
+    assert 'id="graph-export"' in section
+    assert 'id="relationship-table-find"' in section
+    assert 'id="relationship-sort"' in section
+    assert 'id="relationship-table-clear"' in section
 
 
 def test_relationship_explorer_includes_authors_and_cameras_without_clustering():
@@ -183,6 +222,9 @@ def test_relationship_explorer_includes_authors_and_cameras_without_clustering()
     assert '<optgroup label="people">' in page
     assert '<optgroup label="camera bodies">' in page
     assert '<optgroup label="camera models">' in page
+    assert 'data-rel-kind="author"><i class="t-person"></i>author' in page
+    assert 'data-rel-kind="camera body"><i class="t-device"></i>camera body' in page
+    assert 'data-rel-kind="camera model"><i class="t-camera_model"></i>camera model' in page
 
 
 def test_every_pivot_is_listed_with_the_files_it_was_found_in():
@@ -327,16 +369,97 @@ def test_the_timeline_lists_dated_records_in_order_with_what_happened():
     assert '<tr class="day"><td colspan="6">2026-03-01</td></tr>' in section
     assert '<figure class="density">' in section
     assert "https://example.org/first.pdf" in section
+    caption = section.split("<figcaption>")[1].split("</figcaption>")[0]
+    assert "2026-03-01 21:30:00" in caption
     headings = re.findall(r"<h2>([^<]+)</h2>", page)
     assert headings.index("Summary") < headings.index("Timeline") < headings.index("Files")
+
+
+def test_the_timeline_orders_offsets_by_the_instant_they_represent():
+    records = [
+        _file(
+            "later.jpg",
+            EvidenceRecord(source="c2pa", tool="later actual", at="2026-01-01T00:00:00Z"),
+        ),
+        _file(
+            "earlier.jpg",
+            EvidenceRecord(source="c2pa", tool="earlier actual", at="2026-01-01T00:30:00+02:00"),
+        ),
+    ]
+
+    page = _page(records)
+    section = page.split('<section id="timeline"')[1].split("</section>")[0]
+
+    assert section.index("earlier actual") < section.index("later actual")
+    assert section.index("2025-12-31") < section.index("2026-01-01")
+    assert "22:30:00" in section
+
+
+def test_the_timeline_keeps_the_count_when_events_share_the_same_instant():
+    records = [
+        _file(
+            f"same-{number}.docx",
+            EvidenceRecord(
+                source="document-metadata",
+                block="ooxml-properties",
+                at="2026-03-30T14:05:00Z",
+            ),
+        )
+        for number in range(3)
+    ]
+    records.append(
+        _file(
+            "later.jpg",
+            EvidenceRecord(
+                source="device-metadata",
+                block="exif",
+                at="2026-04-05T08:12:44Z",
+            ),
+        )
+    )
+
+    page = _page(records)
+    section = page.split('<section id="timeline"')[1].split("</section>")[0]
+
+    assert 'class="time-bin"' in section
+    assert 'data-count="3"' in section
+    assert 'aria-label="3 metadata records' in section
+    assert section.count('class="event" data-f="metadata" data-moment=') == 4
+    assert 'id="timeline-clear"' in section
 
 
 def test_the_graph_is_drawn_and_its_nodes_focus_the_explorer():
     page = _page(_corpus())
     section = page.split('<section id="relationships"')[1].split("</section>")[0]
 
-    assert '<figure class="graph"><svg viewBox="0 0 960 560"' in section
+    assert section.index('class="graph-toolbar"') < section.index('<figure class="graph"')
+    assert '<svg id="evidence-graph" viewBox="0 0 960 560"' in section
+    assert '<g class="graph-viewport">' in section
+    assert 'id="graph-zoom-out"' in section
+    assert 'id="graph-zoom-in"' in section
+    assert 'id="graph-fit"' in section
+    assert 'id="graph-reset"' in section
+    assert 'id="graph-zoom-value"' in section
+    assert 'id="graph-detail"' in section
     node = "file:/case/press/holiday.jpg"
     assert f'data-graph-node="{node}" data-rel-focus="{node}"' in section
+    assert 'data-file-ref="#002"' in section
+    assert 'data-file-format="JPEG"' in section
+    assert 'id="graph-detail-connected"' in section
+    assert 'id="graph-detail-pivot"' in section
+    assert 'id="to-top"' in page and 'id="i-up"' in page
     assert 'data-source="file:/case/press/holiday.jpg"' in section
-    assert "nodes and" in section and "relationships drawn" in section
+    assert "nodes drawn" in section
+
+
+def test_a_graph_node_that_is_a_shared_pivot_links_to_its_pivot_row():
+    shared = "https://example.org/holiday.jpg"
+    records = _corpus() + [
+        _file("copy.jpg", EvidenceRecord(source="browser-download", url=shared)),
+    ]
+
+    page = _page(records)
+    ids, targets = _ids_and_targets(page)
+
+    assert re.search(r'data-graph-node="[^"]+" [^>]*data-pivot-link="#P\d\d"', page)
+    assert "P01" in ids and targets <= set(ids)

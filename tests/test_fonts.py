@@ -204,3 +204,60 @@ def test_woff_tables_are_inflated_and_its_metadata_block_is_read(tmp_path: Path)
     assert found.fields["meta:credit[2]:role"] == "Hinting"
     assert found.fields["meta:licenseURL"] == "https://scripts.sil.org/OFL"
     assert found.fields["meta:copyright"] == "Copyright 2023 Example Type Foundry"
+
+
+def test_woff_rejects_a_table_whose_stored_length_exceeds_the_read_budget(tmp_path: Path):
+    table = _name_table({1: "Hidden beyond the budget"})
+    offset = 64
+    declared = 4 * 1024 * 1024 + 1
+    entry = b"name" + struct.pack(">IIII", offset, declared, len(table), 0)
+    header = (
+        b"wOFF"
+        + b"\x00\x01\x00\x00"
+        + struct.pack(
+            ">IHHIHHIIIII",
+            offset + len(table),
+            1,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
+    )
+    path = tmp_path / "oversized-table.woff"
+    path.write_bytes(header + entry + b"\x00" * (offset - len(header) - len(entry)) + table)
+
+    assert read_embedded_metadata(path) is None
+
+
+def test_woff_rejects_metadata_whose_stored_length_exceeds_the_read_budget(tmp_path: Path):
+    metadata = b'<metadata><vendor name="Hidden beyond the budget"/></metadata>'
+    offset = 44
+    declared = 1024 * 1024 + 1
+    header = (
+        b"wOFF"
+        + b"\x00\x01\x00\x00"
+        + struct.pack(
+            ">IHHIHHIIIII",
+            offset + len(metadata),
+            0,
+            0,
+            0,
+            1,
+            0,
+            offset,
+            declared,
+            len(metadata),
+            0,
+            0,
+        )
+    )
+    path = tmp_path / "oversized-metadata.woff"
+    path.write_bytes(header + metadata)
+
+    assert read_embedded_metadata(path) is None
