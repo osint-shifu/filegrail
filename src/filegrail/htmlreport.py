@@ -74,19 +74,25 @@ POLICY = (
     "img-src data:; base-uri 'none'; form-action 'none'"
 )
 
-#: The mark, drawn in the page in the accent.
+#: The mark, drawn in the page as an outline holding a wash of its own colour - the
+#: cup reads as a vessel rather than a blot. It does not follow the accent: the accent is
+#: free to change, while the mark stays the brand green the packaged assets show.
+#: The viewBox is padded by 26 units on every side so the stroke is not clipped.
 _MARK = (
-    '<svg class="mark" viewBox="0 0 144 204" aria-hidden="true">'
-    '<path fill="var(--accent)" fill-rule="evenodd" d="M24,48 A48,48 0 0 1 72,0 H108 V24 '
+    '<svg class="mark" viewBox="-26 -26 196 256" aria-hidden="true">'
+    '<path fill="var(--brand-soft)" stroke="var(--brand)" stroke-width="2.4" '
+    'fill-rule="evenodd" d="M24,48 A48,48 0 0 1 72,0 H108 V24 '
     "H72 A24,24 0 0 0 48,48 V72 H144 V96 A60,60 0 0 1 96,154.79 V180 H132 V204 H36 V180 "
     'H72 V154.79 A60,60 0 0 1 24,96 H0 V72 H24 Z M48,96 H120 A36,36 0 0 1 48,96 Z"/></svg>'
 )
 
 #: The same mark as the tab icon. A data URI: drawn by the browser, fetched from nowhere.
+#: A tab strip is light on one machine and dark on the next and the icon cannot ask which,
+#: so it takes the mid verdigris rather than either end of the brand pair.
 _FAVICON = (
     '<link rel="icon" href="data:image/svg+xml,'
     "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 144 204'%3E"
-    "%3Cpath fill='%236EA0C4' fill-rule='evenodd' d='M24,48 A48,48 0 0 1 72,0 H108 V24 "
+    "%3Cpath fill='%233E7F6E' fill-rule='evenodd' d='M24,48 A48,48 0 0 1 72,0 H108 V24 "
     "H72 A24,24 0 0 0 48,48 V72 H144 V96 A60,60 0 0 1 96,154.79 V180 H132 V204 H36 V180 "
     "H72 V154.79 A60,60 0 0 1 24,96 H0 V72 H24 Z M48,96 H120 A36,36 0 0 1 48,96 Z'/%3E"
     '%3C/svg%3E">'

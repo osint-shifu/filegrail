@@ -5,6 +5,16 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.31.1 - 2026-09-19
+
+### Changed
+
+- HTML report: a new accent and darker surfaces in both themes and in print; the mark carries the brand colour on its own token and is drawn as an outline with a light fill, so the accent can change without repainting it; prose, headings, labels and navigation are set in a sans-serif stack while paths, hashes, numbers and field values stay monospace. Nothing is fetched from the network.
+
+### Fixed
+
+- HTML report: the delta before a conflicting value printed as a control character and the digits `94` instead of Δ.
+
 ## 0.31.0 - 2026-09-19
 
 ### Added
