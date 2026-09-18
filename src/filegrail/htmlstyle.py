@@ -45,11 +45,11 @@ grid-template-columns:auto 1fr;gap:0 18px;align-items:center}
 .mast .word small{display:block;font-size:11px;font-weight:400;letter-spacing:.18em;
 text-transform:uppercase;color:var(--muted);margin:10px 0 0}
 .mast .tag{display:none}
-.facts{grid-column:1/-1;display:grid;grid-auto-flow:column;grid-template-rows:auto auto;
-justify-content:start;gap:5px 40px;margin:20px 0 0;padding:14px 0 0;
+.facts{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr;gap:6px 24px;
+justify-content:start;margin:20px 0 0;padding:14px 0 0;
 border-top:1px solid var(--line);font-size:12px}
 .facts dt{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
-.facts dd{margin:0;color:var(--ink);max-width:40ch;overflow-wrap:anywhere}
+.facts dd{margin:0;color:var(--ink);overflow-wrap:anywhere}
 .mast-actions{display:none;gap:6px;align-items:center;margin-left:8px;flex:none}
 .js .mast-actions{display:flex}
 .btn{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px;
@@ -454,8 +454,7 @@ text-transform:uppercase;color:var(--faint)}
 
 /* ── narrow ───────────────────────────────────────────────── */
 @media (max-width:920px){
-.facts{grid-auto-flow:row;grid-template-rows:none;grid-template-columns:auto 1fr;gap:4px 16px}
-.facts dd{max-width:none}
+.facts{gap:4px 16px}
 }
 @media (max-width:820px){
 .mast{gap:0 18px;padding-top:32px}
