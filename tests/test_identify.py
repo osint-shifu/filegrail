@@ -729,7 +729,7 @@ def test_a_message_id_links_a_message_to_the_reply_that_quotes_it():
 def test_the_owner_of_a_github_repository_is_an_account(tmp_path: Path):
     record = _document(
         tmp_path,
-        "clone https://github.com/osint-shifu/filegrail/commit/abc, payload at "
+        "clone https://github.com/osintshifu/filegrail/commit/abc, payload at "
         "https://raw.githubusercontent.com/evil-dev/tools/main/x.ps1; see "
         "https://github.com/features/actions and https://github.com/user-attachments/assets/1",
         source="document-metadata",
@@ -737,7 +737,7 @@ def test_the_owner_of_a_github_repository_is_an_account(tmp_path: Path):
 
     found = sorted(e.normalized for e in extract([record], content=True) if e.type == "handle")
 
-    assert found == ["github:evil-dev", "github:osint-shifu"]
+    assert found == ["github:evil-dev", "github:osintshifu"]
 
 
 # --- names that carry their own label ------------------------------------------

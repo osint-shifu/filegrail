@@ -5,7 +5,7 @@ Contributions are welcome.
 ## Development setup
 
 ```bash
-git clone https://github.com/osint-shifu/filegrail.git
+git clone https://github.com/osintshifu/filegrail.git
 cd filegrail
 
 python -m venv .venv

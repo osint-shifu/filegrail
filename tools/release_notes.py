@@ -25,7 +25,7 @@ def notes(version: str) -> str:
         _unwrapped(section.group(1).strip())
         + "\n\n```bash\npipx install --upgrade filegrail\n```\n\n"
         + "Full detail in [CHANGELOG.md]"
-        + "(https://github.com/osint-shifu/filegrail/blob/master/CHANGELOG.md).\n"
+        + "(https://github.com/osintshifu/filegrail/blob/master/CHANGELOG.md).\n"
     )
 
 

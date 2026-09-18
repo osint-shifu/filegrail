@@ -1,8 +1,8 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-stacked-compact-dark.png">
-  <img src="https://raw.githubusercontent.com/osint-shifu/filegrail/master/assets/filegrail-stacked-compact-light.png" alt="FileGrail" width="420">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/osintshifu/filegrail/master/assets/filegrail-stacked-compact-dark.png">
+  <img src="https://raw.githubusercontent.com/osintshifu/filegrail/master/assets/filegrail-stacked-compact-light.png" alt="FileGrail" width="420">
 </picture>
 
 ### LOCAL FILE INTELLIGENCE
@@ -13,7 +13,7 @@
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-1f883d?style=flat-square)
 ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1f883d?style=flat-square)
-[![CI](https://github.com/osint-shifu/filegrail/actions/workflows/ci.yml/badge.svg)](https://github.com/osint-shifu/filegrail/actions/workflows/ci.yml)
+[![CI](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml/badge.svg)](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-Apache--2.0-8250df?style=flat-square)
 
 [Quick start](#quick-start) ·
@@ -247,7 +247,7 @@ Create a self-contained HTML investigation report:
 filegrail ./evidence --pivots --content --html -o report.html
 ```
 
-[View an example HTML report](https://osint-shifu.github.io/filegrail/example-report.html), built from an invented case.
+[View an example HTML report](https://osintshifu.github.io/filegrail/example-report.html), built from an invented case.
 
 ---
 
@@ -939,7 +939,7 @@ The report can contain:
 
 The complete report remains one portable HTML file.
 
-[View the example report](https://osint-shifu.github.io/filegrail/example-report.html).
+[View the example report](https://osintshifu.github.io/filegrail/example-report.html).
 
 ---
 

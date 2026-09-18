@@ -393,7 +393,7 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - An example report is published with the project and linked from the README:
-  https://osint-shifu.github.io/filegrail/example-report.html. The case it
+  https://osintshifu.github.io/filegrail/example-report.html. The case it
   reports on was invented for it: photographs that share one camera body,
   documents that share an author, a PDF whose Info dictionary and XMP packet
   disagree about when and by what it was made, an image whose Content

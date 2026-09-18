@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-authors = [{ name = "osint-shifu" }]
+authors = [{ name = "osintshifu" }]
 keywords = [
   "provenance",
   "metadata",
@@ -53,10 +53,10 @@ dev = ["pytest>=8.2,<9", "ruff>=0.6,<1", "mypy>=1.11,<2"]
 fuzz = ["hypothesis>=6,<7"]
 
 [project.urls]
-Homepage = "https://github.com/osint-shifu/filegrail"
-Repository = "https://github.com/osint-shifu/filegrail"
-Issues = "https://github.com/osint-shifu/filegrail/issues"
-Changelog = "https://github.com/osint-shifu/filegrail/blob/master/CHANGELOG.md"
+Homepage = "https://github.com/osintshifu/filegrail"
+Repository = "https://github.com/osintshifu/filegrail"
+Issues = "https://github.com/osintshifu/filegrail/issues"
+Changelog = "https://github.com/osintshifu/filegrail/blob/master/CHANGELOG.md"
 
 [project.scripts]
 filegrail = "filegrail.cli:main"
