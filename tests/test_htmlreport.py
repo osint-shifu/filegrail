@@ -61,6 +61,8 @@ def test_the_page_is_dark_self_contained_and_reaches_nothing_outside_itself():
 
     assert page.startswith("<!doctype html>")
     assert "color-scheme:dark" in page
+    assert "@media (prefers-color-scheme:light){:root:not([data-theme=dark])" in page
+    assert '<h1 class="word">' in page
     assert "default-src 'none'" in page
     assert "@media print" in page
     outward = r"""\b(?:src|href|action)\s*=\s*["'](?!#|data:image/svg\+xml,)"""

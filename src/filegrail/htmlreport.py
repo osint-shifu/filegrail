@@ -97,6 +97,15 @@ _MATCH_NOTES = {
     SYNC_ROOT: "managed sync folder",
 }
 
+#: The light palette, applied when chosen and, until a choice is made, when
+#: the system prefers it. Written once and placed twice.
+_LIGHT = """color-scheme:light;
+--bg:#F4F5F6;--surface:#FFFFFF;--surface-2:#EEF0F2;--line:#DDE0E4;--line-2:#C9CDD3;
+--ink:#0F1115;--ink-2:#2C3138;--muted:#5D646C;--faint:#8A9098;
+--accent:#2F8677;--accent-ink:#FFFFFF;--accent-soft:rgba(47,134,119,.12);
+--origin:#2F8677;--metadata:#3E6F9E;--activity:#8E6E2E;--alert:#B5563A;
+--alert-soft:rgba(181,86,58,.12)"""
+
 _STYLE = """
 :root{color-scheme:dark;
 --bg:#0F1115;--surface:#151920;--surface-2:#1B2027;--line:#262A31;--line-2:#333944;
@@ -106,12 +115,8 @@ _STYLE = """
 --alert-soft:rgba(208,135,112,.14);
 --mono:"IBM Plex Mono","JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 --r:6px;--gutter:clamp(20px,4vw,56px)}
-[data-theme=light]{color-scheme:light;
---bg:#F4F5F6;--surface:#FFFFFF;--surface-2:#EEF0F2;--line:#DDE0E4;--line-2:#C9CDD3;
---ink:#0F1115;--ink-2:#2C3138;--muted:#5D646C;--faint:#8A9098;
---accent:#2F8677;--accent-ink:#FFFFFF;--accent-soft:rgba(47,134,119,.12);
---origin:#2F8677;--metadata:#3E6F9E;--activity:#8E6E2E;--alert:#B5563A;
---alert-soft:rgba(181,86,58,.12)}
+[data-theme=light]{%LIGHT%}
+@media (prefers-color-scheme:light){:root:not([data-theme=dark]){%LIGHT%}}
 *{box-sizing:border-box}
 html{scroll-padding-top:120px}
 body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.55 var(--mono);
@@ -413,7 +418,7 @@ padding:6px 0;border-bottom:1px solid var(--line)}
 .tbl.relationships td:last-child{grid-column:1/-1}
 .tbl.relationships summary{display:none}
 }
-"""
+""".replace("%LIGHT%", _LIGHT)
 
 _SCRIPT = """
 (function () {
@@ -434,7 +439,9 @@ _SCRIPT = """
   if (theme) {
     var kept = null;
     try { kept = localStorage.getItem('filegrail-theme'); } catch (error) { kept = null; }
-    wear(kept === 'light' ? 'light' : 'dark');
+    var prefersLight = window.matchMedia
+      && window.matchMedia('(prefers-color-scheme: light)').matches;
+    wear(kept === 'light' || (kept === null && prefersLight) ? 'light' : 'dark');
     theme.addEventListener('click', function () {
       wear(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
     });
@@ -806,7 +813,7 @@ def render_html(
 
     head = [
         "<!doctype html>",
-        '<html lang="en" data-theme="dark">',
+        '<html lang="en">',
         "<head>",
         '<meta charset="utf-8">',
         f'<meta http-equiv="Content-Security-Policy" content="{POLICY}">',
@@ -823,8 +830,7 @@ def render_html(
         '<header class="mast" id="top">',
         _MARK,
         '<div class="who">',
-        '<div class="word">filegrail '
-        f"<small>v{_e(__version__)} · investigation report</small></div>",
+        f'<h1 class="word">filegrail <small>v{_e(__version__)} · investigation report</small></h1>',
         '<div class="tag">Trace origins · Extract metadata · Discover pivots</div>',
         "</div>",
         '<div class="mast-actions">',
@@ -906,7 +912,7 @@ def _note(key: str, case: Case, detailed: set[str], relationship_count: int) -> 
     if key == "conflicts" and case.conflicts:
         return f"{len(case.conflicts)}"
     if key == "relationships" and relationship_count:
-        return f"{relationship_count:,}"
+        return f"{relationship_count:,} <b>· graph edges</b>"
     if key == "pivots" and case.pivots is not None:
         return f"{case.pivots.total:,} <b>· {case.pivots.across:,} in more than one file</b>"
     if key == "coverage":
@@ -1594,7 +1600,7 @@ def _detail(
         notes.append(said)
     if notes:
         body.append(
-            '<div class="extra"><span class="k">notes</span><ul>'
+            '<div class="extra"><span class="k">related</span><ul>'
             + "".join(f"<li>{note}</li>" for note in notes)
             + "</ul></div>"
         )
