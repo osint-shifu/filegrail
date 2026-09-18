@@ -1,6 +1,6 @@
 <div align="center">
 
-[![PyPI](https://img.shields.io/badge/pypi-v0.30.3-3775A9?style=flat-square)](https://pypi.org/project/filegrail/) ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square) ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-1f883d?style=flat-square) ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1f883d?style=flat-square) [![CI](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml/badge.svg)](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml) ![License](https://img.shields.io/badge/license-Apache--2.0-8250df?style=flat-square)
+[![PyPI](https://img.shields.io/badge/pypi-v0.30.4-3775A9?style=flat-square)](https://pypi.org/project/filegrail/) ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square) ![93 formats](https://img.shields.io/badge/formats-93-8250df?style=flat-square) ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-1f883d?style=flat-square) ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1f883d?style=flat-square) [![CI](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml/badge.svg)](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml) ![License](https://img.shields.io/badge/license-Apache--2.0-8250df?style=flat-square)
 
 </div>
 
@@ -8,10 +8,10 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/osintshifu/filegrail/master/assets/filegrail-mark-04-plate-ondark-512.png">
-  <img align="left" hspace="16" src="https://raw.githubusercontent.com/osintshifu/filegrail/master/assets/filegrail-mark-04-plate-onlight-512.png" alt="FileGrail logomark" width="112">
+  <img align="left" hspace="28" src="https://raw.githubusercontent.com/osintshifu/filegrail/master/assets/filegrail-mark-04-plate-onlight-512.png" alt="FileGrail logomark" width="112">
 </picture>
 
-# FileGrail
+### FileGrail
 
 **Local File Intelligence**<br>Provenance. Metadata. Investigative Pivots.
 

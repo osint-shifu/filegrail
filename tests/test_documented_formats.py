@@ -214,6 +214,12 @@ def test_the_format_reference_agrees_with_the_readers_about_how_many_there_are()
     assert _counted(FORMATS, r"file extensions\*\*") == len(_readable())
 
 
+def test_the_readme_format_badge_agrees_with_the_readers():
+    found = re.search(r"badge/formats-(\d+)-", README.read_text(encoding="utf-8"))
+    assert found is not None, "README no longer carries the format-count badge"
+    assert int(found.group(1)) == len(_readable())
+
+
 def _backticked(document: Path, heading: str, stop: str) -> set[str]:
     """Every extension in the tables under one heading of a document."""
     text = document.read_text(encoding="utf-8")
