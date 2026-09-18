@@ -495,7 +495,7 @@ def _summary(case: Case, relationship_count: int) -> str:
         )
     if review:
         said = f"{len(case.conflicts)} conflicts · {fields} fields" if case.conflicts else ""
-        cards.append(_card(f"{len(review):,}", "need a second look", said, files, "flag", "alert"))
+        cards.append(_card(f"{len(review):,}", "need review", said, files, "flag", "alert"))
     if quiet:
         cards.append(
             _card(
@@ -537,7 +537,7 @@ def _summary(case: Case, relationship_count: int) -> str:
         '<span class="cat origin">origin · how it got here</span>'
         '<span class="cat metadata">metadata · what it says about itself</span>'
         '<span class="cat activity">activity · what happened to it here</span>'
-        '<span><span class="flag">!</span> wants a second look</span>'
+        '<span><span class="flag">!</span> needs review</span>'
         "</div>"
     )
     return f'<div class="cards">{"".join(cards)}</div>{legend}'
@@ -649,7 +649,7 @@ def _chips(case: Case) -> str:
     counted = [("all", "all", len(case.files))]
     review = sum(1 for entry in case.files if entry.state == REVIEW)
     if review:
-        counted.append(("flag", "second look", review))
+        counted.append(("flag", "needs review", review))
     for name in CATEGORIES:
         held = sum(1 for entry in case.files if entry.found[name])
         if held:

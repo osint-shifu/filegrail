@@ -5,6 +5,12 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.25.2 - 2026-09-18
+
+### Changed
+
+- HTML report: a calmer blue accent, with the metadata category moved to indigo so the two stay apart; larger navigation links and summary cards, whose titles wrap instead of being cut; files and findings that need attention are labelled "needs review".
+
 ## 0.25.1 - 2026-09-18
 
 ### Changed
