@@ -9,6 +9,7 @@ files, which is what proves the layout right.
 from __future__ import annotations
 
 import struct
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from tests.compound import (
     SUMMARY_FMTID,
     VT_FILETIME,
     VT_LPSTR,
+    directory_entry,
     ole,
 )
 
@@ -31,7 +33,11 @@ EPOCH_1601 = datetime(1601, 1, 1, tzinfo=timezone.utc)
 
 def _filetime(moment: datetime) -> bytes:
     """Encode an instant the way Windows does: 100ns ticks from 1601."""
-    return struct.pack("<Q", int((moment - EPOCH_1601).total_seconds()) * 10_000_000)
+    return struct.pack("<Q", _filetime_ticks(moment))
+
+
+def _filetime_ticks(moment: datetime) -> int:
+    return int((moment - EPOCH_1601).total_seconds()) * 10_000_000
 
 
 def _property_set(fmtid: bytes, properties: dict[int, tuple[int, object]]) -> bytes:
@@ -139,6 +145,110 @@ def test_a_document_without_a_summary_reports_nothing(tmp_path: Path):
     document.write_bytes(ole({"WordDocument": b"\x00" * 128}))
 
     assert read_ole(document) is None
+
+
+def test_storage_directory_timestamps_and_clsid_are_reported(tmp_path: Path):
+    document = tmp_path / "storage.doc"
+    clsid = uuid.UUID("0003000c-0000-0000-c000-000000000046")
+    created = datetime(2018, 5, 6, 7, 8, 9, tzinfo=timezone.utc)
+    modified = datetime(2019, 6, 7, 8, 9, 10, tzinfo=timezone.utc)
+    document.write_bytes(
+        ole(
+            {"WordDocument": b"\x00" * 128},
+            directory_entries=(
+                directory_entry(
+                    "ObjectPool",
+                    1,
+                    0,
+                    0,
+                    clsid=clsid.bytes_le,
+                    created=_filetime_ticks(created),
+                    modified=_filetime_ticks(modified),
+                ),
+            ),
+        )
+    )
+
+    found = read_ole(document)
+    origin = read_embedded_metadata(document)
+
+    assert found.storages[0].clsid == str(clsid)
+    assert found.storages[0].created == "2018-05-06T07:08:09Z"
+    assert found.storages[0].modified == "2019-06-07T08:09:10Z"
+    assert origin.fields["Storage[1]:Name"] == "ObjectPool"
+    assert origin.fields["Storage[1]:CLSID"] == str(clsid)
+    assert origin.fields["Storage[1]:Created"] == "2018-05-06T07:08:09Z"
+    assert origin.fields["Storage[1]:Modified"] == "2019-06-07T08:09:10Z"
+
+
+def test_stream_directory_timestamps_are_not_reported(tmp_path: Path):
+    document = tmp_path / "stream-time.doc"
+    moment = datetime(2020, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    document.write_bytes(
+        ole(
+            {},
+            directory_entries=(directory_entry("Bogus", 2, 0, 0, created=_filetime_ticks(moment)),),
+        )
+    )
+
+    assert read_ole(document) is None
+    assert read_embedded_metadata(document) is None
+
+
+def test_vba_storage_is_reported_as_a_structural_indicator(tmp_path: Path):
+    document = tmp_path / "vba.doc"
+    document.write_bytes(ole({}, directory_entries=(directory_entry("VBA", 1, 0, 0),)))
+
+    origin = read_embedded_metadata(document)
+
+    assert origin.fields["VBAStorage"] == "present"
+    assert origin.note == "VBA storage present"
+    assert "macro" not in origin.note.lower()
+
+
+def test_biff_macro_sheet_is_reported_without_guessing_from_stream_name(tmp_path: Path):
+    bof = struct.pack("<HHHH", 0x0809, 4, 0x0600, 0x0005)
+    macro_sheet = struct.pack("<HHIBB", 0x0085, 6, 0, 0, 1)
+    eof = struct.pack("<HH", 0x000A, 0)
+    document = tmp_path / "xlm.xls"
+    document.write_bytes(ole({"Workbook": bof + macro_sheet + eof}))
+
+    origin = read_embedded_metadata(document)
+
+    assert origin.fields["XLMMacroSheets"] == "1"
+    assert origin.note == "XLM macro sheets 1"
+    assert "malicious" not in origin.note.lower()
+
+
+def test_workbook_stream_name_alone_is_not_an_xlm_indicator(tmp_path: Path):
+    bof = struct.pack("<HHHH", 0x0809, 4, 0x0600, 0x0005)
+    worksheet = struct.pack("<HHIBB", 0x0085, 6, 0, 0, 0)
+    eof = struct.pack("<HH", 0x000A, 0)
+    document = tmp_path / "plain.xls"
+    document.write_bytes(ole({"Workbook": bof + worksheet + eof}))
+
+    assert read_embedded_metadata(document) is None
+
+
+def test_ole_packager_paths_and_payload_size_are_reported(tmp_path: Path):
+    payload = b"embedded payload"
+    package = struct.pack("<H", 2)
+    package += b"invoice.pdf\x00"
+    package += b"C:\\Cases\\invoice.pdf\x00"
+    package += struct.pack("<II", 0, 0)
+    package += b"C:\\Temp\\invoice.pdf\x00"
+    package += struct.pack("<I", len(payload)) + payload
+    native = struct.pack("<I", len(package)) + package
+    document = tmp_path / "embedded.doc"
+    document.write_bytes(ole({"\x01Ole10Native": native}))
+
+    origin = read_embedded_metadata(document)
+
+    assert origin.fields["Ole10NativeStreams"] == "1"
+    assert origin.fields["EmbeddedObject[1]:Filename"] == "invoice.pdf"
+    assert origin.fields["EmbeddedObject[1]:SourcePath"] == "C:\\Cases\\invoice.pdf"
+    assert origin.fields["EmbeddedObject[1]:TempPath"] == "C:\\Temp\\invoice.pdf"
+    assert origin.fields["EmbeddedObject[1]:Size"] == str(len(payload))
 
 
 def test_a_file_that_is_not_a_compound_document(tmp_path: Path):

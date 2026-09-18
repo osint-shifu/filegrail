@@ -250,7 +250,7 @@ BLOCK_LABELS: dict[str, str] = {
     "exif": "EXIF",
     "isobmff": "movie metadata",
     "png-text": "PNG text",
-    "ole-summary": "OLE summary",
+    "ole-summary": "OLE metadata",
     "riff": "RIFF",
     "id3": "ID3",
     "matroska": "Matroska",

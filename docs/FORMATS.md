@@ -38,7 +38,7 @@ on when you want the PDFs rather than everything a file said about itself.
 | `id3` | `.mp3` `.aac` `.tta` | ID3v2 frames: encoding software, artist, title, date |
 | `pdf-info` | `.pdf` | The `Info` dictionary, through compressed object streams and hex strings |
 | `ooxml-properties` | `.docx` `.docm` `.dotx` `.xlsx` `.xlsm` `.xltx` `.pptx` `.pptm` | `app.xml` and `core.xml`: application, author, last editor, company, template, revision count, total editing time |
-| `ole-summary` | `.doc` `.dot` `.xls` `.xlt` `.ppt` `.pot` `.pps` `.msg` | `SummaryInformation` and `DocumentSummaryInformation` property sets |
+| `ole-summary` | `.doc` `.dot` `.xls` `.xlt` `.ppt` `.pot` `.pps` `.msg` | Summary properties, storage CLSIDs and timestamps, VBA/XLM indicators, and OLE Packager paths |
 | `odf-meta` | `.odt` `.ods` `.odp` `.odg` `.odf` `.ott` `.otp` | `meta.xml`: generator, author, creation and editing metadata |
 | `epub-package` | `.epub` | OPF package metadata |
 | `rtf-generator` | `.rtf` | The `\generator` and `\info` groups |
@@ -100,6 +100,11 @@ was written by a machine the sender may control.
 
 A `.msg` also goes through the `ole-summary` reader, because it is a compound
 document and its Office-style properties sit exactly where a `.doc`'s do.
+Directory timestamps are reported only for storage entries. CFB stream entries
+do not define meaningful creation or modification times. `VBAStorage=present`
+means that the container has a VBA storage, not that its code was executed or
+is malicious. XLM is reported only when a BIFF `BoundSheet` record explicitly
+identifies a macro sheet, not from the presence of a `Workbook` stream alone.
 
 ---
 

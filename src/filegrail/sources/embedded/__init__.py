@@ -331,6 +331,54 @@ def _from_compound(path: Path, suffix: str) -> EvidenceRecord | None:
         notes.append(f"company {found.company}")
     if found.title:
         notes.append(f"title {_clip(found.title, 80)}")
+    if found.storages:
+        notes.append(f"storage metadata {len(found.storages)}")
+    if found.vba_storage:
+        notes.append("VBA storage present")
+    if found.xlm_macro_sheets:
+        notes.append(f"XLM macro sheets {found.xlm_macro_sheets}")
+    if found.native_streams:
+        notes.append(f"embedded object streams {found.native_streams}")
+    if found.root_clsid and not notes:
+        notes.append("root CLSID recorded")
+
+    fields = {
+        name: value
+        for name, value in (
+            ("Application", found.tool),
+            ("Author", found.author),
+            ("LastAuthor", found.last_author),
+            ("Company", found.company),
+            ("Title", found.title),
+            ("Created", found.created),
+            ("RootCLSID", found.root_clsid),
+            ("VBAStorage", "present" if found.vba_storage else None),
+            (
+                "XLMMacroSheets",
+                str(found.xlm_macro_sheets) if found.xlm_macro_sheets else None,
+            ),
+            ("Ole10NativeStreams", str(found.native_streams) if found.native_streams else None),
+        )
+        if value
+    }
+    for index, storage in enumerate(found.storages, 1):
+        for name, value in (
+            ("Name", storage.name),
+            ("CLSID", storage.clsid),
+            ("Created", storage.created),
+            ("Modified", storage.modified),
+        ):
+            if value:
+                fields[f"Storage[{index}]:{name}"] = value
+    for index, embedded in enumerate(found.embedded_objects, 1):
+        for name, value in (
+            ("Filename", embedded.filename),
+            ("SourcePath", embedded.source_path),
+            ("TempPath", embedded.temp_path),
+            ("Size", str(embedded.size)),
+        ):
+            if value:
+                fields[f"EmbeddedObject[{index}]:{name}"] = value
 
     return _origin(
         "document-metadata",
@@ -338,18 +386,7 @@ def _from_compound(path: Path, suffix: str) -> EvidenceRecord | None:
         tool=found.tool,
         at=_normalise(found.created),
         note="; ".join(notes) or None,
-        fields={
-            name: value
-            for name, value in (
-                ("Application", found.tool),
-                ("Author", found.author),
-                ("LastAuthor", found.last_author),
-                ("Company", found.company),
-                ("Title", found.title),
-                ("Created", found.created),
-            )
-            if value
-        },
+        fields=fields,
     )
 
 

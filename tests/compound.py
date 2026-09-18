@@ -31,12 +31,23 @@ VT_FILETIME = 64
 # --- compound file -----------------------------------------------------------
 
 
-def directory_entry(name: str, category: int, start: int, size: int, child: int = FREE) -> bytes:
+def directory_entry(
+    name: str,
+    category: int,
+    start: int,
+    size: int,
+    child: int = FREE,
+    *,
+    clsid: bytes = b"\x00" * 16,
+    created: int = 0,
+    modified: int = 0,
+) -> bytes:
+    assert len(clsid) == 16
     raw = name.encode("utf-16-le") + b"\x00\x00"
     entry = raw.ljust(64, b"\x00")[:64]
     entry += struct.pack("<HBB", len(raw), category, 1)
     entry += struct.pack("<III", FREE, FREE, child)
-    entry += b"\x00" * 16 + b"\x00" * 4 + b"\x00" * 16
+    entry += clsid + b"\x00" * 4 + struct.pack("<QQ", created, modified)
     entry += struct.pack("<IQ", start, size)
     assert len(entry) == 128
     return entry
@@ -46,7 +57,7 @@ def chain(first: int, count: int) -> list[int]:
     return [first + step + 1 for step in range(count - 1)] + [ENDOFCHAIN]
 
 
-def ole(streams: dict[str, bytes]) -> bytes:
+def ole(streams: dict[str, bytes], *, directory_entries: tuple[bytes, ...] = ()) -> bytes:
     """Assemble a v3 compound file holding `streams`.
 
     A stream shorter than the cutoff goes into the mini stream, exactly as an
@@ -95,10 +106,12 @@ def ole(streams: dict[str, bytes]) -> bytes:
         mini_fat_start, mini_fat_count = allocate(blob, SECTOR)
         fat.extend(chain(mini_fat_start, mini_fat_count))
 
-    root = directory_entry("Root Entry", 5, mini_start, len(mini_stream), child=1)
+    root_child = 1 if entries or directory_entries else FREE
+    root = directory_entry("Root Entry", 5, mini_start, len(mini_stream), child=root_child)
     directory.append(root)
     for name, category, start, size in entries:
         directory.append(directory_entry(name, category, start, size))
+    directory.extend(directory_entries)
 
     directory_start, directory_count = allocate(b"".join(directory), SECTOR)
     fat.extend(chain(directory_start, directory_count))

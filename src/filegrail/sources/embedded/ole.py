@@ -8,7 +8,9 @@ in two streams that every Office release has written since 1995:
     \\x05DocumentSummaryInformation  the company, and the manager
 
 Both are property sets, a format shared with Windows shell metadata, so the
-parser here is a general one pointed at two known FMTIDs.
+parser here is a general one pointed at two known FMTIDs. The compound-file
+directory also carries storage timestamps and CLSIDs, while selected stream
+structures expose bounded VBA, XLM and embedded-object evidence.
 
 These files are still everywhere - government portals, journal supplements and
 scanned archives hand them out daily - and their metadata is often richer than
@@ -18,8 +20,9 @@ the modern equivalent, because nobody has thought to strip it.
 from __future__ import annotations
 
 import struct
+import uuid
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -32,6 +35,7 @@ _FREESECT = 0xFFFFFFFF
 
 #: A directory entry is fixed width, and its name is UTF-16.
 _ENTRY_SIZE = 128
+_STORAGE = 1
 _STREAM = 2
 _ROOT = 5
 
@@ -40,6 +44,8 @@ _MAX_SECTORS = 1 << 18
 _MAX_ENTRIES = 4096
 _MAX_PROPERTIES = 256
 _MAX_STRING = 1024
+_MAX_PACKAGE_STRING = 4096
+_MAX_BIFF_RECORDS = 100_000
 
 # Property set format identifiers, little-endian on disk.
 _SUMMARY = bytes.fromhex("e0859ff2f94f6810ab9108002b27b3d9")
@@ -66,6 +72,26 @@ _EPOCH_1601 = datetime(1601, 1, 1, tzinfo=timezone.utc)
 
 
 @dataclass(slots=True)
+class Storage:
+    """Directory metadata recorded for one compound-file storage."""
+
+    name: str
+    clsid: str | None = None
+    created: str | None = None
+    modified: str | None = None
+
+
+@dataclass(slots=True)
+class EmbeddedObject:
+    """Paths and payload size exposed by an OLE Packager object."""
+
+    filename: str | None
+    source_path: str | None
+    temp_path: str | None
+    size: int
+
+
+@dataclass(slots=True)
 class Document:
     """What a compound document says about its own creation."""
 
@@ -75,10 +101,29 @@ class Document:
     company: str | None = None
     created: str | None = None
     title: str | None = None
+    root_clsid: str | None = None
+    storages: list[Storage] = field(default_factory=list)
+    vba_storage: bool = False
+    xlm_macro_sheets: int = 0
+    native_streams: int = 0
+    embedded_objects: list[EmbeddedObject] = field(default_factory=list)
 
     def __bool__(self) -> bool:
         return any(
-            (self.tool, self.author, self.last_author, self.company, self.created, self.title)
+            (
+                self.tool,
+                self.author,
+                self.last_author,
+                self.company,
+                self.created,
+                self.title,
+                self.root_clsid,
+                self.storages,
+                self.vba_storage,
+                self.xlm_macro_sheets,
+                self.native_streams,
+                self.embedded_objects,
+            )
         )
 
 
@@ -97,6 +142,7 @@ def read_ole(path: Path) -> Document | None:
         found = Document()
         _apply(found, container.stream("\x05SummaryInformation"), _SUMMARY)
         _apply(found, container.stream("\x05DocumentSummaryInformation"), _DOCUMENT_SUMMARY)
+        _apply_directory(found, container)
     except (struct.error, ValueError, IndexError):
         return None
     return found if found else None
@@ -230,10 +276,14 @@ class _Container:
     def stream(self, name: str) -> bytes | None:
         for entry in self.entries:
             if entry.kind == _STREAM and entry.name == name:
-                if entry.size < self.cutoff and self.mini_stream:
-                    return self._read_chain(entry.start, entry.size, self.mini_fat, self.mini_size)
-                return self._read_chain(entry.start, entry.size, self.fat, self.sector_size)
+                return self.entry_stream(entry)
         return None
+
+    def entry_stream(self, entry: _Entry) -> bytes:
+        """Read one already-resolved stream entry."""
+        if entry.size < self.cutoff and self.mini_stream:
+            return self._read_chain(entry.start, entry.size, self.mini_fat, self.mini_size)
+        return self._read_chain(entry.start, entry.size, self.fat, self.sector_size)
 
 
 @dataclass(slots=True)
@@ -242,16 +292,132 @@ class _Entry:
     kind: int
     start: int
     size: int
+    clsid: str | None
+    created: str | None
+    modified: str | None
 
     @classmethod
     def parse(cls, raw: bytes) -> _Entry | None:
         (length,) = struct.unpack_from("<H", raw, 64)
         kind = raw[66]
-        if kind not in (_STREAM, _ROOT) or not 2 <= length <= 64:
+        if kind not in (_STORAGE, _STREAM, _ROOT) or not 2 <= length <= 64:
             return None
         name = raw[: length - 2].decode("utf-16-le", "replace")
+        clsid = _guid(raw[80:96])
+        created, modified = struct.unpack_from("<QQ", raw, 100)
         start, size = struct.unpack_from("<IQ", raw, 116)
-        return cls(name=name, kind=kind, start=start, size=size)
+        return cls(
+            name=name,
+            kind=kind,
+            start=start,
+            size=size,
+            clsid=clsid,
+            created=_timestamp(created),
+            modified=_timestamp(modified),
+        )
+
+
+def _apply_directory(found: Document, container: _Container) -> None:
+    """Keep bounded directory evidence without interpreting document content."""
+    if container.entries and container.entries[0].kind == _ROOT:
+        found.root_clsid = container.entries[0].clsid
+    workbook = container.stream("Workbook") or container.stream("Book")
+    found.xlm_macro_sheets = _xlm_macro_sheets(workbook)
+
+    for entry in container.entries:
+        if entry.kind == _STORAGE:
+            if entry.name.casefold() == "vba":
+                found.vba_storage = True
+            if entry.clsid or entry.created or entry.modified:
+                found.storages.append(
+                    Storage(entry.name, entry.clsid, entry.created, entry.modified)
+                )
+        elif entry.kind == _STREAM and entry.name.casefold() == "\x01ole10native":
+            found.native_streams += 1
+            if package := _read_packager(container.entry_stream(entry)):
+                found.embedded_objects.append(package)
+
+
+def _xlm_macro_sheets(blob: bytes | None) -> int:
+    """Count BIFF BoundSheet records explicitly typed as macro sheets."""
+    if not blob or len(blob) < 8:
+        return 0
+    first, first_size = struct.unpack_from("<HH", blob)
+    if first != 0x0809 or first_size < 4 or first_size + 4 > len(blob):
+        return 0
+    (version,) = struct.unpack_from("<H", blob, 4)
+    if version not in (0x0500, 0x0600):  # BIFF5 and BIFF8
+        return 0
+
+    found = 0
+    offset = 0
+    records = 0
+    while offset + 4 <= len(blob) and records < _MAX_BIFF_RECORDS:
+        identifier, size = struct.unpack_from("<HH", blob, offset)
+        body = offset + 4
+        end = body + size
+        if end > len(blob):
+            break
+        # BoundSheet8: stream position, visibility, then the sheet type.
+        if identifier == 0x0085 and size >= 6 and blob[body + 5] == 0x01:
+            found += 1
+        offset = end
+        records += 1
+    return found
+
+
+def _guid(raw: bytes) -> str | None:
+    """Decode a CFB CLSID, leaving the all-zero sentinel absent."""
+    if len(raw) != 16 or not any(raw):
+        return None
+    return str(uuid.UUID(bytes_le=raw))
+
+
+def _read_packager(blob: bytes) -> EmbeddedObject | None:
+    """Decode the common OLE Packager layout inside an Ole10Native stream.
+
+    Ole10Native itself only promises a sized opaque payload. Packager adds the
+    three paths below, so the layout is accepted only when every boundary and
+    terminator is present rather than treating arbitrary native data as paths.
+    """
+    if len(blob) < 6:
+        return None
+    (declared,) = struct.unpack_from("<I", blob)
+    if declared < 2 or declared > len(blob) - 4:
+        return None
+    body = blob[4 : 4 + declared]
+    cursor = 2  # Packager's leading marker; not provenance evidence.
+    filename, cursor = _package_text(body, cursor)
+    if cursor < 0:
+        return None
+    source_path, cursor = _package_text(body, cursor)
+    if cursor < 0 or cursor + 8 > len(body):
+        return None
+    cursor += 8  # Two Packager implementation fields.
+    temp_path, cursor = _package_text(body, cursor)
+    if cursor < 0 or cursor + 4 > len(body):
+        return None
+    (size,) = struct.unpack_from("<I", body, cursor)
+    cursor += 4
+    if size > len(body) - cursor or not any((filename, source_path, temp_path)):
+        return None
+    return EmbeddedObject(filename, source_path, temp_path, size)
+
+
+def _package_text(blob: bytes, offset: int) -> tuple[str | None, int]:
+    limit = min(len(blob), offset + _MAX_PACKAGE_STRING + 1)
+    end = blob.find(b"\x00", offset, limit)
+    if end < 0:
+        return None, -1
+    raw = blob[offset:end]
+    try:
+        value = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        value = raw.decode("cp1252", "replace")
+    cleaned = value.strip()
+    if any(ord(character) < 32 for character in cleaned):
+        return None, -1
+    return cleaned or None, end + 1
 
 
 # --- property sets -----------------------------------------------------------
