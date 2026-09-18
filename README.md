@@ -9,7 +9,7 @@
 
 **Provenance. Metadata. Investigative Pivots.**
 
-[![PyPI](https://img.shields.io/badge/pypi-v0.28.0-3775A9?style=flat-square)](https://pypi.org/project/filegrail/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.29.0-3775A9?style=flat-square)](https://pypi.org/project/filegrail/)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-1f883d?style=flat-square)
 ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1f883d?style=flat-square)
@@ -411,8 +411,8 @@ A telemetry track can reveal movement even when ordinary GPS metadata is absent.
 | **AIFF** | `.aif` `.aiff` `.aifc` | Name, author, copyright and annotations, sound description and ID3 tags where present |
 | **APE tag** | `.ape` `.mpc` `.wv` `.ofr` | Encoder, artist, title, year and every other text tag |
 | **ID3** | `.mp3` `.aac` `.tta` | Encoding software, artist, title, date and other tags |
-| **PDF Info** | `.pdf` | Producer, creator, author, title, subject, keywords and dates; incremental updates, document IDs, encryption, attachments, scripts, forms, link targets and signatures |
-| **OOXML properties** | `.docx` `.docm` `.dotx` `.xlsx` `.xlsm` `.xltx` `.pptx` `.pptm` | Application, author, last editor, company, template, revision count and editing time |
+| **PDF Info** | `.pdf` | Producer, creator, author, title, subject, keywords and dates; incremental updates and what each replaced or added, document IDs, encryption, attachments, scripts, forms, link targets and signatures |
+| **OOXML properties** | `.docx` `.docm` `.dotx` `.xlsx` `.xlsm` `.xltx` `.pptx` `.pptm` | Application, author, last editor, company, template, revision count and editing time; links outside the package such as templates, workbooks and hyperlinks; DDE fields |
 | **OLE properties** | `.doc` `.dot` `.xls` `.xlt` `.ppt` `.pot` `.pps` `.msg` | Summary properties, storage metadata, orphaned entries, VBA/XLM indicators and embedded-object paths |
 | **OpenDocument metadata** | `.odt` `.ods` `.odp` `.odg` `.odf` `.ott` `.otp` | Generating application, author, title, creation date and editing statistics |
 | **EPUB package** | `.epub` | Generating application, author, title and date |

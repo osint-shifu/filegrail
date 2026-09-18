@@ -5,6 +5,13 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.29.0 - 2026-09-18
+
+### Added
+
+- Office packages: every relationship that points outside the package is listed, such as a template on a share, a linked workbook or a hyperlink, and DDE field instructions are reported as written. Both are observations; nothing is classified.
+- PDF: each incremental update says which objects it replaced and which it added, so a document edited after it was signed shows what the edit touched.
+
 ## 0.28.0 - 2026-09-18
 
 ### Added

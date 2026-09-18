@@ -89,6 +89,16 @@ _PDF_ENTRY = re.compile(
     rb"(?:\((?P<literal>(?:\\.|[^\\)])*)\)|<(?P<hex>[0-9A-Fa-f\s]*)>)"
 )
 _PDF_INFO_REF = re.compile(rb"/Info\s+(\d+)\s+(\d+)\s+R\b")
+_PDF_OBJECT = re.compile(rb"(?:^|[\r\n])\s*(\d+)\s+\d+\s+obj\b")
+
+_RELATIONSHIPS = "http://schemas.openxmlformats.org/package/2006/relationships"
+#: Parts of a Word package that carry field instructions.
+_WORD_FIELD_PARTS = re.compile(r"^word/(document|header\d*|footer\d*|footnotes|endnotes)\.xml$")
+_INSTRUCTION = re.compile(
+    r"<w:instrText[^>]*>(.*?)</w:instrText>|<w:fldSimple[^>]*w:instr=\"([^\"]*)\"", re.S
+)
+_DDE = re.compile(r"\bDDE(?:AUTO)?\b[^<>]{0,200}")
+_OOXML_MAX_LISTED = 16
 
 _DC = "http://purl.org/dc/elements/1.1/"
 _DCTERMS = "http://purl.org/dc/terms/"
@@ -213,6 +223,7 @@ def _pdf_structure(raw: bytes, inflated: bytes, fields: dict[str, str]) -> list[
     if saves > 1:
         fields["IncrementalUpdates"] = str(saves - 1)
         notes.append(f"{saves - 1} incremental update{'s' if saves > 2 else ''}")
+        _pdf_update_deltas(raw, b"/Linearized" in raw[:1024], fields)
 
     ids = _PDF_TRAILER_ID.findall(raw)
     if ids:
@@ -266,6 +277,34 @@ def _pdf_structure(raw: bytes, inflated: bytes, fields: dict[str, str]) -> list[
         for index, uri in enumerate(uris[:_PDF_MAX_LISTED], 1):
             fields[f"URI[{index}]"] = uri
     return notes
+
+
+def _pdf_update_deltas(raw: bytes, linearized: bool, fields: dict[str, str]) -> None:
+    """Which objects each incremental update replaced and which it added.
+
+    Read from the objects written in plain in each section of the file; an
+    object kept inside a compressed object stream is not seen here.
+    """
+    sections = raw.split(_PDF_EOF)[:-1]
+    if linearized and len(sections) > 1:
+        sections[0:2] = [sections[0] + sections[1]]
+    seen: set[int] = set()
+    for index, section in enumerate(sections):
+        numbers = {int(number) for number in _PDF_OBJECT.findall(section)}
+        if index > 0:
+            replaced = sorted(numbers & seen)
+            added = sorted(numbers - seen)
+            if replaced:
+                fields[f"Update[{index}]:Replaced"] = _listed(replaced)
+            if added:
+                fields[f"Update[{index}]:Added"] = _listed(added)
+        seen |= numbers
+
+
+def _listed(numbers: list[int]) -> str:
+    shown = ", ".join(str(number) for number in numbers[:_PDF_MAX_LISTED])
+    left = len(numbers) - _PDF_MAX_LISTED
+    return f"{shown} and {left} more" if left > 0 else shown
 
 
 def _pdf_filespec_names(data: bytes) -> list[str]:
@@ -398,8 +437,14 @@ def _read_ooxml(path: Path) -> EvidenceRecord | None:
         names = set(archive.namelist())
         core = _parse_xml(archive, names, "docProps/core.xml")
         app = _parse_xml(archive, names, "docProps/app.xml")
+        external = _ooxml_external(archive, names)
+        dde = _ooxml_dde(archive, names)
 
     fields = _ooxml_properties(core, app)
+    for index, (kind, target) in enumerate(external, 1):
+        fields[f"ExternalLink[{index}]"] = f"{kind}: {target}"
+    for index, instruction in enumerate(dde, 1):
+        fields[f"DDE[{index}]"] = instruction
 
     author = _text(core, f"{{{_DC}}}creator")
     last_editor = _text(core, f"{{{_COREPROPS}}}lastModifiedBy")
@@ -417,6 +462,10 @@ def _read_ooxml(path: Path) -> EvidenceRecord | None:
         notes.append(f"last edited by {last_editor}")
     if company:
         notes.append(f"company {company}")
+    if external:
+        notes.append(f"{len(external)} external link{'s' if len(external) > 1 else ''}")
+    if dde:
+        notes.append(f"{len(dde)} DDE field{'s' if len(dde) > 1 else ''}")
 
     record = _origin(
         "ooxml-properties", tool, _normalise_timestamp(created), "; ".join(notes) or None, fields
@@ -430,6 +479,50 @@ def _read_ooxml(path: Path) -> EvidenceRecord | None:
         if parts:
             record.where = {"member": ", ".join(parts)}
     return record
+
+
+def _ooxml_external(archive: zipfile.ZipFile, names: set[str]) -> list[tuple[str, str]]:
+    """Every relationship that points outside the package: a template on a
+    share, a linked workbook, a hyperlink, an object kept elsewhere."""
+    found: list[tuple[str, str]] = []
+    for name in sorted(names):
+        if not name.endswith(".rels") or len(found) >= _OOXML_MAX_LISTED:
+            continue
+        tree = _parse_xml(archive, names, name)
+        if tree is None:
+            continue
+        for relationship in tree.iter(f"{{{_RELATIONSHIPS}}}Relationship"):
+            if relationship.get("TargetMode") != "External":
+                continue
+            target = (relationship.get("Target") or "").strip()
+            kind = (relationship.get("Type") or "").rsplit("/", 1)[-1] or "relationship"
+            if target and (kind, target) not in found:
+                found.append((kind, target))
+            if len(found) >= _OOXML_MAX_LISTED:
+                break
+    return found
+
+
+def _ooxml_dde(archive: zipfile.ZipFile, names: set[str]) -> list[str]:
+    """DDE field instructions, as written: an observation, not a verdict."""
+    found: list[str] = []
+    for name in sorted(names):
+        if not _WORD_FIELD_PARTS.match(name) or len(found) >= _OOXML_MAX_LISTED:
+            continue
+        part = read_part(archive, name)
+        if part is None:
+            continue
+        text = part.decode("utf-8", "replace")
+        instructions = " ".join(
+            (first or second or "") for first, second in _INSTRUCTION.findall(text)
+        )
+        for match in _DDE.finditer(instructions):
+            instruction = " ".join(match.group(0).split())
+            if instruction not in found:
+                found.append(instruction)
+            if len(found) >= _OOXML_MAX_LISTED:
+                break
+    return found
 
 
 def _ooxml_properties(

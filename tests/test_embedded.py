@@ -438,3 +438,81 @@ def test_a_png_exif_chunk_names_the_camera_and_the_capture_time(tmp_path: Path):
     assert origin.fields["Model"] == "K-3 III"
     assert origin.at == "2026-08-24T19:02:11Z"
     assert "Pentax" in (origin.tool or "")
+
+
+def test_ooxml_external_relationships_are_listed(tmp_path: Path):
+    """A template on a share and a hyperlink are what the document reaches for
+    outside itself; an image inside the package is not."""
+    rels = (
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+        'relationships/attachedTemplate" Target="file:///\\\\srv\\templates\\brief.dotm" '
+        'TargetMode="External"/></Relationships>'
+    )
+    body = (
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+        'relationships/hyperlink" Target="https://example.org/x" TargetMode="External"/>'
+        '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+        'relationships/image" Target="media/image1.png"/></Relationships>'
+    )
+    document = tmp_path / "brief.docx"
+    with zipfile.ZipFile(document, "w") as archive:
+        archive.writestr("docProps/core.xml", CORE_XML)
+        archive.writestr("word/_rels/document.xml.rels", body)
+        archive.writestr("word/_rels/settings.xml.rels", rels)
+
+    origin = read_embedded_metadata(document)
+
+    assert origin is not None
+    assert origin.fields["ExternalLink[1]"] == "hyperlink: https://example.org/x"
+    assert origin.fields["ExternalLink[2]"] == "attachedTemplate: file:///\\\\srv\\templates\\brief.dotm"
+    assert "ExternalLink[3]" not in origin.fields
+    assert "2 external links" in origin.note
+
+
+def test_ooxml_dde_fields_are_reported_as_an_observation(tmp_path: Path):
+    document = tmp_path / "invoice.docx"
+    with zipfile.ZipFile(document, "w") as archive:
+        archive.writestr(
+            "word/document.xml",
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            "<w:body><w:p><w:r><w:instrText> DDEAUTO c:\\\\windows\\\\system32\\\\cmd.exe "
+            '"/k calc.exe" </w:instrText></w:r></w:p></w:body></w:document>',
+        )
+
+    origin = read_embedded_metadata(document)
+
+    assert origin is not None
+    assert origin.fields["DDE[1]"] == 'DDEAUTO c:\\\\windows\\\\system32\\\\cmd.exe "/k calc.exe"'
+    assert "DDE field" in origin.note
+
+
+def test_pdf_updates_say_which_objects_they_replaced_or_added(tmp_path: Path):
+    from tests.pdf import document
+
+    first = document(
+        [b"BT (page) Tj ET"],
+        extra=b"<< /Producer (Old Writer) /Author (Old Author) >>",
+    )
+    first = first.replace(b"trailer\n<<", b"trailer\n<< /Info 6 0 R", 1)
+    previous = first.rfind(b"xref")
+    update = (
+        b"6 0 obj\n<< /Producer (New Writer) >>\nendobj\n"
+        b"7 0 obj\n<< /S /JavaScript /JS (app.alert(1)) >>\nendobj\n"
+    )
+    new_xref = len(first) + len(update)
+    update += (
+        b"xref\n6 2\n%010d 00000 n \n%010d 00000 n \n" % (len(first), len(first) + 44)
+        + b"trailer\n<< /Size 8 /Root 1 0 R /Info 6 0 R /Prev %d >>\n" % previous
+        + b"startxref\n%d\n%%%%EOF\n" % new_xref
+    )
+    path = tmp_path / "updated.pdf"
+    path.write_bytes(first + update)
+
+    origin = read_embedded_metadata(path)
+
+    assert origin is not None
+    assert origin.fields["IncrementalUpdates"] == "1"
+    assert origin.fields["Update[1]:Replaced"] == "6"
+    assert origin.fields["Update[1]:Added"] == "7"

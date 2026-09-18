@@ -39,8 +39,8 @@ on when you want the PDFs rather than everything a file said about itself.
 | `aiff` | `.aif` `.aiff` `.aifc` | `NAME`, `AUTH`, `(c) ` and `ANNO` chunks, the `COMM` sound description, an `ID3 ` chunk where one is present |
 | `ape-tag` | `.ape` `.mpc` `.wv` `.ofr` | APEv2 items at the end of the file: encoder, artist, title, year and every other text item |
 | `id3` | `.mp3` `.aac` `.tta` | ID3v2 frames: encoding software, artist, title, date |
-| `pdf-info` | `.pdf` | The `Info` dictionary, through compressed object streams and hex strings; incremental updates, trailer IDs, encryption, embedded files, JavaScript and launch actions, AcroForm/XFA, URI targets and signature dictionaries |
-| `ooxml-properties` | `.docx` `.docm` `.dotx` `.xlsx` `.xlsm` `.xltx` `.pptx` `.pptm` | `app.xml` and `core.xml`: application, author, last editor, company, template, revision count, total editing time |
+| `pdf-info` | `.pdf` | The `Info` dictionary, through compressed object streams and hex strings; incremental updates with the objects each replaced or added, trailer IDs, encryption, embedded files, JavaScript and launch actions, AcroForm/XFA, URI targets and signature dictionaries |
+| `ooxml-properties` | `.docx` `.docm` `.dotx` `.xlsx` `.xlsm` `.xltx` `.pptx` `.pptm` | `app.xml` and `core.xml`: application, author, last editor, company, template, revision count, total editing time; every `.rels` relationship with `TargetMode="External"`, and DDE instructions from the field text of the document, headers, footers and notes |
 | `ole-summary` | `.doc` `.dot` `.xls` `.xlt` `.ppt` `.pot` `.pps` `.msg` | Summary properties, storage metadata, orphaned entries, VBA/XLM indicators, and OLE Packager paths |
 | `odf-meta` | `.odt` `.ods` `.odp` `.odg` `.odf` `.ott` `.otp` | `meta.xml`: generator, author, creation and editing metadata |
 | `epub-package` | `.epub` | OPF package metadata |
