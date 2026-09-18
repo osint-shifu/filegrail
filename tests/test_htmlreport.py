@@ -257,3 +257,15 @@ def test_every_id_is_unique_and_every_internal_link_has_a_target():
     assert "P01" in ids
     assert len(ids) == len(set(ids)), sorted(i for i in ids if ids.count(i) > 1)
     assert targets <= set(ids), sorted(targets - set(ids))
+
+
+def test_the_print_layout_opens_every_block_and_lets_the_tables_fit_the_page():
+    """A printed report used to lose the last column of the file index and the
+    evidence of every relationship, and printed the controls instead."""
+    page = _page(_corpus())
+    printed = page.split("@media print{")[1].split("\n}\n")[0]
+
+    assert "details:not([open])>:not(summary){display:block}" in printed
+    assert ".wrap>table.index,.wrap>table.pivots,.wrap>table.relationships{min-width:0}" in printed
+    assert ".rel-controls,.rel-kinds,.rel-focus{display:none!important}" in printed
+    assert ".tbl.relationships td:last-child{grid-column:1/-1}" in printed

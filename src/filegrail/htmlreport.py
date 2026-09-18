@@ -382,16 +382,31 @@ text-transform:uppercase;color:var(--faint)}
 :root{color-scheme:light;--bg:#fff;--surface:#fff;--surface-2:#f2f3f5;--line:#d5d8dd;
 --line-2:#b8bcc3;--ink:#000;--ink-2:#222;--muted:#555;--faint:#777;--accent:#2F8677;
 --origin:#2F8677;--metadata:#3E6F9E;--activity:#8E6E2E;--alert:#B5563A}
+@page{margin:14mm}
 body{font-size:10.5px}
-.nav,.mast-actions,.copy,.chips,.tabs,.chev,a.card:after{display:none!important}
-.file>summary{cursor:default}
-details.file:not([open])>*:not(summary){display:block}
+.nav,.mast-actions,.copy,.chips,.tabs,.chev,a.card:after,.btn,.search,
+.rel-controls,.rel-kinds,.rel-focus{display:none!important}
+summary{cursor:default;list-style:none}
+summary::-webkit-details-marker{display:none}
+details:not([open])>:not(summary){display:block}
 .js .pane,.pane{display:block!important}
 .pane:before{display:block}
-section{break-inside:avoid-page;padding:22px 0 6px}
-.file,.conf,.find,.card,tr{break-inside:avoid}
+section{padding:22px 0 6px}
+.h{break-after:avoid}
+.file,.conf,.find,.card,tr,.rec{break-inside:avoid}
 thead{display:table-header-group}
 a{color:inherit}
+.wrap{overflow:visible}
+.wrap>table.index,.wrap>table.pivots,.wrap>table.relationships{min-width:0}
+.tbl th,.tbl td{white-space:normal}
+.tbl .path,.tbl .val,.tbl .where,.tbl .found{min-width:0;max-width:none}
+.rel-node,.relationship .kind,.relationship details{min-width:0}
+.tbl.relationships thead{display:none}
+.tbl.relationships tr{display:grid;grid-template-columns:1fr auto 1fr 1fr;gap:4px 10px;
+padding:6px 0;border-bottom:1px solid var(--line)}
+.tbl.relationships td{display:block;border:0;padding:0}
+.tbl.relationships td:last-child{grid-column:1/-1}
+.tbl.relationships summary{display:none}
 }
 """
 
