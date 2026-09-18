@@ -5,6 +5,13 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.30.8 - 2026-09-19
+
+### Changed
+
+- The roadmap states which steps of the evidence-depth round are implemented, what each still lacks, and that the file corpus behind the readers is local.
+- The README navigation names the live example as an HTML report.
+
 ## 0.30.7 - 2026-09-18
 
 ### Changed

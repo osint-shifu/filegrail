@@ -94,27 +94,27 @@ The next round deepens what a scan knows about a file before widening the list o
 
 ### Real files behind every reader
 
-Readers written against a specification alone are checked against files produced by the software the specification describes, and the defects those files reveal are fixed. The corpus test already runs over `test-data/`; what is missing is the files.
+Readers written against a specification alone are checked against files produced by the software the specification describes, and the defects those files reveal are fixed. The corpus test runs over a local `test-data/` directory that is not part of the repository. Files still wanted: an Outlook MSG, a Windows LNK, a WOFF from a foundry, a GoPro MP4 and a WAV with an `id3` chunk.
 
 ### Where a value was found
 
-Every evidence record can say where in the file it was read: the archive member, the embedded object or stream, the metadata namespace and path, the logical place such as a page or a slide, and the byte range where one is reliable. The `place` a person reads stays; the structured location is added beside it, in scan JSON without a schema change.
+Implemented in part. An evidence record names the archive member, the package part or the document object it was read from, beside the `place` a person reads, in scan JSON without a schema change. PDF metadata names its object, Office properties name their part and an archive member names itself. Still to come: the metadata namespace and path, the logical place such as a page or a slide, and the byte range where one is reliable.
 
 ### Files inside files
 
-Embedded objects are read as children of the file that carries them: an archive member, an OLE object in a document, an attachment in a message, a file embedded in a PDF, each with its own evidence and its own location, connected to its parent as a relationship of the graph. Depth, count, size and total work are bounded by one budget, so a container cannot make a scan run without end.
+Implemented for archives. A member that carries evidence is a file of its own, with its size, time, hash and evidence, its archive as its parent and a membership relationship in the graph. The members opened are bounded. Still to come as children: an OLE object in a document, an attachment in a message and a file embedded in a PDF, which is counted and named but not read as a file; a single `.gz` that is not a tar. Depth, count, size and total work are to be bounded by one budget, so a container cannot make a scan run without end.
 
 ### Content Credentials in every container that carries them
 
-C2PA manifests are read from TIFF and DNG, WAV and AVI, MP4, MOV, M4A, HEIF and AVIF, and ID3, using the container readers that already exist. Ingredients and actions are read in their current form, and the `c2pa.ai-disclosure` assertion and the IPTC AI fields are reported as declared AI provenance: a declaration, never a verdict about the content. The claim signature stays unverified and the report keeps saying so.
+Implemented. C2PA manifests are read from TIFF and the raw formats built on it, WebP, WAV and AVI, MP4, MOV, M4A, HEIF and AVIF, and MP3, and the record says which structure carried the manifest. Ingredients and actions are read, and a declared AI source from a C2PA action or the IPTC digital source type is reported as a declaration, never a verdict about the content. The claim signature stays unverified and the report says so. The hard binding used by MP4 and MOV is not computed.
 
 ### Deeper Office and PDF evidence
 
-From Office documents: external relationships, attached templates and linked workbooks, the original name and path of embedded objects, and DDE fields, each reported as an observation. From PDF: what each incremental update changed, object by object, so a document edited after signing shows which objects the edit replaced or added.
+Implemented in part. From Office packages: every relationship that points outside the package, such as an attached template, a linked workbook or a hyperlink, and DDE fields, each reported as an observation. From PDF: what each incremental update replaced and added, object by object, so a document edited after signing shows what the edit touched; objects kept inside object streams are not listed. Still to come: the original name and path of embedded objects.
 
 ### What a media file says about how it was made
 
-From MP4, MOV, Matroska and RIFF: the encoder chain, the recording device, timecode, and the language of subtitle and audio tracks. Codec profiles, colour and bit rates are left out; they describe the picture, not where it came from.
+Implemented in part. MP4 and MOV name the recording device from the keys a phone writes, list every track with its handler, format and language, and note a timecode track. Matroska names the applications that muxed and wrote the file; RIFF names its software and language. Still to come: the timecode value itself, the language of Matroska tracks and the encoder chain in RIFF. Codec profiles, colour and bit rates are left out; they describe the picture, not where it came from.
 
 ### Format identification from the bytes
 
