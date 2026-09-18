@@ -5,6 +5,21 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- Relationship explorer and concise notes in the HTML report.
+- Web documents: Open Graph, JSON-LD, Microdata and RDFa.
+- OLE: storage timestamps and CLSIDs, VBA and XLM indicators, Packager paths, orphaned entries.
+- JPEG: JFIF, JFXX and ICC profile; Photoshop image resources.
+- C2PA: actions and ingredients from the active manifest.
+- PDF: incremental updates, trailer IDs, encryption, attachments, actions, forms, link targets and signatures.
+- PE executables: headers, PDB records, Rich header, version resources, Authenticode presence.
+- Fonts: `name`, `head`, `OS/2` and `fvar` tables, WOFF metadata.
+- AIFF chunks and APEv2 tags.
+- GoPro `udta` atoms and GPMF or CAMM telemetry summaries in MP4 and MOV.
+
 ## 0.23.0 - 2026-09-18
 
 ### Added
