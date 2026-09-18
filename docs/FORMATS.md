@@ -21,7 +21,7 @@ answers:
 
 ## Metadata blocks
 
-**71 file extensions** have a reader. Sixteen named metadata blocks, plus four
+**73 file extensions** have a reader. Seventeen named metadata blocks, plus four
 that turn up in any container that will carry them.
 
 The first column is the `block` value you get in `--json`. It is what to filter
@@ -30,6 +30,7 @@ on when you want the PDFs rather than everything a file said about itself.
 | Block | Extensions | What comes out |
 |:---|:---|:---|
 | `exif` | `.jpg` `.jpeg` `.jpe` `.tif` `.tiff` `.dng` `.nef` `.cr2` `.arw` `.orf` `.rw2` `.webp` `.heic` `.heif` `.avif` | Camera, lens, software, capture time and GPS; JPEG JFIF/JFXX and ICC profile metadata |
+| `photoshop-irb` | `.jpg` `.jpeg` `.jpe` `.tif` `.tiff` `.psd` `.psb` | Resolution, JPEG settings, embedded-thumbnail descriptors, paths, workflow URLs and version information |
 | `png-text` | `.png` `.apng` | `tEXt` / `zTXt` / `iTXt` keywords: software, creation time, author, and whatever a generator wrote there |
 | `isobmff` | `.mp4` `.m4v` `.mov` `.qt` `.3gp` `.m4a` `.heic` `.heif` `.avif` | Encoder and recording device, creation time, ISO 6709 location |
 | `matroska` | `.mkv` `.mk3d` `.webm` `.mka` | Writing application and library, segment date, tag entries |

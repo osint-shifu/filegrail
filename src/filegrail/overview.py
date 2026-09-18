@@ -93,7 +93,9 @@ AUTHOR_FIELDS: dict[str, tuple[str, ...]] = {
 #: Blocks that name no person, listed rather than left out so that adding a
 #: reader is a decision somebody made rather than a count that quietly
 #: understates itself. A test holds the two lists against the readers.
-WITHOUT_AUTHOR = frozenset({"isobmff", "svg-metadata", "notebook-kernel", "c2pa", "xmp-history"})
+WITHOUT_AUTHOR = frozenset(
+    {"isobmff", "svg-metadata", "notebook-kernel", "photoshop-irb", "c2pa", "xmp-history"}
+)
 
 
 @dataclass(frozen=True, slots=True)

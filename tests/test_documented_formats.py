@@ -292,6 +292,7 @@ def test_the_readme_metadata_table_names_the_extensions_its_readers_declare():
         isobmff,
         matroska,
         ole,
+        photoshop,
         png,
         riff,
         vorbis,
@@ -300,6 +301,7 @@ def test_the_readme_metadata_table_names_the_extensions_its_readers_declare():
 
     owners = {
         "EXIF": exif.SUFFIXES,
+        "Photoshop resources": photoshop.SUFFIXES,
         "PNG text": png.SUFFIXES,
         "ISO BMFF": isobmff.SUFFIXES,
         "Matroska": matroska.SUFFIXES,

@@ -18,10 +18,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ..models import EvidenceRecord
+from .embedded.photoshop import find_resource
 
 #: The image-resource block that holds an IIM datastream.
 _IPTC_RESOURCE = 0x0404
-_RESOURCE_MARKER = b"8BIM"
 
 #: The TIFF tag that holds an IIM datastream with no Photoshop block around it.
 #: There is no marker to search for in that case - a datastream begins `\x1c\x02`,
@@ -130,27 +130,8 @@ def _block(path: Path) -> bytes:
 
 def _find(data: bytes) -> bytes:
     """The payload of the first 8BIM resource that holds an IIM datastream."""
-    cursor = 0
-    while (at := data.find(_RESOURCE_MARKER, cursor)) >= 0:
-        cursor = at + len(_RESOURCE_MARKER)
-        if at + 6 > len(data):
-            return b""
-        (resource,) = struct.unpack_from(">H", data, at + 4)
-
-        # A Pascal-string name follows, padded so the name and its length byte
-        # together occupy an even number of bytes.
-        name_at = at + 6
-        if name_at >= len(data):
-            return b""
-        name_length = data[name_at] + 1
-        body = name_at + name_length + (name_length % 2)
-        if body + 4 > len(data):
-            return b""
-        (length,) = struct.unpack_from(">I", data, body)
-
-        if resource == _IPTC_RESOURCE and 0 < length <= _MAX_BLOCK:
-            return data[body + 4 : body + 4 + length]
-    return b""
+    found = find_resource(data, _IPTC_RESOURCE)
+    return found if len(found) <= _MAX_BLOCK else b""
 
 
 def _tiff_tag(data: bytes) -> bytes:

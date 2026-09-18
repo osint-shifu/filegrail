@@ -19,7 +19,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ...models import EvidenceRecord
-from . import containers, documents, exif, id3, isobmff, jpeg, matroska, ole, png, riff, vorbis, web
+from . import (
+    containers,
+    documents,
+    exif,
+    id3,
+    isobmff,
+    jpeg,
+    matroska,
+    ole,
+    photoshop,
+    png,
+    riff,
+    vorbis,
+    web,
+)
 
 #: A malformed container is ordinary: truncated downloads, Office lock files and
 #: files with a misleading extension all land here, and none is an error.
@@ -49,6 +63,7 @@ SUFFIXES = (
     | matroska.SUFFIXES
     | vorbis.SUFFIXES
     | ole.SUFFIXES
+    | photoshop.SUFFIXES
     | web.SUFFIXES
 )
 
@@ -63,6 +78,7 @@ def read_embedded_metadata(path: Path) -> EvidenceRecord | None:
         _from_documents,
         _from_web,
         _from_exif,
+        _from_photoshop,
         _from_movie,
         _from_png,
         _from_container,
@@ -172,13 +188,18 @@ def _from_exif(path: Path, suffix: str) -> EvidenceRecord | None:
         return None
     tags = exif.read_exif(path)
     jpeg_metadata = jpeg.read_jpeg_metadata(path) if suffix in jpeg.SUFFIXES else None
-    if not tags and not jpeg_metadata:
+    photoshop_metadata = (
+        photoshop.read_photoshop_metadata(path)
+        if suffix in photoshop.JPEG_SUFFIXES | photoshop.TIFF_SUFFIXES
+        else None
+    )
+    if not tags and not jpeg_metadata and not photoshop_metadata:
         return None
     tags = tags or exif.Exif()
 
     device = exif.camera(tags)
     software = _string(tags.get(exif.SOFTWARE))
-    tool = device or software
+    tool = device or software or (photoshop_metadata.tool if photoshop_metadata else None)
     if device and software and software.lower() not in device.lower():
         tool = f"{device} (processed with {software})"
 
@@ -198,19 +219,38 @@ def _from_exif(path: Path, suffix: str) -> EvidenceRecord | None:
         notes.append("ICC profile recorded")
     if jpeg_metadata and jpeg_metadata.jfxx_thumbnail:
         notes.append("JFXX thumbnail present")
+    if photoshop_metadata and photoshop_metadata.note:
+        notes.append(photoshop_metadata.note)
 
     fields = _exif_fields(tags)
     if jpeg_metadata:
         fields.update(jpeg_metadata.fields)
+    if photoshop_metadata:
+        fields.update(photoshop_metadata.fields)
 
     return _origin(
         "device-metadata" if device else "document-metadata",
-        block="exif",
+        block="exif" if tags or jpeg_metadata else "photoshop-irb",
         tool=tool,
         at=taken,
         geo=location,
         note="; ".join(notes) or None,
         fields=fields,
+    )
+
+
+def _from_photoshop(path: Path, suffix: str) -> EvidenceRecord | None:
+    if suffix not in photoshop.DOCUMENT_SUFFIXES:
+        return None
+    found = photoshop.read_photoshop_metadata(path)
+    if not found:
+        return None
+    return _origin(
+        "document-metadata",
+        block="photoshop-irb",
+        tool=found.tool,
+        note=found.note,
+        fields=dict(found.fields),
     )
 
 

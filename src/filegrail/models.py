@@ -248,6 +248,7 @@ BLOCK_LABELS: dict[str, str] = {
     "notebook-kernel": "notebook kernel",
     "web-document": "web document",
     "exif": "EXIF",
+    "photoshop-irb": "Photoshop resources",
     "isobmff": "movie metadata",
     "png-text": "PNG text",
     "ole-summary": "OLE metadata",

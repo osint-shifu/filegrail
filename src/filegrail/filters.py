@@ -23,6 +23,7 @@ from .sources.embedded import (
     id3,
     matroska,
     ole,
+    photoshop,
     png,
     riff,
     vorbis,
@@ -47,7 +48,7 @@ _VIDEO = (
 
 #: Formats no reader claims yet, listed so a filter still selects them - a file
 #: this tool cannot read is exactly the sort a report should be able to include.
-_EXTRA_IMAGE = {".gif", ".bmp", ".ico", ".psd", ".raf", ".srw", ".pef"}
+_EXTRA_IMAGE = {".gif", ".bmp", ".ico", ".raf", ".srw", ".pef"}
 _EXTRA_AUDIO = {".m4a", ".aiff", ".wma"}
 _EXTRA_TEXT = {
     ".txt",
@@ -62,7 +63,9 @@ _EXTRA_TEXT = {
 } | web.SUFFIXES
 
 FAMILIES: dict[str, frozenset[str]] = {
-    "image": frozenset(exif.SUFFIXES | png.SUFFIXES | containers.SVG_SUFFIXES | _EXTRA_IMAGE),
+    "image": frozenset(
+        exif.SUFFIXES | png.SUFFIXES | photoshop.SUFFIXES | containers.SVG_SUFFIXES | _EXTRA_IMAGE
+    ),
     "video": frozenset(_VIDEO),
     "audio": frozenset(
         id3.SUFFIXES | riff.WAVE_SUFFIXES | matroska.AUDIO_SUFFIXES | vorbis.SUFFIXES | _EXTRA_AUDIO
