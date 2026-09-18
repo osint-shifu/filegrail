@@ -300,3 +300,43 @@ def test_numbered_fields_are_gathered_under_their_group():
     assert "<dt>Reason</dt>" in section
     assert '<dt>RichEntry</dt><dd><ol class="numbered"><li>' in section
     assert section.count('class="copy"') >= 5
+
+
+def test_the_timeline_lists_dated_records_in_order_with_what_happened():
+    records = [
+        _file(
+            "later.jpg",
+            EvidenceRecord(
+                source="device-metadata", block="exif", tool="Canon", at="2026-03-02T09:00:00Z"
+            ),
+        ),
+        _file(
+            "first.pdf",
+            EvidenceRecord(
+                source="browser-download",
+                url="https://example.org/first.pdf",
+                at="2026-03-01T10:00:00Z",
+            ),
+        ),
+    ]
+
+    page = _page(records)
+    section = page.split('<section id="timeline"')[1].split("</section>")[0]
+
+    assert section.index("downloaded") < section.index("captured")
+    assert '<tr class="day"><td colspan="6">2026-03-01</td></tr>' in section
+    assert '<figure class="density">' in section
+    assert "https://example.org/first.pdf" in section
+    headings = re.findall(r"<h2>([^<]+)</h2>", page)
+    assert headings.index("Summary") < headings.index("Timeline") < headings.index("Files")
+
+
+def test_the_graph_is_drawn_and_its_nodes_focus_the_explorer():
+    page = _page(_corpus())
+    section = page.split('<section id="relationships"')[1].split("</section>")[0]
+
+    assert '<figure class="graph"><svg viewBox="0 0 960 560"' in section
+    node = "file:/case/press/holiday.jpg"
+    assert f'data-graph-node="{node}" data-rel-focus="{node}"' in section
+    assert 'data-source="file:/case/press/holiday.jpg"' in section
+    assert "nodes and" in section and "relationships drawn" in section

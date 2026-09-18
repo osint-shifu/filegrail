@@ -232,6 +232,32 @@ SOURCE_LABELS: dict[str, str] = {
     "filesystem": "filesystem",
 }
 
+#: What each source's records read as on a timeline. The verb is what happened
+#: to the file, not what the tool did: `downloaded` is an event in the file's
+#: life and `read the history` is not. A source with no verb here reads by its
+#: category, from `CATEGORY_VERBS`.
+EVENT_VERBS: dict[str, str] = {
+    "browser-download": "downloaded",
+    "windows-zone-identifier": "downloaded",
+    "macos-wherefroms": "downloaded",
+    "macos-quarantine": "downloaded",
+    "xdg-xattr": "downloaded",
+    "ytdlp-sidecar": "downloaded",
+    "email-delivery": "delivered",
+    "archive-member": "extracted",
+    "torrent": "downloaded",
+    "shell-history": "handled",
+    "device-metadata": "captured",
+    "c2pa": "produced",
+    "xmp-history": "edited",
+    "recent-documents": "opened",
+    "windows-recent": "opened",
+    "freedesktop-trash": "deleted",
+    "sync-folder": "synchronized",
+}
+
+CATEGORY_VERBS: dict[str, str] = {ORIGIN: "recorded", METADATA: "written", ACTIVITY: "handled"}
+
 #: How each metadata block reads in prose, where naming it says more than the
 #: source does. Only a `document-metadata` record is renamed by it: that source
 #: names a category rather than a thing - nine parsers answer to it - so a

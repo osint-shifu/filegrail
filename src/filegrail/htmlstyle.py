@@ -284,6 +284,37 @@ margin-bottom:4px}
 .conf .pair .v{color:var(--ink);overflow-wrap:anywhere}
 .conf .delta{margin-top:8px;color:var(--alert)}
 
+.density{margin:0 0 16px}
+.density svg{display:block;width:100%;height:32px;background:var(--surface);
+border:1px solid var(--line);border-radius:var(--r)}
+.density line{stroke:var(--faint);stroke-width:1.5;stroke-opacity:.8}
+.density line.origin{stroke:var(--origin)}
+.density line.metadata{stroke:var(--metadata)}
+.density line.activity{stroke:var(--activity)}
+.density figcaption{display:flex;justify-content:space-between;font-size:11px;color:var(--faint);
+margin-top:4px}
+.tbl.timeline tr.day td{padding:14px 0 6px;color:var(--muted);font-size:10.5px;
+letter-spacing:.14em;text-transform:uppercase;border-bottom:1px solid var(--line-2)}
+
+.graph{margin:0 0 18px}
+.graph svg{display:block;width:100%;height:auto;max-height:72vh;background:var(--surface);
+border:1px solid var(--line);border-radius:var(--r)}
+.graph .e{stroke:var(--line-2);stroke-width:1;stroke-opacity:.8}
+.graph .node circle{fill:var(--faint);stroke:var(--surface);stroke-width:1.5}
+.graph .t-file circle{fill:var(--accent)}
+.graph .t-person circle,.graph .t-org circle,.graph .t-handle circle{fill:var(--activity)}
+.graph .t-device circle,.graph .t-camera_model circle{fill:var(--metadata)}
+.graph text{font:10px var(--mono);fill:var(--ink-2);text-anchor:middle;pointer-events:none;
+paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
+.js .graph .node{cursor:pointer}
+.graph .node:focus{outline:none}
+.graph .node:hover circle,.graph .node:focus circle,.graph .node.on circle{stroke:var(--ink);
+stroke-width:2}
+.graph.focused .node:not(.on):not(.near){opacity:.22}
+.graph.focused .e{stroke-opacity:.12}
+.graph.focused .e.on{stroke:var(--accent);stroke-opacity:1;stroke-width:1.5}
+.graph figcaption{font-size:11px;color:var(--faint);margin-top:6px}
+
 footer{padding:24px var(--gutter);border-top:1px solid var(--line);display:flex;
 justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:11px;letter-spacing:.14em;
 text-transform:uppercase;color:var(--faint)}
@@ -319,6 +350,8 @@ section{padding:22px 0 6px}
 thead{display:table-header-group}
 a{color:inherit}
 .wrap{overflow:visible}
+.graph svg{max-height:none}
+.graph.focused .node,.graph.focused .e{opacity:1;stroke-opacity:.8}
 .wrap>table.index,.wrap>table.pivots,.wrap>table.relationships{min-width:0}
 .tbl th,.tbl td{white-space:normal}
 .tbl .path,.tbl .val,.tbl .where,.tbl .found{min-width:0;max-width:none}

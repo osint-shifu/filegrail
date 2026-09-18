@@ -129,6 +129,20 @@ SCRIPT = """
     if (relationshipCount) {
       relationshipCount.textContent = left + (left === 1 ? ' relationship' : ' relationships');
     }
+    var figure = one('.graph');
+    if (figure) {
+      figure.classList.toggle('focused', !!node);
+      var near = {};
+      each(figure.querySelectorAll('.e'), function (edge) {
+        var hit = !!node && (edge.dataset.source === node || edge.dataset.target === node);
+        edge.classList.toggle('on', hit);
+        if (hit) { near[edge.dataset.source] = true; near[edge.dataset.target] = true; }
+      });
+      each(figure.querySelectorAll('.node'), function (mark) {
+        mark.classList.toggle('on', mark.dataset.graphNode === node);
+        mark.classList.toggle('near', !!near[mark.dataset.graphNode]);
+      });
+    }
   }
   if (relationshipNode) {
     relationshipNode.addEventListener('change', filterRelationships);
@@ -174,7 +188,15 @@ SCRIPT = """
     relationshipNode.value = focus.dataset.relFocus;
     relationshipKind = 'all';
     filterRelationships();
-    relationshipNode.focus();
+    if (!focus.classList.contains('node')) { relationshipNode.focus(); }
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter' && event.key !== ' ') { return; }
+    var mark = event.target.closest ? event.target.closest('.graph .node') : null;
+    if (mark) {
+      event.preventDefault();
+      mark.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+    }
   });
   filterRelationships();
 
@@ -234,6 +256,7 @@ SCRIPT = """
       Array.prototype.slice.call(all('.conf')),
       Array.prototype.slice.call(all('.rec')),
       Array.prototype.slice.call(all('.pivot')),
+      Array.prototype.slice.call(all('.event')),
       Array.prototype.slice.call(all('.relationship'))
     );
   }

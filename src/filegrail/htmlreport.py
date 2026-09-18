@@ -23,8 +23,10 @@ escaped before it is written.
 
 from __future__ import annotations
 
+import math
 import re
 from collections import Counter
+from collections.abc import Sequence
 from datetime import datetime
 from html import escape
 from pathlib import Path
@@ -33,13 +35,16 @@ from . import __version__
 from .analysis import NOTHING, REVIEW, Case, CaseFile, Conflict, Finding, Pivots, named
 from .casereport import _ABSENT, _LISTED, _PER_FILE, _capital, _facts, _type_name
 from .graph import Graph, Node, Relationship, build_graph
+from .graphlayout import HEIGHT, WIDTH, Picture, picture
 from .htmlscript import SCRIPT
 from .htmlstyle import STYLE
 from .identify import PLACE, Identifier
 from .models import (
     CATEGORIES,
+    CATEGORY_VERBS,
     CONTAINER_MEMBER,
     EMBEDDED,
+    EVENT_VERBS,
     FILE_ATTRIBUTE,
     FILENAME,
     NAME_AND_SIZE,
@@ -108,6 +113,7 @@ _SECTIONS = (
     ("summary", "Summary", "Summary"),
     ("findings", "Key findings", "Findings"),
     ("coverage", "Evidence coverage", "Coverage"),
+    ("timeline", "Timeline", "Timeline"),
     ("files", "Files", "Files"),
     ("relationships", "Relationships", "Related"),
     ("pivots", "Investigative pivots", "Pivots"),
@@ -151,6 +157,7 @@ def render_html(
         "summary": _summary(case, relationship_count),
         "findings": _findings(case, files, linkable),
         "coverage": coverage,
+        "timeline": _timeline(case, files),
         "conflicts": conflicts,
         "files": _files(case, detailed, panes),
         "relationships": _relationships(graph, files),
@@ -261,6 +268,7 @@ def _counts(case: Case, detailed: set[str], relationship_count: int) -> dict[str
         "detail": f"{len(detailed)}" if detailed else "",
         "conflicts": f"{len(case.conflicts)}" if case.conflicts else "",
         "relationships": f"{relationship_count}" if relationship_count else "",
+        "timeline": f"{_dated(case)}" if _dated(case) else "",
     }
     if case.pivots is not None and case.pivots.total:
         said["pivots"] = f"{case.pivots.total}"
@@ -279,6 +287,11 @@ def _note(key: str, case: Case, detailed: set[str], relationship_count: int) -> 
         return f"{len(case.conflicts)}"
     if key == "relationships" and relationship_count:
         return f"{relationship_count:,} <b>· graph edges</b>"
+    if key == "timeline" and _dated(case):
+        files = len(
+            {entry.record.path for entry in case.files for f in entry.record.evidence if f.at}
+        )
+        return f"{_dated(case):,} <b>· dated records in {files:,} files</b>"
     if key == "pivots" and case.pivots is not None:
         return f"{case.pivots.total:,} <b>· {case.pivots.across:,} in more than one file</b>"
     if key == "coverage":
@@ -647,6 +660,94 @@ def _found_in(entry: CaseFile, kinds: dict[str, str], panes: set[str]) -> str:
     return " ".join(said + ([pivots] if pivots else []))
 
 
+#: Dated records the timeline lists before it says how many more there were.
+_MAX_EVENTS = 3000
+
+
+def _dated(case: Case) -> int:
+    return sum(1 for entry in case.files for found in entry.record.evidence if found.at)
+
+
+def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
+    """Every dated record in the scan on one axis, as the terminal `--timeline`.
+
+    A file nothing said anything about has no place here: nothing happened at
+    a time nobody recorded.
+    """
+    events = sorted(
+        (
+            (found.at, entry, found)
+            for entry in case.files
+            for found in entry.record.evidence
+            if found.at
+        ),
+        key=lambda event: event[0] or "",
+    )
+    if not events:
+        return ""
+    strip = _density(events)
+    rows = []
+    day = None
+    for at, entry, found in events[:_MAX_EVENTS]:
+        stamp = _stamp(shown(at)) if at else ""
+        today, _, clock = stamp.partition(" ")
+        if today != day:
+            day = today
+            rows.append(f'<tr class="day"><td colspan="6">{_e(day)}</td></tr>')
+        kind = category(found)
+        verb = EVENT_VERBS.get(found.source, CATEGORY_VERBS[kind])
+        detail = found.url or found.tool or found.note or ""
+        rows.append(
+            f'<tr class="event" data-f="{_e(kind)}"><td class="dim">{_e(clock or stamp)}</td>'
+            f'<td><span class="cat {_e(kind)}">{_e(kind)}</span></td>'
+            f"<td>{_e(verb)}</td><td>{_e(named(found))} {_match(found)}</td>"
+            f"<td>{_file_link(entry)}</td>"
+            f'<td class="dim">{_e(_clip(detail, 96))}</td></tr>'
+        )
+    note = ""
+    if len(events) > _MAX_EVENTS:
+        note = (
+            f'<p class="note">Showing the first {_MAX_EVENTS:,} of {len(events):,} dated records; '
+            "the rest are in the JSON and in each file's detail.</p>"
+        )
+    return (
+        strip + '<div class="wrap"><table class="tbl timeline" id="timeline-table"><thead><tr>'
+        '<th data-sort="text">time</th><th>category</th><th data-sort="text">event</th>'
+        '<th data-sort="text">source</th><th data-sort="text">file</th><th>detail</th>'
+        f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>" + note
+    )
+
+
+def _density(events: Sequence[tuple[str | None, CaseFile, EvidenceRecord]]) -> str:
+    """One tick per dated record along the span of the case, coloured by category."""
+    moments = []
+    for at, _, found in events:
+        try:
+            moment = datetime.fromisoformat((at or "").replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            continue
+        moments.append((moment, category(found)))
+    if len(moments) < 2:
+        return ""
+    first, last = moments[0][0], moments[-1][0]
+    span = (last - first) or 1.0
+    ticks = "".join(
+        f'<line class="{kind}" x1="{(moment - first) / span * 1000:.1f}" '
+        f'x2="{(moment - first) / span * 1000:.1f}" y1="6" y2="26"/>'
+        for moment, kind in moments
+    )
+    return (
+        '<figure class="density"><svg viewBox="0 0 1000 32" preserveAspectRatio="none" '
+        f'aria-label="Dated records over time">{ticks}</svg>'
+        f"<figcaption><span>{_e(_stamp(shown(events[0][0])))}</span>"
+        f"<span>{_e(_stamp(shown(events[-1][0])))}</span></figcaption></figure>"
+    )
+
+
+def _clip(value: str, width: int) -> str:
+    return value if len(value) <= width else value[: width - 1] + "…"
+
+
 def _relationships(graph: Graph, files: dict[str, CaseFile]) -> str:
     """An offline explorer over the same graph JSON and exports use."""
     if not graph.relationships:
@@ -702,7 +803,71 @@ def _relationships(graph: Graph, files: dict[str, CaseFile]) -> str:
         '<th data-sort="text">relationship</th><th data-sort="text">target</th>'
         f"<th>evidence</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
     )
-    return controls + table
+    return _figure(picture(graph), files) + controls + table
+
+
+#: Nodes that get a label in the picture; the rest name themselves on hover.
+_MAX_LABELS = 48
+_LABELLED_TYPES = frozenset({"file", "person", "org", "handle", "device", "camera_model"})
+
+
+def _figure(drawn: Picture | None, files: dict[str, CaseFile]) -> str:
+    """The graph as a picture: the connected part of it, up to a fixed size.
+
+    Clicking a node focuses it in the explorer below, so the picture is a way
+    into the table rather than a substitute for it.
+    """
+    if drawn is None:
+        return ""
+    # Files, people and devices are labelled; an identifier is labelled only
+    # where it ties two or more files together. The rest name themselves on hover, which
+    # keeps a crowd of one-off addresses from writing over each other.
+    files_touched: Counter[int] = Counter()
+    for a, b, _ in drawn.edges:
+        if drawn.nodes[b].type == "file":
+            files_touched[a] += 1
+        if drawn.nodes[a].type == "file":
+            files_touched[b] += 1
+    worth = [
+        node
+        for at, node in enumerate(drawn.nodes)
+        if node.type in _LABELLED_TYPES or files_touched[at] >= 2
+    ]
+    labelled = {
+        node.id for node in sorted(worth, key=lambda item: (-item.degree, item.id))[:_MAX_LABELS]
+    }
+    lines = "".join(
+        f'<line class="e" data-source="{_e(drawn.nodes[a].id)}" '
+        f'data-target="{_e(drawn.nodes[b].id)}" x1="{drawn.nodes[a].x}" y1="{drawn.nodes[a].y}" '
+        f'x2="{drawn.nodes[b].x}" y2="{drawn.nodes[b].y}"><title>{_e(kind)}</title></line>'
+        for a, b, kind in drawn.edges
+    )
+    marks = []
+    for node in drawn.nodes:
+        radius = round(min(4 + 1.6 * math.sqrt(node.degree), 14), 1)
+        held = files.get(node.value) if node.type == "file" else None
+        label = f"{held.ref} {_name(held)}" if held else _clip(node.value, 28)
+        title = f"{_node_type(node.type)} · {node.value} · {node.degree:,} relationships"
+        text = (
+            f'<text x="{node.x}" y="{node.y + radius + 11}">{_e(label)}</text>'
+            if node.id in labelled
+            else ""
+        )
+        marks.append(
+            f'<g class="node t-{_e(node.type)}" data-graph-node="{_e(node.id)}" '
+            f'data-rel-focus="{_e(node.id)}" tabindex="0" role="button">'
+            f'<circle cx="{node.x}" cy="{node.y}" r="{radius}"/>{text}'
+            f"<title>{_e(title)}</title></g>"
+        )
+    said = f"{len(drawn.nodes):,} nodes and {len(drawn.edges):,} relationships drawn"
+    if drawn.left_out:
+        said += f"; {drawn.left_out:,} more connected nodes are in the table below"
+    return (
+        f'<figure class="graph"><svg viewBox="0 0 {WIDTH} {HEIGHT}" role="img" '
+        'aria-label="Evidence graph">'
+        + f'<g class="edges">{lines}</g><g class="nodes">{"".join(marks)}</g></svg>'
+        f"<figcaption>{_e(said)} · click a node to focus it</figcaption></figure>"
+    )
 
 
 def _relationship_options(graph: Graph, connected: set[str], files: dict[str, CaseFile]) -> str:

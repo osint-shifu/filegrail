@@ -29,6 +29,8 @@ from .identify import PLACE, Identifier, extract
 from .models import (
     ACTIVITY,
     BLOCK_LABELS,
+    CATEGORY_VERBS,
+    EVENT_VERBS,
     METADATA,
     ORIGIN,
     EvidenceRecord,
@@ -1133,33 +1135,6 @@ def _identifiers(theme: Theme, found: list[Identifier], *, content: bool = False
     return lines
 
 
-#: What each source's records read as on a timeline. The verb is what happened
-#: to the file, not what the tool did: `downloaded` is an event in the file's
-#: life and `read the history` is not.
-_EVENTS = {
-    "browser-download": "downloaded",
-    "windows-zone-identifier": "downloaded",
-    "macos-wherefroms": "downloaded",
-    "macos-quarantine": "downloaded",
-    "xdg-xattr": "downloaded",
-    "ytdlp-sidecar": "downloaded",
-    "email-delivery": "delivered",
-    "archive-member": "extracted",
-    "torrent": "downloaded",
-    "shell-history": "handled",
-    "device-metadata": "captured",
-    "c2pa": "produced",
-    "xmp-history": "edited",
-    "recent-documents": "opened",
-    "windows-recent": "opened",
-    "freedesktop-trash": "deleted",
-    "sync-folder": "synchronized",
-}
-
-#: What a record of each category reads as when its own source has no verb.
-_CATEGORY_EVENTS = {ORIGIN: "recorded", METADATA: "written", ACTIVITY: "handled"}
-
-
 def render_timeline(
     records: list[FileRecord],
     root: Path,
@@ -1190,7 +1165,7 @@ def render_timeline(
             category(found),
             _relative(record.path, root),
             _named(found),
-            _EVENTS.get(found.source, _CATEGORY_EVENTS[category(found)]),
+            EVENT_VERBS.get(found.source, CATEGORY_VERBS[category(found)]),
         )
         for at, record, found in events
     ]
