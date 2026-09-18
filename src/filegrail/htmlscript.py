@@ -14,6 +14,22 @@ SCRIPT = """
   var one = function (selector) { return document.querySelector(selector); };
   var all = function (selector) { return document.querySelectorAll(selector); };
 
+  each(all('main > section'), function (section) {
+    var fold = section.querySelector('.h .fold');
+    var title = section.querySelector('.h h2');
+    if (!fold) { return; }
+    fold.addEventListener('click', function () {
+      var folded = !section.classList.contains('folded');
+      section.classList.toggle('folded', folded);
+      fold.setAttribute('aria-expanded', folded ? 'false' : 'true');
+      fold.title = folded ? 'Expand section' : 'Collapse section';
+    });
+    if (title) { title.addEventListener('click', function () { fold.click(); }); }
+  });
+  function unfold(target) {
+    var folded = target && target.closest ? target.closest('section.folded') : null;
+    if (folded) { folded.querySelector('.h .fold').click(); }
+  }
   var printer = one('#print');
   if (printer) { printer.addEventListener('click', function () { window.print(); }); }
   // A closed block prints closed whatever the stylesheet says, because the
@@ -142,11 +158,6 @@ SCRIPT = """
   each(all('.time-bin'), function (bin) {
     bin.addEventListener('click', function () {
       filterTimeline(timelineBin === bin ? null : bin);
-    });
-    bin.addEventListener('keydown', function (event) {
-      if (event.key !== 'Enter' && event.key !== ' ') { return; }
-      event.preventDefault();
-      bin.dispatchEvent(new MouseEvent('click', {bubbles: true}));
     });
   });
   if (timelineClear) {
@@ -467,12 +478,13 @@ SCRIPT = """
       var palette = getComputedStyle(root);
       var colour = function (name) { return palette.getPropertyValue(name).trim(); };
       var style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-      style.textContent = 'svg{background:' + colour('--surface') + '}'
-        + '.e{stroke:' + colour('--line-2') + ';stroke-width:1;stroke-opacity:.9}'
-        + '.node circle{fill:' + colour('--faint') + ';stroke:' + colour('--surface')
-        + ';stroke-width:1.5}.t-file circle{fill:' + colour('--accent') + '}'
-        + '.t-person circle,.t-org circle,.t-handle circle{fill:' + colour('--activity') + '}'
-        + '.t-device circle,.t-camera_model circle{fill:' + colour('--metadata') + '}'
+      style.textContent = 'svg{background:' + colour('--bg') + '}'
+        + '.e{stroke:' + colour('--g-edge') + ';stroke-width:1;stroke-opacity:.9}'
+        + '.node{--c:' + colour('--g-key') + '}.f-file{--c:' + colour('--g-file') + '}'
+        + '.f-person{--c:' + colour('--g-person') + '}.f-device{--c:' + colour('--g-device')
+        + '}.f-address{--c:' + colour('--g-address') + '}.f-money{--c:' + colour('--g-money')
+        + '}.node circle{fill:var(--c);stroke:' + colour('--bg') + ';stroke-width:1.5}'
+        + '.node .halo{stroke:none;opacity:.14}'
         + 'text{font:10px ui-monospace,monospace;fill:' + colour('--ink-2')
         + ';text-anchor:middle;paint-order:stroke;stroke:' + colour('--surface')
         + ';stroke-width:3px;stroke-linejoin:round}.focused .node:not(.on):not(.near){opacity:.2}'
@@ -634,6 +646,11 @@ SCRIPT = """
       if (section) { watch.observe(section); }
     });
   }
+  links.forEach(function (link) {
+    link.addEventListener('click', function () {
+      unfold(document.getElementById(link.getAttribute('href').slice(1)));
+    });
+  });
 
   var top = document.getElementById('top');
   var bar = document.querySelector('.nav');
@@ -647,6 +664,7 @@ SCRIPT = """
     if (!location.hash) { return; }
     var target = document.getElementById(location.hash.slice(1));
     if (!target) { return; }
+    unfold(target);
     var block = target.closest('details');
     if (block) { block.open = true; }
     var holder = target.closest('.pane');

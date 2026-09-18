@@ -222,9 +222,11 @@ def test_relationship_explorer_includes_authors_and_cameras_without_clustering()
     assert '<optgroup label="people">' in page
     assert '<optgroup label="camera bodies">' in page
     assert '<optgroup label="camera models">' in page
-    assert 'data-rel-kind="author"><i class="t-person"></i>author' in page
-    assert 'data-rel-kind="camera body"><i class="t-device"></i>camera body' in page
-    assert 'data-rel-kind="camera model"><i class="t-camera_model"></i>camera model' in page
+    assert 'data-rel-kind="author"><i class="t-person f-person"></i>author' in page
+    assert 'data-rel-kind="camera body"><i class="t-device f-device"></i>camera body' in page
+    assert (
+        'data-rel-kind="camera model"><i class="t-camera_model f-device"></i>camera model' in page
+    )
 
 
 def test_every_pivot_is_listed_with_the_files_it_was_found_in():
@@ -366,11 +368,12 @@ def test_the_timeline_lists_dated_records_in_order_with_what_happened():
     section = page.split('<section id="timeline"')[1].split("</section>")[0]
 
     assert section.index("downloaded") < section.index("captured")
-    assert '<tr class="day"><td colspan="6">2026-03-01</td></tr>' in section
-    assert '<figure class="density">' in section
+    assert '<tr class="day"><td colspan="5">2026-03-01</td></tr>' in section
+    assert '<ol class="periods" aria-label="Dated records by day">' in section
     assert "https://example.org/first.pdf" in section
     caption = section.split("<figcaption>")[1].split("</figcaption>")[0]
-    assert "2026-03-01 21:30:00" in caption
+    assert "by day · 2 with records" in caption
+    assert "2026-03-01 10:00:00" in caption and "2026-03-02 09:00:00" in caption
     headings = re.findall(r"<h2>([^<]+)</h2>", page)
     assert headings.index("Summary") < headings.index("Timeline") < headings.index("Files")
 
@@ -423,6 +426,8 @@ def test_the_timeline_keeps_the_count_when_events_share_the_same_instant():
 
     assert 'class="time-bin"' in section
     assert 'data-count="3"' in section
+    assert '<span class="when">2026-03-30</span>' in section
+    assert "5 days without a dated record" in section
     assert 'aria-label="3 metadata records' in section
     assert section.count('class="event" data-f="metadata" data-moment=') == 4
     assert 'id="timeline-clear"' in section

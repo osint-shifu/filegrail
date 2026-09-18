@@ -5,6 +5,19 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.33.0 - 2026-09-19
+
+### Added
+
+- HTML report: every section folds to its heading, from the heading itself or the button beside it, and unfolds when a link or the navigation points into it.
+
+### Changed
+
+- HTML report: the timeline opens with the dated records by period, one row per year, month or day that holds a record, with a stacked bar by category, the count, and a line naming each run of empty periods between two rows; clicking a row limits the list to that period. The list itself puts the file first and the verb on the category chip.
+- HTML report: the summary cards run files scanned, with origin, with metadata, pivots, relationships, need review, no evidence found, trace stores found.
+- HTML report: graph nodes are coloured by what they stand for: files, people, devices, network addresses, money and other keys, each with a soft halo, on a dotted field with depth; the SVG export carries the same colours.
+- HTML report: the mark in the navigation bar is solid, so it reads at 16 px; the masthead mark keeps a crisp stroke at any size.
+
 ## 0.32.0 - 2026-09-19
 
 ### Changed

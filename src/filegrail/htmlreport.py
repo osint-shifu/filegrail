@@ -78,12 +78,21 @@ POLICY = (
 #: cup reads as a vessel rather than a blot. It does not follow the accent: the accent is
 #: free to change, while the mark stays the brand green the packaged assets show.
 #: The viewBox is padded by 26 units on every side so the stroke is not clipped.
+_MARK_PATH = (
+    "M24,48 A48,48 0 0 1 72,0 H108 V24 "
+    "H72 A24,24 0 0 0 48,48 V72 H144 V96 A60,60 0 0 1 96,154.79 V180 H132 V204 H36 V180 "
+    "H72 V154.79 A60,60 0 0 1 24,96 H0 V72 H24 Z M48,96 H120 A36,36 0 0 1 48,96 Z"
+)
 _MARK = (
     '<svg class="mark" viewBox="-26 -26 196 256" aria-hidden="true">'
-    '<path fill="var(--brand-soft)" stroke="var(--brand)" stroke-width="2.4" '
-    'fill-rule="evenodd" d="M24,48 A48,48 0 0 1 72,0 H108 V24 '
-    "H72 A24,24 0 0 0 48,48 V72 H144 V96 A60,60 0 0 1 96,154.79 V180 H132 V204 H36 V180 "
-    'H72 V154.79 A60,60 0 0 1 24,96 H0 V72 H24 Z M48,96 H120 A36,36 0 0 1 48,96 Z"/></svg>'
+    '<path fill="var(--brand-soft)" stroke="var(--brand)" stroke-width="1.5" '
+    f'vector-effect="non-scaling-stroke" fill-rule="evenodd" d="{_MARK_PATH}"/></svg>'
+)
+
+#: The same mark at nav size, solid: an outline a pixel wide is a smudge at 16 px.
+_MARK_SMALL = (
+    '<svg class="mark" viewBox="0 0 144 204" aria-hidden="true">'
+    f'<path fill="var(--brand)" fill-rule="evenodd" d="{_MARK_PATH}"/></svg>'
 )
 
 #: The same mark as the tab icon. A data URI: drawn by the browser, fetched from nowhere.
@@ -238,7 +247,7 @@ def render_html(
     )
     upwards = (
         '<a class="home" href="#top" title="Back to the top" '
-        f'aria-label="Back to the top">{_MARK}</a>'
+        f'aria-label="Back to the top">{_MARK_SMALL}</a>'
     )
     nav = [
         f'<nav class="nav">{upwards}{links}<span class="sp"></span>',
@@ -330,9 +339,21 @@ def _note(key: str, case: Case, detailed: set[str], relationship_count: int) -> 
 
 
 def _section(key: str, title: str, body: str, note: str) -> str:
-    """A section: its heading, the count beside it, and what it holds."""
+    """A section: its heading, the count beside it, and what it holds.
+
+    The heading is also the handle that folds the section to one line, so a
+    long report can be read a section at a time.
+    """
     counted = f'<span class="n">{note}</span>' if note else ""
-    return f'<section id="{key}"><div class="h"><h2>{_e(title)}</h2>{counted}</div>{body}</section>'
+    fold = (
+        f'<button class="fold" type="button" aria-expanded="true" aria-controls="{key}-body" '
+        f'title="Collapse section" aria-label="Collapse {_e(title)}">'
+        '<svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>'
+    )
+    return (
+        f'<section id="{key}"><div class="h"><h2>{_e(title)}</h2>{counted}{fold}</div>'
+        f'<div class="sec-body" id="{key}-body">{body}</div></section>'
+    )
 
 
 def _copyable_table(table: str) -> str:
@@ -504,6 +525,20 @@ def _summary(case: Case, relationship_count: int) -> str:
         cards.append(
             _card(f"{len(entries):,}", f"with {name}", _sources(entries, name), files, name, name)
         )
+    if case.pivots is not None and case.pivots.total:
+        said = f"{case.pivots.across:,} in more than one file"
+        if case.pivots.cross_corpus:
+            said += f" · {case.pivots.cross_corpus:,} in both corpora"
+        cards.append(_card(f"{case.pivots.total:,}", "pivots", said, "pivots", "", "accent"))
+    if relationship_count:
+        cards.append(
+            _card(
+                f"{relationship_count:,}",
+                "relationships",
+                "evidence-backed graph edges",
+                "relationships",
+            )
+        )
     if review:
         said = f"{len(case.conflicts)} conflicts · {fields} fields" if case.conflicts else ""
         cards.append(_card(f"{len(review):,}", "need review", said, files, "flag", "alert"))
@@ -517,20 +552,6 @@ def _summary(case: Case, relationship_count: int) -> str:
                 "none",
             )
         )
-    if relationship_count:
-        cards.append(
-            _card(
-                f"{relationship_count:,}",
-                "relationships",
-                "evidence-backed graph edges",
-                "relationships",
-            )
-        )
-    if case.pivots is not None and case.pivots.total:
-        said = f"{case.pivots.across:,} in more than one file"
-        if case.pivots.cross_corpus:
-            said += f" · {case.pivots.cross_corpus:,} in both corpora"
-        cards.append(_card(f"{case.pivots.total:,}", "pivots", said, "pivots", "", "accent"))
     stores = [source for source in case.coverage if source.store]
     if stores:
         found = sum(1 for source in stores if source.state == "found")
@@ -728,16 +749,16 @@ def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
         today, _, clock = stamp.partition(" ")
         if today != day:
             day = today
-            rows.append(f'<tr class="day"><td colspan="6">{_e(day)}</td></tr>')
+            rows.append(f'<tr class="day"><td colspan="5">{_e(day)}</td></tr>')
         kind = category(found)
         verb = EVENT_VERBS.get(found.source, CATEGORY_VERBS[kind])
         detail = found.url or found.tool or found.note or ""
         rows.append(
             f'<tr class="event" data-f="{_e(kind)}"{moment_attr}>'
             f'<td class="dim">{_e(clock or stamp)}</td>'
-            f'<td><span class="cat {_e(kind)}">{_e(kind)}</span></td>'
-            f"<td>{_e(verb)}</td><td>{_e(named(found))} {_match(found)}</td>"
             f"<td>{_file_link(entry)}</td>"
+            f'<td><span class="cat {_e(kind)}" title="{_e(kind)}">{_e(verb)}</span></td>'
+            f"<td>{_e(named(found))} {_match(found)}</td>"
             f'<td class="dim">{_e(_clip(detail, 96))}</td></tr>'
         )
     note = ""
@@ -750,8 +771,8 @@ def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
         strip
         + _copyable_table(
             '<div class="wrap"><table class="tbl timeline" id="timeline-table"><thead><tr>'
-            '<th data-sort="text">time</th><th>category</th><th data-sort="text">event</th>'
-            '<th data-sort="text">source</th><th data-sort="text">file</th><th>detail</th>'
+            '<th data-sort="text">time</th><th data-sort="text">file</th>'
+            '<th data-sort="text">event</th><th data-sort="text">source</th><th>detail</th>'
             f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
         )
         + note
@@ -759,7 +780,14 @@ def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
 
 
 def _density(events: Sequence[tuple[str | None, CaseFile, EvidenceRecord]]) -> str:
-    """A bounded overview that keeps coincident records visible as counted bars."""
+    """When the dated records fall, period by period, with the gaps said out loud.
+
+    A case spans years with nothing in most of them, so an axis drawn to scale
+    is a few marks and a long blank. Each period that holds a record is a row
+    instead - a year, a month or a day, whichever keeps the list readable -
+    and a run of empty periods between two rows is written as one line, since
+    an absence that long is a fact about the case.
+    """
     moments: list[tuple[float, str]] = []
     for at, _, found in events:
         invalid, moment, _ = _timeline_key(at)
@@ -769,62 +797,109 @@ def _density(events: Sequence[tuple[str | None, CaseFile, EvidenceRecord]]) -> s
     if len(moments) < 2:
         return ""
     first, last = moments[0][0], moments[-1][0]
-    span = (last - first) or 1.0
-    slots = min(96, max(12, len(moments)))
-    grouped: dict[int, Counter[str]] = {}
-    for moment, kind in moments:
-        slot = min(slots - 1, int((moment - first) / span * slots))
-        grouped.setdefault(slot, Counter())[kind] += 1
-    peak = max(count for counts in grouped.values() for count in counts.values())
-    step = 960 / slots
-    width = max(4.0, min(12.0, step * 0.72))
-    lanes = {"origin": 27, "metadata": 51, "activity": 75}
-    bars = []
-    for slot, counts in sorted(grouped.items()):
-        start = first + span * slot / slots
-        end = first + span * (slot + 1) / slots
+    days = (last - first) / 86400
+    unit = "year" if days > 730 else "month" if days > 62 else "day"
+    grouped = _by_period(moments, unit)
+    while len(grouped) > _MAX_PERIODS and unit != "year":
+        unit = "month" if unit == "day" else "year"
+        grouped = _by_period(moments, unit)
+    peak = max(sum(counts.values()) for counts in grouped.values())
+    rows = []
+    previous: tuple[int, ...] | None = None
+    for key, counts in sorted(grouped.items()):
+        if previous is not None and (missing := _periods_between(previous, key, unit)):
+            plural = "s" if missing > 1 else ""
+            rows.append(
+                f'<li class="gap"><span>{missing:,} {unit}{plural} without a dated record'
+                "</span></li>"
+            )
+        previous = key
+        begins, ends = _period_bounds(key, unit)
         total = sum(counts.values())
-        x = 20 + (slot + 0.5) * step - width / 2
         parts = [
             f"{counts[kind]:,} {kind} record" + ("" if counts[kind] == 1 else "s")
             for kind in CATEGORIES
             if counts[kind]
         ]
         label = ", ".join(parts)
-        marks = []
+        bars, x = [], 0.0
         for kind in CATEGORIES:
-            count = counts[kind]
-            if not count:
+            if not counts[kind]:
                 continue
-            height = 5 + 13 * count / peak
-            marks.append(
-                f'<rect class="{_e(kind)}" x="{x:.1f}" y="{lanes[kind] - height:.1f}" '
-                f'width="{width:.1f}" height="{height:.1f}" rx="1.5"/>'
+            width = 100 * counts[kind] / peak
+            bars.append(
+                f'<rect class="{_e(kind)}" x="{x:.2f}" y="0" width="{width:.2f}" height="10"/>'
             )
-        bars.append(
-            f'<g class="time-bin" role="button" tabindex="0" aria-pressed="false" '
-            f'data-from="{start:.3f}" data-to="{end:.3f}" data-count="{total}" '
-            f'aria-label="{_e(label)}">{"".join(marks)}<title>{_e(label)}</title></g>'
+            x += width
+        rows.append(
+            '<li class="period"><button class="time-bin" type="button" aria-pressed="false" '
+            f'data-from="{begins:.3f}" data-to="{ends:.3f}" data-count="{total}" '
+            f'aria-label="{_e(label)}" title="{_e(label)}">'
+            f'<span class="when">{_e(_period_label(key))}</span>'
+            '<svg class="bar" viewBox="0 0 100 10" preserveAspectRatio="none" '
+            f'aria-hidden="true">{"".join(bars)}</svg>'
+            f'<span class="n">{total:,}</span></button></li>'
         )
     legend = "".join(f'<span class="cat {_e(kind)}">{_e(kind)}</span>' for kind in CATEGORIES)
-    middle_at = datetime.fromtimestamp((first + last) / 2, timezone.utc)
-    middle = middle_at.strftime("%Y-%m-%d %H:%M:%S")
     return (
         '<figure class="density"><div class="timeline-tools">'
         f'<div class="timeline-legend">{legend}</div><div class="timeline-state">'
         f'<span id="timeline-shown">{len(moments):,} dated records</span>'
         '<button class="btn compact" id="timeline-clear" type="button" hidden>'
         "Clear range</button></div></div>"
-        '<svg viewBox="0 0 1000 86" preserveAspectRatio="none" '
-        f'aria-label="Dated records over time"><g class="lane-grid">'
-        '<line x1="20" x2="980" y1="27" y2="27"/><line x1="20" x2="980" '
-        'y1="51" y2="51"/><line x1="20" x2="980" y1="75" y2="75"/>'
-        f"</g>{''.join(bars)}</svg><figcaption>"
-        f"<span>{_e(_stamp(_timeline_value(events[0][0])))}</span>"
-        f"<span>{_e(middle)}</span>"
-        f"<span>{_e(_stamp(_timeline_value(events[-1][0])))}</span>"
-        "</figcaption></figure>"
+        f'<ol class="periods" aria-label="Dated records by {unit}">{"".join(rows)}</ol>'
+        f"<figcaption><span>by {unit} · {len(grouped):,} with records</span>"
+        f"<span>{_e(_stamp(_timeline_value(events[0][0])))} to "
+        f"{_e(_stamp(_timeline_value(events[-1][0])))}</span></figcaption></figure>"
     )
+
+
+#: More rows than this and the periods are coarsened one step, day to month to year.
+_MAX_PERIODS = 48
+
+
+def _by_period(moments: list[tuple[float, str]], unit: str) -> dict[tuple[int, ...], Counter[str]]:
+    grouped: dict[tuple[int, ...], Counter[str]] = {}
+    for moment, kind in moments:
+        when = datetime.fromtimestamp(moment, timezone.utc)
+        key: tuple[int, ...] = (when.year,) if unit == "year" else (when.year, when.month)
+        if unit == "day":
+            key = (when.year, when.month, when.day)
+        grouped.setdefault(key, Counter())[kind] += 1
+    return grouped
+
+
+def _period_bounds(key: tuple[int, ...], unit: str) -> tuple[float, float]:
+    """The first instant of the period and the last one before the next begins."""
+    begins = _period_start(key)
+    if unit == "year":
+        after = begins.replace(year=begins.year + 1)
+    elif unit == "month":
+        after = (
+            begins.replace(year=begins.year + 1, month=1)
+            if begins.month == 12
+            else begins.replace(month=begins.month + 1)
+        )
+    else:
+        after = datetime.fromtimestamp(begins.timestamp() + 86400, timezone.utc)
+    return begins.timestamp(), after.timestamp() - 0.001
+
+
+def _periods_between(earlier: tuple[int, ...], later: tuple[int, ...], unit: str) -> int:
+    if unit == "year":
+        return later[0] - earlier[0] - 1
+    if unit == "month":
+        return (later[0] * 12 + later[1]) - (earlier[0] * 12 + earlier[1]) - 1
+    return (_period_start(later) - _period_start(earlier)).days - 1
+
+
+def _period_start(key: tuple[int, ...]) -> datetime:
+    year, month, day = (*key, 1, 1)[:3]
+    return datetime(year, month, day, tzinfo=timezone.utc)
+
+
+def _period_label(key: tuple[int, ...]) -> str:
+    return "-".join(f"{part:02d}" if at else f"{part:04d}" for at, part in enumerate(key))
 
 
 def _clip(value: str, width: int) -> str:
@@ -851,7 +926,7 @@ def _relationships(graph: Graph, files: dict[str, CaseFile], pivot_refs: dict[st
     chips = ['<button type="button" class="chip on" data-rel-kind="all">all</button>']
     chips.extend(
         f'<button type="button" class="chip" data-rel-kind="{_e(kind)}">'
-        f'<i class="t-{_e(kind_markers[kind])}">'
+        f'<i class="t-{_e(kind_markers[kind])} f-{_family(kind_markers[kind])}">'
         f"</i>{_e(kind)} <b>{count:,}</b></button>"
         for kind, count in sorted(kinds.items())
     )
@@ -939,6 +1014,40 @@ def _relationships(graph: Graph, files: dict[str, CaseFile], pivot_refs: dict[st
 
 #: Nodes that get a label in the picture; the rest name themselves on hover.
 _MAX_LABELS = 48
+
+#: The colour a node takes, by what it stands for: a file, a person, a device,
+#: an address on a network, money, or a key such as a hash or a token.
+_FAMILIES = {
+    "file": "file",
+    "person": "person",
+    "org": "person",
+    "handle": "person",
+    "telegram": "person",
+    "device": "device",
+    "camera_model": "device",
+    "mac": "device",
+    "vin": "device",
+    "email": "address",
+    "domain": "address",
+    "url": "address",
+    "host": "address",
+    "ipv4": "address",
+    "ipv6": "address",
+    "onion": "address",
+    "geo": "address",
+    "iban": "money",
+    "bic": "money",
+    "btc": "money",
+    "nip": "money",
+    "regon": "money",
+    "ssn": "money",
+}
+
+
+def _family(kind: str) -> str:
+    return _FAMILIES.get(kind, "key")
+
+
 _LABELLED_TYPES = frozenset({"file", "person", "org", "handle", "device", "camera_model"})
 
 
@@ -1004,8 +1113,10 @@ def _figure(drawn: Picture | None, files: dict[str, CaseFile], pivot_refs: dict[
             else ""
         )
         marks.append(
-            f'<g class="node t-{_e(node.type)}" data-graph-node="{_e(node.id)}" '
+            f'<g class="node t-{_e(node.type)} f-{_family(node.type)}" '
+            f'data-graph-node="{_e(node.id)}" '
             f'data-rel-focus="{_e(node.id)}"{data} tabindex="0" role="button">'
+            f'<circle class="halo" cx="{node.x}" cy="{node.y}" r="{radius + 5}"/>'
             f'<circle cx="{node.x}" cy="{node.y}" r="{radius}"/>{text}'
             f"<title>{_e(title)}</title></g>"
         )
