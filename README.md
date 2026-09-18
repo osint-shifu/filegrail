@@ -465,9 +465,10 @@ A normal scan reads embedded metadata and available local provenance records. Pi
 
 - summary and key findings;
 - evidence coverage, before the files are read;
+- a timeline of every dated record, with a density strip over the span of the case;
 - a file index with filters;
 - every decoded field of every file that carries evidence;
-- a relationship explorer with node search and the evidence behind each edge;
+- a picture of the evidence graph, and a relationship explorer with node search and the evidence behind each edge;
 - investigative pivots;
 - conflicts between sources;
 - sortable tables;

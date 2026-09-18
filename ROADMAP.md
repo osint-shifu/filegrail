@@ -78,7 +78,11 @@ GraphML graph attributes and repeated on each CSV relationship row.
 
 Implemented. The HTML report can focus on any connected file, identifier,
 person or device, filter its relationships by kind and inspect the evidence for
-every edge. Selecting either endpoint moves the focus to that node.
+every edge. Selecting either endpoint moves the focus to that node. A picture
+of the connected part of the graph, laid out at render time without any
+library, sits above the explorer; clicking a node focuses it. The picture is
+bounded to the nodes that carry the shape of the case, and the table keeps the
+rest.
 
 ### Graph export as CASE JSON-LD
 
@@ -94,6 +98,5 @@ Two saved scans compared by their nodes and relationships: what appeared and wha
 
 - Relationships inferred only because two values appear in the same document, such as a name and an email address on one page. Both values are connected to the file, with their places.
 - Enrichment, or any other lookup that needs the network.
-- A full graph layout in the HTML report.
 - A case database and incremental scans.
 - Pseudonymized reports and exports.
