@@ -14,23 +14,6 @@ SCRIPT = """
   var one = function (selector) { return document.querySelector(selector); };
   var all = function (selector) { return document.querySelectorAll(selector); };
 
-  var theme = one('#theme');
-  function wear(name) {
-    root.setAttribute('data-theme', name);
-    theme.title = name === 'light' ? 'Dark theme' : 'Light theme';
-    theme.setAttribute('aria-label', theme.title);
-    try { localStorage.setItem('filegrail-theme', name); } catch (error) { /* private mode */ }
-  }
-  if (theme) {
-    var kept = null;
-    try { kept = localStorage.getItem('filegrail-theme'); } catch (error) { kept = null; }
-    var prefersLight = window.matchMedia
-      && window.matchMedia('(prefers-color-scheme: light)').matches;
-    wear(kept === 'light' || (kept === null && prefersLight) ? 'light' : 'dark');
-    theme.addEventListener('click', function () {
-      wear(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
-    });
-  }
   var printer = one('#print');
   if (printer) { printer.addEventListener('click', function () { window.print(); }); }
   // A closed block prints closed whatever the stylesheet says, because the

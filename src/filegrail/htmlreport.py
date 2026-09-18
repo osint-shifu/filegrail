@@ -2,8 +2,8 @@
 
 The same `analysis.Case` the terminal report lays out, with the same sections,
 numbers and findings, for a reader who wants to click from a file to its
-conflict and back, search a large case, or print it. Dark by default, with a
-light theme a button away and a light print stylesheet.
+conflict and back, search a large case, or print it. Dark on screen, with a
+print stylesheet for paper.
 
 The page is built to be opened on the machine that holds the case and forwarded
 from there, so it can say nothing to anybody else by being opened:
@@ -251,10 +251,6 @@ def render_html(
         '<button class="btn icon" id="print" type="button" title="Print / PDF" '
         'aria-label="Print / PDF"><svg class="ic" aria-hidden="true">'
         '<use href="#i-print"/></svg></button>',
-        '<button class="btn icon" id="theme" type="button" title="Light theme" '
-        'aria-label="Light theme"><svg class="ic moon" aria-hidden="true">'
-        '<use href="#i-moon"/></svg><svg class="ic sun" aria-hidden="true">'
-        '<use href="#i-sun"/></svg></button>',
         "</div>",
         "</nav>",
     ]

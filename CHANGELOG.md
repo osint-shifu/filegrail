@@ -5,6 +5,16 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.32.0 - 2026-09-19
+
+### Changed
+
+- HTML report: the accent is a muted verdigris from the mark's own family, and every text size comes from one scale of seven steps, with the smallest labels raised to 11 px and the body, tables, notes and headings raised with them. Uppercase labels share one tracking, category chips and filter chips are larger, and the print palette follows the same family.
+
+### Removed
+
+- HTML report: the light theme and its toggle. The page is dark on screen and prints on paper.
+
 ## 0.31.1 - 2026-09-19
 
 ### Changed
