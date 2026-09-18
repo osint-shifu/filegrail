@@ -11,6 +11,10 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 - HTML report: a timeline of dated records and a picture of the evidence graph.
 
+### Changed
+
+- HTML report redesigned: numbered sections, icon controls in the navigation, tighter hierarchy and rhythm; the markup and hooks are unchanged.
+
 ## 0.24.0 - 2026-09-18
 
 ### Added
