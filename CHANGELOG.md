@@ -5,6 +5,12 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.30.7 - 2026-09-18
+
+### Changed
+
+- The README masthead gives the product name more visual weight with a theme-aware wordmark, sets the local evidence statement in italics and links directly to the live example report.
+
 ## 0.30.6 - 2026-09-18
 
 ### Changed
