@@ -230,9 +230,14 @@ color:var(--ink-2)}
 .rel-controls{display:flex;align-items:end;gap:14px;flex-wrap:wrap;margin:0 0 12px}
 .rel-controls label{display:grid;gap:5px;min-width:min(100%,34em);color:var(--muted);
 font-size:10.5px;letter-spacing:.12em;text-transform:uppercase}
-.rel-controls select{width:100%;height:34px;padding:0 34px 0 10px;border:1px solid var(--line-2);
-border-radius:var(--r);background:var(--surface);color:var(--ink);font:12px/1.4 var(--mono)}
-.rel-controls select:hover,.rel-controls select:focus{border-color:var(--accent);outline:none}
+.rel-controls select,.rel-controls input{width:100%;height:34px;padding:0 10px;
+border:1px solid var(--line-2);border-radius:var(--r);background:var(--surface);
+color:var(--ink);font:12px/1.4 var(--mono)}
+.rel-controls select{padding-right:34px}
+.rel-controls select:hover,.rel-controls select:focus,.rel-controls input:focus{
+border-color:var(--accent);outline:none}
+.rel-find{display:none}
+.js .rel-find{display:grid;min-width:min(100%,20em)}
 .rel-count{color:var(--muted);font-size:12px;padding-bottom:7px}
 .rel-kinds{display:none;flex-wrap:wrap;gap:6px;margin:0 0 14px}
 .js .rel-kinds{display:flex}
@@ -520,6 +525,34 @@ _SCRIPT = """
   }
   if (relationshipNode) {
     relationshipNode.addEventListener('change', filterRelationships);
+  }
+  var finder = one('#relationship-find');
+  if (finder && relationshipNode) {
+    var groups = Array.prototype.map.call(relationshipNode.querySelectorAll('optgroup'),
+      function (group) {
+        var options = Array.prototype.slice.call(group.querySelectorAll('option'));
+        return {group: group, options: options};
+      });
+    finder.addEventListener('input', function () {
+      var wanted = finder.value.trim().toLowerCase();
+      var kept = [];
+      groups.forEach(function (held) {
+        held.options.forEach(function (option) { option.remove(); });
+        held.options.forEach(function (option) {
+          if (!wanted || option.textContent.toLowerCase().indexOf(wanted) !== -1) {
+            held.group.appendChild(option);
+            kept.push(option);
+          }
+        });
+        held.group.hidden = !held.group.querySelector('option');
+      });
+      if (kept.length === 1) {
+        relationshipNode.value = kept[0].value;
+      } else if (relationshipNode.selectedIndex === -1) {
+        relationshipNode.value = '';
+      }
+      filterRelationships();
+    });
   }
   each(all('[data-rel-kind]'), function (button) {
     button.addEventListener('click', function () {
@@ -1220,7 +1253,11 @@ def _relationships(graph: Graph, files: dict[str, CaseFile]) -> str:
         )
 
     controls = (
-        '<div class="rel-controls"><label for="relationship-node">Focus node'
+        '<div class="rel-controls">'
+        '<label for="relationship-find" class="rel-find">Find node'
+        '<input id="relationship-find" type="search" placeholder="narrow the list" '
+        'autocomplete="off" spellcheck="false"></label>'
+        '<label for="relationship-node">Focus node'
         '<select id="relationship-node"><option value="">All connected nodes</option>'
         f"{_relationship_options(graph, connected, files)}</select></label>"
         f'<span class="rel-count" id="relationship-shown">{len(rows):,} relationships</span>'

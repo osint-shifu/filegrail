@@ -146,6 +146,7 @@ def test_relationship_explorer_uses_the_evidence_backed_graph():
     section = page.split('<section id="relationships"')[1].split("</section>")[0]
 
     assert '<select id="relationship-node">' in section
+    assert '<input id="relationship-find" type="search"' in section
     assert '<optgroup label="files">' in section
     assert '<optgroup label="domains">' in section
     assert 'data-kind="has identifier"' in section
