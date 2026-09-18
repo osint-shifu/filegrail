@@ -76,7 +76,9 @@ GraphML graph attributes and repeated on each CSV relationship row.
 
 ### Relationship explorer in the HTML report
 
-The HTML report gets a view centered on one file or identifier. It shows the neighbors grouped by relationship kind, each with its evidence. Selecting a neighbor moves the view to it.
+Implemented. The HTML report can focus on any connected file, identifier,
+person or device, filter its relationships by kind and inspect the evidence for
+every edge. Selecting either endpoint moves the focus to that node.
 
 ### Graph export as CASE JSON-LD
 

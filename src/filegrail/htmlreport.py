@@ -31,6 +31,7 @@ from pathlib import Path
 from . import __version__
 from .analysis import NOTHING, REVIEW, Case, CaseFile, Conflict, Finding, Pivots, named
 from .casereport import _ABSENT, _LISTED, _PER_FILE, MATCHES, _capital, _facts, _type_name
+from .graph import Graph, Node, Relationship, build_graph
 from .identify import PLACE, Identifier
 from .models import (
     ACTIVITY,
@@ -209,6 +210,31 @@ color:var(--ink-2)}
 .tbl tr.hit td{background:var(--accent-soft)}
 .wrap{overflow-x:auto}
 .wrap>table.index,.wrap>table.pivots{min-width:860px}
+.wrap>table.relationships{min-width:940px}
+
+.rel-controls{display:flex;align-items:end;gap:14px;flex-wrap:wrap;margin:0 0 12px}
+.rel-controls label{display:grid;gap:5px;min-width:min(100%,34em);color:var(--muted);
+font-size:10.5px;letter-spacing:.12em;text-transform:uppercase}
+.rel-controls select{width:100%;height:34px;padding:0 34px 0 10px;border:1px solid var(--line-2);
+border-radius:var(--r);background:var(--surface);color:var(--ink);font:12px/1.4 var(--mono)}
+.rel-controls select:hover,.rel-controls select:focus{border-color:var(--accent);outline:none}
+.rel-count{color:var(--muted);font-size:12px;padding-bottom:7px}
+.rel-kinds{display:none;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.js .rel-kinds{display:flex}
+.rel-node{display:flex;align-items:flex-start;gap:8px;min-width:17em}
+.rel-node .pill{margin-top:1px}
+.rel-node a,.rel-node .v{overflow-wrap:anywhere}
+.rel-focus{display:none;align-items:center;justify-content:center;flex:none;width:22px;height:22px;
+border:1px solid var(--line-2);border-radius:3px;color:var(--faint);margin-left:auto}
+.js .rel-focus{display:inline-flex}
+.rel-focus:hover,.rel-focus:focus{color:var(--accent);border-color:var(--accent);outline:none}
+.relationship .arrow{color:var(--faint);font-size:16px;text-align:center}
+.relationship .kind{color:var(--ink);min-width:13em}
+.relationship .kind .dim{display:block;margin-top:2px}
+.relationship details{min-width:18em}
+.rel-proof{padding:8px 0;border-bottom:1px solid var(--line)}
+.rel-proof:last-child{border-bottom:0}
+.rel-proof .fields{grid-template-columns:minmax(80px,max-content) 1fr;margin-top:0}
 
 .cat{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.06em;
 color:var(--ink-2);white-space:nowrap}
@@ -335,6 +361,9 @@ text-transform:uppercase;color:var(--faint)}
 .rec>.fields{grid-column:1}
 .extra{grid-template-columns:1fr}
 .search input{width:150px}
+.rel-controls{display:grid;grid-template-columns:1fr}
+.rel-controls label{min-width:0}
+.rel-count{padding-bottom:0}
 }
 @media print{
 :root{color-scheme:light;--bg:#fff;--surface:#fff;--surface-2:#f2f3f5;--line:#d5d8dd;
@@ -439,6 +468,48 @@ _SCRIPT = """
     if (chip) { filter(chip.dataset.filter); }
   });
 
+  var relationshipRows = Array.prototype.slice.call(all('#relationship-table tbody tr'));
+  var relationshipNode = one('#relationship-node');
+  var relationshipCount = one('#relationship-shown');
+  var relationshipKind = 'all';
+  function filterRelationships() {
+    var node = relationshipNode ? relationshipNode.value : '';
+    var left = 0;
+    relationshipRows.forEach(function (row) {
+      var touches = !node || row.dataset.source === node || row.dataset.target === node;
+      var ofKind = relationshipKind === 'all' || row.dataset.kind === relationshipKind;
+      row.hidden = !(touches && ofKind);
+      if (!row.hidden) { left += 1; }
+    });
+    each(all('[data-rel-kind]'), function (button) {
+      var chosen = button.dataset.relKind === relationshipKind;
+      button.classList.toggle('on', chosen);
+      button.setAttribute('aria-pressed', chosen ? 'true' : 'false');
+    });
+    if (relationshipCount) {
+      relationshipCount.textContent = left + (left === 1 ? ' relationship' : ' relationships');
+    }
+  }
+  if (relationshipNode) {
+    relationshipNode.addEventListener('change', filterRelationships);
+  }
+  each(all('[data-rel-kind]'), function (button) {
+    button.addEventListener('click', function () {
+      relationshipKind = button.dataset.relKind;
+      filterRelationships();
+    });
+  });
+  document.addEventListener('click', function (event) {
+    if (!event.target.closest || !relationshipNode) { return; }
+    var focus = event.target.closest('[data-rel-focus]');
+    if (!focus) { return; }
+    relationshipNode.value = focus.dataset.relFocus;
+    relationshipKind = 'all';
+    filterRelationships();
+    relationshipNode.focus();
+  });
+  filterRelationships();
+
   function show(name) {
     each(all('.tabs button'), function (tab) {
       var chosen = tab.dataset.panel === name;
@@ -494,7 +565,8 @@ _SCRIPT = """
       Array.prototype.slice.call(all('.find')),
       Array.prototype.slice.call(all('.conf')),
       Array.prototype.slice.call(all('.rec')),
-      Array.prototype.slice.call(all('.pivot'))
+      Array.prototype.slice.call(all('.pivot')),
+      Array.prototype.slice.call(all('.relationship'))
     );
   }
   if (box) {
@@ -502,6 +574,11 @@ _SCRIPT = """
       var wanted = box.value.trim().toLowerCase();
       var found = 0;
       var pane = null;
+      if (wanted && relationshipNode) {
+        relationshipNode.value = '';
+        relationshipKind = 'all';
+        filterRelationships();
+      }
       searchable().forEach(function (item) {
         item.classList.remove('hit');
         if (!wanted) { return; }
@@ -610,18 +687,21 @@ def render_html(
         if case.pivots is not None and identifiers is not None and case.pivots.total
         else set()
     )
+    records = [entry.record for entry in case.files]
+    graph = build_graph(records, identifiers or [])
+    relationship_count = len(graph.relationships)
     sections = {
-        "summary": _summary(case),
+        "summary": _summary(case, relationship_count),
         "findings": _findings(case, files),
         "coverage": _coverage(case, unsearched),
         "conflicts": _conflicts(case, files, detailed),
         "files": _files(case, detailed, panes),
-        "relationships": _relationships(case, files),
+        "relationships": _relationships(graph, files),
         "pivots": _pivots(case, files, identifiers),
         "detail": _details(case, files, detailed, verbose=verbose),
         "notes": _notes(case),
     }
-    counted = _counts(case, detailed)
+    counted = _counts(case, detailed, relationship_count)
     present = [(key, title, short) for key, title, short in _SECTIONS if sections[key]]
 
     options = [
@@ -634,7 +714,6 @@ def render_html(
     facts = [("target", str(case.root))]
     if home:
         facts.append(("profile", f"{home} · external"))
-    records = [entry.record for entry in case.files]
     contents = inventory(records)
     facts.append(("scanned", f"{moment} · {len(records):,} files · {_size(contents.size)}"))
     facts.append(("options", enabled))
@@ -692,7 +771,14 @@ def render_html(
     ]
     body = ["<main>"]
     for key, title, _short in present:
-        body.append(_section(key, title, sections[key], _note(key, case, detailed)))
+        body.append(
+            _section(
+                key,
+                title,
+                sections[key],
+                _note(key, case, detailed, relationship_count),
+            )
+        )
     if filtered:
         said = "No file matched" if not case.files else "Limited to"
         body.append(f'<p class="note">{_e(said)} {_e(filtered)}.</p>')
@@ -711,20 +797,21 @@ def render_html(
 # --- the frame -------------------------------------------------------------------
 
 
-def _counts(case: Case, detailed: set[str]) -> dict[str, str]:
+def _counts(case: Case, detailed: set[str], relationship_count: int) -> dict[str, str]:
     """The number the nav prints beside a section, where a number helps."""
     said = {
         "findings": f"{len(case.findings)}" if case.findings else "",
         "files": f"{len(case.files)}" if case.files else "",
         "detail": f"{len(detailed)}" if detailed else "",
         "conflicts": f"{len(case.conflicts)}" if case.conflicts else "",
+        "relationships": f"{relationship_count}" if relationship_count else "",
     }
     if case.pivots is not None and case.pivots.total:
         said["pivots"] = f"{case.pivots.total}"
     return said
 
 
-def _note(key: str, case: Case, detailed: set[str]) -> str:
+def _note(key: str, case: Case, detailed: set[str], relationship_count: int) -> str:
     """What the section heading says beside its name: the count, and what it counts."""
     if key == "findings" and case.findings:
         return f"{len(case.findings)}"
@@ -734,8 +821,8 @@ def _note(key: str, case: Case, detailed: set[str]) -> str:
         return f"{len(detailed):,} <b>· files that need it</b>"
     if key == "conflicts" and case.conflicts:
         return f"{len(case.conflicts)}"
-    if key == "relationships" and case.relationships:
-        return f"{case.relationships:,}"
+    if key == "relationships" and relationship_count:
+        return f"{relationship_count:,}"
     if key == "pivots" and case.pivots is not None:
         return f"{case.pivots.total:,} <b>· {case.pivots.across:,} in more than one file</b>"
     if key == "coverage":
@@ -842,7 +929,7 @@ def _sources(entries: list[CaseFile], name: str) -> str:
     return " · ".join(label for label, _times in counted.most_common(3))
 
 
-def _summary(case: Case) -> str:
+def _summary(case: Case, relationship_count: int) -> str:
     if not case.files:
         return ""
     records = [entry.record for entry in case.files]
@@ -882,12 +969,12 @@ def _summary(case: Case) -> str:
                 "none",
             )
         )
-    if case.relationships:
+    if relationship_count:
         cards.append(
             _card(
-                f"{case.relationships:,}",
+                f"{relationship_count:,}",
                 "relationships",
-                "identifiers files carry about each other",
+                "evidence-backed graph edges",
                 "relationships",
             )
         )
@@ -1052,23 +1139,151 @@ def _found_in(entry: CaseFile, kinds: dict[str, str], panes: set[str]) -> str:
     return " ".join(said + ([pivots] if pivots else []))
 
 
-def _relationships(case: Case, files: dict[str, CaseFile]) -> str:
-    rows = []
-    for entry in case.files:
-        for link in entry.record.links:
-            others = [files[path] for path in link.others if path in files]
-            related = " ".join(_file_link(other) for other in others)
-            rows.append(
-                f'<tr><td class="path">{_file_link(entry)}</td><td>{_e(link.kind)}</td>'
-                f"<td>{related or _e(f'{link.count} files')}</td></tr>"
-            )
-    if not rows:
+def _relationships(graph: Graph, files: dict[str, CaseFile]) -> str:
+    """An offline explorer over the same graph JSON and exports use."""
+    if not graph.relationships:
         return ""
-    return (
-        '<div class="wrap"><table class="tbl"><thead><tr><th data-sort="text">file</th>'
-        '<th data-sort="text">relationship</th><th>related</th>'
-        f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+
+    nodes = {node.id: node for node in graph.nodes}
+    connected = {edge.source for edge in graph.relationships} | {
+        edge.target for edge in graph.relationships
+    }
+    kinds = Counter(edge.kind for edge in graph.relationships)
+    chips = ['<button type="button" class="chip on" data-rel-kind="all">all</button>']
+    chips.extend(
+        f'<button type="button" class="chip" data-rel-kind="{_e(kind)}">'
+        f"{_e(kind)} <b>{count:,}</b></button>"
+        for kind, count in sorted(kinds.items())
     )
+
+    rows = []
+    ordered = sorted(
+        graph.relationships,
+        key=lambda edge: (edge.kind.casefold(), edge.source, edge.target),
+    )
+    for edge in ordered:
+        source = nodes[edge.source]
+        target = nodes[edge.target]
+        occurrence = "occurrence" if edge.count == 1 else "occurrences"
+        often = f'<span class="dim">{edge.count:,} {occurrence}</span>'
+        rows.append(
+            f'<tr class="relationship" data-source="{_e(edge.source)}" '
+            f'data-target="{_e(edge.target)}" data-kind="{_e(edge.kind)}">'
+            f"<td>{_relationship_node(source, files)}</td>"
+            '<td class="arrow" aria-label="points to">→</td>'
+            f'<td class="kind">{_e(edge.kind)}{often}</td>'
+            f"<td>{_relationship_node(target, files)}</td>"
+            f"<td>{_relationship_evidence(edge)}</td></tr>"
+        )
+
+    controls = (
+        '<div class="rel-controls"><label for="relationship-node">Focus node'
+        '<select id="relationship-node"><option value="">All connected nodes</option>'
+        f"{_relationship_options(graph, connected, files)}</select></label>"
+        f'<span class="rel-count" id="relationship-shown">{len(rows):,} relationships</span>'
+        "</div>"
+        f'<div class="rel-kinds" aria-label="Relationship type filters">{"".join(chips)}</div>'
+    )
+    table = (
+        '<div class="wrap"><table class="tbl relationships" id="relationship-table">'
+        '<thead><tr><th data-sort="text">source</th><th></th>'
+        '<th data-sort="text">relationship</th><th data-sort="text">target</th>'
+        f"<th>evidence</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
+    return controls + table
+
+
+def _relationship_options(graph: Graph, connected: set[str], files: dict[str, CaseFile]) -> str:
+    degrees = Counter(
+        node_id for edge in graph.relationships for node_id in (edge.source, edge.target)
+    )
+    groups: dict[str, list[Node]] = {}
+    for node in graph.nodes:
+        if node.id in connected:
+            groups.setdefault(node.type, []).append(node)
+
+    order = {"file": 0, "person": 1, "device": 2, "camera_model": 3}
+    rendered = []
+    for kind, nodes in sorted(groups.items(), key=lambda item: (order.get(item[0], 4), item[0])):
+        options = []
+        for node in sorted(nodes, key=lambda item: (-degrees[item.id], item.value.casefold())):
+            value = _relationship_option_label(node, files)
+            options.append(
+                f'<option value="{_e(node.id)}">{_e(value)} · {degrees[node.id]:,}</option>'
+            )
+        label = {
+            "camera_model": "camera models",
+            "device": "camera bodies",
+            "file": "files",
+            "person": "people",
+        }.get(kind, _type_name(kind).lower())
+        rendered.append(f'<optgroup label="{_e(label)}">{"".join(options)}</optgroup>')
+    return "".join(rendered)
+
+
+def _relationship_option_label(node: Node, files: dict[str, CaseFile]) -> str:
+    if node.type == "file" and node.value in files:
+        entry = files[node.value]
+        return f"{entry.ref} {_name(entry)}"
+    return node.value
+
+
+def _node_type(kind: str) -> str:
+    return {
+        "bic": "BIC",
+        "camera_model": "camera model",
+        "cve": "CVE",
+        "cwe": "CWE",
+        "device": "camera body",
+        "email": "email",
+        "file": "file",
+        "ghsa": "GHSA",
+        "ipv4": "IPv4",
+        "ipv6": "IPv6",
+        "md5": "MD5",
+        "person": "person",
+        "sha1": "SHA-1",
+        "sha256": "SHA-256",
+        "sha512": "SHA-512",
+        "url": "URL",
+    }.get(kind, kind.replace("_", " "))
+
+
+def _relationship_node(node: Node, files: dict[str, CaseFile]) -> str:
+    if node.type == "file" and node.value in files:
+        value = _file_link(files[node.value])
+    else:
+        value = _value(node.value)
+    focus = (
+        f'<button class="rel-focus" type="button" data-rel-focus="{_e(node.id)}" '
+        f'title="Focus this node" aria-label="Focus {_e(node.value)}">◎</button>'
+    )
+    return (
+        '<div class="rel-node">'
+        f'<span class="pill">{_e(_node_type(node.type))}</span>{value}{focus}</div>'
+    )
+
+
+def _relationship_evidence(edge: Relationship) -> str:
+    proofs = []
+    for proof in edge.evidence:
+        facts = [
+            ("source", proof.source),
+            ("place", proof.place),
+            ("corpus", proof.corpus),
+        ]
+        if proof.category is not None:
+            facts.append(("category", proof.category))
+        if proof.match is not None:
+            facts.append(("match", proof.match))
+        if proof.at is not None:
+            facts.append(("time", proof.at))
+        if proof.count != 1:
+            facts.append(("occurrences", f"{proof.count:,}"))
+        proofs.append(f'<div class="rel-proof">{_fields(facts)}</div>')
+    count = len(proofs)
+    label = "evidence item" if count == 1 else "evidence items"
+    return f"<details><summary>{count:,} {label}</summary>{''.join(proofs)}</details>"
 
 
 def _pivots(case: Case, files: dict[str, CaseFile], identifiers: list[Identifier] | None) -> str:

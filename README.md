@@ -324,6 +324,8 @@ Groups files by shared identifying values:
 
 XMP identifiers such as `xmpMM:DocumentID`, `xmpMM:InstanceID`, `xmpMM:OriginalDocumentID` and `xmpMM:DerivedFrom` can link files after renaming or export. Relationships are reported as derived-from, source-of, same-document or common-ancestor.
 
+The self-contained HTML report includes an evidence-backed relationship explorer for files, identifiers, people and devices.
+
 ### Explain
 
 ```bash

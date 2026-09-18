@@ -120,11 +120,53 @@ def test_the_sections_come_in_the_order_they_are_worked_through():
         "Summary",
         "Key findings",
         "Files",
+        "Relationships",
         "Investigative pivots",
         "File detail",
         "Conflicts",
         "Report notes",
     ]
+
+
+def test_relationship_explorer_uses_the_evidence_backed_graph():
+    page = _page(_corpus())
+    section = page.split('<section id="relationships"')[1].split("</section>")[0]
+
+    assert '<select id="relationship-node">' in section
+    assert '<optgroup label="files">' in section
+    assert '<optgroup label="domains">' in section
+    assert 'data-kind="has identifier"' in section
+    assert 'data-kind="origin URL"' in section
+    assert 'data-kind="URL host"' in section
+    assert 'data-rel-focus="domain:example.org"' in section
+    assert "browser-download" in section
+    assert "recorded-path" in section
+    assert "URL host" in section and "derived" in section
+
+
+def test_relationship_explorer_includes_authors_and_cameras_without_clustering():
+    record = _file(
+        "photo.jpg",
+        EvidenceRecord(
+            source="device-metadata",
+            block="exif",
+            fields={
+                "Make": "NIKON",
+                "Model": "Z 8",
+                "BodySerialNumber": "BODY-1042",
+                "Artist": "Anna Nowak",
+            },
+        ),
+    )
+
+    page = _page([record])
+
+    assert 'data-kind="author"' in page
+    assert 'data-kind="camera body"' in page
+    assert 'data-kind="camera model"' in page
+    assert '<optgroup label="people">' in page
+    assert '<optgroup label="camera bodies">' in page
+    assert '<optgroup label="camera models">' in page
 
 
 def test_every_pivot_is_listed_with_the_files_it_was_found_in():
