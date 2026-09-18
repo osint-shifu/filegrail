@@ -5,6 +5,12 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.28.0 - 2026-09-18
+
+### Added
+
+- Content Credentials are read from every container the tool already parses: TIFF and the raw formats built on it, WebP, WAV and AVI, MP4, MOV, M4A, HEIF and AVIF, and MP3. The record says which structure carried the manifest. The hard binding is checked where the manifest hashes the file's bytes; the binding used by MP4 and MOV is not computed, and the record says so by staying silent about it.
+
 ## 0.27.0 - 2026-09-18
 
 ### Added

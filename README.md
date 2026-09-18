@@ -9,7 +9,7 @@
 
 **Provenance. Metadata. Investigative Pivots.**
 
-[![PyPI](https://img.shields.io/badge/pypi-v0.27.0-3775A9?style=flat-square)](https://pypi.org/project/filegrail/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.28.0-3775A9?style=flat-square)](https://pypi.org/project/filegrail/)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-1f883d?style=flat-square)
 ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1f883d?style=flat-square)
@@ -422,7 +422,7 @@ A telemetry track can reveal movement even when ordinary GPS metadata is absent.
 | **PE header** | `.exe` `.dll` `.sys` `.scr` `.ocx` `.cpl` `.drv` `.efi` | Target machine, linker, link time, PDB path, Rich header records, company, product, original file name and version strings, and whether a signature is attached |
 | **Font tables** | `.ttf` `.otf` `.ttc` `.otc` `.woff` | Family, designer, foundry, version, licence, creation and modification times, vendor identifier and variation axes |
 | **Web document** | `.html` `.htm` `.xhtml` | Author, publisher, dates, canonical URL, Open Graph, Twitter Cards, JSON-LD, Microdata and RDFa |
-| **C2PA** | `.jpg` `.jpeg` `.png` | Producing application, creation data, digital source type such as a generative AI model, the recorded actions and ingredients, and whether the file still matches its manifest |
+| **C2PA** | `.3gp` `.arw` `.avi` `.avif` `.cr2` `.dng` `.heic` `.heif` `.jpeg` `.jpg` `.m4a` `.m4v` `.mov` `.mp3` `.mp4` `.nef` `.orf` `.png` `.qt` `.rmi` `.rw2` `.tif` `.tiff` `.wav` `.wave` `.webp` | Producing application, creation data, digital source type such as a generative AI model, the recorded actions and ingredients, and whether the file still matches its manifest |
 
 XMP, XMP history and IPTC are not tied to one format and are read wherever a supported file carries them.
 

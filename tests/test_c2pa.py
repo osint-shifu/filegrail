@@ -339,3 +339,79 @@ def test_active_manifest_lists_its_actions_and_ingredients(tmp_path: Path):
     assert found.fields["Ingredient[1]:manifest"] == "own manifest"
     assert found.fields["Ingredient[2]:title"] == "logo.png"
     assert "Ingredient[2]:manifest" not in found.fields
+
+
+# --- the other containers ---------------------------------------------------
+#
+# The same JUMBF, carried the way each container carries it: a TIFF tag, a RIFF
+# chunk, a uuid box, an ID3 frame. Each layout is the one c2pa-rs writes.
+
+
+def _tiff_with(path: Path, jumbf: bytes) -> None:
+    """Tag 52545, typed UNDEFINED, in the first IFD."""
+    base = 8 + 2 + 12 + 4
+    path.write_bytes(
+        b"MM\x00\x2a"
+        + struct.pack(">I", 8)
+        + struct.pack(">H", 1)
+        + struct.pack(">HHII", 0xCD41, 7, len(jumbf), base)
+        + struct.pack(">I", 0)
+        + jumbf
+    )
+
+
+def _wav_with(path: Path, jumbf: bytes) -> None:
+    """A `C2PA` chunk at the top level of the RIFF, after the format chunk."""
+    fmt = b"fmt " + struct.pack("<I", 16) + struct.pack("<HHIIHH", 1, 1, 8000, 16000, 2, 16)
+    manifest = (
+        b"C2PA" + struct.pack("<I", len(jumbf)) + jumbf + (b"\x00" if len(jumbf) % 2 else b"")
+    )
+    body = b"WAVE" + fmt + manifest
+    path.write_bytes(b"RIFF" + struct.pack("<I", len(body)) + body)
+
+
+def _mp4_with(path: Path, jumbf: bytes) -> None:
+    """A `uuid` box with the C2PA uuid: version and flags, a purpose, an offset, the store."""
+    uuid = bytes.fromhex("d8fec3d61b0e483c92975828877ec481")
+    payload = uuid + b"\x00\x00\x00\x00" + b"manifest\x00" + struct.pack(">Q", 0) + jumbf
+    path.write_bytes(_box(b"ftyp", b"isom\x00\x00\x02\x00isom") + _box(b"uuid", payload))
+
+
+def _mp3_with(path: Path, jumbf: bytes) -> None:
+    """A GEOB frame whose object is the manifest store, in an ID3v2.4 tag."""
+    mime = b"application/x-c2pa-manifest-store\x00"
+    body = b"\x00" + mime + b"c2pa\x00" + b"c2pa\x00" + jumbf
+    size = len(body)
+    synchsafe = bytes([(size >> 21) & 0x7F, (size >> 14) & 0x7F, (size >> 7) & 0x7F, size & 0x7F])
+    frame = b"GEOB" + synchsafe + b"\x00\x00" + body
+    tag_size = len(frame)
+    header = b"ID3\x04\x00\x00" + bytes(
+        [(tag_size >> 21) & 0x7F, (tag_size >> 14) & 0x7F, (tag_size >> 7) & 0x7F, tag_size & 0x7F]
+    )
+    path.write_bytes(header + frame + b"\xff\xfb\x90\x00" + b"\x00" * 64)
+
+
+def test_the_manifest_is_read_from_a_tiff_a_wav_an_mp4_and_an_mp3(tmp_path: Path):
+    built = {
+        "frame.dng": (_tiff_with, "tag 52545"),
+        "take.wav": (_wav_with, "C2PA chunk"),
+        "clip.mp4": (_mp4_with, "uuid box"),
+        "track.mp3": (_mp3_with, "GEOB frame"),
+    }
+    for name, (build, where) in built.items():
+        path = tmp_path / name
+        build(path, _manifest(GENERATED_CLAIM))
+
+        origin = read_c2pa_manifest(path)
+
+        assert origin is not None, name
+        assert origin.tool == "OpenAI Media Service API (gpt-image 2.0)", name
+        assert origin.where == {"object": where}, name
+
+
+def test_a_container_without_a_manifest_says_nothing(tmp_path: Path):
+    path = tmp_path / "take.wav"
+    _wav_with(path, b"")
+    path.write_bytes(path.read_bytes().replace(b"C2PA", b"JUNK"))
+
+    assert read_c2pa_manifest(path) is None

@@ -18,6 +18,7 @@ recorded as evidence, not as proof, and the report says which of the two it is.
 from __future__ import annotations
 
 import hashlib
+import mmap
 import struct
 from collections.abc import Callable
 from pathlib import Path
@@ -25,17 +26,38 @@ from typing import TYPE_CHECKING, Any, BinaryIO
 
 from ..cbor import CborError, loads
 from ..models import EvidenceRecord
+from .embedded.exif import TIFF_SUFFIXES, WEBP_SUFFIXES
+from .embedded.isobmff import SUFFIXES as BMFF_SUFFIXES
+from .embedded.riff import SUFFIXES as RIFF_SUFFIXES
 
 if TYPE_CHECKING:  # `hashlib._Hash` exists in the type stubs, not at runtime.
     from hashlib import _Hash
 
 PNG_SUFFIXES = {".png"}
 JPEG_SUFFIXES = {".jpg", ".jpeg"}
-SUPPORTED_SUFFIXES = PNG_SUFFIXES | JPEG_SUFFIXES
+ID3_SUFFIXES = {".mp3"}
+SUPPORTED_SUFFIXES = (
+    PNG_SUFFIXES
+    | JPEG_SUFFIXES
+    | TIFF_SUFFIXES
+    | WEBP_SUFFIXES
+    | RIFF_SUFFIXES
+    | BMFF_SUFFIXES
+    | ID3_SUFFIXES
+)
 
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 _PNG_C2PA_CHUNK = b"caBX"
 _JPEG_APP11 = 0xEB
+#: Where each container keeps the manifest store, as c2pa-rs writes it.
+_TIFF_C2PA_TAG = 0xCD41
+_RIFF_C2PA_CHUNK = b"C2PA"
+_BMFF_C2PA_UUID = bytes.fromhex("d8fec3d61b0e483c92975828877ec481")
+_ID3_C2PA_MIME = (b"application/x-c2pa-manifest-store", b"application/c2pa")
+_MAX_IFDS = 64
+_MAX_ENTRIES = 4096
+_MAX_BOXES = 4096
+_MAX_STORE = 64 * 1024 * 1024
 
 _JUMBF_SUPERBOX = b"jumb"
 _JUMBF_DESCRIPTION = b"jumd"
@@ -88,7 +110,7 @@ def read_c2pa_manifest(path: Path) -> EvidenceRecord | None:
     if path.suffix.lower() not in SUPPORTED_SUFFIXES:
         return None
     try:
-        jumbf = _extract_jumbf(path)
+        jumbf, where = _extract_jumbf(path)
     except (OSError, struct.error, ValueError):
         return None
     if not jumbf:
@@ -119,21 +141,147 @@ def read_c2pa_manifest(path: Path) -> EvidenceRecord | None:
             binding = _binding(path, payload, inherited)
             break
 
-    return _summarise(active, binding, len(manifests))
+    record = _summarise(active, binding, len(manifests))
+    if record is not None:
+        record.where = {"object": where}
+    return record
 
 
 # --- container extraction ----------------------------------------------------
 
 
-def _extract_jumbf(path: Path) -> bytes:
+def _extract_jumbf(path: Path) -> tuple[bytes, str]:
+    """The manifest store and the name of the structure it was read from."""
     with path.open("rb") as handle:
-        magic = handle.read(8)
+        magic = handle.read(12)
         handle.seek(0)
         if magic.startswith(_PNG_MAGIC):
-            return _png_chunk(handle)
+            return _png_chunk(handle), "caBX chunk"
         if magic.startswith(b"\xff\xd8"):
-            return _jpeg_app11(handle)
+            return _jpeg_app11(handle), "APP11 segments"
+        if magic[:4] in (b"II*\x00", b"MM\x00*"):
+            return _tiff_tag(handle), f"tag {_TIFF_C2PA_TAG}"
+        if magic.startswith(b"RIFF"):
+            return _riff_chunk(handle), "C2PA chunk"
+        if magic.startswith(b"ID3"):
+            return _id3_frame(handle), "GEOB frame"
+        if magic[4:8] in (b"ftyp", b"moov", b"mdat", b"free", b"skip", b"wide", b"uuid"):
+            return _bmff_box(handle), "uuid box"
+    return b"", ""
+
+
+def _tiff_tag(handle: BinaryIO) -> bytes:
+    """Tag 52545 in any directory of the chain, typed UNDEFINED or BYTE."""
+    with mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ) as data:
+        endian = ">" if data[:2] == b"MM" else "<"
+        (offset,) = struct.unpack_from(endian + "I", data, 4)
+        seen: set[int] = set()
+        for _ in range(_MAX_IFDS):
+            if offset in seen or offset <= 0 or offset + 2 > len(data):
+                return b""
+            seen.add(offset)
+            (count,) = struct.unpack_from(endian + "H", data, offset)
+            for index in range(min(count, _MAX_ENTRIES)):
+                entry = offset + 2 + index * 12
+                if entry + 12 > len(data):
+                    return b""
+                tag, kind, length, at = struct.unpack_from(endian + "HHII", data, entry)
+                if tag == _TIFF_C2PA_TAG and kind in (1, 7) and 0 < length <= _MAX_STORE:
+                    if length <= 4:
+                        return bytes(data[entry + 8 : entry + 8 + length])
+                    if at + length > len(data):
+                        return b""
+                    return bytes(data[at : at + length])
+            after = offset + 2 + min(count, _MAX_ENTRIES) * 12
+            if after + 4 > len(data):
+                return b""
+            (offset,) = struct.unpack_from(endian + "I", data, after)
     return b""
+
+
+def _riff_chunk(handle: BinaryIO) -> bytes:
+    """The `C2PA` chunk, a direct child of the RIFF chunk."""
+    handle.seek(12)
+    for _ in range(_MAX_BOXES):
+        header = handle.read(8)
+        if len(header) < 8:
+            return b""
+        name, size = struct.unpack("<4sI", header)
+        if name == _RIFF_C2PA_CHUNK:
+            return handle.read(size) if size <= _MAX_STORE else b""
+        handle.seek(size + (size & 1), 1)
+    return b""
+
+
+def _bmff_box(handle: BinaryIO) -> bytes:
+    """The top-level `uuid` box with the C2PA uuid: version and flags, a
+    purpose, the offset of the first auxiliary box, then the store."""
+    handle.seek(0, 2)
+    end = handle.tell()
+    at = 0
+    for _ in range(_MAX_BOXES):
+        if at + 8 > end:
+            return b""
+        handle.seek(at)
+        size, name = struct.unpack(">I4s", handle.read(8))
+        header = 8
+        if size == 1:
+            (size,) = struct.unpack(">Q", handle.read(8))
+            header = 16
+        elif size == 0:
+            size = end - at
+        if size < header:
+            return b""
+        if name == b"uuid" and size - header >= 16 + 4 + 1 + 8:
+            if handle.read(16) == _BMFF_C2PA_UUID:
+                body = handle.read(min(size - header - 16, _MAX_STORE))
+                purpose_end = body.find(b"\x00", 4)
+                if purpose_end < 0:
+                    return b""
+                return body[purpose_end + 1 + 8 :]
+        at += size
+    return b""
+
+
+def _id3_frame(handle: BinaryIO) -> bytes:
+    """The GEOB frame whose object is a manifest store, in ID3v2.3 or v2.4."""
+    header = handle.read(10)
+    if len(header) < 10 or header[3] not in (3, 4):
+        return b""
+    major = header[3]
+    size = _synchsafe(header[6:10])
+    body = handle.read(min(size, _MAX_STORE))
+    at = 0
+    for _ in range(_MAX_BOXES):
+        if at + 10 > len(body) or body[at : at + 4] == b"\x00\x00\x00\x00":
+            return b""
+        name = body[at : at + 4]
+        length = (
+            _synchsafe(body[at + 4 : at + 8])
+            if major == 4
+            else struct.unpack(">I", body[at + 4 : at + 8])[0]
+        )
+        frame = body[at + 10 : at + 10 + length]
+        at += 10 + length
+        if name != b"GEOB" or not frame:
+            continue
+        encoding = frame[0]
+        mime_end = frame.find(b"\x00", 1)
+        if mime_end < 0 or frame[1:mime_end] not in _ID3_C2PA_MIME:
+            continue
+        rest = frame[mime_end + 1 :]
+        terminator = b"\x00\x00" if encoding in (1, 2) else b"\x00"
+        for _text in range(2):  # the file name, then the description
+            cut = rest.find(terminator)
+            if cut < 0:
+                return b""
+            rest = rest[cut + len(terminator) :]
+        return rest
+    return b""
+
+
+def _synchsafe(raw: bytes) -> int:
+    return (raw[0] << 21) | (raw[1] << 14) | (raw[2] << 7) | raw[3]
 
 
 def _png_chunk(handle: BinaryIO) -> bytes:
