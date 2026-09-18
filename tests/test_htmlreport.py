@@ -122,8 +122,8 @@ def test_the_sections_come_in_the_order_they_are_worked_through():
         "Files",
         "Relationships",
         "Investigative pivots",
-        "File detail",
         "Conflicts",
+        "File detail",
         "Report notes",
     ]
 

@@ -680,15 +680,19 @@ _SCRIPT = """
 """
 
 #: Section key, the heading it prints, and the short word the nav gives it.
+#: In the order they are read. Coverage comes right after the findings: a
+#: finding of "no trace" is read differently once it is known which stores
+#: were there to search. Conflicts are a result; file detail is the material
+#: behind every result, so it comes last before the notes.
 _SECTIONS = (
     ("summary", "Summary", "Summary"),
     ("findings", "Key findings", "Findings"),
+    ("coverage", "Evidence coverage", "Coverage"),
     ("files", "Files", "Files"),
     ("relationships", "Relationships", "Related"),
     ("pivots", "Investigative pivots", "Pivots"),
-    ("detail", "File detail", "Detail"),
-    ("coverage", "Evidence coverage", "Coverage"),
     ("conflicts", "Conflicts", "Conflicts"),
+    ("detail", "File detail", "Detail"),
     ("notes", "Report notes", "Notes"),
 )
 
