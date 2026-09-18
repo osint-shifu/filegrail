@@ -5,6 +5,13 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.30.1 - 2026-09-18
+
+### Changed
+
+- The README opens with the new mark, a plate filled with hex rows, in a version for each theme; the files are in `assets/`.
+- The project lives under the renamed GitHub account `osintshifu`; every link, the package metadata and the example report address follow it.
+
 ## 0.30.0 - 2026-09-18
 
 ### Added

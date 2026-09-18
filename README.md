@@ -1,15 +1,15 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/osintshifu/filegrail/master/assets/filegrail-stacked-compact-dark.png">
-  <img src="https://raw.githubusercontent.com/osintshifu/filegrail/master/assets/filegrail-stacked-compact-light.png" alt="FileGrail" width="420">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/osintshifu/filegrail/master/assets/filegrail-mark-04-plate-ondark-512.png">
+  <img src="https://raw.githubusercontent.com/osintshifu/filegrail/master/assets/filegrail-mark-04-plate-onlight-512.png" alt="FileGrail" width="128">
 </picture>
 
 ### LOCAL FILE INTELLIGENCE
 
 **Provenance. Metadata. Investigative Pivots.**
 
-[![PyPI](https://img.shields.io/badge/pypi-v0.30.0-3775A9?style=flat-square)](https://pypi.org/project/filegrail/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.30.1-3775A9?style=flat-square)](https://pypi.org/project/filegrail/)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-1f883d?style=flat-square)
 ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1f883d?style=flat-square)

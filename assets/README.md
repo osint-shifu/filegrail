@@ -2,12 +2,12 @@
 
 How to use the brand assets this repository carries.
 
-The lockup at the top of the README, following the reader's theme. The URLs are absolute so that PyPI shows the image too:
+The mark at the top of the README, following the reader's theme. The URLs are absolute so that PyPI shows the image too:
 
 ```markdown
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/osintshifu/filegrail/master/assets/filegrail-stacked-compact-dark.png">
-  <img src="https://raw.githubusercontent.com/osintshifu/filegrail/master/assets/filegrail-stacked-compact-light.png" alt="filegrail" width="420">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/osintshifu/filegrail/master/assets/filegrail-mark-04-plate-ondark-512.png">
+  <img src="https://raw.githubusercontent.com/osintshifu/filegrail/master/assets/filegrail-mark-04-plate-onlight-512.png" alt="FileGrail" width="128">
 </picture>
 ```
 
@@ -19,6 +19,8 @@ The mark the HTML report shows in its masthead and in its tab icon is not a file
 
 | File | Use |
 | --- | --- |
+| `filegrail-mark-04-plate-ondark-512.png`, `-1024.png`, `filegrail-mark-04-plate-ondark.svg` | hexdump plate mark, dark backgrounds |
+| `filegrail-mark-04-plate-onlight-512.png`, `-1024.png`, `filegrail-mark-04-plate-onlight.svg` | hexdump plate mark, light backgrounds |
 | `filegrail-stacked-compact-dark.png` `.svg` | vertical lockup with the smaller mark, dark backgrounds |
 | `filegrail-stacked-compact-light.png` `.svg` | vertical lockup with the smaller mark, light backgrounds |
 | `filegrail-stacked-dark.png` `.svg` | vertical lockup, dark backgrounds |
