@@ -295,6 +295,7 @@ def test_the_readme_metadata_table_names_the_extensions_its_readers_declare():
         png,
         riff,
         vorbis,
+        web,
     )
 
     owners = {
@@ -313,6 +314,7 @@ def test_the_readme_metadata_table_names_the_extensions_its_readers_declare():
         "RTF metadata": containers.RTF_SUFFIXES,
         "SVG metadata": containers.SVG_SUFFIXES,
         "Jupyter notebook": containers.NOTEBOOK_SUFFIXES,
+        "Web document": web.SUFFIXES,
         "C2PA": C2PA,
     }
 

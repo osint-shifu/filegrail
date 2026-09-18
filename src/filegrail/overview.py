@@ -80,6 +80,14 @@ AUTHOR_FIELDS: dict[str, tuple[str, ...]] = {
     "matroska": ("ARTIST",),
     "xmp": ("dc:creator",),
     "iptc": ("By-line",),
+    "web-document": (
+        "author",
+        "article:author",
+        "citation_author",
+        "dc.creator",
+        "dcterms.creator",
+        "jsonld:author",
+    ),
 }
 
 #: Blocks that name no person, listed rather than left out so that adding a

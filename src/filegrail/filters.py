@@ -26,6 +26,7 @@ from .sources.embedded import (
     png,
     riff,
     vorbis,
+    web,
 )
 
 
@@ -48,7 +49,17 @@ _VIDEO = (
 #: this tool cannot read is exactly the sort a report should be able to include.
 _EXTRA_IMAGE = {".gif", ".bmp", ".ico", ".psd", ".raf", ".srw", ".pef"}
 _EXTRA_AUDIO = {".m4a", ".aiff", ".wma"}
-_EXTRA_TEXT = {".txt", ".md", ".csv", ".tsv", ".json", ".xml", ".yaml", ".yml", ".log", ".html"}
+_EXTRA_TEXT = {
+    ".txt",
+    ".md",
+    ".csv",
+    ".tsv",
+    ".json",
+    ".xml",
+    ".yaml",
+    ".yml",
+    ".log",
+} | web.SUFFIXES
 
 FAMILIES: dict[str, frozenset[str]] = {
     "image": frozenset(exif.SUFFIXES | png.SUFFIXES | containers.SVG_SUFFIXES | _EXTRA_IMAGE),

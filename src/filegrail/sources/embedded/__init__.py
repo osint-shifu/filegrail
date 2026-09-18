@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ...models import EvidenceRecord
-from . import containers, documents, exif, id3, isobmff, matroska, ole, png, riff, vorbis
+from . import containers, documents, exif, id3, isobmff, matroska, ole, png, riff, vorbis, web
 
 #: A malformed container is ordinary: truncated downloads, Office lock files and
 #: files with a misleading extension all land here, and none is an error.
@@ -49,6 +49,7 @@ SUFFIXES = (
     | matroska.SUFFIXES
     | vorbis.SUFFIXES
     | ole.SUFFIXES
+    | web.SUFFIXES
 )
 
 
@@ -60,6 +61,7 @@ def read_embedded_metadata(path: Path) -> EvidenceRecord | None:
 
     for reader in (
         _from_documents,
+        _from_web,
         _from_exif,
         _from_movie,
         _from_png,
@@ -88,6 +90,81 @@ def _from_documents(path: Path, suffix: str) -> EvidenceRecord | None:
     if suffix in documents.OOXML_SUFFIXES:
         return documents.read_ooxml(path)
     return None
+
+
+def _from_web(path: Path, suffix: str) -> EvidenceRecord | None:
+    if suffix not in web.SUFFIXES:
+        return None
+    found = web.read_web_document(path)
+    if not found:
+        return None
+
+    fields = found.fields
+    author = _first(
+        fields,
+        (
+            "author",
+            "article:author",
+            "citation_author",
+            "dc.creator",
+            "dcterms.creator",
+            "jsonld:author",
+        ),
+    )
+    publisher = _first(fields, ("publisher", "og:site_name", "jsonld:publisher"))
+    title = _first(fields, ("title", "og:title", "twitter:title", "jsonld:headline", "jsonld:name"))
+    canonical = _first(fields, ("canonical", "og:url", "jsonld:url"))
+    published = _first(
+        fields,
+        (
+            "datePublished",
+            "article:published_time",
+            "citation_publication_date",
+            "dcterms.issued",
+            "dcterms.date",
+            "date",
+            "jsonld:datePublished",
+        ),
+    )
+
+    notes = []
+    if author:
+        notes.append(f"author {_clip(author, 80)}")
+    if publisher:
+        notes.append(f"publisher {_clip(publisher, 80)}")
+    if title:
+        notes.append(f"title {_clip(title, 80)}")
+    if not notes and canonical:
+        notes.append(f"canonical {_clip(canonical, 120)}")
+
+    # An image or URL declared by the page is useful as a pivot even when the
+    # page omitted title and authorship.  A language or description by itself
+    # is not enough to create a provenance record at the top of the report.
+    if not notes and any(
+        name in fields
+        for name in (
+            "og:image",
+            "og:video",
+            "og:audio",
+            "twitter:image",
+            "twitter:player",
+            "jsonld:image",
+            "jsonld:video",
+            "jsonld:audio",
+            "jsonld:contentUrl",
+            "jsonld:embedUrl",
+        )
+    ):
+        notes.append("linked media recorded")
+
+    return _origin(
+        "document-metadata",
+        block="web-document",
+        tool=_first(fields, ("generator", "application-name")),
+        at=_normalise(published),
+        note="; ".join(notes) or None,
+        fields=dict(fields),
+    )
 
 
 def _from_exif(path: Path, suffix: str) -> EvidenceRecord | None:

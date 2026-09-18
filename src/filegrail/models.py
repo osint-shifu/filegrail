@@ -246,6 +246,7 @@ BLOCK_LABELS: dict[str, str] = {
     "rtf-generator": "RTF generator",
     "svg-metadata": "SVG metadata",
     "notebook-kernel": "notebook kernel",
+    "web-document": "web document",
     "exif": "EXIF",
     "isobmff": "movie metadata",
     "png-text": "PNG text",
