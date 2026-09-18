@@ -41,6 +41,46 @@ _PDF_STREAM = re.compile(rb"stream\r?\n(.*?)endstream", re.DOTALL)
 _PDF_MAX_STREAMS = 64
 _PDF_MAX_INFLATED = 4 * 1024 * 1024
 
+#: The structure of the document - how many times it was saved, what it
+#: attaches, what it runs, who signed it - is spread over the whole file, so
+#: the whole file is scanned for it, up to this much. Past the limit only the
+#: head and tail windows above are seen, which still hold the trailer.
+_PDF_MAX_STRUCTURE = 64 * 1024 * 1024
+
+#: Dictionary keys that mark a structural feature. Anchored on `/S /Name` or
+#: `/Type /Name` where the key alone would also match page text.
+_PDF_FEATURES: tuple[tuple[str, re.Pattern[bytes]], ...] = (
+    # Only an action dictionary written inline. A reference or an array is
+    # usually the page the viewer should open on, which every document has.
+    ("OpenAction", re.compile(rb"/OpenAction\s*<<")),
+    ("JavaScript", re.compile(rb"/S\s*/JavaScript\b|/JS\s*(?:\(|<|\d+\s+\d+\s+R)")),
+    ("Launch", re.compile(rb"/S\s*/Launch\b")),
+    ("AcroForm", re.compile(rb"/AcroForm\s*(?:<<|\d+\s+\d+\s+R)")),
+    ("XFA", re.compile(rb"/XFA\s*(?:\[|\d+\s+\d+\s+R|\()")),
+)
+_PDF_EMBEDDED = re.compile(rb"/Type\s*/EmbeddedFile\b")
+_PDF_FILESPEC = re.compile(rb"/Type\s*/Filespec\b")
+_PDF_SIGNATURE = re.compile(rb"/Type\s*/Sig\b")
+_PDF_URI = re.compile(rb"/URI\s*\((?P<literal>(?:\\.|[^\\)])*)\)")
+_PDF_TRAILER_ID = re.compile(rb"/ID\s*\[\s*<([0-9A-Fa-f\s]*)>\s*<([0-9A-Fa-f\s]*)>\s*\]")
+_PDF_EOF = b"%%EOF"
+_PDF_MAX_LISTED = 16
+
+#: Keys a dictionary in an object stream may carry that the structure scan
+#: reads. A stream holding none of these is page content or a font.
+_PDF_STRUCTURE_HINTS = (
+    b"/OpenAction",
+    b"/JavaScript",
+    b"/JS",
+    b"/Launch",
+    b"/AcroForm",
+    b"/XFA",
+    b"/EmbeddedFile",
+    b"/Filespec",
+    b"/Sig",
+    b"/URI",
+)
+
 #: Values appear either as literal strings, ``/Producer (LibreOffice)``, or as
 #: hex strings, ``/Producer<FEFF004C0069...>``, which is what LibreOffice and
 #: several other writers actually emit. Both forms have to be read.
@@ -86,13 +126,22 @@ def _origin(
 
 def _read_pdf(path: Path) -> EvidenceRecord | None:
     with path.open("rb") as handle:
-        head = handle.read(_PDF_SCAN_BYTES)
-        if handle.seek(0, 2) > _PDF_SCAN_BYTES * 2:
+        size = handle.seek(0, 2)
+        handle.seek(0)
+        if size <= _PDF_MAX_STRUCTURE:
+            whole = handle.read(size)
+            head = whole[:_PDF_SCAN_BYTES]
+            if size > _PDF_SCAN_BYTES * 2:
+                head += whole[-_PDF_SCAN_BYTES:]
+        else:
+            head = handle.read(_PDF_SCAN_BYTES)
             handle.seek(-_PDF_SCAN_BYTES, 2)
             head += handle.read(_PDF_SCAN_BYTES)
+            whole = head
 
+    inflated = _inflated_streams(whole)
     found: dict[str, str] = {}
-    for match in _PDF_ENTRY.finditer(head + _inflated_streams(head)):
+    for match in _PDF_ENTRY.finditer(head + inflated):
         key = match.group(1).decode("ascii")
         if match.group("hex") is not None:
             value = _decode_pdf_hex(match.group("hex"))
@@ -107,6 +156,7 @@ def _read_pdf(path: Path) -> EvidenceRecord | None:
         tool = f"{found['Producer']} (created in {found['Creator']})"
 
     notes = [f"author {found['Author']}"] if found.get("Author") else []
+    notes.extend(_pdf_structure(whole, inflated, found))
     return _origin(
         "pdf-info",
         tool,
@@ -114,6 +164,119 @@ def _read_pdf(path: Path) -> EvidenceRecord | None:
         "; ".join(notes) or None,
         found,
     )
+
+
+def _pdf_structure(raw: bytes, inflated: bytes, fields: dict[str, str]) -> list[str]:
+    """What the file's structure says about its history and its contents.
+
+    None of this is in the Info dictionary. A document saved with incremental
+    updates keeps every earlier version inside itself; an attachment, an
+    action that runs on opening and a signature are each a fact about the file
+    that the producer string does not mention.
+    """
+    notes: list[str] = []
+    data = raw + inflated
+
+    saves = raw.count(_PDF_EOF)
+    if b"/Linearized" in raw[:1024]:
+        saves -= 1  # a linearized file writes two cross-reference sections
+    if saves > 1:
+        fields["IncrementalUpdates"] = str(saves - 1)
+        notes.append(f"{saves - 1} incremental update{'s' if saves > 2 else ''}")
+
+    ids = _PDF_TRAILER_ID.findall(raw)
+    if ids:
+        permanent, changing = (bytes(part).translate(None, delete=b" \t\r\n") for part in ids[-1])
+        if permanent:
+            fields["PermanentID"] = permanent.decode("ascii").lower()
+        if changing:
+            fields["ChangingID"] = changing.decode("ascii").lower()
+
+    if re.search(rb"/Encrypt\s*(?:<<|\d+\s+\d+\s+R)", raw):
+        fields["Encrypted"] = "yes"
+        notes.append("encrypted")
+
+    names = _pdf_filespec_names(data)
+    embedded = len(_PDF_EMBEDDED.findall(data))
+    if embedded or names:
+        count = max(embedded, len(names))
+        fields["EmbeddedFiles"] = str(count)
+        for index, name in enumerate(names[:_PDF_MAX_LISTED], 1):
+            fields[f"EmbeddedFile[{index}]"] = name
+        notes.append(f"{count} embedded file{'s' if count > 1 else ''}")
+
+    signatures = [
+        found
+        for match in _PDF_SIGNATURE.finditer(data)
+        if (found := _pdf_signature(data, match.end())) is not None
+    ][:_PDF_MAX_LISTED]
+    if signatures:
+        fields["Signatures"] = str(len(signatures))
+        for index, signature in enumerate(signatures, 1):
+            for name, value in signature.items():
+                fields[f"Signature[{index}]:{name}"] = value
+        signer = signatures[0].get("Name")
+        notes.append(f"signed by {signer}" if signer else "signed")
+
+    for name, pattern in _PDF_FEATURES:
+        if pattern.search(data):
+            fields[name] = "present"
+            if name in ("JavaScript", "Launch"):
+                notes.append(name)
+
+    uris = list(
+        dict.fromkeys(
+            text
+            for match in _PDF_URI.finditer(data)
+            if (text := _decode_pdf_string(match.group("literal")))
+        )
+    )
+    if uris:
+        fields["URIs"] = str(len(uris))
+        for index, uri in enumerate(uris[:_PDF_MAX_LISTED], 1):
+            fields[f"URI[{index}]"] = uri
+    return notes
+
+
+def _pdf_filespec_names(data: bytes) -> list[str]:
+    names: list[str] = []
+    for match in _PDF_FILESPEC.finditer(data):
+        window = data[max(0, match.start() - 512) : match.end() + 512]
+        name = _pdf_string(window, b"UF") or _pdf_string(window, b"F")
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def _pdf_signature(data: bytes, start: int) -> dict[str, str] | None:
+    window = data[max(0, start - 1024) : start + 1024]
+    found = {
+        key: value
+        for key in ("Name", "M", "Reason", "Location", "ContactInfo", "SubFilter")
+        if (value := _pdf_string(window, key.encode("ascii")))
+    }
+    if "M" in found:
+        found["M"] = _parse_pdf_date(found["M"]) or found["M"]
+    return found or None
+
+
+def _pdf_string(window: bytes, key: bytes) -> str | None:
+    """The value of one string or name entry in a dictionary window."""
+    match = re.search(
+        rb"/"
+        + key
+        + rb"\s*(?:\((?P<literal>(?:\\.|[^\\)])*)\)"
+        + rb"|<(?P<hex>[0-9A-Fa-f\s]*)>"
+        + rb"|/(?P<name>[^\s/<>\[\]()]+))",
+        window,
+    )
+    if not match:
+        return None
+    if match.group("hex") is not None:
+        return _decode_pdf_hex(match.group("hex")) or None
+    if match.group("name") is not None:
+        return match.group("name").decode("latin-1")
+    return _decode_pdf_string(match.group("literal")) or None
 
 
 def _inflated_streams(data: bytes) -> bytes:
@@ -132,7 +295,12 @@ def _inflated_streams(data: bytes) -> bytes:
             inflated = zlib.decompressobj().decompress(match.group(1), budget)
         except zlib.error:
             continue
-        if b"/Producer" in inflated or b"/Creator" in inflated or b"/CreationDate" in inflated:
+        if (
+            b"/Producer" in inflated
+            or b"/Creator" in inflated
+            or b"/CreationDate" in inflated
+            or any(hint in inflated for hint in _PDF_STRUCTURE_HINTS)
+        ):
             parts.append(inflated)
             budget -= len(inflated)
 

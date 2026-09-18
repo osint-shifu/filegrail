@@ -167,7 +167,7 @@ Original field names are kept in the report.
 | **RIFF/BWF** | `.wav` `.wave` `.rmi` `.avi` | Info fields such as title and software, recorder information, coding history and ID3 tags where present |
 | **Vorbis comments** | `.flac` `.ogg` `.oga` `.opus` `.spx` | Encoder and every tag |
 | **ID3** | `.mp3` `.aac` `.tta` | Encoding software, artist, title, date and other tags |
-| **PDF Info** | `.pdf` | Producer, creator, author, title, subject, keywords and dates |
+| **PDF Info** | `.pdf` | Producer, creator, author, title, subject, keywords and dates; incremental updates, document IDs, encryption, attachments, scripts, forms, link targets and signatures |
 | **OOXML properties** | `.docx` `.docm` `.dotx` `.xlsx` `.xlsm` `.xltx` `.pptx` `.pptm` | Application, author, last editor, company, template, revision count and editing time |
 | **OLE properties** | `.doc` `.dot` `.xls` `.xlt` `.ppt` `.pot` `.pps` `.msg` | Summary properties, storage metadata, orphaned entries, VBA/XLM indicators and embedded-object paths |
 | **OpenDocument metadata** | `.odt` `.ods` `.odp` `.odg` `.odf` `.ott` `.otp` | Generating application, author, title, creation date and editing statistics |

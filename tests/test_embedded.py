@@ -294,3 +294,54 @@ def test_an_encrypted_property_part_is_declined(tmp_path: Path):
     document.write_bytes(body)
 
     assert read_embedded_metadata(document) is None
+
+
+def test_pdf_structure_reports_updates_attachments_actions_and_signatures(tmp_path: Path):
+    """None of this is in the Info dictionary: an incrementally updated file
+    keeps its earlier version, and an attachment, a script and a signature are
+    each a fact the producer string does not mention."""
+    from tests.pdf import document
+
+    first = document(
+        [b"BT (page) Tj ET"],
+        extra=[
+            b"<< /Type /Filespec /F (notes.txt) /UF (notes.txt) /EF << /F 8 0 R >> >>",
+            b"<< /Type /EmbeddedFile /Length 5 >>\nstream\nhello\nendstream",
+            b"<< /Type /Sig /Filter /Adobe.PPKLite /SubFilter /adbe.pkcs7.detached "
+            b"/Name (Maria Wolf) /M (D:20260918090000Z) /Reason (Approved) "
+            b"/ByteRange [0 0 0 0] /Contents <00> >>",
+            b"<< /S /JavaScript /JS (app.alert\\(1\\)) >>",
+            b"<< /Type /Annot /Subtype /Link /A << /S /URI /URI (https://example.org/x) >> >>",
+        ],
+        catalogue=(
+            b"/OpenAction << /S /JavaScript /JS (this.print\\(\\)) >> /AcroForm << /Fields [] >> "
+        ),
+    )
+    first = first.replace(b"trailer\n<<", b"trailer\n<< /ID [<AB01> <CD02>]", 1)
+    prev = first.rfind(b"xref")
+    update = (
+        b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+        b"xref\n0 1\n0000000000 65535 f \n"
+        b"trailer\n<< /Size 12 /Root 1 0 R /Prev %d /ID [<AB01> <EF03>] >>\n"
+        % prev
+        + b"startxref\n%d\n%%%%EOF\n" % len(first)
+    )
+    path = tmp_path / "history.pdf"
+    path.write_bytes(first + update)
+
+    origin = read_embedded_metadata(path)
+
+    assert origin is not None
+    assert origin.note == (
+        "1 incremental update; 1 embedded file; signed by Maria Wolf; JavaScript"
+    )
+    assert origin.fields["IncrementalUpdates"] == "1"
+    assert origin.fields["PermanentID"] == "ab01"
+    assert origin.fields["ChangingID"] == "ef03"
+    assert origin.fields["EmbeddedFile[1]"] == "notes.txt"
+    assert origin.fields["Signature[1]:M"] == "2026-09-18T09:00:00Z"
+    assert origin.fields["Signature[1]:Reason"] == "Approved"
+    assert origin.fields["OpenAction"] == "present"
+    assert origin.fields["AcroForm"] == "present"
+    assert origin.fields["URI[1]"] == "https://example.org/x"
+    assert "Launch" not in origin.fields
