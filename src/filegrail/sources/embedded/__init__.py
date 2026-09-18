@@ -23,6 +23,7 @@ from . import (
     containers,
     documents,
     exif,
+    fonts,
     id3,
     isobmff,
     jpeg,
@@ -67,6 +68,7 @@ SUFFIXES = (
     | photoshop.SUFFIXES
     | web.SUFFIXES
     | pe.SUFFIXES
+    | fonts.SUFFIXES
 )
 
 
@@ -90,6 +92,7 @@ def read_embedded_metadata(path: Path) -> EvidenceRecord | None:
         _from_vorbis,
         _from_audio,
         _from_executable,
+        _from_font,
     ):
         try:
             origin = reader(path, suffix)
@@ -661,6 +664,54 @@ def _from_executable(path: Path, suffix: str) -> EvidenceRecord | None:
         block="pe-header",
         tool=tool,
         at=found.linked if pe.plausible(found.linked) and not found.reproducible else None,
+        note="; ".join(notes) or None,
+        fields=fields,
+    )
+
+
+def _from_font(path: Path, suffix: str) -> EvidenceRecord | None:
+    if suffix not in fonts.SUFFIXES:
+        return None
+    font = fonts.read_font(path)
+    if not font:
+        return None
+
+    names = font.names
+    tool = names.get("Manufacturer") or font.meta.get("meta:vendor") or font.vendor_id
+
+    notes = []
+    if family := names.get("TypographicFamily") or names.get("Family"):
+        notes.append(f"family {_clip(family, 80)}")
+    if designer := names.get("Designer") or font.meta.get("meta:credit[1]:name"):
+        notes.append(f"designer {_clip(designer, 80)}")
+    if version := names.get("Version"):
+        notes.append(f"version {_clip(version.removeprefix('Version ').split(';', 1)[0], 40)}")
+
+    container = font.container
+    if font.fonts > 1:
+        container = f"{container} collection of {font.fonts} fonts"
+    fields: dict[str, str] = dict(names)
+    for name, value in (
+        ("Created", font.created),
+        ("Modified", font.modified),
+        ("FontRevision", font.revision),
+        ("VendorID", font.vendor_id),
+        ("EmbeddingRights", font.embedding),
+        ("Container", container),
+    ):
+        if value:
+            fields[name] = value
+    if font.axes:
+        fields["Axes"] = ", ".join(axis for axis, _, _, _ in font.axes)
+        for axis, low, default, high in font.axes:
+            fields[f"Axis[{axis}]"] = f"{low:g} to {high:g}, default {default:g}"
+    fields.update(font.meta)
+
+    return _origin(
+        "document-metadata",
+        block="font-tables",
+        tool=tool,
+        at=font.created,
         note="; ".join(notes) or None,
         fields=fields,
     )

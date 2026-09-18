@@ -288,6 +288,7 @@ def test_the_readme_metadata_table_names_the_extensions_its_readers_declare():
         containers,
         documents,
         exif,
+        fonts,
         id3,
         isobmff,
         matroska,
@@ -319,6 +320,7 @@ def test_the_readme_metadata_table_names_the_extensions_its_readers_declare():
         "Jupyter notebook": containers.NOTEBOOK_SUFFIXES,
         "Web document": web.SUFFIXES,
         "PE header": pe.SUFFIXES,
+        "Font tables": fonts.SUFFIXES,
         "C2PA": C2PA,
     }
 

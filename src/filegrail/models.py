@@ -253,6 +253,7 @@ BLOCK_LABELS: dict[str, str] = {
     "png-text": "PNG text",
     "ole-summary": "OLE metadata",
     "pe-header": "PE header",
+    "font-tables": "font tables",
     "riff": "RIFF",
     "id3": "ID3",
     "matroska": "Matroska",

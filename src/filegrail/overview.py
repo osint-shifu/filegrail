@@ -80,6 +80,7 @@ AUTHOR_FIELDS: dict[str, tuple[str, ...]] = {
     "matroska": ("ARTIST",),
     "xmp": ("dc:creator",),
     "iptc": ("By-line",),
+    "font-tables": ("Designer",),
     "web-document": (
         "author",
         "article:author",

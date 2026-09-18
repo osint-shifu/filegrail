@@ -20,6 +20,7 @@ from .sources.embedded import (
     containers,
     documents,
     exif,
+    fonts,
     id3,
     matroska,
     ole,
@@ -88,6 +89,7 @@ FAMILIES: dict[str, frozenset[str]] = {
     "mail": frozenset(mail.SUFFIXES | mail.OUTLOOK_SUFFIXES | {".mbox"}),
     "text": frozenset(_EXTRA_TEXT),
     "executable": frozenset(pe.SUFFIXES),
+    "font": frozenset(fonts.SUFFIXES),
 }
 
 

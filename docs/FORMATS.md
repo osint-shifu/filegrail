@@ -21,7 +21,7 @@ answers:
 
 ## Metadata blocks
 
-**81 file extensions** have a reader. Eighteen named metadata blocks, plus four
+**86 file extensions** have a reader. Nineteen named metadata blocks, plus four
 that turn up in any container that will carry them.
 
 The first column is the `block` value you get in `--json`. It is what to filter
@@ -46,6 +46,7 @@ on when you want the PDFs rather than everything a file said about itself.
 | `svg-metadata` | `.svg` | Generator, plus an embedded RDF block where an editor left one |
 | `notebook-kernel` | `.ipynb` | Kernel name and language runtime version |
 | `pe-header` | `.exe` `.dll` `.sys` `.scr` `.ocx` `.cpl` `.drv` `.efi` | COFF and optional header: machine, subsystem, linker version, link time; CodeView PDB path, GUID and age; Rich header tool records; version resource strings; whether an Authenticode signature is attached |
+| `font-tables` | `.ttf` `.otf` `.ttc` `.otc` `.woff` | `name`, `head`, `OS/2` and `fvar` tables: family, designer, manufacturer, version, licence and URLs, creation and modification times, vendor identifier, embedding rights, variation axes; the WOFF metadata block where one is present |
 | `web-document` | `.html` `.htm` `.xhtml` | Declared author, publisher, dates, canonical URL, Open Graph, Twitter Cards, bounded JSON-LD, Microdata and RDFa |
 | `c2pa` | `.jpg` `.jpeg` `.png` | JUMBF manifest: producing application, creation data, digital source type, actions, ingredients with their relationship, and whether the manifest's own hash still covers the file |
 
