@@ -9,7 +9,7 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Relationship explorer and concise notes in the HTML report.
+- HTML report: relationship explorer with node search, concise notes, a detail block with every decoded field for every file with evidence, a print layout that keeps tables and evidence, coverage placed before the files, the system colour scheme by default.
 - Web documents: Open Graph, JSON-LD, Microdata and RDFa.
 - OLE: storage timestamps and CLSIDs, VBA and XLM indicators, Packager paths, orphaned entries.
 - JPEG: JFIF, JFXX and ICC profile; Photoshop image resources.

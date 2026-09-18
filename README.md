@@ -464,14 +464,16 @@ A normal scan reads embedded metadata and available local provenance records. Pi
 `--html` creates the same investigation report as one self-contained page with:
 
 - summary and key findings;
+- evidence coverage, before the files are read;
 - a file index with filters;
-- provenance and metadata evidence for every file;
+- every decoded field of every file that carries evidence;
+- a relationship explorer with node search and the evidence behind each edge;
 - investigative pivots;
-- evidence coverage and conflicts;
+- conflicts between sources;
 - sortable tables;
 - links between files, findings, conflicts and pivots;
 - full-report search;
-- dark and light themes, plus a light print layout.
+- dark and light themes following the system setting, and a print layout that keeps every table and every piece of evidence.
 
 The report loads nothing from outside itself and makes no network requests. It works offline and can be shared as a single file.
 
