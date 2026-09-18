@@ -21,7 +21,7 @@ answers:
 
 ## Metadata blocks
 
-**86 file extensions** have a reader. Nineteen named metadata blocks, plus four
+**93 file extensions** have a reader. Twenty-one named metadata blocks, plus four
 that turn up in any container that will carry them.
 
 The first column is the `block` value you get in `--json`. It is what to filter
@@ -36,6 +36,8 @@ on when you want the PDFs rather than everything a file said about itself.
 | `matroska` | `.mkv` `.mk3d` `.webm` `.mka` | Writing application and library, segment date, tag entries |
 | `riff` | `.wav` `.wave` `.rmi` `.avi` | `LIST`/`INFO` fields, BWF `bext` recorder and coding history, an `id3 ` chunk where one is present |
 | `vorbis-comment` | `.flac` `.ogg` `.oga` `.opus` `.spx` | Vendor string and every `NAME=value` comment |
+| `aiff` | `.aif` `.aiff` `.aifc` | `NAME`, `AUTH`, `(c) ` and `ANNO` chunks, the `COMM` sound description, an `ID3 ` chunk where one is present |
+| `ape-tag` | `.ape` `.mpc` `.wv` `.ofr` | APEv2 items at the end of the file: encoder, artist, title, year and every other text item |
 | `id3` | `.mp3` `.aac` `.tta` | ID3v2 frames: encoding software, artist, title, date |
 | `pdf-info` | `.pdf` | The `Info` dictionary, through compressed object streams and hex strings; incremental updates, trailer IDs, encryption, embedded files, JavaScript and launch actions, AcroForm/XFA, URI targets and signature dictionaries |
 | `ooxml-properties` | `.docx` `.docm` `.dotx` `.xlsx` `.xlsm` `.xltx` `.pptx` `.pptm` | `app.xml` and `core.xml`: application, author, last editor, company, template, revision count, total editing time |

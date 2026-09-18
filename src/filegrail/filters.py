@@ -17,6 +17,8 @@ from __future__ import annotations
 from .sources import mail
 from .sources.archives import ARCHIVE_SUFFIXES
 from .sources.embedded import (
+    aiff,
+    ape,
     containers,
     documents,
     exif,
@@ -51,7 +53,7 @@ _VIDEO = (
 #: Formats no reader claims yet, listed so a filter still selects them - a file
 #: this tool cannot read is exactly the sort a report should be able to include.
 _EXTRA_IMAGE = {".gif", ".bmp", ".ico", ".raf", ".srw", ".pef"}
-_EXTRA_AUDIO = {".m4a", ".aiff", ".wma"}
+_EXTRA_AUDIO = {".m4a", ".wma"}
 _EXTRA_TEXT = {
     ".txt",
     ".md",
@@ -70,7 +72,13 @@ FAMILIES: dict[str, frozenset[str]] = {
     ),
     "video": frozenset(_VIDEO),
     "audio": frozenset(
-        id3.SUFFIXES | riff.WAVE_SUFFIXES | matroska.AUDIO_SUFFIXES | vorbis.SUFFIXES | _EXTRA_AUDIO
+        id3.SUFFIXES
+        | riff.WAVE_SUFFIXES
+        | matroska.AUDIO_SUFFIXES
+        | vorbis.SUFFIXES
+        | aiff.SUFFIXES
+        | ape.SUFFIXES
+        | _EXTRA_AUDIO
     ),
     "document": frozenset(
         documents.PDF_SUFFIXES

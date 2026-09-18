@@ -20,6 +20,8 @@ from pathlib import Path
 
 from ...models import EvidenceRecord
 from . import (
+    aiff,
+    ape,
     containers,
     documents,
     exif,
@@ -69,6 +71,8 @@ SUFFIXES = (
     | web.SUFFIXES
     | pe.SUFFIXES
     | fonts.SUFFIXES
+    | aiff.SUFFIXES
+    | ape.SUFFIXES
 )
 
 
@@ -91,6 +95,8 @@ def read_embedded_metadata(path: Path) -> EvidenceRecord | None:
         _from_matroska,
         _from_vorbis,
         _from_audio,
+        _from_aiff,
+        _from_ape,
         _from_executable,
         _from_font,
     ):
@@ -714,6 +720,61 @@ def _from_font(path: Path, suffix: str) -> EvidenceRecord | None:
         at=font.created,
         note="; ".join(notes) or None,
         fields=fields,
+    )
+
+
+def _from_aiff(path: Path, suffix: str) -> EvidenceRecord | None:
+    if suffix not in aiff.SUFFIXES:
+        return None
+    found = aiff.read_aiff(path)
+    if not found:
+        return None
+
+    notes = []
+    if author := found.info.get("Author") or found.frames.get("artist"):
+        notes.append(f"author {_clip(author, 80)}")
+    if title := found.info.get("Name") or found.frames.get("title"):
+        notes.append(f"title {_clip(title, 80)}")
+
+    return _origin(
+        "document-metadata",
+        block="aiff",
+        tool=found.frames.get("encoder"),
+        at=_normalise(found.frames.get("date")),
+        note="; ".join(notes) or None,
+        fields=dict(found.info)
+        | found.sound
+        | {f"id3:{name}": value for name, value in found.frames.items()},
+    )
+
+
+def _from_ape(path: Path, suffix: str) -> EvidenceRecord | None:
+    if suffix not in ape.SUFFIXES:
+        return None
+    items = ape.read_ape(path)
+    if not items:
+        return None
+
+    # Keys are whatever the writer chose, in whatever case; they are looked up
+    # case-insensitively and kept in the record exactly as written.
+    lower = {name.lower(): value for name, value in items.items()}
+    tool = lower.get("tool name")
+    if tool and (version := lower.get("tool version")):
+        tool = f"{tool} {version}"
+    tool = tool or lower.get("encoder") or lower.get("encodedby")
+
+    notes = []
+    for key, label in (("artist", "artist"), ("title", "title")):
+        if value := lower.get(key):
+            notes.append(f"{label} {_clip(value, 80)}")
+
+    return _origin(
+        "document-metadata",
+        block="ape-tag",
+        tool=tool,
+        at=_normalise(lower.get("year") or lower.get("date")),
+        note="; ".join(notes) or None,
+        fields=dict(items),
     )
 
 

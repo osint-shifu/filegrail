@@ -77,6 +77,8 @@ AUTHOR_FIELDS: dict[str, tuple[str, ...]] = {
     "riff": ("Artist", "id3:artist"),
     "id3": ("artist",),
     "vorbis-comment": ("ARTIST", "PERFORMER"),
+    "aiff": ("Author", "id3:artist"),
+    "ape-tag": ("Artist",),
     "matroska": ("ARTIST",),
     "xmp": ("dc:creator",),
     "iptc": ("By-line",),

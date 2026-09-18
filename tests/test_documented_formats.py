@@ -285,6 +285,8 @@ def test_the_readme_metadata_table_names_the_extensions_its_readers_declare():
     """
     from filegrail.sources.c2pa import SUPPORTED_SUFFIXES as C2PA
     from filegrail.sources.embedded import (
+        aiff,
+        ape,
         containers,
         documents,
         exif,
@@ -310,6 +312,8 @@ def test_the_readme_metadata_table_names_the_extensions_its_readers_declare():
         "RIFF/BWF": riff.SUFFIXES,
         "Vorbis comments": vorbis.SUFFIXES,
         "ID3": id3.SUFFIXES,
+        "AIFF": aiff.SUFFIXES,
+        "APE tag": ape.SUFFIXES,
         "PDF Info": documents.PDF_SUFFIXES,
         "OOXML properties": documents.OOXML_SUFFIXES,
         "OLE properties": ole.SUFFIXES,

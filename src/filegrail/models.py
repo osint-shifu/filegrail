@@ -258,6 +258,8 @@ BLOCK_LABELS: dict[str, str] = {
     "id3": "ID3",
     "matroska": "Matroska",
     "vorbis-comment": "Vorbis comment",
+    "aiff": "AIFF",
+    "ape-tag": "APE tag",
 }
 
 

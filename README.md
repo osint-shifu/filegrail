@@ -166,6 +166,8 @@ Original field names are kept in the report.
 | **Matroska** | `.mkv` `.mk3d` `.webm` `.mka` | Writing application, creation date and tags |
 | **RIFF/BWF** | `.wav` `.wave` `.rmi` `.avi` | Info fields such as title and software, recorder information, coding history and ID3 tags where present |
 | **Vorbis comments** | `.flac` `.ogg` `.oga` `.opus` `.spx` | Encoder and every tag |
+| **AIFF** | `.aif` `.aiff` `.aifc` | Name, author, copyright and annotations, sound description and ID3 tags where present |
+| **APE tag** | `.ape` `.mpc` `.wv` `.ofr` | Encoder, artist, title, year and every other text tag |
 | **ID3** | `.mp3` `.aac` `.tta` | Encoding software, artist, title, date and other tags |
 | **PDF Info** | `.pdf` | Producer, creator, author, title, subject, keywords and dates; incremental updates, document IDs, encryption, attachments, scripts, forms, link targets and signatures |
 | **OOXML properties** | `.docx` `.docm` `.dotx` `.xlsx` `.xlsm` `.xltx` `.pptx` `.pptm` | Application, author, last editor, company, template, revision count and editing time |
@@ -196,7 +198,7 @@ XMP, XMP history and IPTC are not tied to one format and are read wherever a sup
 | --- | --- |
 | **Images** | JPEG, PNG, TIFF, WebP, HEIC, HEIF, AVIF and RAW (DNG, NEF, CR2, ARW, ORF, RW2) |
 | **Documents** | PDF, DOCX, XLSX, PPTX, legacy Office, OpenDocument, RTF, EPUB, Jupyter notebooks |
-| **Media** | MP4, MOV, M4A, MKV, WebM, WAV, AVI, FLAC, OGG, Opus, MP3 |
+| **Media** | MP4, MOV, M4A, MKV, WebM, WAV, AIFF, AVI, FLAC, OGG, Opus, MP3, APE, Musepack, WavPack |
 | **Executables** | EXE, DLL, SYS, SCR, OCX, CPL, DRV, EFI |
 | **Fonts** | TTF, OTF, TTC, OTC, WOFF |
 | **Email** | EML, MSG |
