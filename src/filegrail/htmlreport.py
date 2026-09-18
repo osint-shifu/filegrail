@@ -1368,7 +1368,9 @@ def _pivot_table(
             rest = " ".join(_holder(files, path, times) for path, times in holders[_HOLDERS:])
             found_in += f"<details><summary>+{left:,} more</summary>{rest}</details>"
         places = _places(entry.where[:_SAMPLE])
-        opening = f'<tr class="pivot" id="{ref}">' if ref else '<tr class="pivot">'
+        # The number is an anchor once, in the table across files; the same
+        # pivot listed again under its type must not carry the id a second time.
+        opening = f'<tr class="pivot" id="{ref}">' if ref and across else '<tr class="pivot">'
         leading = (
             f'<td class="id">{_e(ref or "")}</td><td>{_e(_type_name(entry.type))}</td>'
             if across

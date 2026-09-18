@@ -218,3 +218,42 @@ def test_a_file_with_only_metadata_gets_a_detail_block_with_every_field():
     assert "<dt>PDBPath</dt>" in section
     assert "C:\\build\\tool.pdb" in section
     assert "<dt>Machine</dt>" in section
+
+
+def _ids_and_targets(page: str) -> tuple[list[str], set[str]]:
+    from html.parser import HTMLParser
+
+    class Walk(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__()
+            self.ids: list[str] = []
+            self.targets: set[str] = set()
+
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            held = dict(attrs)
+            if held.get("id"):
+                self.ids.append(held["id"])
+            href = held.get("href") or ""
+            if href.startswith("#") and len(href) > 1:
+                self.targets.add(href[1:])
+
+    walk = Walk()
+    walk.feed(page)
+    return walk.ids, walk.targets
+
+
+def test_every_id_is_unique_and_every_internal_link_has_a_target():
+    """A pivot shared by two files is listed twice - across files and under its
+    type - and used to carry its anchor both times."""
+    shared = "https://example.org/holiday.jpg"
+    records = _corpus() + [
+        _metadata_only(),
+        _file("copy.jpg", EvidenceRecord(source="browser-download", url=shared)),
+    ]
+
+    page = _page(records)
+    ids, targets = _ids_and_targets(page)
+
+    assert "P01" in ids
+    assert len(ids) == len(set(ids)), sorted(i for i in ids if ids.count(i) > 1)
+    assert targets <= set(ids), sorted(targets - set(ids))
