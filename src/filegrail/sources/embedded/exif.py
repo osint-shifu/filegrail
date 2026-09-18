@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import mmap
 import struct
-from collections.abc import Iterator
 from pathlib import Path
-from typing import BinaryIO
+
+from . import jpeg
 
 #: What the parser reads from: a block lifted out of a container, or a whole
 #: file mapped into memory. It only takes lengths, slices and packed fields,
@@ -178,27 +178,10 @@ def _jpeg_exif(path: Path) -> bytes:
     with path.open("rb") as handle:
         if handle.read(2) != b"\xff\xd8":
             return b""
-        for marker, payload in _jpeg_segments(handle):
+        for marker, payload in jpeg.iter_segments(handle):
             if marker == 0xE1 and payload.startswith(b"Exif\x00\x00"):
                 return payload[6:]
     return b""
-
-
-def _jpeg_segments(handle: BinaryIO) -> Iterator[tuple[int, bytes]]:
-    """Yield (marker, payload) for each JPEG segment before the scan starts."""
-    while True:
-        marker = handle.read(2)
-        if len(marker) < 2 or marker[0] != 0xFF:
-            return
-        if marker[1] in (0xDA, 0xD9):  # start of scan, end of image
-            return
-        length_bytes = handle.read(2)
-        if len(length_bytes) < 2:
-            return
-        (length,) = struct.unpack(">H", length_bytes)
-        if length < 2:
-            return
-        yield marker[1], handle.read(length - 2)
 
 
 def _webp_chunk(path: Path, wanted: bytes) -> bytes:

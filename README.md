@@ -159,7 +159,7 @@ Original field names are kept in the report.
 
 | Metadata block | Extensions | Data extracted |
 | --- | --- | --- |
-| **EXIF** | `.jpg` `.jpeg` `.jpe` `.tif` `.tiff` `.dng` `.nef` `.cr2` `.arw` `.orf` `.rw2` `.webp` `.heic` `.heif` `.avif` | Camera make/model, body serial, lens, software, capture time, GPS |
+| **EXIF** | `.jpg` `.jpeg` `.jpe` `.tif` `.tiff` `.dng` `.nef` `.cr2` `.arw` `.orf` `.rw2` `.webp` `.heic` `.heif` `.avif` | Camera, lens, software, capture time and GPS; JPEG JFIF/JFXX and ICC profile metadata |
 | **PNG text** | `.png` `.apng` | Software, creation time, author and other text stored in the image |
 | **ISO BMFF** | `.mp4` `.m4v` `.mov` `.qt` `.3gp` `.m4a` `.heic` `.heif` `.avif` | Encoder or recording device, creation time and location |
 | **Matroska** | `.mkv` `.mk3d` `.webm` `.mka` | Writing application, creation date and tags |

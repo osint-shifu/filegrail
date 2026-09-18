@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ...models import EvidenceRecord
-from . import containers, documents, exif, id3, isobmff, matroska, ole, png, riff, vorbis, web
+from . import containers, documents, exif, id3, isobmff, jpeg, matroska, ole, png, riff, vorbis, web
 
 #: A malformed container is ordinary: truncated downloads, Office lock files and
 #: files with a misleading extension all land here, and none is an error.
@@ -171,8 +171,10 @@ def _from_exif(path: Path, suffix: str) -> EvidenceRecord | None:
     if suffix not in exif.SUFFIXES:
         return None
     tags = exif.read_exif(path)
-    if not tags:
+    jpeg_metadata = jpeg.read_jpeg_metadata(path) if suffix in jpeg.SUFFIXES else None
+    if not tags and not jpeg_metadata:
         return None
+    tags = tags or exif.Exif()
 
     device = exif.camera(tags)
     software = _string(tags.get(exif.SOFTWARE))
@@ -181,6 +183,7 @@ def _from_exif(path: Path, suffix: str) -> EvidenceRecord | None:
         tool = f"{device} (processed with {software})"
 
     taken = _exif_time(tags.get(exif.DATETIME_ORIGINAL) or tags.get(exif.DATETIME))
+    location = _coordinates(exif.coordinates(tags))
 
     notes = []
     artist = _string(tags.get(exif.ARTIST))
@@ -189,15 +192,25 @@ def _from_exif(path: Path, suffix: str) -> EvidenceRecord | None:
     lens = _string(tags.get(exif.LENS_MODEL))
     if lens and device:
         notes.append(f"lens {lens}")
+    if jpeg_metadata and jpeg_metadata.icc_description and jpeg_metadata.icc_evidence:
+        notes.append(f"ICC profile {_clip(jpeg_metadata.icc_description, 80)}")
+    elif jpeg_metadata and jpeg_metadata.icc_evidence:
+        notes.append("ICC profile recorded")
+    if jpeg_metadata and jpeg_metadata.jfxx_thumbnail:
+        notes.append("JFXX thumbnail present")
+
+    fields = _exif_fields(tags)
+    if jpeg_metadata:
+        fields.update(jpeg_metadata.fields)
 
     return _origin(
         "device-metadata" if device else "document-metadata",
         block="exif",
         tool=tool,
         at=taken,
-        geo=_coordinates(exif.coordinates(tags)),
+        geo=location,
         note="; ".join(notes) or None,
-        fields=_exif_fields(tags),
+        fields=fields,
     )
 
 
