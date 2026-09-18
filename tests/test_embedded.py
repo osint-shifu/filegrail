@@ -466,7 +466,10 @@ def test_ooxml_external_relationships_are_listed(tmp_path: Path):
 
     assert origin is not None
     assert origin.fields["ExternalLink[1]"] == "hyperlink: https://example.org/x"
-    assert origin.fields["ExternalLink[2]"] == "attachedTemplate: file:///\\\\srv\\templates\\brief.dotm"
+    assert (
+        origin.fields["ExternalLink[2]"]
+        == "attachedTemplate: file:///\\\\srv\\templates\\brief.dotm"
+    )
     assert "ExternalLink[3]" not in origin.fields
     assert "2 external links" in origin.note
 
