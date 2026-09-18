@@ -7,25 +7,50 @@ are worth reading:
     the encoder or camera        udta atoms, ``\\xa9too``, ``\\xa9swr``, ``\\xa9mak``
     the creation time            ``mvhd``, or ``\\xa9day``
     where it was recorded        ``\\xa9xyz``, an ISO 6709 coordinate string
+
+Two more things are read where a camera wrote them. GoPro puts its firmware,
+lens and camera serial in plain `udta` atoms of its own. An action camera or a
+phone may also write a metadata track - GPMF or CAMM - and that track is
+located through the sample tables and summarised: device, streams, and the GPS
+track's start, end, count and clock.
 """
 
 from __future__ import annotations
 
 import re
 import struct
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import BinaryIO
+
+from . import gpmf
 
 SUFFIXES = {".mp4", ".m4v", ".m4a", ".mov", ".qt", ".3gp", ".heic", ".heif", ".avif"}
 
 # ISO base media times count seconds from 1904-01-01.
 _EPOCH_1904 = datetime(1904, 1, 1, tzinfo=timezone.utc)
 
-_CONTAINERS = {b"moov", b"udta", b"trak", b"mdia", b"meta", b"ilst"}
+_CONTAINERS = {b"moov", b"udta", b"trak", b"mdia", b"meta", b"ilst", b"minf", b"stbl"}
 _MAX_DEPTH = 8
 _MAX_ATOMS = 2048
 _MAX_TEXT = 512
+
+#: Sample tables are read whole, up to this much: a chunk offset table for a
+#: long recording is a few hundred kilobytes.
+_TABLE_ATOMS = {b"stco", b"co64", b"stsz", b"stsc"}
+_MAX_TABLE = 1024 * 1024
+_MAX_TRACKS = 32
+
+#: How much of a telemetry track is read. Samples arrive about once a second
+#: and a few kilobytes each, so this is hours of recording.
+_MAX_SAMPLES = 8192
+_MAX_TELEMETRY = 16 * 1024 * 1024
+_TELEMETRY_FORMATS = {b"gpmd": "GPMF", b"camm": "CAMM"}
+
+#: GoPro's own `udta` atoms: plain payloads, no `data` box and no length.
+_GOPRO_TEXT = {b"FIRM": "firmware", b"LENS": "lens"}
+_GOPRO_BINARY = {b"CAME": "camera_serial", b"MUID": "media_uid"}
 
 ENCODER_ATOMS = (b"\xa9too", b"\xa9swr", b"\xa9enc")
 MAKE_ATOMS = (b"\xa9mak", b"\xa9xmk")
@@ -34,6 +59,39 @@ DATE_ATOMS = (b"\xa9day", b"\xa9cre")
 LOCATION_ATOMS = (b"\xa9xyz", b"loci")
 
 _ISO6709 = re.compile(r"^([-+]\d{1,3}(?:\.\d+)?)([-+]\d{1,3}(?:\.\d+)?)")
+
+
+@dataclass(slots=True)
+class Track:
+    """The parts of one track's sample tables that locate its samples."""
+
+    handler: bytes | None = None
+    format: bytes | None = None
+    chunks: list[int] = field(default_factory=list)
+    sizes: list[int] = field(default_factory=list)
+    fixed_size: int = 0
+    runs: list[tuple[int, int]] = field(default_factory=list)  # (first chunk, per chunk)
+
+    def ranges(self) -> list[tuple[int, int]]:
+        """Every sample as (offset, size), in order, bounded."""
+        found: list[tuple[int, int]] = []
+        sample = 0
+        total = 0
+        for index, chunk in enumerate(self.chunks, 1):
+            per = 0
+            for first, count in self.runs:
+                if first <= index:
+                    per = count
+            offset = chunk
+            for _ in range(per):
+                size = self.fixed_size or (self.sizes[sample] if sample < len(self.sizes) else 0)
+                if not size or len(found) >= _MAX_SAMPLES or total + size > _MAX_TELEMETRY:
+                    return found
+                found.append((offset, size))
+                offset += size
+                total += size
+                sample += 1
+        return found
 
 
 class Movie:
@@ -45,9 +103,22 @@ class Movie:
         self.model: str | None = None
         self.created: str | None = None
         self.coordinates: tuple[float, float] | None = None
+        self.gopro: dict[str, str] = {}
+        self.telemetry: gpmf.Telemetry | None = None
+        self.tracks: list[Track] = []
 
     def __bool__(self) -> bool:
-        return any((self.encoder, self.make, self.model, self.created, self.coordinates))
+        return any(
+            (
+                self.encoder,
+                self.make,
+                self.model,
+                self.created,
+                self.coordinates,
+                self.gopro,
+                self.telemetry,
+            )
+        )
 
 
 def read_movie(path: Path) -> Movie | None:
@@ -57,9 +128,27 @@ def read_movie(path: Path) -> Movie | None:
             size = handle.seek(0, 2)
             handle.seek(0)
             _walk(handle, 0, size, 0, movie)
+            _telemetry(handle, size, movie)
     except (OSError, struct.error, ValueError):
         return movie if movie else None
     return movie if movie else None
+
+
+def _telemetry(handle: BinaryIO, size: int, movie: Movie) -> None:
+    for track in movie.tracks:
+        kind = _TELEMETRY_FORMATS.get(track.format or b"")
+        if kind is None:
+            continue
+        found = gpmf.Telemetry(kind)
+        absorb = gpmf.absorb_gpmf if kind == "GPMF" else gpmf.absorb_camm
+        for offset, length in track.ranges():
+            if offset + length > size:
+                break
+            handle.seek(offset)
+            absorb(handle.read(length), found)
+        if found:
+            movie.telemetry = found
+            return
 
 
 def _walk(handle: BinaryIO, start: int, end: int, depth: int, movie: Movie) -> None:
@@ -91,8 +180,13 @@ def _walk(handle: BinaryIO, start: int, end: int, depth: int, movie: Movie) -> N
         atom_end = offset + size
         if atom == b"meta":
             body += 4  # meta carries a version and flags before its children
+        if atom == b"trak" and len(movie.tracks) < _MAX_TRACKS:
+            movie.tracks.append(Track())
         if atom in _CONTAINERS:
             _walk(handle, body, atom_end, depth + 1, movie)
+        elif atom in _TABLE_ATOMS or atom == b"stsd" or atom == b"hdlr":
+            handle.seek(body)
+            _track_atom(atom, handle.read(min(atom_end - body, _MAX_TABLE)), movie)
         else:
             handle.seek(body)
             _absorb(atom, handle.read(min(atom_end - body, _MAX_TEXT)), movie)
@@ -100,9 +194,52 @@ def _walk(handle: BinaryIO, start: int, end: int, depth: int, movie: Movie) -> N
         offset = atom_end
 
 
+def _track_atom(atom: bytes, payload: bytes, movie: Movie) -> None:
+    """The sample-table atoms of the track being walked."""
+    if not movie.tracks:
+        return
+    track = movie.tracks[-1]
+    if atom == b"hdlr" and len(payload) >= 12:
+        track.handler = payload[8:12]
+    elif atom == b"stsd" and len(payload) >= 16:
+        track.format = payload[12:16]
+    elif atom == b"stco" and len(payload) >= 8:
+        (count,) = struct.unpack_from(">I", payload, 4)
+        count = min(count, (len(payload) - 8) // 4)
+        track.chunks = list(struct.unpack_from(f">{count}I", payload, 8))
+    elif atom == b"co64" and len(payload) >= 8:
+        (count,) = struct.unpack_from(">I", payload, 4)
+        count = min(count, (len(payload) - 8) // 8)
+        track.chunks = list(struct.unpack_from(f">{count}Q", payload, 8))
+    elif atom == b"stsz" and len(payload) >= 12:
+        fixed, count = struct.unpack_from(">II", payload, 4)
+        track.fixed_size = fixed
+        if not fixed:
+            count = min(count, (len(payload) - 12) // 4)
+            track.sizes = list(struct.unpack_from(f">{count}I", payload, 12))
+    elif atom == b"stsc" and len(payload) >= 8:
+        (count,) = struct.unpack_from(">I", payload, 4)
+        count = min(count, (len(payload) - 8) // 12)
+        track.runs = [
+            (first, per)
+            for first, per, _ in (
+                struct.unpack_from(">III", payload, 8 + index * 12) for index in range(count)
+            )
+        ]
+
+
 def _absorb(atom: bytes, payload: bytes, movie: Movie) -> None:
     if atom == b"mvhd" and movie.created is None:
         movie.created = _mvhd_time(payload)
+        return
+    if atom in _GOPRO_TEXT:
+        plain = payload.decode("ascii", "replace").strip("\x00 ")
+        if plain:
+            movie.gopro.setdefault(_GOPRO_TEXT[atom], plain[:_MAX_TEXT])
+        return
+    if atom in _GOPRO_BINARY:
+        if payload.strip(b"\x00"):
+            movie.gopro.setdefault(_GOPRO_BINARY[atom], payload[:32].hex())
         return
 
     text = _atom_text(payload)

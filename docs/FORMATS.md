@@ -32,7 +32,7 @@ on when you want the PDFs rather than everything a file said about itself.
 | `exif` | `.jpg` `.jpeg` `.jpe` `.tif` `.tiff` `.dng` `.nef` `.cr2` `.arw` `.orf` `.rw2` `.webp` `.heic` `.heif` `.avif` | Camera, lens, software, capture time and GPS; JPEG JFIF/JFXX and ICC profile metadata |
 | `photoshop-irb` | `.jpg` `.jpeg` `.jpe` `.tif` `.tiff` `.psd` `.psb` | Resolution, JPEG settings, embedded-thumbnail descriptors, paths, workflow URLs and version information |
 | `png-text` | `.png` `.apng` | `tEXt` / `zTXt` / `iTXt` keywords: software, creation time, author, and whatever a generator wrote there |
-| `isobmff` | `.mp4` `.m4v` `.mov` `.qt` `.3gp` `.m4a` `.heic` `.heif` `.avif` | Encoder and recording device, creation time, ISO 6709 location |
+| `isobmff` | `.mp4` `.m4v` `.mov` `.qt` `.3gp` `.m4a` `.heic` `.heif` `.avif` | Encoder and recording device, creation time, ISO 6709 location; GoPro `FIRM`, `LENS`, `CAME` and `MUID` atoms; a `gpmd` (GPMF) or `camm` track located through the sample tables and summarised: device, stream names, GPS point count, first and last fix, GPS clock start and end |
 | `matroska` | `.mkv` `.mk3d` `.webm` `.mka` | Writing application and library, segment date, tag entries |
 | `riff` | `.wav` `.wave` `.rmi` `.avi` | `LIST`/`INFO` fields, BWF `bext` recorder and coding history, an `id3 ` chunk where one is present |
 | `vorbis-comment` | `.flac` `.ogg` `.oga` `.opus` `.spx` | Vendor string and every `NAME=value` comment |

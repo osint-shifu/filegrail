@@ -323,28 +323,69 @@ def _from_movie(path: Path, suffix: str) -> EvidenceRecord | None:
     if not movie:
         return None
 
+    telemetry = movie.telemetry
     device = " ".join(part for part in (movie.make, movie.model) if part) or None
+    if not device and telemetry and telemetry.devices:
+        device = telemetry.devices[0]  # the camera names itself in its own track
     tool = device or movie.encoder
     if device and movie.encoder:
         tool = f"{device} (encoded with {movie.encoder})"
+
+    fields = {
+        name: str(value)
+        for name, value in (
+            ("Encoder", movie.encoder),
+            ("Make", movie.make),
+            ("Model", movie.model),
+            ("CreationTime", movie.created),
+            ("Location", _coordinates(movie.coordinates)),
+        )
+        if value
+    }
+    for name, label in (
+        ("firmware", "GoPro:Firmware"),
+        ("lens", "GoPro:Lens"),
+        ("camera_serial", "GoPro:CameraSerial"),
+        ("media_uid", "GoPro:MediaUID"),
+    ):
+        if name in movie.gopro:
+            fields[label] = movie.gopro[name]
+
+    notes = []
+    geo = _coordinates(movie.coordinates)
+    if telemetry:
+        kind = telemetry.kind
+        if telemetry.devices:
+            fields[f"{kind}:Device"] = ", ".join(telemetry.devices)
+        if telemetry.streams:
+            fields[f"{kind}:Streams"] = ", ".join(telemetry.streams)
+        if telemetry.gps_points:
+            fields[f"{kind}:GPSPoints"] = str(telemetry.gps_points)
+            for name, value in (
+                ("GPSStart", telemetry.gps_start),
+                ("GPSEnd", telemetry.gps_end),
+                ("GPSFirst", _coordinates(telemetry.gps_first)),
+                ("GPSLast", _coordinates(telemetry.gps_last)),
+                ("GPSFix", telemetry.gps_fix),
+            ):
+                if value is not None:
+                    fields[f"{kind}:{name}"] = str(value)
+            span = f"GPS track of {telemetry.gps_points} points"
+            if telemetry.gps_start and telemetry.gps_end:
+                span += f" from {telemetry.gps_start} to {telemetry.gps_end}"
+            notes.append(span)
+            # The first fix stands for the recording where the container did
+            # not write a location of its own.
+            geo = geo or _coordinates(telemetry.gps_first)
 
     return _origin(
         "device-metadata" if device else "document-metadata",
         block="isobmff",
         tool=tool,
-        at=movie.created,
-        geo=_coordinates(movie.coordinates),
-        fields={
-            name: str(value)
-            for name, value in (
-                ("Encoder", movie.encoder),
-                ("Make", movie.make),
-                ("Model", movie.model),
-                ("CreationTime", movie.created),
-                ("Location", _coordinates(movie.coordinates)),
-            )
-            if value
-        },
+        at=movie.created or (telemetry.gps_start if telemetry else None),
+        geo=geo,
+        note="; ".join(notes) or None,
+        fields=fields,
     )
 
 
