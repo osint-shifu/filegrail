@@ -36,10 +36,15 @@ from .identify import PLACE, Identifier
 from .models import (
     ACTIVITY,
     CATEGORIES,
+    CONTAINER_MEMBER,
     EMBEDDED,
     FILE_ATTRIBUTE,
+    FILENAME,
+    NAME_AND_SIZE,
     ORIGIN,
     RECORDED_PATH,
+    SIDECAR,
+    SYNC_ROOT,
     EvidenceRecord,
     category,
 )
@@ -81,6 +86,18 @@ _SAMPLE = 8
 
 #: Bases that tie a record to this exact file rather than to a name it shares.
 _STRONG = frozenset({EMBEDDED, FILE_ATTRIBUTE, RECORDED_PATH})
+
+#: Compact definitions for the match bases that actually occur in the report.
+_MATCH_NOTES = {
+    EMBEDDED: "file bytes",
+    FILE_ATTRIBUTE: "filesystem metadata for this file",
+    RECORDED_PATH: "exact path in an external store",
+    SIDECAR: "adjacent sidecar file",
+    NAME_AND_SIZE: "same name and size; not unique",
+    FILENAME: "same filename only",
+    CONTAINER_MEMBER: "container membership",
+    SYNC_ROOT: "managed sync folder",
+}
 
 _STYLE = """
 :root{color-scheme:dark;
@@ -659,6 +676,7 @@ _SECTIONS = (
     ("detail", "File detail", "Detail"),
     ("coverage", "Evidence coverage", "Coverage"),
     ("conflicts", "Conflicts", "Conflicts"),
+    ("notes", "Report notes", "Notes"),
 )
 
 
@@ -696,6 +714,7 @@ def render_html(
         "relationships": _relationships(graph, files),
         "pivots": _pivots(case, files, identifiers),
         "detail": _details(case, files, detailed, verbose=verbose),
+        "notes": _notes(case),
     }
     counted = _counts(case, detailed, relationship_count)
     present = [(key, title, short) for key, title, short in _SECTIONS if sections[key]]
@@ -1569,4 +1588,23 @@ def _conflict(conflict: Conflict, files: dict[str, CaseFile], detailed: set[str]
                 f'<div class="delta">{_e(f"{second} is {difference.delta} than {first}")}</div>'
             )
     parts.append("</div></div>")
+    return "".join(parts)
+
+
+def _notes(case: Case) -> str:
+    records = [entry.record for entry in case.files]
+    parts = [
+        "<h3>Categories</h3>",
+        _fields(
+            [
+                ("origin", "how it arrived here"),
+                ("metadata", "what the file says about itself"),
+                ("activity", "what happened to it here"),
+            ]
+        ),
+    ]
+    used = {found.matched_by for record in records for found in record.evidence}
+    bases = [(basis, meaning) for basis, meaning in _MATCH_NOTES.items() if basis in used]
+    if bases:
+        parts.extend(("<h3>Match basis</h3>", _fields(bases)))
     return "".join(parts)

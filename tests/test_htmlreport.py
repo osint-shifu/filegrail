@@ -124,8 +124,21 @@ def test_the_sections_come_in_the_order_they_are_worked_through():
         "Investigative pivots",
         "File detail",
         "Conflicts",
+        "Report notes",
     ]
-    assert 'id="notes"' not in page
+
+
+def test_report_notes_are_brief_and_only_explain_match_bases_in_use():
+    page = _page(_corpus())
+    section = page.split('<section id="notes"')[1].split("</section>")[0]
+
+    assert "how it arrived here" in section
+    assert "what the file says about itself" in section
+    assert "what happened to it here" in section
+    assert "file bytes" in section
+    assert "exact path in an external store" in section
+    assert "same name and size" not in section
+    assert "How a file reached the examined environment" not in section
 
 
 def test_relationship_explorer_uses_the_evidence_backed_graph():
