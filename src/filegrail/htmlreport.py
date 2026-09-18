@@ -34,14 +34,12 @@ from .casereport import _ABSENT, _LISTED, _PER_FILE, _capital, _facts, _type_nam
 from .graph import Graph, Node, Relationship, build_graph
 from .identify import PLACE, Identifier
 from .models import (
-    ACTIVITY,
     CATEGORIES,
     CONTAINER_MEMBER,
     EMBEDDED,
     FILE_ATTRIBUTE,
     FILENAME,
     NAME_AND_SIZE,
-    ORIGIN,
     RECORDED_PATH,
     SIDECAR,
     SYNC_ROOT,
@@ -696,7 +694,7 @@ def render_html(
     """The whole page. A section with nothing in it is not written."""
     files = {entry.record.path: entry for entry in case.files}
     moment = (now or datetime.now().astimezone()).strftime("%Y-%m-%d %H:%M %Z").strip()
-    detailed = {entry.record.path for entry in case.files if _wants_detail(entry, verbose)}
+    detailed = {entry.record.path for entry in case.files if _wants_detail(entry)}
     panes = (
         {kind for kind, _count in case.pivots.by_type}
         if case.pivots is not None and identifiers is not None and case.pivots.total
@@ -705,15 +703,20 @@ def render_html(
     records = [entry.record for entry in case.files]
     graph = build_graph(records, identifiers or [])
     relationship_count = len(graph.relationships)
+    coverage = _coverage(case, unsearched)
+    conflicts = _conflicts(case, files, detailed)
+    linkable = frozenset(
+        name for name, body in (("coverage", coverage), ("conflicts", conflicts)) if body
+    )
     sections = {
         "summary": _summary(case, relationship_count),
-        "findings": _findings(case, files),
-        "coverage": _coverage(case, unsearched),
-        "conflicts": _conflicts(case, files, detailed),
+        "findings": _findings(case, files, linkable),
+        "coverage": coverage,
+        "conflicts": conflicts,
         "files": _files(case, detailed, panes),
         "relationships": _relationships(graph, files),
         "pivots": _pivots(case, files, identifiers),
-        "detail": _details(case, files, detailed, verbose=verbose),
+        "detail": _details(case, files, detailed),
         "notes": _notes(case),
     }
     counted = _counts(case, detailed, relationship_count)
@@ -833,7 +836,7 @@ def _note(key: str, case: Case, detailed: set[str], relationship_count: int) -> 
     if key == "files" and case.files:
         return f'{len(case.files):,} <b>· showing <span id="shown">{len(case.files):,}</span></b>'
     if key == "detail" and detailed:
-        return f"{len(detailed):,} <b>· files that need it</b>"
+        return f"{len(detailed):,} <b>· files with evidence</b>"
     if key == "conflicts" and case.conflicts:
         return f"{len(case.conflicts)}"
     if key == "relationships" and relationship_count:
@@ -1021,11 +1024,13 @@ def _summary(case: Case, relationship_count: int) -> str:
     return f'<div class="cards">{"".join(cards)}</div>{legend}'
 
 
-def _findings(case: Case, files: dict[str, CaseFile]) -> str:
-    return "".join(_finding(case, finding, files) for finding in case.findings)
+def _findings(case: Case, files: dict[str, CaseFile], linkable: frozenset[str]) -> str:
+    return "".join(_finding(case, finding, files, linkable) for finding in case.findings)
 
 
-def _finding(case: Case, finding: Finding, files: dict[str, CaseFile]) -> str:
+def _finding(
+    case: Case, finding: Finding, files: dict[str, CaseFile], linkable: frozenset[str]
+) -> str:
     warn = " warn" if finding.notable else ""
     facts = [(label, value) for label, value in finding.facts]
     if finding.kind in _PER_FILE:
@@ -1062,9 +1067,13 @@ def _finding(case: Case, finding: Finding, files: dict[str, CaseFile]) -> str:
         parts.append(f'<div class="note">{_e(said)}</div>')
     if finding.see:
         target = "conflicts" if finding.see == "CONFLICTS" else "coverage"
-        parts.append(
-            f'<div class="note">See <a href="#{target}">{_e(finding.see.lower())}</a>.</div>'
+        # A pointer to a section the page does not have is a dead link.
+        named = (
+            f'<a href="#{target}">{_e(finding.see.lower())}</a>'
+            if target in linkable
+            else _e(finding.see.lower())
         )
+        parts.append(f'<div class="note">See {named}.</div>')
     parts.append("</div></div>")
     return "".join(parts)
 
@@ -1438,20 +1447,24 @@ def _dense(pivots: Pivots, files: dict[str, CaseFile]) -> str:
     )
 
 
-def _wants_detail(entry: CaseFile, verbose: bool) -> bool:
-    """A file gets a block of its own when there is something to read in it."""
-    wanted = entry.state == REVIEW or entry.found[ORIGIN] or entry.found[ACTIVITY]
-    return bool(wanted) or (verbose and entry.state != NOTHING)
+def _wants_detail(entry: CaseFile) -> bool:
+    """A file gets a block of its own when there is something to read in it.
+
+    Metadata counts. A document that names its author, a font that names its
+    foundry and an executable that names its build machine have each said
+    something worth reading, whether or not a download record sits beside it.
+    """
+    return entry.state != NOTHING
 
 
-def _details(case: Case, files: dict[str, CaseFile], detailed: set[str], *, verbose: bool) -> str:
+def _details(case: Case, files: dict[str, CaseFile], detailed: set[str]) -> str:
     findings = {finding.ref: finding for finding in case.findings}
     conflicts = {conflict.ref: conflict for conflict in case.conflicts}
     parts = []
     for entry in case.files:
         if entry.record.path not in detailed:
             continue
-        parts.append(_detail(case, entry, files, findings, conflicts, verbose=verbose))
+        parts.append(_detail(case, entry, files, findings, conflicts))
     return "".join(parts)
 
 
@@ -1461,8 +1474,6 @@ def _detail(
     files: dict[str, CaseFile],
     findings: dict[str, Finding],
     conflicts: dict[str, Conflict],
-    *,
-    verbose: bool,
 ) -> str:
     record = entry.record
     body = []
@@ -1475,9 +1486,12 @@ def _detail(
             )
             continue
         for found in held:
+            # Every decoded field, as the terminal report shows them: a page
+            # has room, and the field an investigation turns on is rarely the
+            # one a summary would have picked.
             facts = [
                 (label, value)
-                for label, value in _facts(found, name, verbose=verbose)
+                for label, value in _facts(found, name, verbose=True)
                 if label != "Match"
             ]
             body.append(

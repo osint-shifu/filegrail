@@ -192,3 +192,29 @@ def test_every_pivot_is_listed_with_the_files_it_was_found_in():
 
 def test_a_conflict_says_which_statement_is_how_much_earlier():
     assert "XMP is 72 days earlier than PDF Info" in _page(_corpus())
+
+
+def _metadata_only() -> FileRecord:
+    return _file(
+        "tool.exe",
+        EvidenceRecord(
+            source="document-metadata",
+            block="pe-header",
+            tool="Example Tool 1.2",
+            note="company Example Corp",
+            fields={"Machine": "x64", "PDBPath": "C:\\build\\tool.pdb"},
+        ),
+    )
+
+
+def test_a_file_with_only_metadata_gets_a_detail_block_with_every_field():
+    """Metadata is something to read. Without a download record beside it the
+    block used to be left out, and with it the fields were left out unless the
+    report was asked for in full."""
+    page = _page([_metadata_only()])
+    section = page.split('<section id="detail"')[1].split("</section>")[0]
+
+    assert '<details class="file" id="detail-001">' in section
+    assert "<dt>PDBPath</dt>" in section
+    assert "C:\\build\\tool.pdb" in section
+    assert "<dt>Machine</dt>" in section
