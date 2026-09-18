@@ -5,6 +5,13 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.25.3 - 2026-09-18
+
+### Changed
+
+- README rewritten around the investigative questions the tool answers: evidence model, match basis, worked investigation shapes, one section per evidence family, exit codes and JSON recipes.
+- HTML report: the tab icon follows the accent colour.
+
 ## 0.25.2 - 2026-09-18
 
 ### Changed

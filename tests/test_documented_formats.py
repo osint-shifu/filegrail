@@ -225,7 +225,7 @@ def test_the_readme_lists_exactly_what_content_reads():
     """A count in prose can be checked; a list of extensions can be checked
     against the reader itself, which is the stronger claim and the one the
     readme actually makes."""
-    listed = _backticked(README, "### Document content", "## Investigative pivots")
+    listed = _backticked(README, "## Document content", "## Investigative pivots")
 
     assert listed == CONTENT_SUFFIXES, sorted(listed ^ CONTENT_SUFFIXES)
 
@@ -247,7 +247,7 @@ def test_every_place_the_readme_promises_is_one_the_reader_writes():
     }
     written = {name for _, name in reader._PARTS} | built
     promised = set()
-    for row in _readme_rows(README, "### Document content"):
+    for row in _readme_rows(README, "## Document content"):
         promised |= {re.sub(r"\d+", "{}", place) for place in _EXTENSION_FREE.findall(row[2])}
 
     assert promised, "the table no longer says where a value is reported from"
@@ -330,7 +330,7 @@ def test_the_readme_metadata_table_names_the_extensions_its_readers_declare():
 
     rows = {
         row[0].strip("*"): set(_EXTENSION.findall(row[1]))
-        for row in _readme_rows(README, "### Embedded metadata")[1:]
+        for row in _readme_rows(README, "## Embedded metadata")[1:]
     }
     assert set(rows) == set(owners), sorted(set(rows) ^ set(owners))
     for block, listed in rows.items():
@@ -340,7 +340,7 @@ def test_the_readme_metadata_table_names_the_extensions_its_readers_declare():
 def test_the_readme_lists_exactly_what_clean_can_strip():
     from filegrail.clean import _STRIPPERS
 
-    listed = _backticked(README, "### Cleanable formats", "Clean one file")
+    listed = _backticked(README, "### Cleanable formats", "### Cleaning options")
 
     assert listed == set(_STRIPPERS), sorted(listed ^ set(_STRIPPERS))
 

@@ -77,7 +77,7 @@ _MARK = (
 _FAVICON = (
     '<link rel="icon" href="data:image/svg+xml,'
     "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 144 204'%3E"
-    "%3Cpath fill='%235FA89A' fill-rule='evenodd' d='M24,48 A48,48 0 0 1 72,0 H108 V24 "
+    "%3Cpath fill='%236EA0C4' fill-rule='evenodd' d='M24,48 A48,48 0 0 1 72,0 H108 V24 "
     "H72 A24,24 0 0 0 48,48 V72 H144 V96 A60,60 0 0 1 96,154.79 V180 H132 V204 H36 V180 "
     "H72 V154.79 A60,60 0 0 1 24,96 H0 V72 H24 Z M48,96 H120 A36,36 0 0 1 48,96 Z'/%3E"
     '%3C/svg%3E">'
