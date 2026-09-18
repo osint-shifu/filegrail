@@ -71,6 +71,7 @@ class Track:
     sizes: list[int] = field(default_factory=list)
     fixed_size: int = 0
     runs: list[tuple[int, int]] = field(default_factory=list)  # (first chunk, per chunk)
+    language: str | None = None
 
     def ranges(self) -> list[tuple[int, int]]:
         """Every sample as (offset, size), in order, bounded."""
@@ -106,6 +107,11 @@ class Movie:
         self.gopro: dict[str, str] = {}
         self.telemetry: gpmf.Telemetry | None = None
         self.tracks: list[Track] = []
+        #: The `mdta` key names of the `moov/meta` atom, in order; an `ilst`
+        #: item under it is numbered rather than named.
+        self.keys: list[str] = []
+        #: The `mdta` items nothing above stands for, by key.
+        self.items: dict[str, str] = {}
 
     def __bool__(self) -> bool:
         return any(
@@ -179,14 +185,21 @@ def _walk(handle: BinaryIO, start: int, end: int, depth: int, movie: Movie) -> N
 
         atom_end = offset + size
         if atom == b"meta":
-            body += 4  # meta carries a version and flags before its children
+            # ISO's meta is a full box with version and flags before its
+            # children; QuickTime's is not, and opens with `hdlr` at once.
+            handle.seek(body)
+            if handle.read(8)[4:8] != b"hdlr":
+                body += 4
         if atom == b"trak" and len(movie.tracks) < _MAX_TRACKS:
             movie.tracks.append(Track())
         if atom in _CONTAINERS:
             _walk(handle, body, atom_end, depth + 1, movie)
-        elif atom in _TABLE_ATOMS or atom == b"stsd" or atom == b"hdlr":
+        elif atom in _TABLE_ATOMS or atom in (b"stsd", b"hdlr", b"mdhd"):
             handle.seek(body)
             _track_atom(atom, handle.read(min(atom_end - body, _MAX_TABLE)), movie)
+        elif atom == b"keys":
+            handle.seek(body)
+            _keys(handle.read(min(atom_end - body, _MAX_TABLE)), movie)
         else:
             handle.seek(body)
             _absorb(atom, handle.read(min(atom_end - body, _MAX_TEXT)), movie)
@@ -201,6 +214,13 @@ def _track_atom(atom: bytes, payload: bytes, movie: Movie) -> None:
     track = movie.tracks[-1]
     if atom == b"hdlr" and len(payload) >= 12:
         track.handler = payload[8:12]
+    elif atom == b"mdhd" and len(payload) >= 24:
+        at = 20 if payload[0] == 0 else 32  # version 1 widens the times
+        if len(payload) >= at + 2:
+            (packed,) = struct.unpack_from(">H", payload, at)
+            letters = [((packed >> shift) & 0x1F) + 0x60 for shift in (10, 5, 0)]
+            if all(0x61 <= letter <= 0x7A for letter in letters):
+                track.language = bytes(letters).decode("ascii")
     elif atom == b"stsd" and len(payload) >= 16:
         track.format = payload[12:16]
     elif atom == b"stco" and len(payload) >= 8:
@@ -228,9 +248,43 @@ def _track_atom(atom: bytes, payload: bytes, movie: Movie) -> None:
         ]
 
 
+def _keys(payload: bytes, movie: Movie) -> None:
+    """The key names an `mdta` metadata atom numbers its items by."""
+    if len(payload) < 8:
+        return
+    (count,) = struct.unpack_from(">I", payload, 4)
+    at = 8
+    for _ in range(min(count, _MAX_ATOMS)):
+        if at + 8 > len(payload):
+            return
+        size, namespace = struct.unpack_from(">I4s", payload, at)
+        if size < 8 or at + size > len(payload):
+            return
+        name = (
+            payload[at + 8 : at + size].decode("utf-8", "replace") if namespace == b"mdta" else ""
+        )
+        movie.keys.append(name)
+        at += size
+
+
+#: What each `mdta` key stands for, by the end of its name.
+_MDTA_MEANS = {
+    ".make": "make",
+    ".model": "model",
+    ".software": "encoder",
+    ".creationdate": "created",
+    ".location.iso6709": "coordinates",
+}
+
+
 def _absorb(atom: bytes, payload: bytes, movie: Movie) -> None:
     if atom == b"mvhd" and movie.created is None:
         movie.created = _mvhd_time(payload)
+        return
+    if movie.keys and len(atom) == 4 and atom[0] == 0:
+        index = int.from_bytes(atom, "big")
+        if 0 < index <= len(movie.keys):
+            _mdta_item(movie.keys[index - 1], _atom_text(payload), movie)
         return
     if atom in _GOPRO_TEXT:
         plain = payload.decode("ascii", "replace").strip("\x00 ")
@@ -255,6 +309,26 @@ def _absorb(atom: bytes, payload: bytes, movie: Movie) -> None:
         movie.created = _normalise(text)
     elif atom in LOCATION_ATOMS and not movie.coordinates:
         movie.coordinates = _iso6709(text)
+
+
+def _mdta_item(key: str, text: str | None, movie: Movie) -> None:
+    if not text:
+        return
+    lowered = key.lower()
+    meaning = next((meaning for end, meaning in _MDTA_MEANS.items() if lowered.endswith(end)), None)
+    if meaning == "make" and not movie.make:
+        movie.make = text
+    elif meaning == "model" and not movie.model:
+        movie.model = text
+    elif meaning == "encoder" and not movie.encoder:
+        movie.encoder = text
+    elif meaning == "created":
+        # A phone's own date carries its zone; `mvhd` before it did not.
+        movie.created = _normalise(text) or movie.created
+    elif meaning == "coordinates" and not movie.coordinates:
+        movie.coordinates = _iso6709(text)
+    elif meaning is None and len(movie.items) < _MAX_TRACKS:
+        movie.items.setdefault(key, text[:_MAX_TEXT])
 
 
 def _mvhd_time(payload: bytes) -> str | None:

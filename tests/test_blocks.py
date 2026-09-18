@@ -290,3 +290,77 @@ def test_the_report_calls_a_pdf_claim_by_the_block_it_read(tmp_path: Path):
 
     assert "PDF Info" in output
     assert "document metadata" not in output
+
+
+# --- what a phone writes into a MOV ------------------------------------------
+
+
+def _atom(category: bytes, payload: bytes) -> bytes:
+    return struct.pack(">I", len(payload) + 8) + category + payload
+
+
+def _mdta_movie(path: Path, values: dict[str, str]) -> Path:
+    """A QuickTime `moov/meta` with `mdta` keys, the way iOS writes one: the
+    meta atom carries no version and flags, and the items are numbered."""
+    keys = b"".join(_atom(b"mdta", key.encode()) for key in values)
+    keys_atom = _atom(b"keys", struct.pack(">II", 0, len(values)) + keys)
+    items = b"".join(
+        _atom(
+            struct.pack(">I", index),
+            _atom(b"data", struct.pack(">II", 1, 0) + value.encode("utf-8")),
+        )
+        for index, value in enumerate(values.values(), 1)
+    )
+    handler = _atom(b"hdlr", b"\x00" * 8 + b"mdta" + b"\x00" * 13)
+    meta = _atom(b"meta", handler + keys_atom + _atom(b"ilst", items))
+    path.write_bytes(_atom(b"ftyp", b"qt  ") + _atom(b"moov", meta))
+    return path
+
+
+def test_a_phones_mdta_keys_name_the_device_the_time_and_the_place(tmp_path: Path):
+    clip = _mdta_movie(
+        tmp_path / "IMG_0412.MOV",
+        {
+            "com.apple.quicktime.make": "Apple",
+            "com.apple.quicktime.model": "iPhone 15 Pro",
+            "com.apple.quicktime.software": "17.4",
+            "com.apple.quicktime.creationdate": "2026-05-01T10:00:00+0200",
+            "com.apple.quicktime.location.ISO6709": "+52.2297+021.0122+112.000/",
+            "com.apple.quicktime.author": "Jan",
+        },
+    )
+
+    origin = read_embedded_metadata(clip)
+
+    assert origin is not None
+    assert origin.tool == "Apple iPhone 15 Pro (encoded with 17.4)"
+    assert origin.at == "2026-05-01T08:00:00Z"
+    assert origin.geo == "52.2297, 21.0122"
+    assert origin.fields["QuickTime:com.apple.quicktime.author"] == "Jan"
+
+
+def test_track_languages_and_a_timecode_track_are_listed(tmp_path: Path):
+    def track(handler: bytes, language: str) -> bytes:
+        packed = 0
+        for letter in language:
+            packed = (packed << 5) | (ord(letter) - 0x60)
+        mdhd = _atom(b"mdhd", b"\x00" * 4 + struct.pack(">IIIIHH", 0, 0, 600, 600, packed, 0))
+        hdlr = _atom(b"hdlr", b"\x00" * 8 + handler + b"\x00" * 13)
+        return _atom(b"trak", _atom(b"mdia", mdhd + hdlr))
+
+    udta = _atom(b"udta", _atom(b"\xa9too", struct.pack(">HH", 9, 0) + b"HandBrake"))
+    clip = tmp_path / "clip.mov"
+    clip.write_bytes(
+        _atom(b"ftyp", b"qt  ")
+        + _atom(
+            b"moov", udta + track(b"vide", "und") + track(b"soun", "pol") + track(b"tmcd", "und")
+        )
+    )
+
+    origin = read_embedded_metadata(clip)
+
+    assert origin is not None
+    assert origin.fields["Track[1]"] == "vide und"
+    assert origin.fields["Track[2]"] == "soun pol"
+    assert origin.fields["Track[3]"] == "tmcd und"
+    assert origin.fields["Timecode"] == "track present"

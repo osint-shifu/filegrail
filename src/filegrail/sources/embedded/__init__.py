@@ -343,6 +343,22 @@ def _from_movie(path: Path, suffix: str) -> EvidenceRecord | None:
         )
         if value
     }
+    for key, kept in movie.items.items():
+        fields[f"QuickTime:{key}"] = kept
+    for index, track in enumerate(movie.tracks, 1):
+        said = " ".join(
+            part
+            for part in (
+                track.handler.decode("ascii", "replace").strip() if track.handler else "",
+                track.format.decode("ascii", "replace").strip() if track.format else "",
+                track.language or "",
+            )
+            if part
+        )
+        if said:
+            fields[f"Track[{index}]"] = said
+    if any(track.handler == b"tmcd" for track in movie.tracks):
+        fields["Timecode"] = "track present"
     for name, label in (
         ("firmware", "GoPro:Firmware"),
         ("lens", "GoPro:Lens"),

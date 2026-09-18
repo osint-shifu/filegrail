@@ -5,6 +5,12 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.30.0 - 2026-09-18
+
+### Added
+
+- MP4 and MOV: the `mdta` keys a phone writes are read, so a clip from an iPhone names its make, model, system version, creation time with its zone and location, and any other key is kept under its own name. Every track is listed with its handler, format and language, and a timecode track is noted.
+
 ## 0.29.0 - 2026-09-18
 
 ### Added
