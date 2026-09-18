@@ -334,7 +334,7 @@ What each pivot type takes from metadata and document text, and the look-alike v
 
 ## Written from the specification
 
-Three readers have never been run against a file the originating software
+These readers have never been run against a file the originating software
 produced, because nothing on the developer's machine writes one. They are built
 to the specification and tested against fixtures assembled from it, with every
 offset computed rather than counted by hand.
@@ -344,6 +344,11 @@ offset computed rather than counted by hand.
 | Outlook `.msg` transport headers | [MS-OXMSG] | No Outlook here. The container walk underneath is not in this position — real `.doc` files exercise it |
 | Windows `.lnk` shortcuts | [MS-SHLLINK] | No Windows desktop writing Recent entries |
 | The `id3 ` chunk inside a WAV | ID3v2 in RIFF | Nothing available writes one; the rest of the RIFF reader is exercised by real files |
+| AIFF chunks | AIFF-C 1.0 | No AIFF here; the ID3 tag inside one goes through the same reader MP3 files exercise |
+| APEv2 tags | APEv2 (Monkey's Audio) | No Monkey's Audio, Musepack or WavPack file here |
+| WOFF tables and metadata | WOFF 1.0 | No WOFF here; the tables underneath are the same ones real TrueType, CFF and collection fonts exercise |
+| PDF attachments, signature dictionaries and JavaScript | ISO 32000 | Real PDFs here exercise updates, trailer IDs, link targets and open actions, but none is signed, carries an attachment or a script |
+| GPMF and CAMM telemetry tracks | GoPro GPMF, Google CAMM | No action-camera or phone recording with a metadata track here; the sample tables that locate it are read from real MP4 files |
 
 That is worth knowing before you rely on one of them in something that matters.
 

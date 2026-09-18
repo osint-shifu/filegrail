@@ -94,7 +94,7 @@ filegrail ./evidence --pivots --content --html > report.html
 | **Investigative pivots** | Structured identifiers with their type, file, source and exact location |
 | **Content inspection** | Pivots extracted from supported document content |
 | **Timeline** | Origin, creation, modification and activity events in chronological order |
-| **File relationships** | XMP document identifiers and derivation chains between related files |
+| **File relationships** | XMP derivation chains, and an evidence graph linking files to identifiers, authors, cameras, archives and torrents |
 | **Clustering** | Files grouped by shared camera serial, camera model or recorded author |
 | **File comparison** | Metadata, provenance and timing differences between two files |
 | **Extension check** | Files whose actual content does not match their extension |
@@ -610,7 +610,9 @@ Other values are not redacted, so review the report before sharing it.
 - an archive or torrent match by name and size is an association, not proof of authorship or intent;
 - a shared camera model does not identify the same physical camera, while a body serial is a much stronger link;
 - recorded author and organization metadata can be edited and does not prove identity;
-- C2PA hard binding is checked, but certificate chains and signature trust are **not** verified.
+- C2PA hard binding is checked, but certificate chains and signature trust are **not** verified;
+- an Authenticode signature on an executable and a signature dictionary in a PDF are reported as present, not verified;
+- a version resource, a font's name table and a camera's telemetry track are what the writer declared, and can be edited like any other embedded metadata.
 
 It is not a monitoring agent, chain-of-custody system, full disk-forensics suite, automatic attribution engine or OSINT enrichment service.
 

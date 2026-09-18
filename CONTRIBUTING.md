@@ -77,6 +77,13 @@ That file is parsed by `tests/test_documented_formats.py` and held against the
 readers, so a format you can read and did not document is a failing test rather
 than a document that quietly stops being true.
 
+The same change registers the reader everywhere else a test looks: its block
+name in `BLOCK_LABELS` in `models.py`, the field naming a person in
+`AUTHOR_FIELDS` in `overview.py` (or the block in `WITHOUT_AUTHOR` when it
+names none), its extensions in a family in `filters.py` so `--type` can select
+them, and a row in the README's embedded-metadata table. Each of these is held
+against the readers by a test, so a missed one fails rather than drifts.
+
 Build the fixture the way a real encoder writes the file, not the way the
 specification reads. The two differ, and where they differ is where the bugs
 are: a HEIC names an `Exif` item in its item table long before the payload
