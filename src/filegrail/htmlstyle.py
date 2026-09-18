@@ -38,16 +38,16 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 ::selection{background:var(--accent);color:var(--accent-ink)}
 
 /* ── masthead ─────────────────────────────────────────────── */
-.mast{padding:28px var(--gutter) 22px;border-bottom:1px solid var(--line);display:grid;
-grid-template-columns:auto 1fr;gap:0 18px;align-items:center}
-.mast .mark{width:44px;height:62px;flex:none}
-.mast .word{font-size:30px;font-weight:500;letter-spacing:-.8px;line-height:1;margin:0}
-.mast .word small{display:block;font-size:11px;font-weight:400;letter-spacing:.18em;
-text-transform:uppercase;color:var(--muted);margin:10px 0 0}
+.mast{padding:22px var(--gutter) 24px;border-bottom:1px solid var(--line)}
+.mast .word{margin:0 0 16px;font-size:11px;font-weight:400;letter-spacing:.18em;
+text-transform:uppercase;color:var(--muted)}
+.mast .word small{font-size:inherit;color:var(--faint)}
+.mast-body{display:grid;grid-template-columns:auto 1fr;gap:0 26px;align-items:stretch}
+.mast-mark{display:flex;align-items:stretch}
+.mast .mark{height:100%;width:auto;flex:none}
 .mast .tag{display:none}
-.facts{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr;gap:6px 24px;
-justify-content:start;margin:20px 0 0;padding:14px 0 0;
-border-top:1px solid var(--line);font-size:12px}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 24px;justify-content:start;margin:0;
+font-size:12px;align-content:center}
 .facts dt{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
 .facts dd{margin:0;color:var(--ink);overflow-wrap:anywhere}
 .mast-actions{display:none;gap:6px;align-items:center;margin-left:8px;flex:none}
@@ -457,9 +457,7 @@ text-transform:uppercase;color:var(--faint)}
 .facts{gap:4px 16px}
 }
 @media (max-width:820px){
-.mast{gap:0 18px;padding-top:32px}
-.mast .mark{width:40px;height:57px}
-.mast .word{font-size:26px}
+.mast-body{gap:0 18px}
 .rec{grid-template-columns:1fr}
 .rec .cat{margin-bottom:4px}
 .rec>.fields{grid-column:1}

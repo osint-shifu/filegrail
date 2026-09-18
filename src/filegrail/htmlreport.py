@@ -208,11 +208,11 @@ def render_html(
     ]
     masthead = [
         '<header class="mast" id="top">',
-        _MARK,
-        '<div class="who">',
         f'<h1 class="word">filegrail <small>v{_e(__version__)} · investigation report</small></h1>',
-        "</div>",
+        '<div class="mast-body">',
+        f'<div class="mast-mark">{_MARK}</div>',
         _fields(facts, css="facts", copy=frozenset({"target", "profile", "report"})),
+        "</div>",
         "</header>",
     ]
     links = "".join(
