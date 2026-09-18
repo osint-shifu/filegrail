@@ -546,7 +546,11 @@ Each command has its own schema version. The version changes only when a field c
 | `doctor` | `filegrail.doctor/1` |
 | `clean` | `filegrail.clean/1` |
 
-Every scan document contains `schema`, `filegrail_version`, `root`, `summary`, `files` and `unsearched`.
+Every scan document contains `schema`, `filegrail_version`, `root`, `summary`,
+`files`, `run`, `coverage` and `unsearched`. `run` records the effective scan
+options, profile and filters. `coverage` records which evidence stores were
+searched, unavailable, partial or disabled, how many artifacts were readable,
+and which filesystem paths were skipped or unreadable.
 
 Depending on the scan, it can also contain `home` (with `--home`), `identifiers`
 and an evidence-backed `graph` (with `--pivots`, `--content` or `--hash`), and
@@ -557,6 +561,10 @@ underlying evidence has them. A matched archive or torrent member also adds a
 graph automatically because its evidence records the container path explicitly.
 Resolved XMP derivation links do the same and name the exact fields matched at
 both ends.
+
+GraphML stores `run` and `coverage` as graph attributes. Graph CSV repeats the
+same JSON documents on each relationship row, so an imported edge keeps the
+conditions under which it was produced.
 
 Each file includes `path`, `size`, `mtime`, `btime`, `sha256`, `links` and `evidence`. Evidence records include their `category`, `source`, `match` and decoded fields. Correlation results are stored under `correlation`.
 

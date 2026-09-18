@@ -76,18 +76,39 @@ class Events:
     by_name: dict[str, list[EvidenceRecord]] = field(default_factory=dict)
 
 
-def collect_quarantine_events(home: Path | None = None) -> Events:
+def collect_quarantine_events(
+    home: Path | None = None, stats: dict[str, int] | None = None
+) -> Events:
     """Read the LaunchServices quarantine database, if there is one."""
     home = home or Path.home()
     path = home / QUARANTINE_DB
     found = Events()
     if not path.is_file():
+        if stats is not None:
+            stats.update(
+                quarantine_artifacts_found=0,
+                quarantine_artifacts_read=0,
+                quarantine_records=0,
+            )
         return found
 
     try:
         rows = _rows(path)
     except (sqlite3.Error, OSError):
+        if stats is not None:
+            stats.update(
+                quarantine_artifacts_found=1,
+                quarantine_artifacts_read=0,
+                quarantine_records=0,
+            )
         return found
+
+    if stats is not None:
+        stats.update(
+            quarantine_artifacts_found=1,
+            quarantine_artifacts_read=1,
+            quarantine_records=len(rows),
+        )
 
     for identifier, stamp, agent, url, origin_url in rows:
         claim = EvidenceRecord(

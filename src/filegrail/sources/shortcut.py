@@ -68,7 +68,9 @@ _MAX_LINKS = 20_000
 _MAX_LINK = 1024 * 1024
 
 
-def collect_windows_recent(home: Path | None = None) -> dict[str, list[EvidenceRecord]]:
+def collect_windows_recent(
+    home: Path | None = None, stats: dict[str, int] | None = None
+) -> dict[str, list[EvidenceRecord]]:
     """Map the file name a shortcut points at -> what it recorded about opening it.
 
     Indexed by name rather than by path because the path in the shortcut was
@@ -78,10 +80,27 @@ def collect_windows_recent(home: Path | None = None) -> dict[str, list[EvidenceR
     home = home or Path.home()
     folder = home / RECENT_LINKS
     if not folder.is_dir():
+        if stats is not None:
+            stats.update(
+                windows_recent_artifacts_found=0,
+                windows_recent_artifacts_read=0,
+                windows_recent_records=0,
+            )
         return {}
 
     found: dict[str, list[EvidenceRecord]] = {}
-    for index, path in enumerate(sorted(folder.iterdir())):
+    records = 0
+    try:
+        paths = sorted(folder.iterdir())
+    except OSError:
+        if stats is not None:
+            stats.update(
+                windows_recent_artifacts_found=1,
+                windows_recent_artifacts_read=0,
+                windows_recent_records=0,
+            )
+        return {}
+    for index, path in enumerate(paths):
         if index >= _MAX_LINKS:
             break
         if not path.is_file() or path.suffix.lower() != ".lnk":
@@ -96,10 +115,17 @@ def collect_windows_recent(home: Path | None = None) -> dict[str, list[EvidenceR
         origin = read_link(raw, opened=_opened(path))
         if origin is None:
             continue
+        records += 1
         name = basename(str(origin.fields.get("OpenedFrom") or ""))
         # A shortcut with no recorded path still names its target in the file
         # name Windows gave it: `report.docx.lnk`.
         found.setdefault(name or path.stem, []).append(origin)
+    if stats is not None:
+        stats.update(
+            windows_recent_artifacts_found=1,
+            windows_recent_artifacts_read=1,
+            windows_recent_records=records,
+        )
     return found
 
 

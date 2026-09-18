@@ -248,6 +248,57 @@ def test_the_scan_document_carries_what_was_not_searched(tmp_path: Path, capsys)
     assert document["unsearched"]["unreadable"] == []
 
 
+def test_scan_json_records_effective_run_options_and_coverage(tmp_path: Path, capsys):
+    case = tmp_path / "case"
+    case.mkdir()
+    (case / "note.txt").write_text("hello", encoding="utf-8")
+
+    assert (
+        main(
+            [
+                str(case),
+                "--json",
+                "--home",
+                str(tmp_path),
+                "--hash",
+                "--pivots",
+                "--cluster",
+                "--no-recurse",
+                "--no-skip",
+                "--no-shell-history",
+                "--no-archives",
+                "--ext",
+                "txt",
+            ]
+        )
+        == 0
+    )
+
+    document = json.loads(capsys.readouterr().out)
+    assert document["run"] == {
+        "output": "json",
+        "home": str(tmp_path),
+        "recursive": False,
+        "hash": True,
+        "shell_history": False,
+        "archives": False,
+        "skip_named_directories": False,
+        "pivots": True,
+        "content": False,
+        "cluster": True,
+        "unknown_only": False,
+        "redacted": False,
+        "filters": {
+            "types": [],
+            "extensions": ["txt"],
+            "effective_suffixes": [".txt"],
+        },
+    }
+    assert document["coverage"]["files"] == {"discovered": 1, "scanned": 1}
+    assert document["coverage"]["sources"]["shell-history"]["state"] == "disabled"
+    assert document["coverage"]["sources"]["archives"]["state"] == "disabled"
+
+
 def test_no_skip_descends_into_the_names_a_scan_normally_leaves(tmp_path: Path, capsys):
     case = tmp_path / "case"
     (case / "build").mkdir(parents=True)

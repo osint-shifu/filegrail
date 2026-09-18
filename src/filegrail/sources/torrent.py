@@ -66,24 +66,50 @@ class Torrent:
     members: dict[str, set[int]]
 
 
-def collect_torrents(home: Path | None = None) -> list[Torrent]:
+def collect_torrents(
+    home: Path | None = None, stats: dict[str, int] | None = None
+) -> list[Torrent]:
     """Every torrent the local clients have kept, from their own stores."""
     home = home or Path.home()
     found: list[Torrent] = []
+    stores_found = 0
+    stores_read = 0
+    artifacts_found = 0
+    artifacts_read = 0
     for relative in TORRENT_STORES:
         store = home / relative
         if not store.is_dir():
             continue
+        stores_found += 1
         try:
             stored = sorted(store.glob(f"*{SUFFIX}"))
         except OSError:
             continue
+        stores_read += 1
         for path in stored:
             if len(found) >= _MAX_STORED:
+                if stats is not None:
+                    stats.update(
+                        torrent_artifacts_found=artifacts_found,
+                        torrent_artifacts_read=artifacts_read,
+                        torrent_records=len(found),
+                        torrent_stores_found=stores_found,
+                        torrent_stores_read=stores_read,
+                    )
                 return found
+            artifacts_found += 1
             torrent = read_torrent(path)
             if torrent is not None:
+                artifacts_read += 1
                 found.append(torrent)
+    if stats is not None:
+        stats.update(
+            torrent_artifacts_found=artifacts_found,
+            torrent_artifacts_read=artifacts_read,
+            torrent_records=len(found),
+            torrent_stores_found=stores_found,
+            torrent_stores_read=stores_read,
+        )
     return found
 
 

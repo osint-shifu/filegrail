@@ -71,3 +71,26 @@ def test_csv_has_one_relationship_per_row_with_endpoint_data():
     assert rows[0]["target_id"] == "email:anna@example.org"
     assert rows[0]["kind"] == "has identifier"
     assert json.loads(rows[0]["evidence"])[0]["category"] == "metadata"
+
+
+def test_graphml_carries_run_and_coverage_metadata():
+    run = {"content": True, "hash": False}
+    coverage = {"files": {"discovered": 2, "scanned": 2}}
+
+    root = ElementTree.fromstring(render_graphml(_graph(), run=run, coverage=coverage))
+    graph = root.find(f"{{{GRAPHML}}}graph")
+    assert graph is not None
+    data = {item.get("key"): item.text for item in graph.findall(f"{{{GRAPHML}}}data")}
+
+    assert json.loads(data["graph_run"] or "{}") == run
+    assert json.loads(data["graph_coverage"] or "{}") == coverage
+
+
+def test_csv_repeats_run_and_coverage_on_each_relationship():
+    run = {"content": False, "hash": True}
+    coverage = {"files": {"discovered": 2, "scanned": 2}}
+
+    rows = list(csv.DictReader(io.StringIO(render_graph_csv(_graph(), run=run, coverage=coverage))))
+
+    assert json.loads(rows[0]["run"]) == run
+    assert json.loads(rows[0]["coverage"]) == coverage

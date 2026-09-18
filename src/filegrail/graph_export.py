@@ -6,6 +6,7 @@ import csv
 import io
 import json
 import xml.etree.ElementTree as ElementTree
+from collections.abc import Mapping
 
 from .graph import Graph
 
@@ -13,7 +14,12 @@ _GRAPHML = "http://graphml.graphdrawing.org/xmlns"
 ElementTree.register_namespace("", _GRAPHML)
 
 
-def render_graphml(graph: Graph) -> str:
+def render_graphml(
+    graph: Graph,
+    *,
+    run: Mapping[str, object] | None = None,
+    coverage: Mapping[str, object] | None = None,
+) -> str:
     """Serialize ``graph`` as dependency-free, interoperable GraphML."""
     root = ElementTree.Element(f"{{{_GRAPHML}}}graphml")
     for key, scope, name, value_type in (
@@ -25,6 +31,8 @@ def render_graphml(graph: Graph) -> str:
         ("edge_kind", "edge", "kind", "string"),
         ("edge_count", "edge", "count", "int"),
         ("edge_evidence", "edge", "evidence", "string"),
+        ("graph_run", "graph", "run", "string"),
+        ("graph_coverage", "graph", "coverage", "string"),
     ):
         ElementTree.SubElement(
             root,
@@ -35,6 +43,10 @@ def render_graphml(graph: Graph) -> str:
     document = ElementTree.SubElement(
         root, f"{{{_GRAPHML}}}graph", {"id": "filegrail", "edgedefault": "directed"}
     )
+    if run is not None:
+        _data(document, "graph_run", _json(run))
+    if coverage is not None:
+        _data(document, "graph_coverage", _json(coverage))
     exported_ids = {node.id: f"n{position}" for position, node in enumerate(graph.nodes)}
     for node in graph.nodes:
         element = ElementTree.SubElement(
@@ -75,7 +87,12 @@ def render_graphml(graph: Graph) -> str:
     return ElementTree.tostring(root, encoding="unicode", xml_declaration=True)
 
 
-def render_graph_csv(graph: Graph) -> str:
+def render_graph_csv(
+    graph: Graph,
+    *,
+    run: Mapping[str, object] | None = None,
+    coverage: Mapping[str, object] | None = None,
+) -> str:
     """Serialize one relationship per CSV row, including both endpoint nodes."""
     nodes = {node.id: node for node in graph.nodes}
     output = io.StringIO(newline="")
@@ -89,6 +106,8 @@ def render_graph_csv(graph: Graph) -> str:
         "kind",
         "count",
         "evidence",
+        "run",
+        "coverage",
     )
     writer = csv.DictWriter(output, fieldnames=fields, lineterminator="\n")
     writer.writeheader()
@@ -111,6 +130,8 @@ def render_graph_csv(graph: Graph) -> str:
                     separators=(",", ":"),
                     sort_keys=True,
                 ),
+                "run": _json(run) if run is not None else "",
+                "coverage": _json(coverage) if coverage is not None else "",
             }
         )
     return output.getvalue()
@@ -118,3 +139,7 @@ def render_graph_csv(graph: Graph) -> str:
 
 def _data(parent: ElementTree.Element, key: str, value: str) -> None:
     ElementTree.SubElement(parent, f"{{{_GRAPHML}}}data", {"key": key}).text = value
+
+
+def _json(value: Mapping[str, object]) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)

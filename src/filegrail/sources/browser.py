@@ -182,6 +182,7 @@ def collect_browser_downloads(
     """
     home = home or Path.home()
     found: dict[str, list[EvidenceRecord]] = {}
+    profiles_found = 0
     profiles_read = 0
     records = 0
 
@@ -191,6 +192,7 @@ def collect_browser_downloads(
     ]
     for globs, reader in readers:
         for profile in _profiles(home, globs):
+            profiles_found += 1
             try:
                 seen = list(reader(profile))
             except (sqlite3.Error, OSError):
@@ -201,7 +203,10 @@ def collect_browser_downloads(
                 found.setdefault(target, []).append(origin)
 
     if stats is not None:
+        stats["browser_profiles_found"] = profiles_found
         stats["browser_profiles"] = profiles_read
         stats["browser_records"] = records
+        stats["browser_artifacts_found"] = profiles_found
+        stats["browser_artifacts_read"] = profiles_read
 
     return found

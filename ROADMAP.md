@@ -57,7 +57,11 @@ The section is an addition, so the schema version does not change.
 
 ### Scan options and evidence coverage in JSON
 
-Scan JSON records the options the scan was run with, such as `--pivots`, `--content`, `--home` and filters, and which evidence sources were available. This tells a source with no record of a file apart from a source that could not be searched.
+Implemented. Scan JSON records the effective options, profile and filters under
+`run`. `coverage` records each evidence source as searched, unavailable,
+partial or disabled, with artifact and record counts plus skipped and unreadable
+paths. These values are collected during the scan rather than by rereading the
+profile afterward.
 
 ### Graph export as GraphML and CSV
 
@@ -67,8 +71,8 @@ Implemented as `--graphml` and `--graph-csv`, with `-o` for a destination file:
 - **CSV edge list**: one relationship per row, with both nodes, their types and the evidence, for table imports such as Maltego, Neo4j `LOAD CSV`, Cytoscape and spreadsheets.
 
 `--redact` applies before the graph is built, and secrets and US Social Security
-numbers remain fingerprints. Scan options and evidence coverage will be added
-with the JSON coverage work above.
+numbers remain fingerprints. Scan options and evidence coverage are stored as
+GraphML graph attributes and repeated on each CSV relationship row.
 
 ### Relationship explorer in the HTML report
 

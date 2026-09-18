@@ -1769,6 +1769,8 @@ def render_json(
     cluster: bool = False,
     home: Path | None = None,
     unsearched: Unsearched | None = None,
+    run: dict[str, object] | None = None,
+    coverage: dict[str, object] | None = None,
 ) -> str:
     payload: dict[str, object] = {
         "root": str(root),
@@ -1779,6 +1781,10 @@ def render_json(
             "with_origin": sum(1 for record in records if record.evidence),
         },
     }
+    if run is not None:
+        payload["run"] = run
+    if coverage is not None:
+        payload["coverage"] = coverage
     payload["unsearched"] = (unsearched or Unsearched()).to_dict()
     identifiers = []
     if identify:

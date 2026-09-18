@@ -35,19 +35,26 @@ _BOOKMARK_NS = "http://www.freedesktop.org/standards/desktop-bookmarks"
 _MAX_BOOKMARKS = 20_000
 
 
-def collect_recent_files(home: Path | None = None) -> dict[str, list[EvidenceRecord]]:
+def collect_recent_files(
+    home: Path | None = None, stats: dict[str, int] | None = None
+) -> dict[str, list[EvidenceRecord]]:
     """Map absolute path -> what the desktop recorded about opening it."""
     home = home or Path.home()
     found: dict[str, list[EvidenceRecord]] = {}
+    artifacts_found = 0
+    artifacts_read = 0
+    records = 0
 
     for relative in RECENT_FILES:
         path = home / relative
         if not path.is_file():
             continue
+        artifacts_found += 1
         try:
             root = ElementTree.fromstring(path.read_text(encoding="utf-8", errors="replace"))
         except (OSError, ElementTree.ParseError):
             continue
+        artifacts_read += 1
 
         for index, bookmark in enumerate(root.iter("bookmark")):
             if index >= _MAX_BOOKMARKS:
@@ -57,7 +64,14 @@ def collect_recent_files(home: Path | None = None) -> dict[str, list[EvidenceRec
                 continue
             origin = _record(bookmark)
             if origin is not None:
+                records += 1
                 found.setdefault(target, []).append(origin)
+    if stats is not None:
+        stats.update(
+            recent_artifacts_found=artifacts_found,
+            recent_artifacts_read=artifacts_read,
+            recent_records=records,
+        )
     return found
 
 

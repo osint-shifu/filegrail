@@ -41,7 +41,9 @@ class SyncRoot:
     account: str
 
 
-def collect_sync_roots(home: Path | None = None) -> list[SyncRoot]:
+def collect_sync_roots(
+    home: Path | None = None, stats: dict[str, int] | None = None
+) -> list[SyncRoot]:
     """Every directory a local sync client says it keeps in step."""
     home = home or Path.home()
     found: list[SyncRoot] = []
@@ -50,7 +52,10 @@ def collect_sync_roots(home: Path | None = None) -> list[SyncRoot]:
             found.extend(reader(home))
         except (OSError, ValueError, ElementTree.ParseError, configparser.Error):
             continue
-    return found[:_MAX_ROOTS]
+    found = found[:_MAX_ROOTS]
+    if stats is not None:
+        stats["sync_records"] = len(found)
+    return found
 
 
 def read_sync(path: Path, roots: list[SyncRoot]) -> EvidenceRecord | None:

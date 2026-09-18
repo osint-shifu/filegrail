@@ -33,10 +33,12 @@ _ZSH_ENTRY = re.compile(r"^: (\d{9,11}):\d+;(.*)$", re.DOTALL)
 _MIN_SUBSTRING_NAME = 6
 
 
-def _parse_history(path: Path) -> list[tuple[float | None, str]]:
+def _parse_history(path: Path, *, raise_errors: bool = False) -> list[tuple[float | None, str]]:
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
+        if raise_errors:
+            raise
         return []
 
     entries: list[tuple[float | None, str]] = []
@@ -88,7 +90,7 @@ def _match_names(names: set[str], words: list[str], command: str) -> set[str]:
 
 
 def collect_shell_history(
-    names: set[str], home: Path | None = None
+    names: set[str], home: Path | None = None, stats: dict[str, int] | None = None
 ) -> dict[str, list[EvidenceRecord]]:
     """Map file name -> commands that mention it.
 
@@ -97,12 +99,22 @@ def collect_shell_history(
     presentation rank this source is given.
     """
     home = home or Path.home()
-    if not names:
-        return {}
-
+    artifacts_found = 0
+    artifacts_read = 0
+    entries_read = 0
     found: dict[str, list[EvidenceRecord]] = {}
     for relative in HISTORY_FILES:
-        for timestamp, command in _parse_history(home / relative):
+        path = home / relative
+        if not path.is_file():
+            continue
+        artifacts_found += 1
+        try:
+            entries = _parse_history(path, raise_errors=True)
+        except OSError:
+            continue
+        artifacts_read += 1
+        entries_read += len(entries)
+        for timestamp, command in entries:
             try:
                 words = shlex.split(command)
             except ValueError:
@@ -125,4 +137,10 @@ def collect_shell_history(
                         note=None if program in _FETCH_TOOLS else "command mentions the file",
                     )
                 )
+    if stats is not None:
+        stats.update(
+            shell_artifacts_found=artifacts_found,
+            shell_artifacts_read=artifacts_read,
+            shell_records=entries_read,
+        )
     return found

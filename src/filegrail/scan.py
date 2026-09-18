@@ -64,6 +64,81 @@ SKIP_DIRECTORIES = {
     ".cache",
 }
 
+SEARCHED = "searched"
+UNAVAILABLE = "unavailable"
+PARTIAL = "partial"
+DISABLED = "disabled"
+
+
+@dataclass(slots=True)
+class SourceCoverage:
+    """What one evidence source contributed to this exact scan."""
+
+    state: str
+    records: int = 0
+    artifacts_found: int | None = None
+    artifacts_read: int | None = None
+    detail: str | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        result: dict[str, object] = {"state": self.state, "records": self.records}
+        if self.artifacts_found is not None:
+            result["artifacts_found"] = self.artifacts_found
+        if self.artifacts_read is not None:
+            result["artifacts_read"] = self.artifacts_read
+        if self.detail is not None:
+            result["detail"] = self.detail
+        return result
+
+
+@dataclass(slots=True)
+class ScanCoverage:
+    """Sources and filesystem paths actually covered by one scan pass."""
+
+    files_discovered: int = 0
+    files_scanned: int = 0
+    sources: dict[str, SourceCoverage] = field(default_factory=dict)
+    unreadable: list[str] = field(default_factory=list)
+    skipped_by_name: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "files": {
+                "discovered": self.files_discovered,
+                "scanned": self.files_scanned,
+            },
+            "sources": {name: source.to_dict() for name, source in self.sources.items()},
+            "unsearched": {
+                "unreadable": self.unreadable,
+                "skipped_by_name": self.skipped_by_name,
+            },
+        }
+
+
+def _artifact_coverage(
+    stats: dict[str, int], prefix: str, *, records: str | None = None
+) -> SourceCoverage:
+    found = stats.get(f"{prefix}_artifacts_found", 0)
+    read = stats.get(f"{prefix}_artifacts_read", 0)
+    if not found:
+        state = UNAVAILABLE
+    elif read == found:
+        state = SEARCHED
+    elif read:
+        state = PARTIAL
+    else:
+        state = UNAVAILABLE
+    detail = None
+    if found and read != found:
+        detail = f"{read} of {found} artifacts readable"
+    return SourceCoverage(
+        state=state,
+        records=stats.get(records or f"{prefix}_records", 0),
+        artifacts_found=found,
+        artifacts_read=read,
+        detail=detail,
+    )
+
 
 @dataclass(slots=True)
 class Unsearched:
@@ -144,6 +219,7 @@ def scan(
     stats: dict[str, int] | None = None,
     skip_names: bool = True,
     unsearched: Unsearched | None = None,
+    coverage: ScanCoverage | None = None,
 ) -> list[FileRecord]:
     """Build a FileRecord for every file under root.
 
@@ -152,17 +228,19 @@ def scan(
     guessing whether the tool failed.
     """
     root = root.resolve()
+    source_stats = stats if stats is not None else {}
+    missed = unsearched if unsearched is not None else Unsearched()
     files = list(
         iter_files(
             root,
             recursive=recursive,
             suffixes=suffixes,
             skip_names=skip_names,
-            unsearched=unsearched,
+            unsearched=missed,
         )
     )
 
-    downloads = collect_browser_downloads(home=home, stats=stats)
+    downloads = collect_browser_downloads(home=home, stats=source_stats)
     # Browsers record the path at download time; index by name too so a file
     # that was later moved into the case directory still resolves. The record
     # keeps the path as its own operating system spelled it, which is why the
@@ -172,18 +250,21 @@ def scan(
         downloads_by_name.setdefault(basename(target), []).extend(found)
 
     history = (
-        collect_shell_history({path.name for path in files}, home=home) if use_shell_history else {}
+        collect_shell_history({path.name for path in files}, home=home, stats=source_stats)
+        if use_shell_history
+        else {}
     )
-    recent = collect_recent_files(home=home)
-    quarantined = collect_quarantine_events(home=home)
-    shortcuts = collect_windows_recent(home=home)
-    synced = collect_sync_roots(home=home)
+    recent = collect_recent_files(home=home, stats=source_stats)
+    quarantined = collect_quarantine_events(home=home, stats=source_stats)
+    shortcuts = collect_windows_recent(home=home, stats=source_stats)
+    synced = collect_sync_roots(home=home, stats=source_stats)
 
     records: list[FileRecord] = []
     for path in files:
         try:
             stat = path.stat()
         except OSError:
+            missed.unreadable.append(str(path))
             continue
 
         record = FileRecord(
@@ -236,8 +317,46 @@ def scan(
 
     if follow_archives:
         _attach_archive_records(records, downloads, downloads_by_name)
-    _attach_torrent_records(records, files, home)
+    torrent_coverage = _attach_torrent_records(records, files, home, source_stats)
     attach_lineage(records)
+
+    if coverage is not None:
+        coverage.files_discovered = len(files)
+        coverage.files_scanned = len(records)
+        coverage.unreadable = list(dict.fromkeys(missed.unreadable))
+        coverage.skipped_by_name = list(dict.fromkeys(missed.by_name))
+        coverage.sources = {
+            "file-evidence": SourceCoverage(
+                PARTIAL if len(records) != len(files) else SEARCHED,
+                records=sum(len(record.evidence) for record in records),
+                artifacts_found=len(files),
+                artifacts_read=len(records),
+            ),
+            "browser-download": _artifact_coverage(
+                source_stats,
+                "browser",
+                records="browser_records",
+            ),
+            "shell-history": (
+                _artifact_coverage(source_stats, "shell")
+                if use_shell_history
+                else SourceCoverage(DISABLED, detail="disabled by --no-shell-history")
+            ),
+            "recent-documents": _artifact_coverage(source_stats, "recent"),
+            "macos-quarantine": _artifact_coverage(source_stats, "quarantine"),
+            "windows-recent": _artifact_coverage(source_stats, "windows_recent"),
+            "sync-folder": SourceCoverage(
+                SEARCHED if synced else UNAVAILABLE,
+                records=len(synced),
+                detail=None if synced else "no readable sync roots found",
+            ),
+            "torrent": torrent_coverage,
+            "archives": SourceCoverage(
+                SEARCHED if follow_archives else DISABLED,
+                records=sum(1 for path in files if is_archive(path)),
+                detail=None if follow_archives else "disabled by --no-archives",
+            ),
+        }
 
     return records
 
@@ -291,8 +410,11 @@ def _attach_archive_records(
 
 
 def _attach_torrent_records(
-    records: list[FileRecord], files: list[Path], home: Path | None = None
-) -> None:
+    records: list[FileRecord],
+    files: list[Path],
+    home: Path | None = None,
+    stats: dict[str, int] | None = None,
+) -> SourceCoverage:
     """Give a file the torrent that lists it, where one was scanned beside it.
 
     A torrent is paired the way an archive member is - base name and exact size
@@ -306,12 +428,38 @@ def _attach_torrent_records(
     for record in records:
         by_signature.setdefault((Path(record.path).name, record.size), []).append(record)
 
-    scanned = (read_torrent(path) for path in files if is_torrent(path))
-    for torrent in [*(t for t in scanned if t is not None), *collect_torrents(home=home)]:
+    scanned_paths = [path for path in files if is_torrent(path)]
+    scanned = [torrent for path in scanned_paths if (torrent := read_torrent(path)) is not None]
+    source_stats = stats if stats is not None else {}
+    stored = collect_torrents(home=home, stats=source_stats)
+    for torrent in [*scanned, *stored]:
         for name, sizes in torrent.members.items():
             for size in sizes:
                 for record in by_signature.get((name, size), []):
                     record.evidence.append(torrent.record)
+
+    found = len(scanned_paths) + source_stats.get("torrent_artifacts_found", 0)
+    read = len(scanned) + source_stats.get("torrent_artifacts_read", 0)
+    stores_found = source_stats.get("torrent_stores_found", 0)
+    stores_read = source_stats.get("torrent_stores_read", 0)
+    if stores_found != stores_read or (found and read != found):
+        state = PARTIAL if stores_read or read else UNAVAILABLE
+    elif stores_read or read:
+        state = SEARCHED
+    else:
+        state = UNAVAILABLE
+    details = []
+    if stores_found:
+        details.append(f"{stores_read} of {stores_found} client stores readable")
+    if found and read != found:
+        details.append(f"{read} of {found} torrent files readable")
+    return SourceCoverage(
+        state,
+        records=read,
+        artifacts_found=found,
+        artifacts_read=read,
+        detail="; ".join(details) or None,
+    )
 
 
 #: Why a name match was needed, for a source that recorded where the file was

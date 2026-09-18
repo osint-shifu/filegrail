@@ -35,7 +35,7 @@ from .report import (
     render_text,
     render_timeline,
 )
-from .scan import Unsearched, scan
+from .scan import ScanCoverage, Unsearched, scan
 from .theme import detect
 
 if TYPE_CHECKING:  # only for the signatures; the scan brings the real thing
@@ -442,6 +442,7 @@ def _scan(rest: list[str]) -> int:
 
     stats: dict[str, int] = {}
     missed = Unsearched()
+    coverage = ScanCoverage()
     records = scan(
         root,
         recursive=not args.no_recurse,
@@ -453,6 +454,7 @@ def _scan(rest: list[str]) -> int:
         stats=stats,
         skip_names=not args.no_skip,
         unsearched=missed,
+        coverage=coverage,
     )
 
     if args.unknown_only:
@@ -467,6 +469,39 @@ def _scan(rest: list[str]) -> int:
     # opened and parsed and then print a count of what it found. Asking for the
     # wider corpus is asking to be shown it.
     listed = args.pivots or args.content or args.graphml or args.graph_csv
+    output_format = (
+        "json"
+        if args.json
+        else "graphml"
+        if args.graphml
+        else "graph-csv"
+        if args.graph_csv
+        else "html"
+        if args.html
+        else "timeline"
+        if args.timeline
+        else "text"
+    )
+    run: dict[str, object] = {
+        "output": output_format,
+        "home": str(home or Path.home()),
+        "recursive": not args.no_recurse,
+        "hash": args.hash_files,
+        "shell_history": not args.no_shell_history,
+        "archives": not args.no_archives,
+        "skip_named_directories": not args.no_skip,
+        "pivots": listed,
+        "content": args.content,
+        "cluster": args.cluster,
+        "unknown_only": args.unknown_only,
+        "redacted": args.redact,
+        "filters": {
+            "types": list(args.families),
+            "extensions": list(args.extensions),
+            "effective_suffixes": sorted(suffixes) if suffixes is not None else None,
+        },
+    }
+    coverage_document = coverage.to_dict()
 
     written = args.out.resolve() if args.out else None
     if args.json:
@@ -478,13 +513,19 @@ def _scan(rest: list[str]) -> int:
             cluster=args.cluster,
             home=home,
             unsearched=missed,
+            run=run,
+            coverage=coverage_document,
         )
     elif args.graphml or args.graph_csv:
         from .graph import build_graph
         from .graph_export import render_graph_csv, render_graphml
 
         graph = build_graph(records, extract(records, content=args.content))
-        report = render_graphml(graph) if args.graphml else render_graph_csv(graph)
+        report = (
+            render_graphml(graph, run=run, coverage=coverage_document)
+            if args.graphml
+            else render_graph_csv(graph, run=run, coverage=coverage_document)
+        )
     elif args.html:
         case, found = _case(records, base, home, content=args.content, listed=listed)
         report = render_html(

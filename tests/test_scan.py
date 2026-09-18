@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from filegrail.scan import Unsearched, iter_files, scan
+from filegrail.scan import ScanCoverage, Unsearched, iter_files, scan
 from filegrail.sources.fsattrs import read_file_attributes
 
 from .test_browser import CHROMIUM_SCHEMA, START_TIME
@@ -74,6 +74,35 @@ def test_hashing_is_opt_in(tmp_path: Path):
     assert scan(case, home=tmp_path, use_shell_history=False)[0].sha256 is None
     hashed = scan(case, home=tmp_path, use_shell_history=False, hash_files=True)[0]
     assert hashed.sha256 == "4e17aeaa904104862a741775bf05b6cb883716b07589e088c94d46d192ef4614"
+
+
+def test_coverage_records_what_the_scan_actually_read(tmp_path: Path):
+    case = tmp_path / "case"
+    case.mkdir()
+    evidence = case / "evidence.txt"
+    evidence.write_text("hello world", encoding="utf-8")
+    _profile_with(tmp_path, str(evidence))
+    coverage = ScanCoverage()
+
+    scan(
+        case,
+        home=tmp_path,
+        use_shell_history=False,
+        follow_archives=False,
+        coverage=coverage,
+    )
+
+    document = coverage.to_dict()
+    assert document["files"] == {"discovered": 1, "scanned": 1}
+    assert document["sources"]["browser-download"] == {
+        "state": "searched",
+        "records": 1,
+        "artifacts_found": 1,
+        "artifacts_read": 1,
+    }
+    assert document["sources"]["shell-history"]["state"] == "disabled"
+    assert document["sources"]["archives"]["state"] == "disabled"
+    assert document["unsearched"] == {"unreadable": [], "skipped_by_name": []}
 
 
 def test_noise_directories_are_skipped(tmp_path: Path):
