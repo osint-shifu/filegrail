@@ -23,6 +23,7 @@ from .sources import (
     list_members,
     member_origin,
     read_c2pa_manifest,
+    read_children,
     read_embedded_metadata,
     read_file_attributes,
     read_iptc,
@@ -314,7 +315,7 @@ def scan(
         record.evidence.extend(recent.get(str(path), []))
         record.evidence.extend(read_shortcuts(path, stat.st_size, shortcuts))
         records.append(record)
-        if is_archive(path) and follow_archives:
+        if follow_archives:
             records.extend(_member_records(record, path, hash_files))
 
     if follow_archives:
@@ -364,16 +365,22 @@ def scan(
 
 
 def _member_records(archive: FileRecord, path: Path, hash_files: bool) -> list[FileRecord]:
-    """The files inside an archive that carry evidence, each a record of its own.
+    """The files inside a carrier that carry evidence, each a record of its own.
 
-    A member's origin is the archive's, inherited as such: it arrived inside
-    the thing that arrived that way. An archive with no origin record still
+    A member's origin is the carrier's, inherited as such: it arrived inside
+    the thing that arrived that way. A carrier with no origin record still
     places the member inside itself, which is the one thing known about it.
+    An archive's members are archive members; a file inside a document or a
+    message is an embedded file, and its record says which.
     """
+    if is_archive(path):
+        members, source = read_members(path, hashing=hash_files), "archive-member"
+    else:
+        members, source = read_children(path, hashing=hash_files), "embedded-file"
     origins = [found for found in archive.evidence if category(found) == ORIGIN]
     leading = max(origins, key=lambda found: found.priority) if origins else None
     children = []
-    for member in read_members(path, hashing=hash_files):
+    for member in members:
         child = FileRecord(
             path=f"{path}/{member.name}",
             size=member.size,
@@ -383,9 +390,9 @@ def _member_records(archive: FileRecord, path: Path, hash_files: bool) -> list[F
             member=member.name,
         )
         child.evidence.append(
-            inherited_origin(leading, str(path), member.name)
+            inherited_origin(leading, str(path), member.name, source=source)
             if leading is not None
-            else member_origin(str(path), member.name)
+            else member_origin(str(path), member.name, source=source)
         )
         child.evidence.extend(member.evidence)
         children.append(child)

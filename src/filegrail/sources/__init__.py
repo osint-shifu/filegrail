@@ -9,6 +9,7 @@ from .fsattrs import read_file_attributes
 from .iptc import read_iptc
 from .mail import read_mail
 from .messenger import read_messenger_name
+from .nested import read_children
 from .quarantine import collect_quarantine_events, read_quarantine
 from .recent import collect_recent_files
 from .shell import collect_shell_history
@@ -49,6 +50,7 @@ __all__ = [
     "read_trash",
     "is_archive",
     "list_members",
+    "read_children",
     "read_members",
     "member_origin",
     "inherited_origin",

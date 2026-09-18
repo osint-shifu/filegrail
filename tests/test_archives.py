@@ -171,7 +171,7 @@ def test_the_archive_read_budget_bounds_members_opened_not_findings(tmp_path: Pa
     archive = tmp_path / "many.zip"
     _make_zip(archive, {f"blob-{n}.bin": b"x" for n in range(60)})
     opened = []
-    monkeypatch.setattr(archives, "_read_member", lambda name, extract: opened.append(name) or [])
+    monkeypatch.setattr(archives, "read_member", lambda name, extract: opened.append(name) or [])
 
     archives.read_members(archive)
 

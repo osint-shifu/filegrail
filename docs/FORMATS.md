@@ -186,6 +186,8 @@ carries evidence becomes a file of its own in the report, with the archive as
 its parent, the archive's origin inherited as its own, and its member path in
 `where`. What it says stays its own - a photograph taken in 2008 inside a zip
 written last week does not date the zip, and a zip has never been anywhere.
+A `.gz`, `.bz2` or `.xz` that is not a tar holds one file, named by the
+archive's own name without the compression suffix.
 
 For the same reason the readers that sweep raw bytes for a block, XMP and IPTC,
 are not run on an archive at all. What they would find there belongs to a
@@ -193,6 +195,26 @@ member, and a zip is not made by Photoshop because a photograph inside it was.
 
 The archive is considered whether or not it is inside the scanned tree — a case
 directory is usually the *result* of unpacking something that lives elsewhere.
+
+## Files inside documents and messages
+
+Read the way an archive's members are: each becomes a file of its own in the
+report, with the carrier as its parent, the carrier's origin inherited as its
+own under the `embedded-file` source, and an `embedded in` relationship in
+the graph.
+
+| Carrier | What is read |
+|:---|:---|
+| PDF | Files attached to the document, named by their file specification |
+| `.eml` | Attachments, under the name the message gives them |
+| `.msg` | Attachments, under the name the message gives them; a message attached to a message is not opened |
+| Office packages (`.docx`, `.xlsx`, `.pptx` and their macro and template variants) | Files under `embeddings/`; an OLE Packager object is read as the file it packages, under its original file name |
+| Legacy Office (`.doc`, `.xls`, `.ppt` and their template variants) | OLE Packager objects, named by their storage and original file name |
+
+The budget is the archive's: a bounded number of files opened per carrier and
+a bounded size per file, and a carrier over a size of its own is not opened.
+A carried file is read one level deep: a zip attached to a message is
+reported, and what is inside that zip is not.
 
 ---
 

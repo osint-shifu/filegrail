@@ -97,6 +97,9 @@ SOURCE_CATEGORIES: dict[str, str] = {
     "email-delivery": ORIGIN,
     # The archive's own origin, inherited by a file that came out of it.
     "archive-member": ORIGIN,
+    # A file carried inside a document or a message: an attachment, an
+    # embedded file, a packaged object. Its origin is the carrier's.
+    "embedded-file": ORIGIN,
     "torrent": ORIGIN,
     # A file name in the shape a messenger writes. It is an association with a
     # naming convention, and the match basis on every one of these records says
@@ -144,6 +147,7 @@ SOURCE_MATCH: dict[str, str] = {
     "email-relay": EMBEDDED,
     "email-header": EMBEDDED,
     "archive-member": CONTAINER_MEMBER,
+    "embedded-file": CONTAINER_MEMBER,
     "torrent": NAME_AND_SIZE,
     "messenger-name": FILENAME,
     "shell-history": FILENAME,
@@ -176,6 +180,7 @@ SOURCE_PRIORITY: dict[str, int] = {
     "email-delivery": 78,
     "ytdlp-sidecar": 75,
     "archive-member": 70,
+    "embedded-file": 70,
     "torrent": 70,
     "c2pa": 60,
     "device-metadata": 55,
@@ -210,6 +215,7 @@ SOURCE_LABELS: dict[str, str] = {
     "xdg-xattr": "XDG attribute",
     "ytdlp-sidecar": "yt-dlp sidecar",
     "archive-member": "archive member",
+    "embedded-file": "embedded file",
     "torrent": "torrent",
     "c2pa": "Content Credentials",
     "device-metadata": "device metadata",
@@ -240,6 +246,7 @@ EVENT_VERBS: dict[str, str] = {
     "ytdlp-sidecar": "downloaded",
     "email-delivery": "delivered",
     "archive-member": "extracted",
+    "embedded-file": "embedded",
     "torrent": "downloaded",
     "shell-history": "handled",
     "device-metadata": "captured",

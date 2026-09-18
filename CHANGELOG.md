@@ -5,6 +5,17 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.31.0 - 2026-09-19
+
+### Added
+
+- Files carried inside documents and messages are files of their own: an attachment in an `.eml` or `.msg`, a file attached to a PDF and an object packaged in an Office document are read under their own names, with their own evidence, the carrier as their parent and an `embedded in` relationship in the graph. Their origin is the carrier's, recorded by the `embedded-file` source.
+- A `.gz`, `.bz2` or `.xz` that is not a tar is read as the one file it holds.
+
+### Changed
+
+- `--no-archives` also leaves files inside documents and messages unread.
+
 ## 0.30.8 - 2026-09-19
 
 ### Changed

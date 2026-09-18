@@ -62,6 +62,7 @@ def chain(first: int, count: int) -> list[int]:
 def ole(
     streams: dict[str, bytes],
     *,
+    storages: dict[str, dict[str, bytes]] | None = None,
     directory_entries: tuple[bytes, ...] = (),
     orphan_entries: tuple[bytes, ...] = (),
 ) -> bytes:
@@ -69,9 +70,10 @@ def ole(
 
     A stream shorter than the cutoff goes into the mini stream, exactly as an
     encoder writes it, so the mini-FAT path is exercised rather than assumed.
+    `storages` places further streams one storage below the root, the way a
+    message keeps each attachment or a document its object pool.
     """
-    big = {name: data for name, data in streams.items() if len(data) >= MINI_CUTOFF}
-    small = {name: data for name, data in streams.items() if len(data) < MINI_CUTOFF}
+    groups = [("", streams), *(storages or {}).items()]
 
     sectors: list[bytes] = []
     fat: list[int] = []
@@ -85,22 +87,26 @@ def ole(
             sectors.append(padded[offset : offset + unit].ljust(unit, b"\x00"))
         return start, (len(padded) // unit) or 0
 
-    entries: list[tuple[str, int, int, int]] = []
+    placed: dict[str, list[tuple[str, int, int, int]]] = {name: [] for name, _ in groups}
 
-    for name, data in big.items():
-        start, count = allocate(data, SECTOR)
-        fat.extend(chain(start, count))
-        entries.append((name, 2, start, len(data)))
+    for group, members in groups:
+        for name, data in members.items():
+            if len(data) >= MINI_CUTOFF:
+                start, count = allocate(data, SECTOR)
+                fat.extend(chain(start, count))
+                placed[group].append((name, 2, start, len(data)))
 
     mini_stream = b""
     mini_fat: list[int] = []
-    for name, data in small.items():
-        index = len(mini_stream) // MINI_SECTOR
-        padded = data + b"\x00" * (-len(data) % MINI_SECTOR)
-        count = len(padded) // MINI_SECTOR
-        mini_stream += padded
-        mini_fat.extend(chain(index, count))
-        entries.append((name, 2, index, len(data)))
+    for group, members in groups:
+        for name, data in members.items():
+            if len(data) < MINI_CUTOFF:
+                index = len(mini_stream) // MINI_SECTOR
+                padded = data + b"\x00" * (-len(data) % MINI_SECTOR)
+                count = len(padded) // MINI_SECTOR
+                mini_stream += padded
+                mini_fat.extend(chain(index, count))
+                placed[group].append((name, 2, index, len(data)))
 
     mini_start = ENDOFCHAIN
     if mini_stream:
@@ -113,21 +119,37 @@ def ole(
         mini_fat_start, mini_fat_count = allocate(blob, SECTOR)
         fat.extend(chain(mini_fat_start, mini_fat_count))
 
-    root_child = 1 if entries or directory_entries else FREE
-    root = directory_entry("Root Entry", 5, mini_start, len(mini_stream), child=root_child)
-    directory.append(root)
-    for name, category, start, size in entries:
-        directory.append(directory_entry(name, category, start, size))
-    directory.extend(directory_entries)
+    def link(indices: list[int]) -> None:
+        """Chain siblings to the right: a right-leaning tree reaches them all."""
+        for position, index in enumerate(indices):
+            right = indices[position + 1] if position + 1 < len(indices) else FREE
+            linked = bytearray(directory[index])
+            struct.pack_into("<I", linked, 72, right)
+            directory[index] = bytes(linked)
 
-    # A right-leaning tree is enough to make every ordinary fixture entry
-    # reachable from the root. Entries appended afterward are intentionally
-    # allocated but unreachable, matching deleted/orphaned directory records.
-    for index in range(1, len(directory)):
-        right = index + 1 if index + 1 < len(directory) else FREE
-        linked = bytearray(directory[index])
-        struct.pack_into("<I", linked, 72, right)
-        directory[index] = bytes(linked)
+    directory.append(b"")  # the root, written once its first child is known
+    top: list[int] = []
+    for name, category, start, size in placed[""]:
+        top.append(len(directory))
+        directory.append(directory_entry(name, category, start, size))
+    for storage, _ in groups[1:]:
+        top.append(len(directory))
+        first_child = len(directory) + 1 if placed[storage] else FREE
+        directory.append(directory_entry(storage, 1, 0, 0, child=first_child))
+        below: list[int] = []
+        for name, category, start, size in placed[storage]:
+            below.append(len(directory))
+            directory.append(directory_entry(name, category, start, size))
+        link(below)
+    for raw in directory_entries:
+        top.append(len(directory))
+        directory.append(raw)
+    link(top)
+    directory[0] = directory_entry(
+        "Root Entry", 5, mini_start, len(mini_stream), child=top[0] if top else FREE
+    )
+    # Entries appended afterward are intentionally allocated but unreachable,
+    # matching deleted/orphaned directory records.
     directory.extend(orphan_entries)
 
     directory_start, directory_count = allocate(b"".join(directory), SECTOR)

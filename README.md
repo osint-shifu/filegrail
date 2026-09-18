@@ -1,6 +1,6 @@
 <div align="center">
 
-[![PyPI](https://img.shields.io/badge/pypi-v0.30.8-3775A9?style=flat-square)](https://pypi.org/project/filegrail/) ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-9A6700?style=flat-square) ![93 formats](https://img.shields.io/badge/formats-93-8250DF?style=flat-square) ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-00897B?style=flat-square) ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1F883D?style=flat-square) [![CI](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml/badge.svg)](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml) ![License](https://img.shields.io/badge/license-Apache--2.0-BC4C00?style=flat-square)
+[![PyPI](https://img.shields.io/badge/pypi-v0.31.0-3775A9?style=flat-square)](https://pypi.org/project/filegrail/) ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-9A6700?style=flat-square) ![93 formats](https://img.shields.io/badge/formats-93-8250DF?style=flat-square) ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-00897B?style=flat-square) ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1F883D?style=flat-square) [![CI](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml/badge.svg)](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml) ![License](https://img.shields.io/badge/license-Apache--2.0-BC4C00?style=flat-square)
 
 </div>
 
@@ -335,6 +335,7 @@ What can be recovered depends on which local records still exist.
 | **Linux XDG attributes** | `user.xdg.origin.url`, `user.xdg.referrer.url` |
 | **Shell history** | Fetch commands such as `curl`, `wget`, `yt-dlp`, `aria2c`, `scp`, `rsync`, `git`, `gh`, `aws`; other commands naming a file are retained as activity |
 | **Archives** | Member names and sizes; extracted files can be matched back to archive members |
+| **Embedded files** | Attachments in `.eml` and `.msg` messages, files attached to a PDF and objects packaged in Office documents, each read as a file of its own with the carrier as its parent |
 | **Torrent files** | Trackers, client, comment, info hash, magnet link and member information |
 | **Torrent client stores** | qBittorrent, Transmission and Deluge local torrent records |
 | **`yt-dlp` sidecars** | Page URL, uploader, channel, publication date, extractor and fetch time |
@@ -988,7 +989,7 @@ Running `filegrail` without arguments shows the command overview without startin
 | `--no-recurse` | Disable recursive directory scanning |
 | `--no-skip` | Include normally skipped build/cache/vendor directories |
 | `--no-shell-history` | Exclude shell history |
-| `--no-archives` | Disable inherited archive-origin matching |
+| `--no-archives` | Leave files inside archives, documents and messages unread, and disable inherited archive-origin matching |
 | `--color`, `--no-color` | Force or disable ANSI colour |
 
 One output form at a time: `--timeline`, `--json`, `--html`, `--graphml` and `--graph-csv` exclude one another.
@@ -1141,7 +1142,7 @@ Scan documents can contain:
 - scan root;
 - run configuration;
 - evidence coverage;
-- file records, including the members read inside archives, each with its parent;
+- file records, including the files read inside archives, documents and messages, each with its parent;
 - evidence records, each with where in the file it was read from, where the reader knows;
 - correlation results;
 - investigative identifiers;

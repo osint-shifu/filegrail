@@ -187,3 +187,21 @@ def test_coverage_counts_the_files_on_disk(tmp_path: Path):
     scan(case, use_shell_history=False, coverage=coverage)
 
     assert coverage.files_discovered == coverage.files_scanned == 1
+
+
+def test_a_single_compressed_file_is_read_under_its_own_name(tmp_path: Path):
+    """A `.gz` that is not a tar holds one file, named by the archive's own name."""
+    import gzip
+
+    case = tmp_path / "case"
+    case.mkdir()
+    photo = tmp_path / "source.jpg"
+    jpeg_with_exif(photo, "NIKON", "COOLPIX P6000", "2008:10:22 16:28:39")
+    (case / "holiday.jpg.gz").write_bytes(gzip.compress(photo.read_bytes()))
+
+    child = _child(scan(case, use_shell_history=False), "holiday.jpg")
+
+    assert child.parent == str(case / "holiday.jpg.gz")
+    assert child.size == photo.stat().st_size
+    exif = next(found for found in child.evidence if found.block == "exif")
+    assert exif.fields["Model"] == "COOLPIX P6000"

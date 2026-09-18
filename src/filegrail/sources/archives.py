@@ -16,7 +16,10 @@ seen for a name is kept, not just the last.
 
 from __future__ import annotations
 
+import bz2
+import gzip
 import hashlib
+import lzma
 import tarfile
 import tempfile
 import zipfile
@@ -128,7 +131,7 @@ def read_members(path: Path, *, hashing: bool = False) -> list[Member]:
                     raw = extract()
                 except (*_UNREADABLE, RuntimeError):
                     continue
-                evidence = _read_member(name, raw)
+                evidence = read_member(name, raw)
                 if not evidence:
                     continue
                 digest = hashlib.sha256(raw).hexdigest() if hashing else None
@@ -179,7 +182,35 @@ def _opened(path: Path) -> Iterator[Iterator[_Listed] | None]:
             yield from_tar()
         return
 
+    if path.suffix.lower() in _SINGLE_FILE:
+        yield _from_single(path)
+        return
+
     yield None
+
+
+#: A compressed file that is not a tar holds one file, which the suffix names
+#: by leaving it off: `holiday.jpg.gz` carries `holiday.jpg`.
+_SINGLE_FILE = {".gz", ".bz2", ".xz"}
+
+
+def _from_single(path: Path) -> Iterator[_Listed]:
+    suffix = path.suffix.lower()
+    try:
+        if suffix == ".gz":
+            with gzip.open(path, "rb") as unzipped:
+                raw = unzipped.read(_MAX_MEMBER_BYTES + 1)
+        elif suffix == ".bz2":
+            with bz2.open(path, "rb") as unzipped:
+                raw = unzipped.read(_MAX_MEMBER_BYTES + 1)
+        else:
+            with lzma.open(path, "rb") as unzipped:
+                raw = unzipped.read(_MAX_MEMBER_BYTES + 1)
+    except (*_UNREADABLE, EOFError, lzma.LZMAError):
+        return
+    if len(raw) > _MAX_MEMBER_BYTES:
+        return
+    yield (path.stem, len(raw), None, lambda: raw)
 
 
 def _zip_time(stamp: tuple[int, int, int, int, int, int]) -> str | None:
@@ -196,8 +227,13 @@ def _tar_bytes(bundle: tarfile.TarFile, entry: tarfile.TarInfo) -> bytes:
     return handle.read() if handle is not None else b""
 
 
-def _read_member(name: str, raw: bytes) -> list[EvidenceRecord]:
-    """Run the ordinary readers over one member, copied out to a temporary file."""
+def read_member(name: str, raw: bytes) -> list[EvidenceRecord]:
+    """Run the ordinary readers over one file carried inside another.
+
+    The bytes are copied out to a temporary file under the member's own suffix,
+    so a photograph inside a zip, a PDF or a message is read by the same
+    readers, and read the same way, as one on disk.
+    """
     suffix = Path(name).suffix.lower()
     if suffix not in SUFFIXES:
         return []
@@ -219,7 +255,11 @@ def _read_member(name: str, raw: bytes) -> list[EvidenceRecord]:
 
 
 def inherited_origin(
-    record: EvidenceRecord, archive_path: str, member: str | None = None
+    record: EvidenceRecord,
+    archive_path: str,
+    member: str | None = None,
+    *,
+    source: str = "archive-member",
 ) -> EvidenceRecord:
     """Rewrite an archive's own origin as one for a file that came out of it.
 
@@ -234,13 +274,13 @@ def inherited_origin(
     archive_name = Path(archive_path).name
     if member is not None:
         note = f"inside {archive_name}"
-        basis = f"member of {archive_name}"
+        basis = _basis(source, archive_name)
     else:
         note = f"extracted from {archive_name}"
         basis = f"member of {archive_name}, matched by name and exact size"
     return replace(
         record,
-        source="archive-member",
+        source=source,
         match=CONTAINER_MEMBER,
         match_note=basis,
         container=archive_path,
@@ -252,12 +292,19 @@ def inherited_origin(
     )
 
 
-def member_origin(archive_path: str, member: str) -> EvidenceRecord:
+def _basis(source: str, carrier: str) -> str:
+    """How the file is tied to its carrier: membership, said in the carrier's terms."""
+    return f"embedded in {carrier}" if source == "embedded-file" else f"member of {carrier}"
+
+
+def member_origin(
+    archive_path: str, member: str, *, source: str = "archive-member"
+) -> EvidenceRecord:
     """The one thing known about how a member got here: it is inside the archive."""
     return EvidenceRecord(
-        source="archive-member",
+        source=source,
         match=CONTAINER_MEMBER,
-        match_note=f"member of {Path(archive_path).name}",
+        match_note=_basis(source, Path(archive_path).name),
         container=archive_path,
         note=f"inside {Path(archive_path).name}",
         where={"member": member},

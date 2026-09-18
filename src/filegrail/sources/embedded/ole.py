@@ -189,6 +189,87 @@ def read_streams(path: Path, names: Iterable[str]) -> dict[str, bytes]:
     return found
 
 
+def packaged_objects(data: bytes) -> list[tuple[str, bytes]]:
+    """The files wrapped by OLE Packager in a compound document given as bytes.
+
+    Each is named by its place: the storage that holds the Ole10Native stream,
+    then the file name Packager recorded, `ObjectPool/_1234/invoice.pdf`.
+    """
+    if not data.startswith(_SIGNATURE):
+        return []
+    found = []
+    try:
+        container = _Container(data)
+        for path, entry in container.walk():
+            if entry.kind != _STREAM or entry.name.casefold() != "\x01ole10native":
+                continue
+            parsed = _parse_packager(container.entry_stream(entry))
+            if parsed is None or not parsed[0].filename:
+                continue
+            folder = path.rpartition("/")[0]
+            name = Path(parsed[0].filename).name
+            found.append((f"{folder}/{name}" if folder else name, parsed[1]))
+    except (struct.error, ValueError, IndexError):
+        return found
+    return found
+
+
+#: [MS-OXMSG]: each attachment is a storage named for its index, holding the
+#: bytes under property 3701 typed binary and the name under 3707 (long) or
+#: 3704 (short), typed 001F for UTF-16 text and 001E for 8-bit.
+_ATTACHMENT_STORAGE = "__attach_version1.0_#"
+_ATTACHMENT_DATA = "__substg1.0_37010102"
+_ATTACHMENT_NAMES = (
+    "__substg1.0_3707001F",
+    "__substg1.0_3707001E",
+    "__substg1.0_3704001F",
+    "__substg1.0_3704001E",
+)
+
+
+def attachments(data: bytes) -> list[tuple[str, bytes]]:
+    """The files attached to a message stored as a compound document.
+
+    An attachment that is itself a message is a storage rather than a byte
+    stream, and its own attachments are its own; neither is listed here.
+    """
+    if not data.startswith(_SIGNATURE):
+        return []
+    storages: dict[str, dict[str, bytes]] = {}
+    try:
+        container = _Container(data)
+        for path, entry in container.walk():
+            folder, _, name = path.rpartition("/")
+            if entry.kind != _STREAM or not folder.startswith(_ATTACHMENT_STORAGE):
+                continue
+            if name == _ATTACHMENT_DATA or name in _ATTACHMENT_NAMES:
+                storages.setdefault(folder, {})[name] = container.entry_stream(entry)
+    except (struct.error, ValueError, IndexError):
+        return []
+    found = []
+    for folder in sorted(storages):
+        streams = storages[folder]
+        raw = streams.get(_ATTACHMENT_DATA)
+        filename = next(
+            (text for key in _ATTACHMENT_NAMES if (text := _property_text(key, streams.get(key)))),
+            None,
+        )
+        if raw is not None and filename:
+            found.append((Path(filename).name, raw))
+    return found
+
+
+def _property_text(name: str, raw: bytes | None) -> str | None:
+    """Decode a property stream by the type its name declares."""
+    if raw is None:
+        return None
+    if name.endswith("001F"):
+        if len(raw) % 2:
+            return None
+        return raw.decode("utf-16-le", "replace").rstrip("\x00") or None
+    return raw.decode("utf-8", "replace").rstrip("\x00") or None
+
+
 # --- the container -----------------------------------------------------------
 
 
@@ -310,6 +391,27 @@ class _Container:
             entry = self.entries[index]
             if entry is not None:
                 yield entry
+
+    def walk(self) -> Iterable[tuple[str, _Entry]]:
+        """Every reachable entry with its path below the root, `storage/stream`."""
+        root = self.entries[0] if self.entries else None
+        if root is None or root.kind != _ROOT:
+            return
+        seen: set[int] = set()
+        pending = [(root.child, "")]
+        while pending and len(seen) <= _MAX_ENTRIES:
+            index, folder = pending.pop()
+            if index in seen or not 0 <= index < len(self.entries):
+                continue
+            entry = self.entries[index]
+            if entry is None:
+                continue
+            seen.add(index)
+            pending.extend(((entry.left, folder), (entry.right, folder)))
+            path = f"{folder}/{entry.name}" if folder else entry.name
+            yield path, entry
+            if entry.kind == _STORAGE:
+                pending.append((entry.child, path))
 
     def orphaned_entries(self) -> Iterable[_Entry]:
         if 0 not in self.active:
@@ -440,6 +542,11 @@ def _guid(raw: bytes) -> str | None:
 
 
 def _read_packager(blob: bytes) -> EmbeddedObject | None:
+    parsed = _parse_packager(blob)
+    return parsed[0] if parsed is not None else None
+
+
+def _parse_packager(blob: bytes) -> tuple[EmbeddedObject, bytes] | None:
     """Decode the common OLE Packager layout inside an Ole10Native stream.
 
     Ole10Native itself only promises a sized opaque payload. Packager adds the
@@ -467,7 +574,7 @@ def _read_packager(blob: bytes) -> EmbeddedObject | None:
     cursor += 4
     if size > len(body) - cursor or not any((filename, source_path, temp_path)):
         return None
-    return EmbeddedObject(filename, source_path, temp_path, size)
+    return EmbeddedObject(filename, source_path, temp_path, size), body[cursor : cursor + size]
 
 
 def _package_text(blob: bytes, offset: int) -> tuple[str | None, int]:

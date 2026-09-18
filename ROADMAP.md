@@ -102,7 +102,7 @@ Implemented in part. An evidence record names the archive member, the package pa
 
 ### Files inside files
 
-Implemented for archives. A member that carries evidence is a file of its own, with its size, time, hash and evidence, its archive as its parent and a membership relationship in the graph. The members opened are bounded. Still to come as children: an OLE object in a document, an attachment in a message and a file embedded in a PDF, which is counted and named but not read as a file; a single `.gz` that is not a tar. Depth, count, size and total work are to be bounded by one budget, so a container cannot make a scan run without end.
+Implemented. A file carried inside another is a file of its own: an archive member, an attachment in a message, a file attached to a PDF and an object packaged in an Office document, each with its own evidence, the carrier as its parent and a membership relationship in the graph. The number of files opened per carrier and the size of each are bounded, and a carrier is read one level deep. Still to come: a budget for the total work of a scan, and reading what a carried file itself carries.
 
 ### Content Credentials in every container that carries them
 

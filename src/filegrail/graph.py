@@ -41,6 +41,7 @@ CAMERA_BODY = "camera body"
 CAMERA_MODEL = "camera model"
 AUTHORSHIP = "author"
 ARCHIVE_MEMBER = "member of archive"
+EMBEDDED_IN = "embedded in"
 TORRENT_MEMBER = "listed in torrent"
 
 
@@ -259,7 +260,11 @@ def _xmp_evidence(found: EvidenceRecord, field: str) -> RelationshipEvidence:
 def _container_memberships(records: list[FileRecord], nodes: dict[str, Node]) -> list[Relationship]:
     """Connect matched members to an explicitly recorded archive or torrent."""
     relationships = []
-    kinds = {"archive-member": ARCHIVE_MEMBER, "torrent": TORRENT_MEMBER}
+    kinds = {
+        "archive-member": ARCHIVE_MEMBER,
+        "embedded-file": EMBEDDED_IN,
+        "torrent": TORRENT_MEMBER,
+    }
     for record in records:
         for found in record.evidence:
             kind = kinds.get(found.source)
