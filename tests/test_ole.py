@@ -206,6 +206,51 @@ def test_vba_storage_is_reported_as_a_structural_indicator(tmp_path: Path):
     assert "macro" not in origin.note.lower()
 
 
+def test_orphaned_storage_is_kept_separate_from_active_vba(tmp_path: Path):
+    document = tmp_path / "deleted-vba.doc"
+    clsid = uuid.UUID("0003000c-0000-0000-c000-000000000046")
+    modified = datetime(2021, 2, 3, 4, 5, 6, tzinfo=timezone.utc)
+    document.write_bytes(
+        ole(
+            {},
+            orphan_entries=(
+                directory_entry(
+                    "VBA",
+                    1,
+                    0,
+                    0,
+                    clsid=clsid.bytes_le,
+                    modified=_filetime_ticks(modified),
+                ),
+            ),
+        )
+    )
+
+    found = read_ole(document)
+    origin = read_embedded_metadata(document)
+
+    assert found.vba_storage is False
+    assert len(found.orphaned_entries) == 1
+    assert "VBAStorage" not in origin.fields
+    assert origin.note == "orphaned directory entries 1"
+    assert origin.fields["OrphanedEntry[1]:Name"] == "VBA"
+    assert origin.fields["OrphanedEntry[1]:Type"] == "storage"
+    assert origin.fields["OrphanedEntry[1]:CLSID"] == str(clsid)
+    assert origin.fields["OrphanedEntry[1]:Modified"] == "2021-02-03T04:05:06Z"
+
+
+def test_orphaned_native_stream_is_not_reported_as_an_active_object(tmp_path: Path):
+    document = tmp_path / "deleted-object.doc"
+    document.write_bytes(ole({}, orphan_entries=(directory_entry("\x01Ole10Native", 2, 0, 64),)))
+
+    origin = read_embedded_metadata(document)
+
+    assert "Ole10NativeStreams" not in origin.fields
+    assert origin.fields["OrphanedEntry[1]:Name"] == "\x01Ole10Native"
+    assert origin.fields["OrphanedEntry[1]:Type"] == "stream"
+    assert origin.fields["OrphanedEntry[1]:Size"] == "64"
+
+
 def test_biff_macro_sheet_is_reported_without_guessing_from_stream_name(tmp_path: Path):
     bof = struct.pack("<HHHH", 0x0809, 4, 0x0600, 0x0005)
     macro_sheet = struct.pack("<HHIBB", 0x0085, 6, 0, 0, 1)

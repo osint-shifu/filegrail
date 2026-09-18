@@ -168,7 +168,7 @@ Original field names are kept in the report.
 | **ID3** | `.mp3` `.aac` `.tta` | Encoding software, artist, title, date and other tags |
 | **PDF Info** | `.pdf` | Producer, creator, author, title, subject, keywords and dates |
 | **OOXML properties** | `.docx` `.docm` `.dotx` `.xlsx` `.xlsm` `.xltx` `.pptx` `.pptm` | Application, author, last editor, company, template, revision count and editing time |
-| **OLE properties** | `.doc` `.dot` `.xls` `.xlt` `.ppt` `.pot` `.pps` `.msg` | Summary properties, storage metadata, VBA/XLM indicators and embedded-object paths |
+| **OLE properties** | `.doc` `.dot` `.xls` `.xlt` `.ppt` `.pot` `.pps` `.msg` | Summary properties, storage metadata, orphaned entries, VBA/XLM indicators and embedded-object paths |
 | **OpenDocument metadata** | `.odt` `.ods` `.odp` `.odg` `.odf` `.ott` `.otp` | Generating application, author, title, creation date and editing statistics |
 | **EPUB package** | `.epub` | Generating application, author, title and date |
 | **RTF metadata** | `.rtf` | Generating application |

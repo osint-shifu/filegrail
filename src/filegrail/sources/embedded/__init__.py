@@ -339,6 +339,8 @@ def _from_compound(path: Path, suffix: str) -> EvidenceRecord | None:
         notes.append(f"XLM macro sheets {found.xlm_macro_sheets}")
     if found.native_streams:
         notes.append(f"embedded object streams {found.native_streams}")
+    if found.orphaned_entries:
+        notes.append(f"orphaned directory entries {len(found.orphaned_entries)}")
     if found.root_clsid and not notes:
         notes.append("root CLSID recorded")
 
@@ -379,6 +381,17 @@ def _from_compound(path: Path, suffix: str) -> EvidenceRecord | None:
         ):
             if value:
                 fields[f"EmbeddedObject[{index}]:{name}"] = value
+    for index, orphaned in enumerate(found.orphaned_entries, 1):
+        for name, value in (
+            ("Name", orphaned.name),
+            ("Type", orphaned.kind),
+            ("CLSID", orphaned.clsid),
+            ("Created", orphaned.created),
+            ("Modified", orphaned.modified),
+            ("Size", str(orphaned.size)),
+        ):
+            if value:
+                fields[f"OrphanedEntry[{index}]:{name}"] = value
 
     return _origin(
         "document-metadata",

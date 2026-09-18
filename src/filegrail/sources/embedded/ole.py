@@ -92,6 +92,18 @@ class EmbeddedObject:
 
 
 @dataclass(slots=True)
+class OrphanedEntry:
+    """An allocated directory entry unreachable from the root tree."""
+
+    name: str
+    kind: str
+    clsid: str | None
+    created: str | None
+    modified: str | None
+    size: int
+
+
+@dataclass(slots=True)
 class Document:
     """What a compound document says about its own creation."""
 
@@ -107,6 +119,7 @@ class Document:
     xlm_macro_sheets: int = 0
     native_streams: int = 0
     embedded_objects: list[EmbeddedObject] = field(default_factory=list)
+    orphaned_entries: list[OrphanedEntry] = field(default_factory=list)
 
     def __bool__(self) -> bool:
         return any(
@@ -123,6 +136,7 @@ class Document:
                 self.xlm_macro_sheets,
                 self.native_streams,
                 self.embedded_objects,
+                self.orphaned_entries,
             )
         )
 
@@ -202,6 +216,7 @@ class _Container:
         self.entries = self._read_directory()
 
         root = self.entries[0] if self.entries else None
+        self.active = self._active_indices(root)
         self.mini_stream = b""
         if root and root.kind == _ROOT and root.size:
             self.mini_stream = self._read_chain(root.start, root.size, self.fat, self.sector_size)
@@ -262,19 +277,49 @@ class _Container:
 
     # -- directory --
 
-    def _read_directory(self) -> list[_Entry]:
+    def _read_directory(self) -> list[_Entry | None]:
         blob = self._read_chain(
             self.directory_start, _MAX_ENTRIES * _ENTRY_SIZE, self.fat, self.sector_size
         )
-        entries = []
+        entries: list[_Entry | None] = []
         for offset in range(0, len(blob) - _ENTRY_SIZE + 1, _ENTRY_SIZE):
-            entry = _Entry.parse(blob[offset : offset + _ENTRY_SIZE])
-            if entry is not None:
-                entries.append(entry)
+            entries.append(_Entry.parse(blob[offset : offset + _ENTRY_SIZE]))
         return entries
 
+    def _active_indices(self, root: _Entry | None) -> set[int]:
+        """Walk the directory's sibling trees from the root storage."""
+        if root is None or root.kind != _ROOT:
+            return set()
+        active = {0}
+        pending = [root.child]
+        while pending and len(active) <= _MAX_ENTRIES:
+            index = pending.pop()
+            if index in active or not 0 <= index < len(self.entries):
+                continue
+            entry = self.entries[index]
+            if entry is None:
+                continue
+            active.add(index)
+            pending.extend((entry.left, entry.right))
+            if entry.kind == _STORAGE:
+                pending.append(entry.child)
+        return active
+
+    def active_entries(self) -> Iterable[_Entry]:
+        for index in sorted(self.active):
+            entry = self.entries[index]
+            if entry is not None:
+                yield entry
+
+    def orphaned_entries(self) -> Iterable[_Entry]:
+        if 0 not in self.active:
+            return
+        for index, entry in enumerate(self.entries):
+            if index not in self.active and entry is not None:
+                yield entry
+
     def stream(self, name: str) -> bytes | None:
-        for entry in self.entries:
+        for entry in self.active_entries():
             if entry.kind == _STREAM and entry.name == name:
                 return self.entry_stream(entry)
         return None
@@ -295,6 +340,9 @@ class _Entry:
     clsid: str | None
     created: str | None
     modified: str | None
+    left: int
+    right: int
+    child: int
 
     @classmethod
     def parse(cls, raw: bytes) -> _Entry | None:
@@ -303,6 +351,7 @@ class _Entry:
         if kind not in (_STORAGE, _STREAM, _ROOT) or not 2 <= length <= 64:
             return None
         name = raw[: length - 2].decode("utf-16-le", "replace")
+        left, right, child = struct.unpack_from("<III", raw, 68)
         clsid = _guid(raw[80:96])
         created, modified = struct.unpack_from("<QQ", raw, 100)
         start, size = struct.unpack_from("<IQ", raw, 116)
@@ -314,17 +363,21 @@ class _Entry:
             clsid=clsid,
             created=_timestamp(created),
             modified=_timestamp(modified),
+            left=left,
+            right=right,
+            child=child,
         )
 
 
 def _apply_directory(found: Document, container: _Container) -> None:
     """Keep bounded directory evidence without interpreting document content."""
-    if container.entries and container.entries[0].kind == _ROOT:
-        found.root_clsid = container.entries[0].clsid
+    root = container.entries[0] if container.entries else None
+    if root is not None and root.kind == _ROOT:
+        found.root_clsid = root.clsid
     workbook = container.stream("Workbook") or container.stream("Book")
     found.xlm_macro_sheets = _xlm_macro_sheets(workbook)
 
-    for entry in container.entries:
+    for entry in container.active_entries():
         if entry.kind == _STORAGE:
             if entry.name.casefold() == "vba":
                 found.vba_storage = True
@@ -336,6 +389,19 @@ def _apply_directory(found: Document, container: _Container) -> None:
             found.native_streams += 1
             if package := _read_packager(container.entry_stream(entry)):
                 found.embedded_objects.append(package)
+
+    for entry in container.orphaned_entries():
+        is_storage = entry.kind == _STORAGE
+        found.orphaned_entries.append(
+            OrphanedEntry(
+                name=entry.name,
+                kind="storage" if is_storage else "stream",
+                clsid=entry.clsid if is_storage else None,
+                created=entry.created if is_storage else None,
+                modified=entry.modified if is_storage else None,
+                size=entry.size,
+            )
+        )
 
 
 def _xlm_macro_sheets(blob: bytes | None) -> int:

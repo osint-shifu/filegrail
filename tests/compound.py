@@ -38,6 +38,8 @@ def directory_entry(
     size: int,
     child: int = FREE,
     *,
+    left: int = FREE,
+    right: int = FREE,
     clsid: bytes = b"\x00" * 16,
     created: int = 0,
     modified: int = 0,
@@ -46,7 +48,7 @@ def directory_entry(
     raw = name.encode("utf-16-le") + b"\x00\x00"
     entry = raw.ljust(64, b"\x00")[:64]
     entry += struct.pack("<HBB", len(raw), category, 1)
-    entry += struct.pack("<III", FREE, FREE, child)
+    entry += struct.pack("<III", left, right, child)
     entry += clsid + b"\x00" * 4 + struct.pack("<QQ", created, modified)
     entry += struct.pack("<IQ", start, size)
     assert len(entry) == 128
@@ -57,7 +59,12 @@ def chain(first: int, count: int) -> list[int]:
     return [first + step + 1 for step in range(count - 1)] + [ENDOFCHAIN]
 
 
-def ole(streams: dict[str, bytes], *, directory_entries: tuple[bytes, ...] = ()) -> bytes:
+def ole(
+    streams: dict[str, bytes],
+    *,
+    directory_entries: tuple[bytes, ...] = (),
+    orphan_entries: tuple[bytes, ...] = (),
+) -> bytes:
     """Assemble a v3 compound file holding `streams`.
 
     A stream shorter than the cutoff goes into the mini stream, exactly as an
@@ -112,6 +119,16 @@ def ole(streams: dict[str, bytes], *, directory_entries: tuple[bytes, ...] = ())
     for name, category, start, size in entries:
         directory.append(directory_entry(name, category, start, size))
     directory.extend(directory_entries)
+
+    # A right-leaning tree is enough to make every ordinary fixture entry
+    # reachable from the root. Entries appended afterward are intentionally
+    # allocated but unreachable, matching deleted/orphaned directory records.
+    for index in range(1, len(directory)):
+        right = index + 1 if index + 1 < len(directory) else FREE
+        linked = bytearray(directory[index])
+        struct.pack_into("<I", linked, 72, right)
+        directory[index] = bytes(linked)
+    directory.extend(orphan_entries)
 
     directory_start, directory_count = allocate(b"".join(directory), SECTOR)
     fat.extend(chain(directory_start, directory_count))
