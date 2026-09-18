@@ -23,6 +23,7 @@ from .sources.embedded import (
     id3,
     matroska,
     ole,
+    pe,
     photoshop,
     png,
     riff,
@@ -86,6 +87,7 @@ FAMILIES: dict[str, frozenset[str]] = {
     # is one file, so asking for it selects nothing this can answer yet.
     "mail": frozenset(mail.SUFFIXES | mail.OUTLOOK_SUFFIXES | {".mbox"}),
     "text": frozenset(_EXTRA_TEXT),
+    "executable": frozenset(pe.SUFFIXES),
 }
 
 

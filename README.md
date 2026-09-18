@@ -175,6 +175,7 @@ Original field names are kept in the report.
 | **RTF metadata** | `.rtf` | Generating application |
 | **SVG metadata** | `.svg` | Generating application and author |
 | **Jupyter notebook** | `.ipynb` | Kernel, language version and author |
+| **PE header** | `.exe` `.dll` `.sys` `.scr` `.ocx` `.cpl` `.drv` `.efi` | Target machine, linker, link time, PDB path, Rich header records, company, product, original file name and version strings, and whether a signature is attached |
 | **Web document** | `.html` `.htm` `.xhtml` | Author, publisher, dates, canonical URL, Open Graph, Twitter Cards, JSON-LD, Microdata and RDFa |
 | **C2PA** | `.jpg` `.jpeg` `.png` | Producing application, creation data, digital source type such as a generative AI model, the recorded actions and ingredients, and whether the file still matches its manifest |
 
@@ -195,6 +196,7 @@ XMP, XMP history and IPTC are not tied to one format and are read wherever a sup
 | **Images** | JPEG, PNG, TIFF, WebP, HEIC, HEIF, AVIF and RAW (DNG, NEF, CR2, ARW, ORF, RW2) |
 | **Documents** | PDF, DOCX, XLSX, PPTX, legacy Office, OpenDocument, RTF, EPUB, Jupyter notebooks |
 | **Media** | MP4, MOV, M4A, MKV, WebM, WAV, AVI, FLAC, OGG, Opus, MP3 |
+| **Executables** | EXE, DLL, SYS, SCR, OCX, CPL, DRV, EFI |
 | **Email** | EML, MSG |
 | **Archives** | ZIP, JAR, WHL, TAR, TGZ, GZ, BZ2, XZ |
 | **Text and data** | TXT, Markdown, JSON, YAML, TOML, CSV, HTML, XML, GPX, KML, KMZ, GeoJSON, vCard, iCalendar |
@@ -418,7 +420,7 @@ A normal scan reads embedded metadata and available local provenance records. Pi
 | `--cluster` | Group files by shared cameras and authors |
 | `--unknown-only` | Show only files with no evidence found |
 | `--hash` | Compute SHA-256 for each file |
-| `--type NAME` | Filter by `archive`, `audio`, `document`, `image`, `mail`, `text` or `video` |
+| `--type NAME` | Filter by `archive`, `audio`, `document`, `executable`, `image`, `mail`, `text` or `video` |
 | `--ext LIST` | Filter by extensions, e.g. `--ext jpg,pdf` |
 | `--limit N` | Limit the list of files with no evidence found; `0` means all |
 | `--home DIR` | Read evidence from another user profile |

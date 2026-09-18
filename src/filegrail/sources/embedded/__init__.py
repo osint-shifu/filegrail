@@ -28,6 +28,7 @@ from . import (
     jpeg,
     matroska,
     ole,
+    pe,
     photoshop,
     png,
     riff,
@@ -65,6 +66,7 @@ SUFFIXES = (
     | ole.SUFFIXES
     | photoshop.SUFFIXES
     | web.SUFFIXES
+    | pe.SUFFIXES
 )
 
 
@@ -87,6 +89,7 @@ def read_embedded_metadata(path: Path) -> EvidenceRecord | None:
         _from_matroska,
         _from_vorbis,
         _from_audio,
+        _from_executable,
     ):
         try:
             origin = reader(path, suffix)
@@ -594,6 +597,72 @@ def _from_audio(path: Path, suffix: str) -> EvidenceRecord | None:
         tool=frames.get("encoder"),
         at=_normalise(frames.get("date")),
         note="; ".join(notes) or None,
+    )
+
+
+def _from_executable(path: Path, suffix: str) -> EvidenceRecord | None:
+    if suffix not in pe.SUFFIXES:
+        return None
+    found = pe.read_executable(path)
+    if not found:
+        return None
+
+    strings = found.strings
+    product = strings.get("ProductName") or strings.get("FileDescription")
+    version = strings.get("ProductVersion") or found.product_version
+    tool = f"{product} {version}".strip() if product and version else product
+
+    notes = []
+    if company := strings.get("CompanyName"):
+        notes.append(f"company {_clip(company, 80)}")
+    if original := strings.get("OriginalFilename"):
+        notes.append(f"original name {_clip(original, 80)}")
+    if found.pdb_path:
+        notes.append(f"PDB {_clip(found.pdb_path, 100)}")
+    if found.signature_size:
+        notes.append("Authenticode signature present")
+    if found.reproducible:
+        notes.append("reproducible build")
+    if found.linker:
+        notes.append(f"linker {found.linker}")
+
+    fields = {
+        name: str(value)
+        for name, value in (
+            ("Machine", found.machine),
+            ("Subsystem", found.subsystem),
+            ("LinkerVersion", found.linker),
+            ("LinkTime", found.linked),
+            ("ReproducibleBuild", "yes" if found.reproducible else None),
+            ("PDBPath", found.pdb_path),
+            ("PDBGuid", found.pdb_guid),
+            ("PDBAge", found.pdb_age),
+            ("FileType", found.file_type),
+            ("FileVersion", strings.get("FileVersion") or found.file_version),
+            ("ProductVersion", version),
+            (
+                "Authenticode",
+                f"present, {found.signature_size} bytes" if found.signature_size else None,
+            ),
+        )
+        if value is not None
+    }
+    if found.rich:
+        fields["RichHeader"] = f"{len(found.rich)} entries"
+        for index, (product_id, build, count) in enumerate(found.rich[: pe._MAX_RICH_LISTED], 1):
+            fields[f"RichEntry[{index}]"] = f"id {product_id}, build {build}, count {count}"
+    for name, value in strings.items():
+        fields.setdefault(name, value)
+
+    # A link time is placed on the timeline only where it can be one. A
+    # reproducible build writes a hash in its place, on purpose.
+    return _origin(
+        "document-metadata",
+        block="pe-header",
+        tool=tool,
+        at=found.linked if pe.plausible(found.linked) and not found.reproducible else None,
+        note="; ".join(notes) or None,
+        fields=fields,
     )
 
 

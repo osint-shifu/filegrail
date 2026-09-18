@@ -292,6 +292,7 @@ def test_the_readme_metadata_table_names_the_extensions_its_readers_declare():
         isobmff,
         matroska,
         ole,
+        pe,
         photoshop,
         png,
         riff,
@@ -317,6 +318,7 @@ def test_the_readme_metadata_table_names_the_extensions_its_readers_declare():
         "SVG metadata": containers.SVG_SUFFIXES,
         "Jupyter notebook": containers.NOTEBOOK_SUFFIXES,
         "Web document": web.SUFFIXES,
+        "PE header": pe.SUFFIXES,
         "C2PA": C2PA,
     }
 

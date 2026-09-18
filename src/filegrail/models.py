@@ -252,6 +252,7 @@ BLOCK_LABELS: dict[str, str] = {
     "isobmff": "movie metadata",
     "png-text": "PNG text",
     "ole-summary": "OLE metadata",
+    "pe-header": "PE header",
     "riff": "RIFF",
     "id3": "ID3",
     "matroska": "Matroska",

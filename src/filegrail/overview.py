@@ -94,7 +94,15 @@ AUTHOR_FIELDS: dict[str, tuple[str, ...]] = {
 #: reader is a decision somebody made rather than a count that quietly
 #: understates itself. A test holds the two lists against the readers.
 WITHOUT_AUTHOR = frozenset(
-    {"isobmff", "svg-metadata", "notebook-kernel", "photoshop-irb", "c2pa", "xmp-history"}
+    {
+        "isobmff",
+        "svg-metadata",
+        "notebook-kernel",
+        "photoshop-irb",
+        "pe-header",
+        "c2pa",
+        "xmp-history",
+    }
 )
 
 
