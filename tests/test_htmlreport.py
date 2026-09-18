@@ -124,8 +124,8 @@ def test_the_sections_come_in_the_order_they_are_worked_through():
         "Investigative pivots",
         "File detail",
         "Conflicts",
-        "Report notes",
     ]
+    assert 'id="notes"' not in page
 
 
 def test_relationship_explorer_uses_the_evidence_backed_graph():

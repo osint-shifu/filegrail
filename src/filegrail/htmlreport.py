@@ -30,7 +30,7 @@ from pathlib import Path
 
 from . import __version__
 from .analysis import NOTHING, REVIEW, Case, CaseFile, Conflict, Finding, Pivots, named
-from .casereport import _ABSENT, _LISTED, _PER_FILE, MATCHES, _capital, _facts, _type_name
+from .casereport import _ABSENT, _LISTED, _PER_FILE, _capital, _facts, _type_name
 from .graph import Graph, Node, Relationship, build_graph
 from .identify import PLACE, Identifier
 from .models import (
@@ -347,8 +347,6 @@ margin-bottom:4px}
 .conf .pair .v{color:var(--ink);overflow-wrap:anywhere}
 .conf .delta{margin-top:8px;color:var(--alert)}
 
-.notes{display:grid;gap:8px;margin:0;padding:0;list-style:none;color:var(--ink-2);
-font-size:12px;max-width:92ch}
 footer{padding:24px var(--gutter);border-top:1px solid var(--line);display:flex;
 justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:11px;letter-spacing:.14em;
 text-transform:uppercase;color:var(--faint)}
@@ -661,7 +659,6 @@ _SECTIONS = (
     ("detail", "File detail", "Detail"),
     ("coverage", "Evidence coverage", "Coverage"),
     ("conflicts", "Conflicts", "Conflicts"),
-    ("notes", "Report notes", "Notes"),
 )
 
 
@@ -699,7 +696,6 @@ def render_html(
         "relationships": _relationships(graph, files),
         "pivots": _pivots(case, files, identifiers),
         "detail": _details(case, files, detailed, verbose=verbose),
-        "notes": _notes(case),
     }
     counted = _counts(case, detailed, relationship_count)
     present = [(key, title, short) for key, title, short in _SECTIONS if sections[key]]
@@ -1573,25 +1569,4 @@ def _conflict(conflict: Conflict, files: dict[str, CaseFile], detailed: set[str]
                 f'<div class="delta">{_e(f"{second} is {difference.delta} than {first}")}</div>'
             )
     parts.append("</div></div>")
-    return "".join(parts)
-
-
-def _notes(case: Case) -> str:
-    records = [entry.record for entry in case.files]
-    parts = [
-        "<h3>Evidence categories</h3>",
-        _fields(
-            [
-                ("origin", "How a file reached the examined environment."),
-                ("metadata", "What the file records about itself."),
-                ("activity", "What happened to the file locally."),
-            ]
-        ),
-    ]
-    used = {found.matched_by for record in records for found in record.evidence}
-    if used:
-        parts.append("<h3>Match basis</h3>")
-        parts.append(
-            _fields([(basis, meaning) for basis, meaning in MATCHES.items() if basis in used])
-        )
     return "".join(parts)
