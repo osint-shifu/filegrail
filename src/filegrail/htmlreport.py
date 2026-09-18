@@ -23,6 +23,7 @@ escaped before it is written.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from datetime import datetime
 from html import escape
@@ -349,6 +350,9 @@ border-bottom:1px solid var(--line)}
 margin:8px 0 0;font-size:12px}
 .fields dt{color:var(--muted);white-space:nowrap}
 .fields dd{margin:0;color:var(--ink-2);overflow-wrap:anywhere}
+.fields .sub{display:grid;grid-template-columns:minmax(80px,max-content) 1fr;gap:2px 12px;
+margin:0;padding:4px 0 4px 10px;border-left:1px solid var(--line)}
+.fields ol.numbered{margin:0;padding:0 0 0 1.6em;display:grid;gap:2px}
 .extra{display:grid;grid-template-columns:96px 1fr;gap:0 20px;padding:12px 16px;
 border-top:1px dashed var(--line);font-size:12px}
 .extra .k{color:var(--muted);letter-spacing:.14em;text-transform:uppercase;font-size:10.5px;
@@ -969,6 +973,52 @@ def _fields(
     return f'<dl class="{css}">{"".join(rows)}</dl>'
 
 
+#: `Ingredient[1]:title`, `Signature[2]:Reason`, `RichEntry[3]`: one entry of a
+#: numbered group, with or without a field of its own.
+_NUMBERED = re.compile(r"^([A-Za-z][\w ]*?)\[(\d+)\](?::(.+))?$")
+
+
+def _grouped(pairs: list[tuple[str, str]]) -> str:
+    """Decoded fields, with numbered ones gathered under their group.
+
+    A signature's name, date and reason belong together, and fourteen Rich
+    header entries are one list, not fourteen labels that differ by a digit.
+    Every value keeps its copy button.
+    """
+    groups: dict[str, dict[str, list[tuple[str, str]]]] = {}
+    order: list[tuple[str, str, str]] = []
+    for label, value in pairs:
+        match = _NUMBERED.match(label)
+        if match is None:
+            order.append(("plain", label, value))
+            continue
+        prefix, number, field = match.group(1), match.group(2), match.group(3) or ""
+        if prefix not in groups:
+            groups[prefix] = {}
+            order.append(("group", prefix, ""))
+        groups[prefix].setdefault(number, []).append((field, value))
+
+    rows = []
+    for kind, label, value in order:
+        if kind == "plain":
+            rows.append(f"<dt>{_e(label)}</dt><dd>{_value(value)}</dd>")
+            continue
+        numbered = groups[label]
+        if all(not field for entries in numbered.values() for field, _ in entries):
+            items = "".join(
+                f"<li>{_value(value)}</li>" for entries in numbered.values() for _, value in entries
+            )
+            rows.append(f'<dt>{_e(label)}</dt><dd><ol class="numbered">{items}</ol></dd>')
+            continue
+        for number, entries in numbered.items():
+            inner = "".join(
+                f"<dt>{_e(field or 'value')}</dt><dd>{_value(value)}</dd>"
+                for field, value in entries
+            )
+            rows.append(f'<dt>{_e(label)} {number}</dt><dd><dl class="sub">{inner}</dl></dd>')
+    return f'<dl class="fields">{"".join(rows)}</dl>'
+
+
 def _value(value: str) -> str:
     """A value and a button that copies it: the text shown, never a second copy of it."""
     return (
@@ -1577,7 +1627,7 @@ def _detail(
                 f'<div><div class="src">{_e(named(found))} {_match(found)}</div>'
                 + (f'<div class="note">{_e(found.note)}</div>' if found.note else "")
                 + "</div>"
-                + (_fields(facts, copy=True) if facts else "")
+                + (_grouped(facts) if facts else "")
                 + "</div>"
             )
     notes = []

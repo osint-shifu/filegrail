@@ -273,3 +273,30 @@ def test_the_print_layout_opens_every_block_and_lets_the_tables_fit_the_page():
     assert ".rel-controls,.rel-kinds,.rel-focus{display:none!important}" in printed
     assert ".tbl.relationships td:last-child{grid-column:1/-1}" in printed
     assert "addEventListener('beforeprint'" in page
+
+
+def test_numbered_fields_are_gathered_under_their_group():
+    """A signature's name and reason belong together; fourteen Rich header
+    entries are one list, not fourteen labels that differ by a digit."""
+    record = _file(
+        "signed.pdf",
+        EvidenceRecord(
+            source="document-metadata",
+            block="pdf-info",
+            tool="Acrobat",
+            fields={
+                "Signature[1]:Name": "Maria Wolf",
+                "Signature[1]:Reason": "Approved",
+                "RichEntry[1]": "id 253, build 31424, count 3",
+                "RichEntry[2]": "id 260, build 31424, count 1",
+            },
+        ),
+    )
+
+    page = _page([record])
+    section = page.split('<section id="detail"')[1].split("</section>")[0]
+
+    assert '<dt>Signature 1</dt><dd><dl class="sub"><dt>Name</dt>' in section
+    assert "<dt>Reason</dt>" in section
+    assert '<dt>RichEntry</dt><dd><ol class="numbered"><li>' in section
+    assert section.count('class="copy"') >= 5
