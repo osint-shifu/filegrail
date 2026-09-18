@@ -16,16 +16,19 @@ seen for a name is kept, not just the last.
 
 from __future__ import annotations
 
+import hashlib
 import tarfile
 import tempfile
 import zipfile
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import replace
+from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 
 from ..models import CONTAINER_MEMBER, EvidenceRecord
+from ..util import iso
 from .c2pa import read_c2pa_manifest
 from .embedded import SUFFIXES, read_embedded_metadata
 from .iptc import read_iptc
@@ -95,41 +98,65 @@ _MAX_READ = 25
 _MAX_MEMBER_BYTES = 64 * 1024 * 1024
 
 
-def read_contents(path: Path) -> list[EvidenceRecord]:
-    """Metadata from the files inside the archive, without unpacking it.
+@dataclass(slots=True)
+class Member:
+    """One file inside an archive that a reader had something to say about."""
 
-    Each member a reader claims is copied out one at a time and read exactly as
-    it would be on disk, so nothing here re-implements a format. What differs
-    is the claim that comes back: it is about the archive, not about the member,
-    which is why the moment and the coordinates the member carried do not
-    survive into it. A photograph taken in 2008 inside a zip written last week
-    does not date the zip, and its fix is not the zip's location; both stay in
-    the fields, where they say whose they are.
+    name: str
+    size: int
+    mtime: str | None
+    sha256: str | None
+    evidence: list[EvidenceRecord]
+
+
+def read_members(path: Path, *, hashing: bool = False) -> list[Member]:
+    """The members of the archive that carry evidence, each read as a file.
+
+    Read under its own name, with its own size and time, so what a member says
+    stays the member's: a photograph taken in 2008 inside a zip written last
+    week does not date the zip, and its fix is not the zip's location.
     """
-    found: list[EvidenceRecord] = []
+    found: list[Member] = []
     try:
         with _opened(path) as archive:
             if archive is None:
                 return []
-            for opened, (name, extract) in enumerate(archive):
+            for opened, (name, size, mtime, extract) in enumerate(archive):
                 if opened >= _MAX_READ:
                     break
-                found.extend(_read_member(name, extract))
+                try:
+                    raw = extract()
+                except (*_UNREADABLE, RuntimeError):
+                    continue
+                evidence = _read_member(name, raw)
+                if not evidence:
+                    continue
+                digest = hashlib.sha256(raw).hexdigest() if hashing else None
+                found.append(Member(name, size, mtime, digest, evidence))
     except _UNREADABLE:
         return found
     return found
 
 
+#: A member as the archive lists it: name, size, time, and a way to its bytes.
+_Listed = tuple[str, int, "str | None", Callable[[], bytes]]
+
+
 @contextmanager
-def _opened(path: Path) -> Iterator[Iterator[tuple[str, Callable[[], bytes]]] | None]:
-    """Yield (member name, a callable returning its bytes) for each real file."""
+def _opened(path: Path) -> Iterator[Iterator[_Listed] | None]:
+    """Yield (name, size, mtime, a callable returning the bytes) for each real file."""
     if zipfile.is_zipfile(path):
         with zipfile.ZipFile(path) as archive:
 
-            def from_zip() -> Iterator[tuple[str, Callable[[], bytes]]]:
+            def from_zip() -> Iterator[_Listed]:
                 for info in archive.infolist()[:_MAX_MEMBERS]:
                     if not info.is_dir() and info.file_size <= _MAX_MEMBER_BYTES:
-                        yield info.filename, partial(archive.read, info)
+                        yield (
+                            info.filename,
+                            info.file_size,
+                            _zip_time(info.date_time),
+                            partial(archive.read, info),
+                        )
 
             yield from_zip()
         return
@@ -137,17 +164,30 @@ def _opened(path: Path) -> Iterator[Iterator[tuple[str, Callable[[], bytes]]] | 
     if tarfile.is_tarfile(path):
         with tarfile.open(path) as bundle:
 
-            def from_tar() -> Iterator[tuple[str, Callable[[], bytes]]]:
+            def from_tar() -> Iterator[_Listed]:
                 for count, entry in enumerate(bundle):
                     if count >= _MAX_MEMBERS:
                         break
                     if entry.isfile() and entry.size <= _MAX_MEMBER_BYTES:
-                        yield entry.name, partial(_tar_bytes, bundle, entry)
+                        yield (
+                            entry.name,
+                            entry.size,
+                            iso(entry.mtime),
+                            partial(_tar_bytes, bundle, entry),
+                        )
 
             yield from_tar()
         return
 
     yield None
+
+
+def _zip_time(stamp: tuple[int, int, int, int, int, int]) -> str | None:
+    """A zip's DOS time, which names no zone; read as a clock reading in UTC."""
+    try:
+        return datetime(*stamp, tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
+    except ValueError:
+        return None
 
 
 def _tar_bytes(bundle: tarfile.TarFile, entry: tarfile.TarInfo) -> bytes:
@@ -156,7 +196,7 @@ def _tar_bytes(bundle: tarfile.TarFile, entry: tarfile.TarInfo) -> bytes:
     return handle.read() if handle is not None else b""
 
 
-def _read_member(name: str, extract: Callable[[], bytes]) -> list[EvidenceRecord]:
+def _read_member(name: str, raw: bytes) -> list[EvidenceRecord]:
     """Run the ordinary readers over one member, copied out to a temporary file."""
     suffix = Path(name).suffix.lower()
     if suffix not in SUFFIXES:
@@ -165,8 +205,8 @@ def _read_member(name: str, extract: Callable[[], bytes]) -> list[EvidenceRecord
     with tempfile.TemporaryDirectory(prefix="filegrail-") as room:
         copy = Path(room) / f"member{suffix}"
         try:
-            copy.write_bytes(extract())
-        except (*_UNREADABLE, RuntimeError):
+            copy.write_bytes(raw)
+        except OSError:
             return []
 
         found = []
@@ -175,51 +215,50 @@ def _read_member(name: str, extract: Callable[[], bytes]) -> list[EvidenceRecord
             if claim is not None:
                 found.append(claim)
         found.extend(read_xmp(copy))
-        return [_about_the_archive(claim, name) for claim in found]
+        return found
 
 
-def _about_the_archive(record: EvidenceRecord, member: str) -> EvidenceRecord:
-    """Restate what a member says about itself as a fact about the container.
-
-    Still metadata - it is what some file wrote about itself - but about the
-    archive rather than about the member, and matched to it by nothing more
-    than membership. Both of those are on the record.
-    """
-    fields = dict(record.fields)
-    if record.geo:
-        fields.setdefault("location", record.geo)
-    said = f"{member}: {record.note}" if record.note else member
-    return replace(
-        record,
-        source="archive-content",
-        match=CONTAINER_MEMBER,
-        match_note=f"read from {member}",
-        at=None,
-        geo=None,
-        bytes=None,
-        sha256=None,
-        note=said,
-        fields=fields,
-    )
-
-
-def inherited_origin(record: EvidenceRecord, archive_path: str) -> EvidenceRecord:
+def inherited_origin(
+    record: EvidenceRecord, archive_path: str, member: str | None = None
+) -> EvidenceRecord:
     """Rewrite an archive's own origin as one for a file that came out of it.
 
     The member did not arrive the way the archive did; it arrived *inside* the
     thing that arrived that way. The match basis is what keeps the difference
     visible, because the URL on the record is the archive's and not the file's.
+
+    With `member`, the file is the member itself, read inside the archive; the
+    match is membership and nothing weaker. Without it, the file is one on disk
+    that matched a member by name and exact size.
     """
     archive_name = Path(archive_path).name
-    note = f"extracted from {archive_name}"
+    if member is not None:
+        note = f"inside {archive_name}"
+        basis = f"member of {archive_name}"
+    else:
+        note = f"extracted from {archive_name}"
+        basis = f"member of {archive_name}, matched by name and exact size"
     return replace(
         record,
         source="archive-member",
         match=CONTAINER_MEMBER,
-        match_note=f"member of {archive_name}, matched by name and exact size",
+        match_note=basis,
         container=archive_path,
         bytes=None,
         mime=None,
         sha256=None,
         note=f"{record.note}; {note}" if record.note else note,
+        where={"member": member} if member is not None else record.where,
+    )
+
+
+def member_origin(archive_path: str, member: str) -> EvidenceRecord:
+    """The one thing known about how a member got here: it is inside the archive."""
+    return EvidenceRecord(
+        source="archive-member",
+        match=CONTAINER_MEMBER,
+        match_note=f"member of {Path(archive_path).name}",
+        container=archive_path,
+        note=f"inside {Path(archive_path).name}",
+        where={"member": member},
     )

@@ -173,6 +173,6 @@ def test_the_archive_read_budget_bounds_members_opened_not_findings(tmp_path: Pa
     opened = []
     monkeypatch.setattr(archives, "_read_member", lambda name, extract: opened.append(name) or [])
 
-    archives.read_contents(archive)
+    archives.read_members(archive)
 
     assert len(opened) <= archives._MAX_READ

@@ -181,11 +181,11 @@ archive's origin, when the member name and uncompressed size both match.
 | `.tar` `.tgz` `.gz` `.bz2` `.xz` | The same, through the compression |
 
 The files inside are also read, one at a time, without unpacking the archive:
-a photograph in a zip has the same EXIF it would have on disk. That claim is
-about the **archive**, so the member's moment and its coordinates do not
-survive into it - a photograph taken in 2008 inside a zip written last week
-does not date the zip, and a zip has never been anywhere. Both keep saying what
-they say in the fields, under the member's name.
+a photograph in a zip has the same EXIF it would have on disk. A member that
+carries evidence becomes a file of its own in the report, with the archive as
+its parent, the archive's origin inherited as its own, and its member path in
+`where`. What it says stays its own - a photograph taken in 2008 inside a zip
+written last week does not date the zip, and a zip has never been anywhere.
 
 For the same reason the readers that sweep raw bytes for a block, XMP and IPTC,
 are not run on an archive at all. What they would find there belongs to a

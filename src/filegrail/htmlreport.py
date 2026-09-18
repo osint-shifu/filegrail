@@ -56,7 +56,16 @@ from .models import (
     category,
 )
 from .overview import inventory
-from .report import _format, _relative, _size, _stamp, _timeline_key, _timeline_value, shown
+from .report import (
+    _format,
+    _read_from,
+    _relative,
+    _size,
+    _stamp,
+    _timeline_key,
+    _timeline_value,
+    shown,
+)
 from .scan import Unsearched
 
 #: Nothing leaves the page: no fetch, no image, no font, no frame, no form.
@@ -1317,6 +1326,11 @@ def _detail(
                 f'<div class="rec"><span class="cat {name}">{_e(name)}</span>'
                 f'<div><div class="src">{_e(named(found))} {_match(found)}</div>'
                 + (f'<div class="note">{_e(found.note)}</div>' if found.note else "")
+                + (
+                    f'<div class="note">read from {_e(_read_from(found))}</div>'
+                    if found.where
+                    else ""
+                )
                 + "</div>"
                 + (_grouped(facts) if facts else "")
                 + "</div>"

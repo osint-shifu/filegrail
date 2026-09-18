@@ -33,7 +33,7 @@ from pathlib import Path
 import pytest
 
 from filegrail.clean import clean_file
-from filegrail.sources.archives import list_members, read_contents
+from filegrail.sources.archives import list_members, read_members
 from filegrail.sources.c2pa import read_c2pa_manifest
 from filegrail.sources.content import read_passages
 from filegrail.sources.embedded import read_embedded_metadata
@@ -54,7 +54,7 @@ from tests.shortcut import link_info, shortcut, volume_id
 #: opens a file it should have skipped is worth knowing about too.
 _READERS: tuple[Callable[[Path], object], ...] = (
     read_c2pa_manifest,
-    read_contents,
+    read_members,
     read_passages,
     read_embedded_metadata,
     read_iptc,

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .lineage import attach_lineage
-from .models import FILENAME, NAME_AND_SIZE, ORIGIN, EvidenceRecord, FileRecord
+from .models import FILENAME, NAME_AND_SIZE, ORIGIN, EvidenceRecord, FileRecord, category
 from .sources import (
     collect_browser_downloads,
     collect_quarantine_events,
@@ -21,12 +21,13 @@ from .sources import (
     is_archive,
     is_torrent,
     list_members,
+    member_origin,
     read_c2pa_manifest,
-    read_contents,
     read_embedded_metadata,
     read_file_attributes,
     read_iptc,
     read_mail,
+    read_members,
     read_messenger_name,
     read_quarantine,
     read_shortcuts,
@@ -297,8 +298,7 @@ def scan(
         # the container's: a zip is not made by Photoshop because a photograph
         # inside it was. The members are read under their own names instead.
         if is_archive(path):
-            if follow_archives:
-                record.evidence.extend(read_contents(path))
+            pass  # the members are read below, as files of their own
         else:
             for reader in (read_c2pa_manifest, read_embedded_metadata, read_iptc):
                 claim = reader(path)
@@ -314,6 +314,8 @@ def scan(
         record.evidence.extend(recent.get(str(path), []))
         record.evidence.extend(read_shortcuts(path, stat.st_size, shortcuts))
         records.append(record)
+        if is_archive(path) and follow_archives:
+            records.extend(_member_records(record, path, hash_files))
 
     if follow_archives:
         _attach_archive_records(records, downloads, downloads_by_name)
@@ -322,7 +324,7 @@ def scan(
 
     if coverage is not None:
         coverage.files_discovered = len(files)
-        coverage.files_scanned = len(records)
+        coverage.files_scanned = sum(1 for record in records if record.parent is None)
         coverage.unreadable = list(dict.fromkeys(missed.unreadable))
         coverage.skipped_by_name = list(dict.fromkeys(missed.by_name))
         coverage.sources = {
@@ -359,6 +361,35 @@ def scan(
         }
 
     return records
+
+
+def _member_records(archive: FileRecord, path: Path, hash_files: bool) -> list[FileRecord]:
+    """The files inside an archive that carry evidence, each a record of its own.
+
+    A member's origin is the archive's, inherited as such: it arrived inside
+    the thing that arrived that way. An archive with no origin record still
+    places the member inside itself, which is the one thing known about it.
+    """
+    origins = [found for found in archive.evidence if category(found) == ORIGIN]
+    leading = max(origins, key=lambda found: found.priority) if origins else None
+    children = []
+    for member in read_members(path, hashing=hash_files):
+        child = FileRecord(
+            path=f"{path}/{member.name}",
+            size=member.size,
+            mtime=member.mtime or "",
+            sha256=member.sha256,
+            parent=str(path),
+            member=member.name,
+        )
+        child.evidence.append(
+            inherited_origin(leading, str(path), member.name)
+            if leading is not None
+            else member_origin(str(path), member.name)
+        )
+        child.evidence.extend(member.evidence)
+        children.append(child)
+    return children
 
 
 def _attach_archive_records(

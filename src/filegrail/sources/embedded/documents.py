@@ -142,6 +142,7 @@ def _read_pdf(path: Path) -> EvidenceRecord | None:
 
     inflated = _inflated_streams(whole)
     found = _pdf_info_fields(whole, head + inflated)
+    reference = _PDF_INFO_REF.findall(whole)
 
     tool = found.get("Producer") or found.get("Creator")
     if found.get("Producer") and found.get("Creator") not in (None, found.get("Producer")):
@@ -149,13 +150,17 @@ def _read_pdf(path: Path) -> EvidenceRecord | None:
 
     notes = [f"author {found['Author']}"] if found.get("Author") else []
     notes.extend(_pdf_structure(whole, inflated, found))
-    return _origin(
+    record = _origin(
         "pdf-info",
         tool,
         _parse_pdf_date(found.get("CreationDate")),
         "; ".join(notes) or None,
         found,
     )
+    if record is not None and reference and found:
+        number, generation = reference[-1]
+        record.where = {"object": f"{number.decode()} {generation.decode()} R"}
+    return record
 
 
 def _pdf_info_fields(raw: bytes, fallback: bytes) -> dict[str, str]:
@@ -413,9 +418,18 @@ def _read_ooxml(path: Path) -> EvidenceRecord | None:
     if company:
         notes.append(f"company {company}")
 
-    return _origin(
+    record = _origin(
         "ooxml-properties", tool, _normalise_timestamp(created), "; ".join(notes) or None, fields
     )
+    if record is not None:
+        parts = [
+            part
+            for part, tree in (("docProps/core.xml", core), ("docProps/app.xml", app))
+            if tree is not None
+        ]
+        if parts:
+            record.where = {"member": ", ".join(parts)}
+    return record
 
 
 def _ooxml_properties(

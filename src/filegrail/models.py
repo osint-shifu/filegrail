@@ -116,8 +116,6 @@ SOURCE_CATEGORIES: dict[str, str] = {
     # which is what makes it metadata rather than a statement about arrival.
     "file-signature": METADATA,
     # Metadata read from a member and restated as a fact about the container.
-    # Still metadata: it is what some file wrote about itself.
-    "archive-content": METADATA,
     "email-header": METADATA,
     # A hop some machine wrote into the message before it was sent. It is a
     # header the file carries - transport of the message, not the origin of the
@@ -146,7 +144,6 @@ SOURCE_MATCH: dict[str, str] = {
     "email-relay": EMBEDDED,
     "email-header": EMBEDDED,
     "archive-member": CONTAINER_MEMBER,
-    "archive-content": CONTAINER_MEMBER,
     "torrent": NAME_AND_SIZE,
     "messenger-name": FILENAME,
     "shell-history": FILENAME,
@@ -186,7 +183,6 @@ SOURCE_PRIORITY: dict[str, int] = {
     "xmp-history": 52,
     "iptc": 51,
     "document-metadata": 50,
-    "archive-content": 50,
     "email-relay": 45,
     "freedesktop-trash": 45,
     "shell-history": 40,
@@ -221,7 +217,6 @@ SOURCE_LABELS: dict[str, str] = {
     "xmp-history": "XMP history",
     "iptc": "IPTC",
     "document-metadata": "document metadata",
-    "archive-content": "archive content",
     "file-signature": "file signature",
     "shell-history": "shell history",
     "messenger-name": "messenger file name",
@@ -400,6 +395,12 @@ class EvidenceRecord:
     #: the two without guessing which same-named container was meant.
     container: str | None = None
 
+    #: Where inside the file the record was read from, where the reader knows:
+    #: `member` for a part of a package or an archive, `object` for a stream or
+    #: an object inside a document, `path` for a metadata path. The `note` a
+    #: person reads stays; this is the same place, for a consumer.
+    where: dict[str, str] = field(default_factory=dict)
+
     @property
     def category(self) -> str:
         return category(self)
@@ -460,6 +461,11 @@ class FileRecord:
     #: two files that only exists because both were scanned together.
     links: list[Link] = field(default_factory=list)
 
+    #: For a file read inside a container: the container's path on disk, and
+    #: the file's own path inside it. Unset for a file on disk.
+    parent: str | None = None
+    member: str | None = None
+
     @property
     def primary(self) -> EvidenceRecord | None:
         """One record for a file that needs one row, by presentation order.
@@ -502,12 +508,16 @@ class FileRecord:
         return replace(self, evidence=[record.redacted() for record in self.evidence])
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "path": self.path,
             "size": self.size,
             "mtime": self.mtime,
             "btime": self.btime,
             "sha256": self.sha256,
-            "evidence": [record.to_dict() for record in self.evidence],
-            "links": [link.to_dict() for link in self.links],
         }
+        if self.parent is not None:
+            data["parent"] = self.parent
+            data["member"] = self.member
+        data["evidence"] = [record.to_dict() for record in self.evidence]
+        data["links"] = [link.to_dict() for link in self.links]
+        return data

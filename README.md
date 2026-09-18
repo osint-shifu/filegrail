@@ -9,7 +9,7 @@
 
 **Provenance. Metadata. Investigative Pivots.**
 
-[![PyPI](https://img.shields.io/badge/pypi-v0.26.0-3775A9?style=flat-square)](https://pypi.org/project/filegrail/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.27.0-3775A9?style=flat-square)](https://pypi.org/project/filegrail/)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-1f883d?style=flat-square)
 ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1f883d?style=flat-square)
@@ -124,8 +124,7 @@ Examples:
 - PE version resources;
 - embedded telemetry;
 - mail headers and relay hops;
-- the file signature compared with the extension;
-- the members of an archive.
+- the file signature compared with the extension.
 
 ### Activity
 
@@ -514,16 +513,16 @@ Where an Exchange message does not contain internet transport headers, FileGrail
 
 FileGrail uses archives in two ways:
 
-1. supported files inside them are inspected;
+1. supported files inside them are read as files of their own;
 2. extracted files are connected back to the archive they likely came from.
 
 Supported archive families: ZIP, JAR, WHL, TAR, TGZ, GZ, BZ2, XZ.
 
-Members are matched by file name and exact uncompressed size.
+A member that carries evidence is reported as a file inside the archive, with its own size, time and evidence, the archive as its parent and the archive's origin inherited as its own. Nothing is unpacked to the scanned directory.
 
-Supported members can be inspected without unpacking the entire archive to the destination filesystem.
+A member's metadata remains the member's. A photograph taken in 2018 does not make the ZIP containing it a 2018 archive, and the photograph's GPS fix is not the archive's location.
 
-A member's metadata remains metadata about that member. A photograph taken in 2018 does not make the ZIP containing it a 2018 archive, and the photograph's GPS fix is not treated as the archive's location.
+Extracted files are matched back to a member by file name and exact uncompressed size.
 
 ---
 
@@ -1146,8 +1145,8 @@ Scan documents can contain:
 - scan root;
 - run configuration;
 - evidence coverage;
-- file records;
-- evidence records;
+- file records, including the members read inside archives, each with its parent;
+- evidence records, each with where in the file it was read from, where the reader knows;
 - correlation results;
 - investigative identifiers;
 - graph nodes and relationships;

@@ -5,6 +5,17 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.27.0 - 2026-09-18
+
+### Added
+
+- Files inside archives are files of their own: a member that carries evidence is reported with its own size, time, hash and evidence, the archive as its parent, and the archive's origin inherited as its own. Scan JSON names the `parent` and `member` of such a file.
+- Evidence records say where in the file they were read from: the `where` of a record names the package part, the archive member or the document object, in scan JSON, in `explain` and in the HTML report.
+
+### Removed
+
+- The `archive-content` source. What a member said about itself was restated as metadata of the archive; it is now the member's own record.
+
 ## 0.26.0 - 2026-09-18
 
 ### Added

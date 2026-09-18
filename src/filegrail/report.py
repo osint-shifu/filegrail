@@ -96,6 +96,11 @@ def shown(moment: str | None) -> str | None:
     return f"{moment[:19]}Z" if moment.endswith("Z") else moment[:19]
 
 
+def _read_from(found: EvidenceRecord) -> str:
+    """`member docProps/core.xml · object 6 0 R`, or nothing."""
+    return " · ".join(f"{key} {value}" for key, value in found.where.items())
+
+
 def _timeline_key(moment: str | None) -> tuple[bool, float, str]:
     """Sort an ISO timestamp by its instant, with malformed values last."""
     if not moment:
@@ -553,6 +558,7 @@ def _origin_section(
                     ("command", one.command or ""),
                     ("note", one.note or ""),
                     ("match", one.match_note or ""),
+                    ("where", _read_from(one)),
                 ]
                 for _, one in found
             ],

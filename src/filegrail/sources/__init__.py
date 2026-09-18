@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .archives import inherited_origin, is_archive, list_members, read_contents
+from .archives import inherited_origin, is_archive, list_members, member_origin, read_members
 from .browser import collect_browser_downloads
 from .c2pa import read_c2pa_manifest
 from .content import read_passages
@@ -49,6 +49,7 @@ __all__ = [
     "read_trash",
     "is_archive",
     "list_members",
-    "read_contents",
+    "read_members",
+    "member_origin",
     "inherited_origin",
 ]
