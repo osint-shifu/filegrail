@@ -439,6 +439,8 @@ SCRIPT = """
         + '}.f-address{--c:' + colour('--g-address') + '}.f-money{--c:' + colour('--g-money')
         + '}.node circle{fill:var(--c);stroke:' + colour('--bg') + ';stroke-width:1.5}'
         + '.node .halo{stroke:none;opacity:.14}'
+        + 'text.aux{display:' + (graphLabels && graphLabels.value === 'all' ? 'block' : 'none')
+        + '}' + (graphLabels && graphLabels.value === 'none' ? 'text{display:none}' : '')
         + 'text{font:10px ui-monospace,monospace;fill:' + colour('--ink-2')
         + ';text-anchor:middle;paint-order:stroke;stroke:' + colour('--surface')
         + ';stroke-width:3px;stroke-linejoin:round}.focused .node:not(.on):not(.near){opacity:.2}'
@@ -469,6 +471,128 @@ SCRIPT = """
       if (graphDetail) { graphDetail.hidden = true; }
       inspectGraphNode(null);
       fitGraph();
+    });
+  }
+  // Arrangement: the report ships one force-directed layout; the reader can
+  // re-arrange the same nodes here, spread them out, and choose which carry a label.
+  var graphLayout = one('#graph-layout');
+  var graphSpacing = one('#graph-spacing');
+  var graphSpacingValue = one('#graph-spacing-value');
+  var graphLabels = one('#graph-labels');
+  var graphBase = [];
+  var graphById = {};
+  if (graph) {
+    each(graph.querySelectorAll('.node'), function (mark) {
+      var dot = mark.querySelector('circle:not(.halo)');
+      var family = Array.prototype.filter.call(mark.classList, function (name) {
+        return name.indexOf('f-') === 0;
+      })[0] || 'f-key';
+      var node = {
+        id: mark.dataset.graphNode, mark: mark, family: family.slice(2),
+        degree: Number(mark.dataset.nodeDegree) || 0,
+        r: Number(dot.getAttribute('r')) || 4,
+        x: Number(dot.getAttribute('cx')), y: Number(dot.getAttribute('cy'))
+      };
+      graphBase.push(node);
+      graphById[node.id] = node;
+    });
+  }
+  function ringPositions(view) {
+    var centre = {x: view.width / 2, y: view.height / 2};
+    var outer = Math.min(view.width, view.height) / 2 - 56;
+    var byDegree = function (a, b) { return b.degree - a.degree || (a.id < b.id ? -1 : 1); };
+    var families = ['file', 'address', 'person', 'device', 'money', 'key'];
+    var inner = graphBase.filter(function (n) { return n.family === 'file'; }).sort(byDegree);
+    var around = graphBase.filter(function (n) { return n.family !== 'file'; })
+      .sort(function (a, b) {
+        var fa = families.indexOf(a.family), fb = families.indexOf(b.family);
+        return fa - fb || byDegree(a, b);
+      });
+    var placed = {};
+    var place = function (list, radius, turn) {
+      list.forEach(function (n, at) {
+        var angle = turn + 2 * Math.PI * at / Math.max(list.length, 1);
+        placed[n.id] = {x: centre.x + Math.cos(angle) * radius,
+         y: centre.y + Math.sin(angle) * radius};
+      });
+    };
+    if (inner.length === 1) {
+      placed[inner[0].id] = centre;
+    } else if (inner.length <= 18) {
+      place(inner, outer * 0.42, -Math.PI / 2);
+    } else {
+      place(inner.slice(0, Math.ceil(inner.length / 2)), outer * 0.28, -Math.PI / 2);
+      place(inner.slice(Math.ceil(inner.length / 2)), outer * 0.5, -Math.PI / 2 + 0.1);
+    }
+    place(around, outer, -Math.PI / 2);
+    return placed;
+  }
+  function columnPositions(view) {
+    var families = ['file', 'address', 'person', 'device', 'money', 'key'];
+    var groups = {};
+    graphBase.forEach(function (n) { (groups[n.family] = groups[n.family] || []).push(n); });
+    var present = families.filter(function (f) { return groups[f]; });
+    var placed = {};
+    var left = 120, right = view.width - 120, top = 40, bottom = view.height - 40;
+    present.forEach(function (family, column) {
+      var x = present.length === 1 ? view.width / 2
+        : left + (right - left) * column / (present.length - 1);
+      var list = groups[family].sort(function (a, b) {
+        return b.degree - a.degree || (a.id < b.id ? -1 : 1);
+      });
+      var step = Math.max(24, (bottom - top) / Math.max(list.length - 1, 1));
+      var span = step * (list.length - 1);
+      var start = view.height / 2 - span / 2;
+      list.forEach(function (n, at) { placed[n.id] = {x: x, y: start + at * step}; });
+    });
+    return placed;
+  }
+  function arrangeGraph() {
+    if (!graph || !graphBase.length) { return; }
+    var view = graph.viewBox.baseVal;
+    var layout = graphLayout ? graphLayout.value : 'force';
+    var placed = layout === 'rings' ? ringPositions(view)
+      : layout === 'columns' ? columnPositions(view) : null;
+    var factor = graphSpacing ? Number(graphSpacing.value) / 100 : 1;
+    var centre = {x: 0, y: 0};
+    graphBase.forEach(function (n) {
+      var at = placed ? placed[n.id] : {x: n.x, y: n.y};
+      n.cx = at.x; n.cy = at.y;
+      centre.x += at.x / graphBase.length; centre.y += at.y / graphBase.length;
+    });
+    graphBase.forEach(function (n) {
+      n.cx = centre.x + (n.cx - centre.x) * factor;
+      n.cy = centre.y + (n.cy - centre.y) * factor;
+      each(n.mark.querySelectorAll('circle'), function (dot) {
+        dot.setAttribute('cx', n.cx.toFixed(1));
+        dot.setAttribute('cy', n.cy.toFixed(1));
+      });
+      var text = n.mark.querySelector('text');
+      if (text) {
+        text.setAttribute('x', n.cx.toFixed(1));
+        text.setAttribute('y', (n.cy + n.r + 11).toFixed(1));
+      }
+    });
+    each(graph.querySelectorAll('.e'), function (edge) {
+      var a = graphById[edge.dataset.source], b = graphById[edge.dataset.target];
+      if (!a || !b) { return; }
+      edge.setAttribute('x1', a.cx.toFixed(1)); edge.setAttribute('y1', a.cy.toFixed(1));
+      edge.setAttribute('x2', b.cx.toFixed(1)); edge.setAttribute('y2', b.cy.toFixed(1));
+    });
+    if (graphSpacingValue) { graphSpacingValue.textContent = Math.round(factor * 100) + '%'; }
+    var figure = graph.closest('.graph');
+    if (figure && graphLabels) { figure.setAttribute('data-labels', graphLabels.value); }
+    fitGraph();
+  }
+  if (graphLayout) { graphLayout.addEventListener('change', arrangeGraph); }
+  if (graphSpacing) { graphSpacing.addEventListener('input', arrangeGraph); }
+  if (graphLabels) { graphLabels.addEventListener('change', arrangeGraph); }
+  if (graphReset) {
+    graphReset.addEventListener('click', function () {
+      if (graphLayout) { graphLayout.value = 'force'; }
+      if (graphSpacing) { graphSpacing.value = '100'; }
+      if (graphLabels) { graphLabels.value = 'auto'; }
+      arrangeGraph();
     });
   }
   if (graph) { window.requestAnimationFrame(fitGraph); }

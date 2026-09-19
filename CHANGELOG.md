@@ -5,6 +5,17 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.35.0 - 2026-09-19
+
+### Added
+
+- HTML report: the graph can be re-arranged in the page. Three layouts: the force-directed one the report ships, files on inner rings with identifiers around them grouped by type, and columns by type. A spacing slider spreads the nodes apart, and a labels control shows the main nodes, every node or none. The SVG export follows the arrangement on screen.
+
+### Changed
+
+- HTML report: the controls above the graph sit on a grid: find and focus on one row, arrangement and view controls on the next, the type filters below.
+- HTML report: the summary cards are separate tiles, each with its category colour on the top edge and a larger figure.
+
 ## 0.34.1 - 2026-09-19
 
 ### Changed

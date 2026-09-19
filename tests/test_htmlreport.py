@@ -314,7 +314,7 @@ def test_the_print_layout_opens_every_block_and_lets_the_tables_fit_the_page():
 
     assert "details:not([open])>:not(summary){display:block}" in printed
     assert ".wrap>table.index,.wrap>table.pivots,.wrap>table.relationships{min-width:0}" in printed
-    assert ".rel-controls,.rel-kinds,.rel-focus{display:none!important}" in printed
+    assert ".rel-controls,.rel-kinds,.rel-focus,.graph-arrange{display:none!important}" in printed
     assert ".tbl.relationships td:last-child{grid-column:1/-1}" in printed
     assert "addEventListener('beforeprint'" in page
 

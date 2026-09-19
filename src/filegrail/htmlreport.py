@@ -841,6 +841,17 @@ def _relationships(graph: Graph, files: dict[str, CaseFile], pivot_refs: dict[st
         '<label for="relationship-node">Focus node'
         '<select id="relationship-node"><option value="">All connected nodes</option>'
         f"{_relationship_options(graph, connected, files)}</select></label>"
+        '</div><div class="graph-arrange" role="group" aria-label="Graph arrangement">'
+        '<label for="graph-layout">Layout<select id="graph-layout">'
+        '<option value="force">Force-directed</option>'
+        '<option value="rings">Files inside, identifiers around</option>'
+        '<option value="columns">Columns by type</option></select></label>'
+        '<label for="graph-spacing">Spacing<span class="range">'
+        '<input id="graph-spacing" type="range" min="60" max="260" step="10" value="100">'
+        '<output id="graph-spacing-value" aria-live="polite">100%</output></span></label>'
+        '<label for="graph-labels">Labels<select id="graph-labels">'
+        '<option value="auto">Main nodes</option><option value="all">Every node</option>'
+        '<option value="none">None</option></select></label>'
         '</div><div class="graph-tools" role="group" aria-label="Graph view controls">'
         '<button class="btn icon" id="graph-zoom-out" type="button" '
         'title="Zoom out" aria-label="Zoom out">−</button>'
@@ -987,11 +998,8 @@ def _figure(drawn: Picture | None, files: dict[str, CaseFile], pivot_refs: dict[
             )
         elif node.id in pivot_refs:
             data += f' data-pivot-link="#{_e(pivot_refs[node.id])}"'
-        text = (
-            f'<text x="{node.x}" y="{node.y + radius + 11}">{_e(label)}</text>'
-            if node.id in labelled
-            else ""
-        )
+        aux = "" if node.id in labelled else ' class="aux"'
+        text = f'<text{aux} x="{node.x}" y="{node.y + radius + 11}">{_e(label)}</text>'
         marks.append(
             f'<g class="node t-{_e(node.type)} f-{_family(node.type)}" '
             f'data-graph-node="{_e(node.id)}" '
