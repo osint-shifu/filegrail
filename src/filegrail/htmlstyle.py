@@ -95,9 +95,8 @@ border:1px solid var(--line-2);border-radius:var(--r);padding:0 4px;line-height:
 
 /* ── sections ─────────────────────────────────────────────── */
 main{padding:0 var(--gutter) 80px;counter-reset:sec}
-section{padding:48px 0 12px;border-bottom:1px solid var(--line);counter-increment:sec}
+section{padding:56px 0 8px;counter-increment:sec}
 main>section:first-child{padding-top:36px}
-section:last-of-type{border-bottom:0}
 .h{display:flex;align-items:baseline;gap:14px;margin:0 0 22px;flex-wrap:wrap}
 .js .h h2{cursor:pointer}
 .fold{display:none;align-self:center;width:22px;height:22px;margin:0 -2px 0 -6px;
@@ -263,6 +262,13 @@ font-size:var(--t-small)}
 .graph-filterbar .rel-kinds{margin:0}
 .graph{margin:0;padding:10px 14px 12px}
 .graph-canvas{position:relative}
+.graph-panel.full{position:fixed;inset:0;z-index:40;margin:0;border:0;border-radius:0;
+display:flex;flex-direction:column;background:var(--bg);overflow:auto}
+.graph-panel.full .graph{flex:1;display:flex;flex-direction:column;min-height:0}
+.graph-panel.full .graph-canvas{flex:1;min-height:0}
+.graph-panel.full .graph svg{height:100%;min-height:360px}
+.graph-panel:fullscreen{background:var(--bg)}
+body.graph-full{overflow:hidden}
 .graph svg{display:block;width:100%;height:clamp(360px,52vw,620px);border:0;
 background:radial-gradient(circle,var(--line-2) 1px,transparent 1.5px) 0 0/22px 22px,
 radial-gradient(ellipse at 50% 40%,#151B22 0%,#10141A 55%,var(--bg) 100%);
@@ -420,15 +426,15 @@ tr:hover .copy,.rec:hover .copy,dd:hover .copy,.pair:hover .copy,.facts dd:hover
 .copy.ok,.copy.no{opacity:1}
 
 /* ── findings ─────────────────────────────────────────────── */
-.findings{border:1px solid var(--line);border-radius:var(--r);background:var(--bg)}
-.find{display:grid;grid-template-columns:56px 1fr;gap:0 18px;padding:16px 18px;
-border-bottom:1px solid var(--line);box-shadow:inset 2px 0 0 transparent}
-.find.warn{box-shadow:inset 2px 0 0 var(--alert)}
-.find:last-child{border-bottom:0}
-.find:target{background:var(--accent-soft)}
-.find .fid{display:inline-flex;align-items:center;height:22px;padding:0 7px;
-border:1px solid var(--line-2);border-radius:var(--r);font-size:var(--t-label);color:var(--accent)}
-.find .fid:hover{text-decoration:none;border-color:var(--accent)}
+.findings{border-top:1px solid var(--line)}
+.find{display:grid;grid-template-columns:56px 1fr;gap:0 18px;padding:18px 0 18px 14px;
+border-bottom:1px solid var(--line);position:relative}
+.find.warn:before{content:"";position:absolute;left:0;top:18px;bottom:18px;width:2px;
+background:var(--alert);border-radius:1px}
+.find:target{background:linear-gradient(90deg,var(--accent-soft),transparent 70%)}
+.find .fid{display:inline-flex;align-items:center;height:22px;font-size:var(--t-label);
+letter-spacing:.06em;color:var(--accent)}
+.find .fid:hover{text-decoration:underline;text-underline-offset:3px}
 .find .t{color:var(--ink);font:400 var(--t-lead)/1.5 var(--sans);overflow-wrap:anywhere}
 .find .t.warn:before{content:"!";display:inline-flex;align-items:center;justify-content:center;
 width:16px;height:16px;border-radius:var(--r);background:var(--alert-soft);color:var(--alert);
@@ -436,8 +442,8 @@ margin-right:8px;font-size:var(--t-label);vertical-align:1px}
 .find .fields{margin-top:10px;font-size:var(--t-table)}
 .find .files{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;font-size:var(--t-small)}
 .find .files a{display:inline-flex;align-items:center;height:24px;padding:0 9px;
-border:1px solid var(--line-2);border-radius:var(--r);color:var(--ink-2);background:var(--bg)}
-.find .files a:hover{border-color:var(--accent);color:var(--ink);text-decoration:none}
+border-radius:var(--r);color:var(--ink-2);background:var(--surface)}
+.find .files a:hover{background:var(--surface-2);color:var(--ink);text-decoration:none}
 .find .files+.fields{margin-top:8px;padding-bottom:6px}
 .find details .files{margin-top:8px}
 .find .note{color:var(--muted);font:400 var(--t-body)/1.6 var(--sans);margin-top:8px;max-width:78ch}
@@ -539,10 +545,11 @@ letter-spacing:var(--track);text-transform:uppercase;color:var(--faint)}
 .graph-toolbar{grid-template-columns:1fr}
 .graph-tools{justify-content:flex-end}
 .graph svg{height:420px}
+.graph-panel.full .graph svg{height:100%}
 .graph-detail{position:absolute;width:calc(100% - 24px)}
 .relationship-bar{flex-direction:column;align-items:stretch}
 .find,.conf{grid-template-columns:1fr;gap:6px 0}
-.find{padding:14px}
+.find{padding:14px 0 14px 12px}
 .tl .ev{grid-template-columns:5.6em 22px minmax(0,1fr);row-gap:4px}
 .tl .ev .txt{grid-column:3}
 }
@@ -571,7 +578,8 @@ section{padding:22px 0 6px}
 .file,.conf,.find,.card,tr,.rec{break-inside:avoid}
 thead{display:table-header-group}
 a{color:inherit}
-.wrap,.findings{overflow:visible;border:0;background:none}
+.wrap{overflow:visible;border:0;background:none}
+.findings{border:0}
 .tbl th{position:static;background:none}
 .graph-panel{border:0;background:transparent}
 .graph{padding:0}

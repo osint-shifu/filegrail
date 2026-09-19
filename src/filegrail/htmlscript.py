@@ -658,6 +658,50 @@ SCRIPT = """
       arrangeGraph();
     });
   }
+  // Full screen: the panel with its controls fills the window, through the
+  // Fullscreen API where the browser grants it and as a fixed layer where not.
+  var graphFull = one('#graph-full');
+  var graphPanel = graph ? graph.closest('.graph-panel') : null;
+  function graphIsFull() {
+    return !!graphPanel && (graphPanel.classList.contains('full')
+      || document.fullscreenElement === graphPanel);
+  }
+  function showGraphFull(on) {
+    if (!graphPanel) { return; }
+    graphPanel.classList.toggle('full', on);
+    document.body.classList.toggle('graph-full', on);
+    if (graphFull) {
+      graphFull.textContent = on ? 'Exit full screen' : 'Full screen';
+      graphFull.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    window.requestAnimationFrame(fitGraph);
+  }
+  if (graphFull && graphPanel) {
+    graphFull.addEventListener('click', function () {
+      if (graphIsFull()) {
+        if (document.fullscreenElement === graphPanel && document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+        showGraphFull(false);
+        return;
+      }
+      showGraphFull(true);
+      if (graphPanel.requestFullscreen) {
+        graphPanel.requestFullscreen().catch(function () { /* the fixed layer stays */ });
+      }
+    });
+    document.addEventListener('fullscreenchange', function () {
+      if (!document.fullscreenElement && graphPanel.classList.contains('full')) {
+        showGraphFull(false);
+      }
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && graphPanel.classList.contains('full')) {
+        showGraphFull(false);
+      }
+    });
+    window.addEventListener('resize', function () { if (graphIsFull()) { fitGraph(); } });
+  }
   if (graph) { window.requestAnimationFrame(fitGraph); }
 
   var toTop = one('#to-top');

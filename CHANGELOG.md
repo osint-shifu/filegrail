@@ -5,6 +5,17 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.37.0 - 2026-09-19
+
+### Added
+
+- HTML report: the graph panel, with its controls, can fill the screen; Esc or the same button brings the page back.
+
+### Changed
+
+- HTML report: findings are divided by a hairline only, with the finding number as plain text and the files as unframed tags; a finding that needs attention carries a short alert bar at its edge.
+- HTML report: sections are separated by space rather than a rule.
+
 ## 0.36.0 - 2026-09-19
 
 ### Changed

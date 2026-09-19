@@ -905,7 +905,10 @@ def _relationships(graph: Graph, files: dict[str, CaseFile], pivot_refs: dict[st
         '<button class="btn compact" id="graph-export" type="button" '
         'title="Export the current graph view as SVG">Export SVG</button>'
         '<button class="btn compact" id="graph-reset" type="button" '
-        'title="Reset view and filters">Reset</button></div></div>'
+        'title="Reset view and filters">Reset</button>'
+        '<button class="btn compact" id="graph-full" type="button" aria-pressed="false" '
+        'title="Work on the graph alone, filling the screen (Esc leaves)">Full screen</button>'
+        "</div></div>"
         '<div class="graph-filterbar">'
         f'<div class="rel-kinds" aria-label="Relationship type filters">{"".join(chips)}</div>'
         "</div>"
