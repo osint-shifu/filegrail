@@ -381,7 +381,8 @@ def _anchor(ref: str) -> str:
 
 
 def _link(ref: str) -> str:
-    return f'<a href="#{_anchor(ref)}">{_e(ref)}</a>'
+    """A finding or conflict number, framed the way its paragraph frames it."""
+    return f'<a class="rid {_e(ref[:1].lower())}" href="#{_anchor(ref)}">{_e(ref)}</a>'
 
 
 def _fields(
@@ -1069,9 +1070,12 @@ def _figure(drawn: Picture | None, files: dict[str, CaseFile], pivot_refs: dict[
             f'<circle cx="{node.x}" cy="{node.y}" r="{radius}"/>{text}'
             f"<title>{_e(title)}</title></g>"
         )
-    said = f"{len(drawn.nodes):,} nodes drawn"
-    if drawn.left_out:
-        said += f"; {drawn.left_out:,} more connected nodes are in the table below"
+    # The picture is capped; a reader should hear when the table holds more.
+    caption = (
+        f"<figcaption>{drawn.left_out:,} more connected nodes are in the table below</figcaption>"
+        if drawn.left_out
+        else ""
+    )
     return (
         '<figure class="graph"><div class="graph-canvas">'
         f'<svg id="evidence-graph" viewBox="0 0 {WIDTH} {HEIGHT}" '
@@ -1097,10 +1101,7 @@ def _figure(drawn: Picture | None, files: dict[str, CaseFile], pivot_refs: dict[
         '<a class="btn compact file-only" id="graph-detail-open">Open file detail</a>'
         '<a class="btn compact pivot-only" id="graph-detail-pivot" hidden>Open pivot</a>'
         "</div></aside></div>"
-        "<figcaption><span>"
-        f"{_e(said)} · click a node to focus it</span>"
-        '<span id="graph-inspector" aria-live="polite">Drag to pan · scroll to zoom</span>'
-        "</figcaption></figure>"
+        f"{caption}</figure>"
     )
 
 
@@ -1172,7 +1173,8 @@ def _relationship_node(node: Node, files: dict[str, CaseFile]) -> str:
     )
     return (
         '<div class="rel-node">'
-        f'<span class="pill">{_e(_node_type(node.type))}</span>{value}{focus}</div>'
+        f'<span class="pill"><i class="f-{_family(node.type)}"></i>{_e(_node_type(node.type))}'
+        f"</span>{value}{focus}</div>"
     )
 
 
@@ -1407,15 +1409,13 @@ def _detail(
     for ref in entry.conflicts:
         conflict = conflicts[ref]
         fields = " · ".join(difference.field for difference in conflict.differences)
-        notes.append(
-            f"{_e(' and '.join(conflict.sources))} disagree on {_e(fields)} ({_link(ref)})"
-        )
+        notes.append(f"{_e(' and '.join(conflict.sources))} disagree on {_e(fields)} {_link(ref)}")
     for ref in entry.findings:
         finding = findings[ref]
         if finding.kind in ("conflicts", "no-trace"):
             continue
         others = [files[item.path] for item in finding.items if item.path != record.path]
-        said = f"{_e(finding.title)} ({_link(ref)})"
+        said = f"{_e(finding.title)} {_link(ref)}"
         if others and len(others) <= 6:
             said += ": " + " · ".join(_file_link(other) for other in others)
         elif others:

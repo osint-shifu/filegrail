@@ -5,6 +5,12 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.40.3 - 2026-09-19
+
+### Changed
+
+- HTML report: relationship rows carry family-coloured type pills, coloured file numbers and the focus button beside the name; finding and conflict references are framed wherever they appear; the status line under the graph is gone.
+
 ## 0.40.2 - 2026-09-19
 
 ### Changed

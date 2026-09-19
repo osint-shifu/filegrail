@@ -324,7 +324,6 @@ SCRIPT = """
   var graph = one('#evidence-graph');
   var graphViewport = graph ? graph.querySelector('.graph-viewport') : null;
   var graphZoomValue = one('#graph-zoom-value');
-  var graphInspector = one('#graph-inspector');
   var graphDetail = one('#graph-detail');
   var graphDetailClose = one('#graph-detail-close');
   var graphScale = 1;
@@ -400,11 +399,6 @@ SCRIPT = """
     graphY = view.height / 2 - (bounds.y + bounds.height / 2) * graphScale;
     drawGraphView();
   }
-  function inspectGraphNode(mark) {
-    if (!graphInspector) { return; }
-    var title = mark ? mark.querySelector('title') : null;
-    graphInspector.textContent = title ? title.textContent : 'Drag to pan · scroll to zoom';
-  }
   function graphDetailText(id, value) {
     var field = one(id);
     if (field) { field.textContent = value || '·'; }
@@ -472,8 +466,7 @@ SCRIPT = """
       graph.classList.add('dragging');
     });
     graph.addEventListener('pointermove', function (event) {
-      var mark = event.target.closest ? event.target.closest('.node') : null;
-      if (!graphDrag) { inspectGraphNode(mark); return; }
+      if (!graphDrag) { return; }
       var point = graphPoint(event);
       graphX += point.x - graphDrag.x;
       graphY += point.y - graphDrag.y;
@@ -488,12 +481,6 @@ SCRIPT = """
     graph.addEventListener('pointercancel', function () {
       graphDrag = null;
       graph.classList.remove('dragging');
-    });
-    graph.addEventListener('focusin', function (event) {
-      inspectGraphNode(event.target.closest ? event.target.closest('.node') : null);
-    });
-    graph.addEventListener('mouseleave', function () {
-      inspectGraphNode(graph.querySelector('.node.on'));
     });
     graph.addEventListener('keydown', function (event) {
       var step = 28;
@@ -566,7 +553,6 @@ SCRIPT = """
     graphReset.addEventListener('click', function () {
       clearRelationshipFilters();
       if (graphDetail) { graphDetail.hidden = true; }
-      inspectGraphNode(null);
       if (graphLayout) { graphLayout.value = 'force'; }
       if (graphSpacing) { graphSpacing.value = '100'; }
       if (graphLabels) { graphLabels.value = 'auto'; }

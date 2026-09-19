@@ -164,17 +164,23 @@ color:var(--ink-2)}
 .tbl td.num,.tbl th.num{text-align:right;white-space:nowrap}
 .tbl th.num{letter-spacing:.04em}
 .tbl .id{color:var(--faint);white-space:nowrap}
-.tbl .pid{display:inline-flex;align-items:center;height:20px;padding:0 6px;
+.tbl .pid,.rid{display:inline-flex;align-items:center;height:20px;padding:0 6px;
 border:1px solid var(--accent);border-radius:var(--r);font-size:var(--t-label);
 letter-spacing:.06em;color:var(--accent)}
+.rid{height:18px;padding:0 5px;margin-right:2px;vertical-align:1px}
+.rid:hover{text-decoration:none;background:var(--accent-soft)}
+.rid.c{border-color:var(--alert);color:var(--alert)}
+.rid.c:hover{background:var(--alert-soft)}
 .tbl.pivots .kind{white-space:nowrap}
-.tbl.pivots .kind i{display:inline-block;width:8px;height:8px;border-radius:50%;
+.tbl.pivots .kind i,.pill i{display:inline-block;width:8px;height:8px;border-radius:50%;
 background:var(--g-key);margin-right:8px;vertical-align:1px}
-.tbl.pivots .kind i.f-file{background:var(--g-file)}
-.tbl.pivots .kind i.f-person{background:var(--g-person)}
-.tbl.pivots .kind i.f-device{background:var(--g-device)}
-.tbl.pivots .kind i.f-address{background:var(--g-address)}
-.tbl.pivots .kind i.f-money{background:var(--g-money)}
+.pill i{width:7px;height:7px;margin-right:6px;vertical-align:0}
+.tbl.pivots .kind i.f-file,.pill i.f-file{background:var(--g-file)}
+.tbl.pivots .kind i.f-person,.pill i.f-person{background:var(--g-person)}
+.tbl.pivots .kind i.f-device,.pill i.f-device{background:var(--g-device)}
+.tbl.pivots .kind i.f-address,.pill i.f-address{background:var(--g-address)}
+.tbl.pivots .kind i.f-money,.pill i.f-money{background:var(--g-money)}
+.rel-node a .ref{color:var(--accent)}
 .tbl .corpus{white-space:nowrap}
 .pill.corpus.both{border-color:var(--accent);color:var(--accent)}
 .tbl .path{color:var(--ink);overflow-wrap:anywhere;min-width:18em}
@@ -328,10 +334,8 @@ paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
 .graph.kinded .e:not(.kind-on){stroke-opacity:.06}
 .graph.kinded .e.kind-on{stroke:var(--accent);stroke-opacity:.9;stroke-width:1.3}
 .graph.kinded .node.kind-near .halo{opacity:.3}
-.graph figcaption{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
-font-size:var(--t-label);letter-spacing:.04em;color:var(--faint);padding-top:8px;
-border-top:1px solid var(--line)}
-#graph-inspector{color:var(--muted);text-align:right}
+.graph figcaption{margin:6px 0 0;padding:9px 14px;border-top:1px solid var(--line);
+background:var(--surface-2);color:var(--muted);font:400 var(--t-small)/1.4 var(--sans)}
 .graph-detail{--c:var(--g-key);position:absolute;top:12px;right:12px;
 width:min(380px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;
 scrollbar-gutter:stable;
@@ -402,7 +406,7 @@ border-color:var(--accent);outline:none}
 .rel-node a,.rel-node .v{overflow-wrap:anywhere}
 .rel-focus{display:none;align-items:center;justify-content:center;flex:none;width:22px;
 height:22px;border:1px solid var(--line-2);border-radius:var(--r);color:var(--faint);
-margin-left:auto}
+margin-left:2px}
 .rel-focus .ic{width:12px;height:12px}
 .js .rel-focus{display:inline-flex}
 .rel-focus:hover,.rel-focus:focus{color:var(--accent);border-color:var(--accent);outline:none}
@@ -558,6 +562,7 @@ border-bottom:1px solid var(--line)}
 border:1px solid var(--alert);border-radius:var(--r);font-size:var(--t-label);color:var(--alert)}
 .conf .cid:hover{text-decoration:none;background:var(--alert-soft)}
 .conf .t{color:var(--ink);font:400 var(--t-lead)/1.5 var(--sans);overflow-wrap:anywhere}
+.conf .t a{color:var(--ink)}
 .conf .t a .ref{color:var(--alert)}
 .conf .field{color:var(--muted);font:500 var(--t-label)/1.4 var(--sans);letter-spacing:var(--track);
 text-transform:uppercase;margin:16px 0 0}

@@ -451,7 +451,7 @@ def test_the_graph_is_drawn_and_its_nodes_focus_the_explorer():
     assert 'id="graph-detail-pivot"' in section
     assert 'id="to-top"' in page and 'id="i-up"' in page
     assert 'data-source="file:/case/press/holiday.jpg"' in section
-    assert "nodes drawn" in section
+    assert "nodes drawn" not in section and "<figcaption" not in section
 
 
 def test_a_graph_node_that_is_a_shared_pivot_links_to_its_pivot_row():
