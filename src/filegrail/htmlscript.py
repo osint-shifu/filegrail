@@ -118,52 +118,6 @@ SCRIPT = """
     if (chip) { filter(chip.dataset.filter); }
   });
 
-  var timeline = one('.density');
-  var timelineRows = Array.prototype.slice.call(all('#timeline-table tbody tr'));
-  var timelineShown = one('#timeline-shown');
-  var timelineClear = one('#timeline-clear');
-  var timelineBin = null;
-  function filterTimeline(bin) {
-    timelineBin = bin;
-    var from = bin ? Number(bin.dataset.from) : -Infinity;
-    var to = bin ? Number(bin.dataset.to) : Infinity;
-    var day = null;
-    var dayHasEvent = false;
-    var left = 0;
-    timelineRows.forEach(function (row) {
-      if (row.classList.contains('day')) {
-        if (day) { day.hidden = !dayHasEvent; }
-        day = row;
-        dayHasEvent = false;
-        row.hidden = false;
-        return;
-      }
-      var moment = Number(row.dataset.moment);
-      var keep = !bin || (Number.isFinite(moment) && moment >= from && moment <= to);
-      row.hidden = !keep;
-      if (keep) { left += 1; dayHasEvent = true; }
-    });
-    if (day) { day.hidden = !dayHasEvent; }
-    each(all('.time-bin'), function (mark) {
-      var chosen = mark === bin;
-      mark.classList.toggle('on', chosen);
-      mark.setAttribute('aria-pressed', chosen ? 'true' : 'false');
-    });
-    if (timeline) { timeline.classList.toggle('filtered', !!bin); }
-    if (timelineShown) {
-      timelineShown.textContent = left + (left === 1 ? ' dated record' : ' dated records');
-    }
-    if (timelineClear) { timelineClear.hidden = !bin; }
-  }
-  each(all('.time-bin'), function (bin) {
-    bin.addEventListener('click', function () {
-      filterTimeline(timelineBin === bin ? null : bin);
-    });
-  });
-  if (timelineClear) {
-    timelineClear.addEventListener('click', function () { filterTimeline(null); });
-  }
-
   var relationshipRows = Array.prototype.slice.call(all('#relationship-table tbody tr'));
   var relationshipNode = one('#relationship-node');
   var relationshipCount = one('#relationship-shown');

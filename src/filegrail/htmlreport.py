@@ -26,8 +26,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
-from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import datetime
 from html import escape
 from pathlib import Path
 
@@ -351,7 +350,7 @@ def _section(key: str, title: str, body: str, note: str) -> str:
         '<svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></button>'
     )
     return (
-        f'<section id="{key}"><div class="h"><h2>{_e(title)}</h2>{counted}{fold}</div>'
+        f'<section id="{key}"><div class="h">{fold}<h2>{_e(title)}</h2>{counted}</div>'
         f'<div class="sec-body" id="{key}-body">{body}</div></section>'
     )
 
@@ -576,7 +575,10 @@ def _summary(case: Case, relationship_count: int) -> str:
 
 
 def _findings(case: Case, files: dict[str, CaseFile], linkable: frozenset[str]) -> str:
-    return "".join(_finding(case, finding, files, linkable) for finding in case.findings)
+    if not case.findings:
+        return ""
+    listed = "".join(_finding(case, finding, files, linkable) for finding in case.findings)
+    return f'<div class="findings">{listed}</div>'
 
 
 def _finding(
@@ -587,7 +589,7 @@ def _finding(
     if finding.kind in _PER_FILE:
         facts = [fact for fact in facts if fact[0] != "files"]
     parts = [
-        f'<div class="find" id="{finding.ref}">',
+        f'<div class="find{warn}" id="{finding.ref}">',
         f'<a class="fid" href="#{finding.ref}">{finding.ref}</a><div>',
         f'<div class="t{warn}">{_e(finding.title)}</div>',
     ]
@@ -739,7 +741,6 @@ def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
     )
     if not events:
         return ""
-    strip = _density(events)
     rows = []
     day = None
     for at, entry, found in events[:_MAX_EVENTS]:
@@ -768,8 +769,7 @@ def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
             "the rest are in the JSON and in each file's detail.</p>"
         )
     return (
-        strip
-        + _copyable_table(
+        _copyable_table(
             '<div class="wrap"><table class="tbl timeline" id="timeline-table"><thead><tr>'
             '<th data-sort="text">time</th><th data-sort="text">file</th>'
             '<th data-sort="text">event</th><th data-sort="text">source</th><th>detail</th>'
@@ -777,129 +777,6 @@ def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
         )
         + note
     )
-
-
-def _density(events: Sequence[tuple[str | None, CaseFile, EvidenceRecord]]) -> str:
-    """When the dated records fall, period by period, with the gaps said out loud.
-
-    A case spans years with nothing in most of them, so an axis drawn to scale
-    is a few marks and a long blank. Each period that holds a record is a row
-    instead - a year, a month or a day, whichever keeps the list readable -
-    and a run of empty periods between two rows is written as one line, since
-    an absence that long is a fact about the case.
-    """
-    moments: list[tuple[float, str]] = []
-    for at, _, found in events:
-        invalid, moment, _ = _timeline_key(at)
-        if invalid:
-            continue
-        moments.append((moment, category(found)))
-    if len(moments) < 2:
-        return ""
-    first, last = moments[0][0], moments[-1][0]
-    days = (last - first) / 86400
-    unit = "year" if days > 730 else "month" if days > 62 else "day"
-    grouped = _by_period(moments, unit)
-    while len(grouped) > _MAX_PERIODS and unit != "year":
-        unit = "month" if unit == "day" else "year"
-        grouped = _by_period(moments, unit)
-    peak = max(sum(counts.values()) for counts in grouped.values())
-    rows = []
-    previous: tuple[int, ...] | None = None
-    for key, counts in sorted(grouped.items()):
-        if previous is not None and (missing := _periods_between(previous, key, unit)):
-            plural = "s" if missing > 1 else ""
-            rows.append(
-                f'<li class="gap"><span>{missing:,} {unit}{plural} without a dated record'
-                "</span></li>"
-            )
-        previous = key
-        begins, ends = _period_bounds(key, unit)
-        total = sum(counts.values())
-        parts = [
-            f"{counts[kind]:,} {kind} record" + ("" if counts[kind] == 1 else "s")
-            for kind in CATEGORIES
-            if counts[kind]
-        ]
-        label = ", ".join(parts)
-        bars, x = [], 0.0
-        for kind in CATEGORIES:
-            if not counts[kind]:
-                continue
-            width = 100 * counts[kind] / peak
-            bars.append(
-                f'<rect class="{_e(kind)}" x="{x:.2f}" y="0" width="{width:.2f}" height="10"/>'
-            )
-            x += width
-        rows.append(
-            '<li class="period"><button class="time-bin" type="button" aria-pressed="false" '
-            f'data-from="{begins:.3f}" data-to="{ends:.3f}" data-count="{total}" '
-            f'aria-label="{_e(label)}" title="{_e(label)}">'
-            f'<span class="when">{_e(_period_label(key))}</span>'
-            '<svg class="bar" viewBox="0 0 100 10" preserveAspectRatio="none" '
-            f'aria-hidden="true">{"".join(bars)}</svg>'
-            f'<span class="n">{total:,}</span></button></li>'
-        )
-    legend = "".join(f'<span class="cat {_e(kind)}">{_e(kind)}</span>' for kind in CATEGORIES)
-    return (
-        '<figure class="density"><div class="timeline-tools">'
-        f'<div class="timeline-legend">{legend}</div><div class="timeline-state">'
-        f'<span id="timeline-shown">{len(moments):,} dated records</span>'
-        '<button class="btn compact" id="timeline-clear" type="button" hidden>'
-        "Clear range</button></div></div>"
-        f'<ol class="periods" aria-label="Dated records by {unit}">{"".join(rows)}</ol>'
-        f"<figcaption><span>by {unit} · {len(grouped):,} with records</span>"
-        f"<span>{_e(_stamp(_timeline_value(events[0][0])))} to "
-        f"{_e(_stamp(_timeline_value(events[-1][0])))}</span></figcaption></figure>"
-    )
-
-
-#: More rows than this and the periods are coarsened one step, day to month to year.
-_MAX_PERIODS = 48
-
-
-def _by_period(moments: list[tuple[float, str]], unit: str) -> dict[tuple[int, ...], Counter[str]]:
-    grouped: dict[tuple[int, ...], Counter[str]] = {}
-    for moment, kind in moments:
-        when = datetime.fromtimestamp(moment, timezone.utc)
-        key: tuple[int, ...] = (when.year,) if unit == "year" else (when.year, when.month)
-        if unit == "day":
-            key = (when.year, when.month, when.day)
-        grouped.setdefault(key, Counter())[kind] += 1
-    return grouped
-
-
-def _period_bounds(key: tuple[int, ...], unit: str) -> tuple[float, float]:
-    """The first instant of the period and the last one before the next begins."""
-    begins = _period_start(key)
-    if unit == "year":
-        after = begins.replace(year=begins.year + 1)
-    elif unit == "month":
-        after = (
-            begins.replace(year=begins.year + 1, month=1)
-            if begins.month == 12
-            else begins.replace(month=begins.month + 1)
-        )
-    else:
-        after = datetime.fromtimestamp(begins.timestamp() + 86400, timezone.utc)
-    return begins.timestamp(), after.timestamp() - 0.001
-
-
-def _periods_between(earlier: tuple[int, ...], later: tuple[int, ...], unit: str) -> int:
-    if unit == "year":
-        return later[0] - earlier[0] - 1
-    if unit == "month":
-        return (later[0] * 12 + later[1]) - (earlier[0] * 12 + earlier[1]) - 1
-    return (_period_start(later) - _period_start(earlier)).days - 1
-
-
-def _period_start(key: tuple[int, ...]) -> datetime:
-    year, month, day = (*key, 1, 1)[:3]
-    return datetime(year, month, day, tzinfo=timezone.utc)
-
-
-def _period_label(key: tuple[int, ...]) -> str:
-    return "-".join(f"{part:02d}" if at else f"{part:04d}" for at, part in enumerate(key))
 
 
 def _clip(value: str, width: int) -> str:

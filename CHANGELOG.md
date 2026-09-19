@@ -5,6 +5,18 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.34.0 - 2026-09-19
+
+### Changed
+
+- HTML report: tables sit in a panel with a shaded header row, first and last columns padded from the edge, and secondary text a step brighter; the timeline's day rows carry an accent tick and keep the source and its match basis on one line.
+- HTML report: key findings sit in one panel, each with its fields in an aligned two-column grid and its files as tags; a notable finding is marked by an alert edge.
+- HTML report: the fold control is a chevron before the section title rather than a button at the far end of the heading.
+
+### Removed
+
+- HTML report: the by-period list above the timeline.
+
 ## 0.33.0 - 2026-09-19
 
 ### Added
