@@ -5,6 +5,12 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.34.1 - 2026-09-19
+
+### Changed
+
+- HTML report: tables and the findings panel sit on the page's own dark ground, with the header row one shade lighter; the timeline alternates a shade between one day's records and the next.
+
 ## 0.34.0 - 2026-09-19
 
 ### Changed

@@ -150,7 +150,7 @@ color:var(--muted);margin:16px 0 0}
 .tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:var(--t-table)}
 .tbl th{text-align:left;font:500 var(--t-label)/1.4 var(--sans);letter-spacing:var(--track);
 text-transform:uppercase;color:var(--muted);padding:10px 14px 10px 0;
-background:var(--surface-2);border-bottom:1px solid var(--line-2);white-space:nowrap;
+background:var(--surface);border-bottom:1px solid var(--line-2);white-space:nowrap;
 user-select:none;position:sticky;top:0;z-index:1}
 .tbl th:first-child,.tbl td:first-child{padding-left:14px}
 .tbl th:last-child,.tbl td:last-child{padding-right:14px}
@@ -160,7 +160,7 @@ user-select:none;position:sticky;top:0;z-index:1}
 .tbl td{padding:11px 14px 11px 0;border-bottom:1px solid var(--line);vertical-align:top;
 color:var(--ink-2)}
 .tbl tbody tr:last-child td{border-bottom:0}
-.tbl tbody tr:hover td{background:var(--surface-2)}
+.tbl tbody tr:hover td{background:var(--surface)}
 .tbl td.num,.tbl th.num{text-align:right;white-space:nowrap}
 .tbl th.num{letter-spacing:.04em}
 .tbl .id{color:var(--faint);white-space:nowrap}
@@ -174,7 +174,7 @@ color:var(--ink-2)}
 .tbl tr[hidden]{display:none}
 .tbl tr.hit td{background:var(--accent-soft)}
 .wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);
-background:var(--surface)}
+background:var(--bg)}
 .table-block{position:relative}
 .table-actions{display:none;position:absolute;top:5px;right:6px;z-index:2}
 .js .table-actions{display:block}
@@ -190,14 +190,16 @@ white-space:nowrap}
 .wrap>table.relationships{min-width:940px}
 
 /* ── timeline ── */
-.tbl.timeline tr.day td{padding:14px 14px 7px;color:var(--ink);
+.tbl.timeline tr.day td{padding:12px 14px 7px;color:var(--ink);
 font:500 var(--t-small)/1.4 var(--sans);letter-spacing:.04em;
 border-bottom:1px solid var(--line-2)}
+.tbl.timeline tr[data-band] td{background:var(--surface)}
+.tbl.timeline tbody tr[data-band]:hover td{background:var(--surface-2)}
 .tbl.timeline tr.day td:before{content:"";display:inline-block;width:8px;height:2px;
 background:var(--accent);margin:0 10px 3px 0}
 .tbl.timeline .pill{margin-left:6px}
 .tbl.timeline td:nth-child(4){white-space:nowrap}
-.tbl.timeline tbody tr.day:hover td{background:var(--surface)}
+.tbl.timeline tbody tr.day:hover td{background:inherit}
 .tbl.timeline td:first-child{white-space:nowrap}
 
 /* ── graph ── */
@@ -364,7 +366,7 @@ tr:hover .copy,.rec:hover .copy,dd:hover .copy,.pair:hover .copy,.facts dd:hover
 .copy.ok,.copy.no{opacity:1}
 
 /* ── findings ─────────────────────────────────────────────── */
-.findings{border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.findings{border:1px solid var(--line);border-radius:var(--r);background:var(--bg)}
 .find{display:grid;grid-template-columns:56px 1fr;gap:0 18px;padding:16px 18px;
 border-bottom:1px solid var(--line);box-shadow:inset 2px 0 0 transparent}
 .find.warn{box-shadow:inset 2px 0 0 var(--alert)}

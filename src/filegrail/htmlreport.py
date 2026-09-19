@@ -743,19 +743,22 @@ def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
         return ""
     rows = []
     day = None
+    band = ""
     for at, entry, found in events[:_MAX_EVENTS]:
         stamp = _stamp(_timeline_value(at)) if at else ""
         invalid, moment, _ = _timeline_key(at)
         moment_attr = "" if invalid else f' data-moment="{moment:.3f}"'
         today, _, clock = stamp.partition(" ")
         if today != day:
+            # Days alternate between two shades, so a day's records read as one block.
+            band = "" if (day is None or band) else ' data-band="1"'
             day = today
-            rows.append(f'<tr class="day"><td colspan="5">{_e(day)}</td></tr>')
+            rows.append(f'<tr class="day"{band}><td colspan="5">{_e(day)}</td></tr>')
         kind = category(found)
         verb = EVENT_VERBS.get(found.source, CATEGORY_VERBS[kind])
         detail = found.url or found.tool or found.note or ""
         rows.append(
-            f'<tr class="event" data-f="{_e(kind)}"{moment_attr}>'
+            f'<tr class="event" data-f="{_e(kind)}"{band}{moment_attr}>'
             f'<td class="dim">{_e(clock or stamp)}</td>'
             f"<td>{_file_link(entry)}</td>"
             f'<td><span class="cat {_e(kind)}" title="{_e(kind)}">{_e(verb)}</span></td>'

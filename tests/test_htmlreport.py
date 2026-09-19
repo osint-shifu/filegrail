@@ -421,8 +421,9 @@ def test_the_timeline_keeps_the_count_when_events_share_the_same_instant():
     page = _page(records)
     section = page.split('<section id="timeline"')[1].split("</section>")[0]
 
-    assert section.count('class="event" data-f="metadata" data-moment=') == 4
-    assert section.count('<tr class="day">') == 2
+    assert section.count('class="event" data-f="metadata"') == 4
+    assert section.count('<tr class="day"') == 2
+    assert section.count(' data-band="1"') == 2  # the second day and its one record
 
 
 def test_the_graph_is_drawn_and_its_nodes_focus_the_explorer():
