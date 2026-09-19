@@ -5,6 +5,17 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.40.4 - 2026-09-19
+
+### Security
+
+- Releases verify that the tag names the package version and points at the current `master`, then run tests on Python 3.10 and 3.13, Ruff, mypy, the package build and Twine before PyPI publication can begin.
+- GitHub Actions are pinned to commit SHAs. Repository policy tests keep the release gate and the pins in place.
+
+### Changed
+
+- Local Claude review exports are ignored so screenshots and patches cannot enter a release through a broad staging command.
+
 ## 0.40.3 - 2026-09-19
 
 ### Changed
