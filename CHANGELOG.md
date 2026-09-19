@@ -5,6 +5,13 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.38.1 - 2026-09-19
+
+### Fixed
+
+- HTML report: on a phone the mark in the masthead grew to the height of the facts beside it and covered them; it is now capped and sits above the facts on a narrow screen, with each fact's label above its value.
+- HTML report: in the graph's node details, each connected-to row is a fixed grid of relation, type, value and focus button, so the button is always inside the panel, in full screen too; the panel is a little wider and keeps a stable gutter for its scrollbar.
+
 ## 0.38.0 - 2026-09-19
 
 ### Changed

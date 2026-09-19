@@ -46,7 +46,7 @@ text-transform:uppercase;color:var(--muted)}
 .mast .word small{font-size:inherit;font-weight:400;color:var(--faint)}
 .mast-body{display:grid;grid-template-columns:auto 1fr;gap:0 26px;align-items:stretch}
 .mast-mark{display:flex;align-items:stretch}
-.mast .mark{height:100%;width:auto;flex:none}
+.mast .mark{height:100%;max-height:112px;width:auto;flex:none}
 .mast .tag{display:none}
 .facts{display:grid;grid-template-columns:auto 1fr;gap:6px 24px;justify-content:start;margin:0;
 font-size:var(--t-body);align-content:center}
@@ -311,7 +311,8 @@ font-size:var(--t-label);letter-spacing:.04em;color:var(--faint);padding-top:8px
 border-top:1px solid var(--line)}
 #graph-inspector{color:var(--muted);text-align:right}
 .graph-detail{--c:var(--g-key);position:absolute;top:12px;right:12px;
-width:min(360px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;
+width:min(380px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;
+scrollbar-gutter:stable;
 padding:0 0 4px;background:color-mix(in srgb,var(--surface) 96%,transparent);
 backdrop-filter:blur(10px);border:1px solid var(--line-2);border-top:2px solid var(--c);
 border-radius:4px;box-shadow:0 16px 40px rgba(0,0,0,.4);font-size:var(--t-small)}
@@ -339,13 +340,14 @@ border-top:1px solid var(--line)}
 .graph-detail h4{margin:0 18px 4px;font:500 var(--t-label)/1.4 var(--sans);
 letter-spacing:var(--track);text-transform:uppercase;color:var(--faint)}
 .graph-detail ul{list-style:none;margin:0 18px 14px;padding:0}
-.graph-detail li{display:grid;grid-template-columns:minmax(88px,max-content) 1fr;gap:12px;
-padding:6px 0;border-top:1px solid var(--line);align-items:start}
+.graph-detail li{display:grid;grid-template-columns:minmax(0,max-content) max-content
+minmax(0,1fr) 22px;
+gap:8px 10px;padding:6px 0;border-top:1px solid var(--line);align-items:start}
 .graph-detail li .kind{font-family:var(--sans);color:var(--faint);white-space:nowrap}
-.graph-detail li .rel-node{min-width:0;flex-wrap:wrap;gap:6px 8px}
-.graph-detail li .rel-node a,.graph-detail li .rel-node .v{flex:1 1 8em;min-width:0}
-.graph-detail li .rel-focus{margin-left:0}
-.graph-detail li{grid-template-columns:minmax(0,max-content) minmax(0,1fr)}
+.graph-detail li .rel-node{display:contents}
+.graph-detail li .rel-node .pill{margin-top:1px}
+.graph-detail li .rel-node a,.graph-detail li .rel-node .v{min-width:0;overflow-wrap:anywhere}
+.graph-detail li .rel-focus{margin:0;justify-self:end}
 .graph-detail-actions{display:flex;gap:8px;flex-wrap:wrap;padding:0 18px 12px}
 .to-top{position:fixed;right:20px;bottom:20px;z-index:20;width:36px;height:36px;
 box-shadow:0 6px 18px rgba(0,0,0,.28)}
@@ -550,7 +552,12 @@ letter-spacing:var(--track);text-transform:uppercase;color:var(--faint)}
 .facts{gap:4px 16px}
 }
 @media (max-width:820px){
-.mast-body{gap:0 18px}
+.mast-body{grid-template-columns:1fr;gap:14px 0}
+.mast-mark{align-items:start}
+.mast .mark{height:64px;max-height:64px}
+.facts{grid-template-columns:1fr;gap:2px 0}
+.facts dt{margin-top:8px}
+.facts dt:first-child{margin-top:0}
 .rec{grid-template-columns:1fr}
 .rec .cat{margin-bottom:4px}
 .rec>.fields{grid-column:1}
