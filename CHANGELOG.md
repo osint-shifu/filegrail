@@ -5,6 +5,16 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.38.0 - 2026-09-19
+
+### Changed
+
+- Terminal report: the masthead carries the mark in the brand colour beside the name and the product line, and one line says when the scan ran and what it covered. Sections are numbered, with the title and a rule on one line. The summary lists the same figures as the HTML report, in the same order, with a note beside each; `Relationships` counts the graph's edges. The file index gives every file the same two-line shape, with the full block kept for `-v`. Coverage states are marked `●`, `◐` and `○`. The XMP derivation section is named `XMP LINEAGE`. The footer names the version and the time.
+
+### Fixed
+
+- Terminal report: a terminal without Unicode no longer gets a traceback from a separator or from a file name it cannot encode; the separator takes the ASCII glyph and the character is replaced.
+
 ## 0.37.1 - 2026-09-19
 
 ### Changed

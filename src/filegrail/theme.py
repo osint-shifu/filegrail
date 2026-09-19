@@ -40,6 +40,10 @@ _PALETTE = {
     "rail": ("3a3a3a", 237, 90),
     # Reserved for a claim the source itself flagged as incomplete.
     "warning": ("d7875f", 173, 33),
+    # The mark and the accents of the page furniture: section numbers, the
+    # masthead, a value the reader is pointed at.
+    "brand": ("5fa89a", 72, 32),
+    "accent": ("7fb5a8", 115, 36),
 }
 
 #: Which colour a source is painted in. Keyed by the category the record
@@ -65,6 +69,10 @@ RAIL = "│"
 BRANCH = "├"
 LAST = "└"
 FLAG = "!"
+#: Coverage states: a store read in full, in part, and one not found.
+FULL = "●"
+HALF = "◐"
+RING = "○"
 RULE = "─"
 
 #: Opens and closes a whole report, which a single rule under a heading must
@@ -95,6 +103,9 @@ _ASCII = {
     BRANCH: "+",
     LAST: "\\",
     FLAG: "!",
+    FULL: "*",
+    HALF: "~",
+    RING: "o",
     RULE: "-",
     DOUBLE_RULE: "=",
     BOTH_WAYS: "<->",

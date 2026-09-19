@@ -20,6 +20,7 @@ from pathlib import Path
 
 from . import __version__
 from .analysis import NOTHING, REVIEW, Case, CaseFile, Finding, named, stamp
+from .graph import build_graph
 from .identify import PLACE, Identifier
 from .models import ACTIVITY, CATEGORIES, METADATA, ORIGIN, EvidenceRecord, FileRecord, category
 from .overview import inventory
@@ -34,7 +35,7 @@ from .report import (
     _size,
 )
 from .scan import Unsearched
-from .theme import BOTH_WAYS, DOUBLE_RULE, FLAG, MIDDOT, RULE, Theme, detect
+from .theme import BOTH_WAYS, DOUBLE_RULE, FLAG, FULL, HALF, MIDDOT, RING, RULE, Theme, detect
 
 #: Where a property's value starts, measured from its label.
 LABEL = 12
@@ -93,8 +94,13 @@ class _Page:
         self.theme = theme
         self.width = theme.width
         self.lines: list[str] = []
+        self.count = 0
 
     def add(self, line: str = "") -> None:
+        # A separator that arrived inside a value, from the analysis, takes the
+        # theme's glyph too, so an ASCII terminal never meets a middle dot.
+        if not self.theme.unicode and MIDDOT in line:
+            line = line.replace(MIDDOT, self.theme.glyph(MIDDOT))
         self.lines.append(line.rstrip())
 
     def gap(self) -> None:
@@ -140,13 +146,41 @@ class _Page:
                     self.prop(label.strip(), value, indent)
 
     def section(self, name: str) -> None:
-        rule = self.theme.dim(self.theme.glyph(RULE) * self.width)
+        """`01  SUMMARY ────`: the number, the name, and a rule to the edge."""
+        self.count += 1
+        number = f"{self.count:02d}"
+        lead = f"{number}  {name}  "
+        rule = self.theme.glyph(RULE) * max(0, self.width - len(lead))
         self.gap()
         self.add()
-        self.add(rule)
-        self.add(self.theme.bold(name))
-        self.add(rule)
+        self.add(
+            self.theme.paint(number, "accent")
+            + "  "
+            + self.theme.bold(name)
+            + "  "
+            + self.theme.dim(rule)
+        )
         self.add()
+
+    def kpis(self, rows: list[tuple[str, str, str]]) -> None:
+        """A label, its figure on the right of a column, and a note beside it."""
+        if not rows:
+            return
+        left = max(len(label) for label, _, _ in rows) + 2
+        right = max(len(value) for _, value, _ in rows)
+        room = self.width - left - right - 3
+        for label, value, note in rows:
+            line = label.ljust(left) + self.theme.bold(value.rjust(right))
+            if not note:
+                self.add(line)
+            elif room >= 16:
+                parts = self.theme.wrap(note, room)
+                self.add(line + "   " + self.theme.dim(parts[0]))
+                for part in parts[1:]:
+                    self.add(" " * (left + right + 3) + self.theme.dim(part))
+            else:
+                self.add(line)
+                self.wrapped(self.theme.dim(note), 2)
 
     def double(self) -> None:
         self.add(self.theme.dim(self.theme.glyph(DOUBLE_RULE) * self.width))
@@ -172,8 +206,8 @@ def render_case(
     files = {entry.record.path: entry for entry in case.files}
     records = [entry.record for entry in case.files]
 
-    _masthead(page, case, home, now, brief=brief, verbose=verbose)
-    _summary(page, case, records)
+    moment = _masthead(page, case, home, now, brief=brief, verbose=verbose)
+    _summary(page, case, records, identifiers)
     _findings(page, case, files)
     _files(page, case, verbose=verbose, limit=limit, compact=brief)
     if not brief:
@@ -190,7 +224,19 @@ def render_case(
         page.add(f"{'No file matched' if not records else 'Limited to'} {filtered}.")
     page.gap()
     page.double()
-    page.add("END OF REPORT")
+    dot = page.theme.glyph(MIDDOT)
+    page.add(page.theme.bold("END OF REPORT"))
+    for line in page.theme.wrap(
+        f" {dot} ".join(
+            [
+                f"filegrail {__version__}",
+                moment.strftime("%Y-%m-%d %H:%M %Z").strip(),
+                "no network requests",
+            ]
+        ),
+        page.width,
+    ):
+        page.add(page.theme.dim(line))
     page.double()
     return "\n".join(page.lines)
 
@@ -213,65 +259,113 @@ def _folder(case: Case, record: FileRecord) -> str | None:
     return str(relative) if relative.parent != Path(".") else None
 
 
+#: The mark in half blocks, five lines high: a cup on its stem. Painted in the
+#: brand colour and printed only where the terminal can draw it.
+_GRAIL = (
+    " ▄▄▄▄▄▄▄▄ ",
+    "▐████████▌",
+    " ▀██████▀ ",
+    "    ██    ",
+    "  ▄▄██▄▄  ",
+)
+
+
 def _masthead(
     page: _Page, case: Case, home: Path | None, now: datetime | None, *, brief: bool, verbose: bool
-) -> None:
-    dot = page.theme.glyph(MIDDOT)
-    mode = f" {dot} BRIEF" if brief else f" {dot} VERBOSE" if verbose else ""
-    page.add(page.theme.bold(f"FILEGRAIL {__version__}"))
-    page.add(f"INVESTIGATION REPORT{mode}")
+) -> datetime:
+    theme = page.theme
+    dot = theme.glyph(MIDDOT)
+    mode = f"  {dot}  brief" if brief else f"  {dot}  verbose" if verbose else ""
+    words = [
+        theme.bold(f"FILEGRAIL {__version__}"),
+        theme.label("LOCAL FILE INTELLIGENCE"),
+        f"Investigation report{mode}",
+    ]
+    if theme.unicode:
+        page.add()
+        for row, art in enumerate(_GRAIL):
+            said = words[row] if row < len(words) else ""
+            page.add(theme.paint(art, "brand") + "    " + said)
+    else:
+        for said in words:
+            page.add(said)
+    page.add()
     page.double()
     page.add()
+    records = [entry.record for entry in case.files]
+    contents = inventory(records)
+    moment = now or datetime.now().astimezone()
     page.prop("Target", _display(case.root), 0)
     if home:
         page.prop("Profile", f"{_display(home)} {dot} external", 0)
-    moment = now or datetime.now().astimezone()
-    page.prop("Generated", moment.strftime("%Y-%m-%d %H:%M %Z").strip(), 0)
-
-
-def _summary(page: _Page, case: Case, records: list[FileRecord]) -> None:
-    contents = inventory(records)
-    flag, dot = page.theme.glyph(FLAG), page.theme.glyph(MIDDOT)
-    holding = {name: sum(1 for entry in case.files if entry.found[name]) for name in CATEGORIES}
-    known = sum(1 for record in records if record.evidence)
-    fields = sum(len(conflict.differences) for conflict in case.conflicts)
-
-    groups = [
-        [
-            ("Files", f"{len(records):,}"),
-            ("File types", f"{len(contents.types):,}"),
-            ("Total size", _size(contents.size)),
-        ],
-        [
-            ("Evidence", ""),
-            ("  Files with evidence", f"{known:,} / {len(records):,}"),
-            ("  Origin", f"{holding[ORIGIN]:,}"),
-            ("  Metadata", f"{holding[METADATA]:,}"),
-            ("  Activity", f"{holding[ACTIVITY]:,}"),
-        ],
-    ]
-    analysed = [
-        ("Analysis", ""),
-        (
-            f"  {flag if case.conflicts else dot} Conflicts",
-            f"{len(case.conflicts)} files / {fields} fields" if case.conflicts else "0",
+    page.prop(
+        "Scanned",
+        f" {dot} ".join(
+            [
+                moment.strftime("%Y-%m-%d %H:%M %Z").strip(),
+                f"{len(records):,} files",
+                f"{len(contents.types):,} types",
+                _size(contents.size),
+            ]
         ),
-        (f"  {dot} Relationships", f"{case.relationships:,}"),
+        0,
+    )
+    return moment
+
+
+def _summary(
+    page: _Page, case: Case, records: list[FileRecord], identifiers: list[Identifier] | None
+) -> None:
+    """The figures the HTML report opens with, in the same order, one line each."""
+    theme = page.theme
+    contents = inventory(records)
+    flag, dot = theme.glyph(FLAG), theme.glyph(MIDDOT)
+    holding = {name: [entry for entry in case.files if entry.found[name]] for name in CATEGORIES}
+    review = [entry for entry in case.files if entry.state == REVIEW]
+    quiet = [entry for entry in case.files if entry.state == NOTHING]
+    fields = sum(len(conflict.differences) for conflict in case.conflicts)
+    edges = len(build_graph(records, identifiers or []).relationships)
+
+    rows: list[tuple[str, str, str]] = [
+        (
+            "Files scanned",
+            f"{len(records):,}",
+            f"{len(contents.types):,} types {dot} {_size(contents.size)}",
+        )
     ]
-    if case.pivots is not None:
-        analysed += [
-            (f"  {dot} Investigative pivots", f"{case.pivots.total:,}"),
-            (f"  {dot} Shared pivots", f"{case.pivots.across:,}"),
-            (f"  {dot} Cross-corpus pivots", f"{case.pivots.cross_corpus:,}"),
-        ]
-    groups.append(analysed)
+    for name in CATEGORIES:
+        entries = holding[name]
+        if entries:
+            sources = sorted({found for entry in entries for found in entry.found[name]})
+            rows.append((f"With {name}", f"{len(entries):,}", f" {dot} ".join(sources)))
+    if case.pivots is not None and case.pivots.total:
+        said = f"{case.pivots.across:,} in more than one file"
+        if case.pivots.cross_corpus:
+            said += f" {dot} {case.pivots.cross_corpus:,} in both corpora"
+        rows.append(("Pivots", f"{case.pivots.total:,}", said))
+    if edges:
+        rows.append(("Relationships", f"{edges:,}", "evidence-backed graph edges"))
+    if review:
+        said = f"{len(case.conflicts)} conflicts {dot} {fields} fields" if case.conflicts else ""
+        rows.append((f"{flag} Need review", f"{len(review):,}", said))
+    if quiet:
+        rows.append(
+            ("No evidence found", f"{len(quiet):,}", "see coverage before reading as absence")
+        )
     stores = [source for source in case.coverage if source.store]
     if stores:
         found = sum(1 for source in stores if source.state == "found")
-        groups.append([("Coverage", f"{found} / {len(stores)} trace stores")])
+        said = f"history begins {case.begins}" if case.begins else ""
+        rows.append(("Trace stores found", f"{found}/{len(stores)}", said))
 
     page.section("SUMMARY")
-    page.figures(groups)
+    page.kpis(rows)
+    states = {entry.state for entry in case.files}
+    marks = [(flag, "needs review", REVIEW), (dot, "no evidence found", NOTHING)]
+    legend = [f"{mark}  {meaning}" for mark, meaning, state in marks if state in states]
+    if legend:
+        page.add()
+        page.add(theme.dim("    ".join(legend)))
 
 
 def _findings(page: _Page, case: Case, files: dict[str, CaseFile]) -> None:
@@ -341,13 +435,14 @@ def _coverage(page: _Page, case: Case, unsearched: Unsearched | None) -> None:
     if not case.coverage and not missed:
         return
     page.section("EVIDENCE COVERAGE")
+    theme = page.theme
     for source in case.coverage:
         if source.state in ("found", "readable"):
-            mark = "[+]"
+            mark = theme.paint(theme.glyph(FULL), "origin")
         elif source.state == "partial":
-            mark = "[~]"
+            mark = theme.paint(theme.glyph(HALF), "activity")
         else:
-            mark = "[-]"
+            mark = theme.dim(theme.glyph(RING))
         indent = page.head(mark, "", source.name)
         page.prop("Status", source.state, indent)
         if source.detail:
@@ -356,7 +451,7 @@ def _coverage(page: _Page, case: Case, unsearched: Unsearched | None) -> None:
             page.prop("Since", source.since, indent)
         page.gap()
     for path, why in missed:
-        indent = page.head("[-]", "", _relative(path, case.root))
+        indent = page.head(theme.dim(theme.glyph(RING)), "", _relative(path, case.root))
         page.prop("Status", why, indent)
         page.gap()
     if case.coverage:
@@ -399,33 +494,16 @@ def _conflicts(page: _Page, case: Case, files: dict[str, CaseFile]) -> None:
 
 
 def _files(page: _Page, case: Case, *, verbose: bool, limit: int, compact: bool) -> None:
+    """The index: one line per file, the same shape for every file.
+
+    A file that wants reading in full - a conflict, an arrival, a local trace,
+    a finding that needs a second look - is marked, and opens as a block under
+    `-v`; the index itself keeps one rhythm so the eye can run down it.
+    """
     if not case.files:
         return
-    theme = page.theme
-    dot = theme.glyph(MIDDOT)
-    records = [entry.record for entry in case.files]
-    contents = inventory(records)
     kinds = {finding.ref: finding.kind for finding in case.findings}
-    notable = {finding.ref for finding in case.findings if finding.notable}
     page.section("FILES")
-    page.add(
-        f" {dot} ".join(
-            [f"{len(records):,} files", f"{len(contents.types):,} types", _size(contents.size)]
-        )
-    )
-    states = {entry.state for entry in case.files}
-    legend = [
-        (theme.glyph(FLAG), "needs review", REVIEW),
-        (dot, "no evidence found", NOTHING),
-        (" ", "evidence present", "evidence"),
-    ]
-    page.add()
-    page.add("Legend")
-    for mark, meaning, state in legend:
-        if state in states:
-            page.add(f"  {mark}  {meaning}")
-    page.add()
-
     listed = hidden = 0
     for entry in case.files:
         if entry.state == NOTHING:
@@ -433,12 +511,7 @@ def _files(page: _Page, case: Case, *, verbose: bool, limit: int, compact: bool)
                 hidden += 1
                 continue
             listed += 1
-        # A block for what wants reading: a conflict, an arrival, a local trace,
-        # a finding that needs a second look. Everything else is one line, which
-        # still points at every finding the file is part of.
-        opened = bool(entry.conflicts or entry.found[ORIGIN] or entry.found[ACTIVITY])
-        opened = opened or any(ref in notable for ref in entry.findings)
-        if not compact and (verbose or opened):
+        if verbose and not compact:
             _file_block(page, case, entry, kinds)
         else:
             _file_line(page, case, entry, kinds)
@@ -447,15 +520,15 @@ def _files(page: _Page, case: Case, *, verbose: bool, limit: int, compact: bool)
         page.wrapped(f"+{hidden} more files with no evidence found; --limit 0 lists them all.", 2)
 
 
-def _references(entry: CaseFile, kinds: dict[str, str]) -> list[tuple[str, str]]:
+def _references(entry: CaseFile, kinds: dict[str, str], dot: str) -> list[tuple[str, str]]:
     findings = [ref for ref in entry.findings if kinds[ref] != "no-trace"]
     said = []
     if findings:
-        said.append(("findings", " · ".join(findings)))
+        said.append(("findings", f" {dot} ".join(findings)))
     if entry.conflicts:
-        said.append(("conflicts", " · ".join(entry.conflicts)))
+        said.append(("conflicts", f" {dot} ".join(entry.conflicts)))
     if entry.pivots:
-        said.append(("pivots", " · ".join(entry.pivots)))
+        said.append(("pivots", f" {dot} ".join(entry.pivots)))
     return said
 
 
@@ -471,9 +544,10 @@ def _file_block(page: _Page, case: Case, entry: CaseFile, kinds: dict[str, str])
         page.prop("evidence", "none found", indent)
     else:
         blank = _blank(page.theme)
+        dot = page.theme.glyph(MIDDOT)
         for name in CATEGORIES:
-            page.prop(name, " · ".join(entry.found[name]) or blank, indent)
-    references = _references(entry, kinds)
+            page.prop(name, f" {dot} ".join(entry.found[name]) or blank, indent)
+    references = _references(entry, kinds, page.theme.glyph(MIDDOT))
     if references:
         page.add()
         for label, value in references:
@@ -485,30 +559,31 @@ def _file_line(page: _Page, case: Case, entry: CaseFile, kinds: dict[str, str]) 
     dot = page.theme.glyph(MIDDOT)
     found = [name for category_ in CATEGORIES for name in entry.found[category_]]
     facts = [_format(entry.record.path), _size(entry.record.size)]
-    facts.append(" · ".join(found) if found else "no evidence found")
-    facts += [value for label, value in _references(entry, kinds) if label != "pivots"]
+    facts.append(f" {dot} ".join(found) if found else "no evidence found")
+    facts += [value for label, value in _references(entry, kinds, dot) if label != "pivots"]
     if folder := _folder(case, entry.record):
         facts.append(f"in {Path(folder).parent}")
+    # Two lines for every file, whatever fits: the name, then what is known
+    # of it. One shape lets the eye run down the index.
     opening = f"{_mark(page, entry)} {entry.ref}  "
     said = f" {dot} ".join(facts)
-    line = f"{opening}{_name(entry)}  {said}"
-    if len(line) <= page.width:
-        page.add(line)
-        return
     page.wrapped(_name(entry), len(opening), opening)
-    page.wrapped(said, len(opening))
+    for wrapped in page.theme.wrap(said, page.width - len(opening)):
+        page.add(" " * len(opening) + page.theme.dim(wrapped))
 
 
 def _relationships(page: _Page, case: Case, files: dict[str, CaseFile]) -> None:
     linked = [entry for entry in case.files if entry.record.links]
     if not linked:
         return
-    page.section("RELATIONSHIPS")
+    page.section("XMP LINEAGE")
     for entry in linked:
         indent = page.head(" ", entry.ref, _name(entry))
         for link in entry.record.links:
             others = [files[path] for path in link.others if path in files]
-            said = " · ".join(f"{other.ref} {_name(other)}" for other in others)
+            said = f" {page.theme.glyph(MIDDOT)} ".join(
+                f"{other.ref} {_name(other)}" for other in others
+            )
             page.prop(link.kind, said or f"{link.count} files", indent, width=16)
         page.gap()
 
@@ -541,7 +616,7 @@ def _pivots(
             sources = dict.fromkeys(
                 place.split(PLACE)[1] for place in entry.where if PLACE in place
             )
-            page.prop("Sources", " · ".join(sources), indent)
+            page.prop("Sources", f" {page.theme.glyph(MIDDOT)} ".join(sources), indent)
             page.gap()
 
     if pivots.dense:
@@ -606,7 +681,9 @@ def _details(page: _Page, case: Case, files: dict[str, CaseFile], *, verbose: bo
         notes = []
         for ref in entry.conflicts:
             conflict = conflicts[ref]
-            fields = " · ".join(difference.field for difference in conflict.differences)
+            fields = f" {page.theme.glyph(MIDDOT)} ".join(
+                difference.field for difference in conflict.differences
+            )
             notes.append(
                 (
                     page.theme.glyph(FLAG),
@@ -620,7 +697,9 @@ def _details(page: _Page, case: Case, files: dict[str, CaseFile], *, verbose: bo
             others = [files[item.path] for item in finding.items if item.path != record.path]
             said = f"{finding.title} ({ref})"
             if others and len(others) <= SHOWN:
-                said += ": " + " · ".join(f"{other.ref} {_name(other)}" for other in others)
+                said += ": " + f" {page.theme.glyph(MIDDOT)} ".join(
+                    f"{other.ref} {_name(other)}" for other in others
+                )
             elif others:
                 said += f": with {len(others)} other files"
             notes.append((page.theme.glyph(MIDDOT), said))

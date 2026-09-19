@@ -96,9 +96,9 @@ def shown(moment: str | None) -> str | None:
     return f"{moment[:19]}Z" if moment.endswith("Z") else moment[:19]
 
 
-def _read_from(found: EvidenceRecord) -> str:
+def _read_from(found: EvidenceRecord, dot: str = "·") -> str:
     """`member docProps/core.xml · object 6 0 R`, or nothing."""
-    return " · ".join(f"{key} {value}" for key, value in found.where.items())
+    return f" {dot} ".join(f"{key} {value}" for key, value in found.where.items())
 
 
 def _timeline_key(moment: str | None) -> tuple[bool, float, str]:

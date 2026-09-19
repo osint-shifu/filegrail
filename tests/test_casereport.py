@@ -26,7 +26,7 @@ HEADINGS = (
     "SUMMARY",
     "KEY FINDINGS",
     "FILES",
-    "RELATIONSHIPS",
+    "XMP LINEAGE",
     "INVESTIGATIVE PIVOTS",
     "FILE DETAIL",
     "EVIDENCE COVERAGE",
@@ -38,6 +38,24 @@ HEADINGS = (
 
 def _theme(width: int = 94) -> Theme:
     return Theme(colour=False, unicode=True, width=width)
+
+
+def _heading(line: str) -> str:
+    """`01  SUMMARY  ────` reads as `SUMMARY`; the footer reads as itself."""
+    if line.startswith("END OF REPORT"):
+        return "END OF REPORT"
+    found = re.match(r"^\d\d  (.+?)  ─", line)
+    return found.group(1) if found else ""
+
+
+def _between(report: str, start: str, end: str | None = None) -> str:
+    """The text of one section, found by its numbered heading."""
+    lines = report.splitlines()
+    first = next(number for number, line in enumerate(lines) if _heading(line) == start)
+    last = len(lines)
+    if end is not None:
+        last = next(number for number, line in enumerate(lines) if _heading(line) == end)
+    return "\n".join(lines[first + 1 : last])
 
 
 def _file(name: str, *evidence: EvidenceRecord, size: int = 1024) -> FileRecord:
@@ -95,7 +113,7 @@ def _report(records: list[FileRecord], **options: object) -> str:
 def test_the_sections_follow_the_questions_a_case_is_opened_with():
     lines = _report(_corpus(), theme=_theme()).splitlines()
 
-    assert [line for line in lines if line in HEADINGS] == [
+    assert [_heading(line) for line in lines if _heading(line) in HEADINGS] == [
         "SUMMARY",
         "KEY FINDINGS",
         "FILES",
@@ -117,31 +135,32 @@ def test_every_object_starts_on_its_own_line_with_its_whole_name():
 
 def test_a_file_with_nothing_to_say_takes_one_line_until_verbose_opens_it():
     quiet = _report(_corpus(), theme=_theme()).splitlines()
-    (sheet,) = [line for line in quiet if line.startswith("  #003  ")]
+    at = quiet.index("  #003  sheet.xlsx")
 
-    assert sheet == "  #003  sheet.xlsx  XLSX · 2.9 KB · OOXML properties · in isamples"
+    assert quiet[at + 1] == "        XLSX · 2.9 KB · OOXML properties · in isamples"
+    assert re.match(r"^[ ·!] #\d{3}  ", quiet[at + 2]) or quiet[at + 2] == ""
     assert "  #003  sheet.xlsx" in _report(_corpus(), theme=_theme(), verbose=True).splitlines()
 
 
 def test_brief_stops_at_a_one_line_index():
     brief = _report(_corpus(), theme=_theme(), brief=True)
 
-    assert "  #003  sheet.xlsx  XLSX · 2.9 KB · OOXML properties · in isamples" in brief
+    assert "        XLSX · 2.9 KB · OOXML properties · in isamples" in brief.splitlines()
     for later in ("EVIDENCE COVERAGE", "CONFLICTS", "FILE DETAIL", "REPORT NOTES"):
-        assert later not in brief.splitlines(), later
+        assert later not in [_heading(line) for line in brief.splitlines()], later
 
 
 def test_a_file_points_at_its_conflict_and_the_conflict_shows_both_statements():
     report = _report(_corpus(), theme=_theme())
-    files = report.split("\nFILES\n")[1].split("\nINVESTIGATIVE PIVOTS\n")[0]
+    files = _between(report, "FILES", "INVESTIGATIVE PIVOTS")
 
-    assert re.search(r"conflicts\s+C01", files)
+    assert re.search(r"C01", files)
     assert re.search(r"PDF Info\s+2018-05-11 18:37:20 UTC", report)
     assert re.search(r"Difference\s+XMP is 72 days earlier than PDF Info", report)
 
 
 def test_the_notes_explain_only_the_match_bases_the_report_uses():
-    notes = _report(_corpus(), theme=_theme()).split("\nREPORT NOTES\n")[1]
+    notes = _between(_report(_corpus(), theme=_theme()), "REPORT NOTES")
 
     assert "embedded" in notes
     assert "recorded-path" not in notes

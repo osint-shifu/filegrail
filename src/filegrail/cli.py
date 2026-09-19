@@ -579,7 +579,14 @@ def _emit(report: str, out: Path | None) -> int:
     """The report, to the file it was asked for or to standard output."""
     said = report if report.endswith("\n") else report + "\n"
     if out is None:
-        print(said, end="")
+        # A terminal that cannot show a character in a file name still gets
+        # the report, with that character replaced, rather than a traceback.
+        try:
+            sys.stdout.write(said)
+        except UnicodeEncodeError:
+            encoding = sys.stdout.encoding or "ascii"
+            sys.stdout.buffer.write(said.encode(encoding, "replace"))
+        sys.stdout.flush()
         return 0
     try:
         out.write_text(said, encoding="utf-8")
