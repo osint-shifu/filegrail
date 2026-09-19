@@ -253,6 +253,10 @@ paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
 .graph.focused .node:not(.on):not(.near){opacity:.2}
 .graph.focused .e{stroke-opacity:.1}
 .graph.focused .e.on{stroke:var(--accent);stroke-opacity:1;stroke-width:1.5}
+.graph.kinded .node:not(.kind-near){opacity:.15}
+.graph.kinded .e:not(.kind-on){stroke-opacity:.06}
+.graph.kinded .e.kind-on{stroke:var(--accent);stroke-opacity:.9;stroke-width:1.3}
+.graph.kinded .node.kind-near .halo{opacity:.3}
 .graph figcaption{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
 font-size:var(--t-label);letter-spacing:.04em;color:var(--faint);padding-top:8px;
 border-top:1px solid var(--line)}

@@ -880,6 +880,13 @@ def _relationships(graph: Graph, files: dict[str, CaseFile], pivot_refs: dict[st
         '<input id="relationship-table-find" type="search" '
         'placeholder="from, relation, to or evidence" autocomplete="off" spellcheck="false">'
         "</label>"
+        '<label for="relationship-kind"><span class="vh">Relation type</span>'
+        '<select id="relationship-kind"><option value="all">All relation types</option>'
+        + "".join(
+            f'<option value="{_e(kind)}">{_e(kind)} · {count:,}</option>'
+            for kind, count in sorted(kinds.items())
+        )
+        + "</select></label>"
         '<label for="relationship-sort"><span class="vh">Sort by</span>'
         '<select id="relationship-sort">'
         '<option value="relation-asc">Relation A–Z</option>'
@@ -968,7 +975,7 @@ def _figure(drawn: Picture | None, files: dict[str, CaseFile], pivot_refs: dict[
         node.id for node in sorted(worth, key=lambda item: (-item.degree, item.id))[:_MAX_LABELS]
     }
     lines = "".join(
-        f'<line class="e" data-source="{_e(drawn.nodes[a].id)}" '
+        f'<line class="e" data-source="{_e(drawn.nodes[a].id)}" data-kind="{_e(kind)}" '
         f'data-target="{_e(drawn.nodes[b].id)}" x1="{drawn.nodes[a].x}" y1="{drawn.nodes[a].y}" '
         f'x2="{drawn.nodes[b].x}" y2="{drawn.nodes[b].y}"><title>{_e(kind)}</title></line>'
         for a, b, kind in drawn.edges

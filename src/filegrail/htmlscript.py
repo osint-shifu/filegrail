@@ -123,6 +123,7 @@ SCRIPT = """
   var relationshipCount = one('#relationship-shown');
   var relationshipTableFind = one('#relationship-table-find');
   var relationshipSort = one('#relationship-sort');
+  var relationshipKindSelect = one('#relationship-kind');
   var relationshipTableClear = one('#relationship-table-clear');
   var relationshipKind = 'all';
   function filterRelationships() {
@@ -141,6 +142,9 @@ SCRIPT = """
       button.classList.toggle('on', chosen);
       button.setAttribute('aria-pressed', chosen ? 'true' : 'false');
     });
+    if (relationshipKindSelect && relationshipKindSelect.value !== relationshipKind) {
+      relationshipKindSelect.value = relationshipKind;
+    }
     if (relationshipCount) {
       relationshipCount.textContent = left;
     }
@@ -156,6 +160,19 @@ SCRIPT = """
       each(figure.querySelectorAll('.node'), function (mark) {
         mark.classList.toggle('on', mark.dataset.graphNode === node);
         mark.classList.toggle('near', !!near[mark.dataset.graphNode]);
+      });
+      // The chosen relation type lights its edges and the nodes they join;
+      // the rest of the picture steps back, the way a focused node does it.
+      var kinded = relationshipKind !== 'all';
+      figure.classList.toggle('kinded', kinded);
+      var joined = {};
+      each(figure.querySelectorAll('.e'), function (edge) {
+        var lit = kinded && edge.dataset.kind === relationshipKind;
+        edge.classList.toggle('kind-on', lit);
+        if (lit) { joined[edge.dataset.source] = true; joined[edge.dataset.target] = true; }
+      });
+      each(figure.querySelectorAll('.node'), function (mark) {
+        mark.classList.toggle('kind-near', !!joined[mark.dataset.graphNode]);
       });
     }
   }
@@ -199,6 +216,12 @@ SCRIPT = """
       filterRelationships();
     });
   });
+  if (relationshipKindSelect) {
+    relationshipKindSelect.addEventListener('change', function () {
+      relationshipKind = relationshipKindSelect.value || 'all';
+      filterRelationships();
+    });
+  }
   function sortRelationships() {
     if (!relationshipSort || !relationshipRows.length) { return; }
     var parts = relationshipSort.value.split('-');
@@ -445,7 +468,10 @@ SCRIPT = """
         + ';text-anchor:middle;paint-order:stroke;stroke:' + colour('--surface')
         + ';stroke-width:3px;stroke-linejoin:round}.focused .node:not(.on):not(.near){opacity:.2}'
         + '.focused .e{stroke-opacity:.1}.focused .e.on{stroke:' + colour('--accent')
-        + ';stroke-opacity:1;stroke-width:1.5}';
+        + ';stroke-opacity:1;stroke-width:1.5}'
+        + '.kinded .node:not(.kind-near){opacity:.15}.kinded .e:not(.kind-on){stroke-opacity:.06}'
+        + '.kinded .e.kind-on{stroke:' + colour('--accent')
+        + ';stroke-opacity:.9;stroke-width:1.3}';
       clone.insertBefore(style, clone.firstChild);
       clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
       clone.setAttribute('width', graph.viewBox.baseVal.width);
