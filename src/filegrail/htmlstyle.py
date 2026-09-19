@@ -8,9 +8,9 @@ from __future__ import annotations
 
 STYLE = """
 :root{color-scheme:dark;
---bg:#0B0D11;--surface:#12161C;--surface-2:#171C23;--line:#222831;--line-2:#303743;
+--bg:#0C0C0D;--surface:#141415;--surface-2:#1A1A1C;--line:#262628;--line-2:#353537;
 --ink:#E6E8EB;--ink-2:#C3C8CE;--muted:#9AA1A9;--faint:#6B727B;
---accent:#7FB5A8;--accent-ink:#0B0D11;--accent-soft:rgba(127,181,168,.14);
+--accent:#7FB5A8;--accent-ink:#0C0C0D;--accent-soft:rgba(127,181,168,.14);
 --brand:#5FA89A;--brand-soft:rgba(95,168,154,.14);
 --origin:#5FA89A;--metadata:#A39BD9;--activity:#C9A66B;--alert:#D08770;
 --alert-soft:rgba(208,135,112,.14);
@@ -277,9 +277,9 @@ body.graph-full{overflow:hidden}
 #graph-full .ic.out,#graph-full[aria-pressed=true] .ic.in{display:none}
 #graph-full[aria-pressed=true] .ic.out{display:block}
 .graph-canvas>svg{display:block;width:100%;height:clamp(360px,52vw,620px);border:0;
-background:radial-gradient(circle,#1A2129 1px,transparent 1.5px) 0 0/24px 24px,
-radial-gradient(ellipse at 50% 40%,#0C1116 0%,#080B0F 55%,#04060A 100%);
-box-shadow:inset 0 0 120px rgba(0,0,0,.55);
+background:radial-gradient(circle,#1F1F21 1px,transparent 1.5px) 0 0/24px 24px,
+radial-gradient(ellipse 70% 60% at 50% 42%,#161617 0%,#0E0E0F 45%,#070708 80%,#030304 100%);
+box-shadow:inset 0 0 160px rgba(0,0,0,.7);
 touch-action:none;cursor:grab;user-select:none}
 .graph-canvas>svg.dragging{cursor:grabbing}
 .graph .graph-viewport{transform-origin:0 0}

@@ -358,15 +358,45 @@ SCRIPT = """
     graphScale = scale;
     drawGraphView();
   }
+  // What a fit frames: the focused node with its neighbours, the nodes a
+  // relationship-type filter lit up, or - with neither - the whole graph.
+  function fitBounds() {
+    var figure = graph.closest('.graph');
+    var picked = [];
+    if (figure && figure.classList.contains('focused')) {
+      picked = graph.querySelectorAll('.node.on, .node.near');
+    } else if (figure && figure.classList.contains('kinded')) {
+      picked = graph.querySelectorAll('.node.kind-near');
+    }
+    if (!picked.length) { return graphViewport.getBBox(); }
+    var box = null;
+    each(picked, function (mark) {
+      var b = mark.getBBox();
+      if (!box) { box = {x: b.x, y: b.y, r: b.x + b.width, b: b.y + b.height}; return; }
+      box.x = Math.min(box.x, b.x); box.y = Math.min(box.y, b.y);
+      box.r = Math.max(box.r, b.x + b.width); box.b = Math.max(box.b, b.y + b.height);
+    });
+    return {x: box.x, y: box.y, width: box.r - box.x, height: box.b - box.y};
+  }
   function fitGraph() {
     if (!graph || !graphViewport) { return; }
-    var bounds = graphViewport.getBBox();
+    var bounds = fitBounds();
     if (!bounds.width || !bounds.height) { return; }
     var view = graph.viewBox.baseVal;
     var pad = 34;
+    // The details panel lies over the right of the canvas; a fit frames the
+    // part still visible beside it.
+    var width = view.width;
+    if (graphDetail && !graphDetail.hidden) {
+      var box = graph.getBoundingClientRect();
+      var panel = graphDetail.getBoundingClientRect();
+      if (box.width && panel.width && panel.left < box.right) {
+        width = Math.max(view.width / 2, (panel.left - box.left) * view.width / box.width);
+      }
+    }
     graphScale = Math.max(0.5, Math.min(2.5,
-      Math.min((view.width - 2 * pad) / bounds.width, (view.height - 2 * pad) / bounds.height)));
-    graphX = view.width / 2 - (bounds.x + bounds.width / 2) * graphScale;
+      Math.min((width - 2 * pad) / bounds.width, (view.height - 2 * pad) / bounds.height)));
+    graphX = width / 2 - (bounds.x + bounds.width / 2) * graphScale;
     graphY = view.height / 2 - (bounds.y + bounds.height / 2) * graphScale;
     drawGraphView();
   }
@@ -537,7 +567,10 @@ SCRIPT = """
       clearRelationshipFilters();
       if (graphDetail) { graphDetail.hidden = true; }
       inspectGraphNode(null);
-      fitGraph();
+      if (graphLayout) { graphLayout.value = 'force'; }
+      if (graphSpacing) { graphSpacing.value = '100'; }
+      if (graphLabels) { graphLabels.value = 'auto'; }
+      arrangeGraph();
     });
   }
   // Arrangement: the report ships one force-directed layout; the reader can

@@ -5,6 +5,14 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.40.0 - 2026-09-19
+
+### Changed
+
+- HTML report: Fit frames the focused node with its neighbours, or the nodes a relationship-type filter lit up, and keeps clear of the open details panel; with nothing highlighted it frames the whole graph as before.
+- HTML report: Reset is an icon and also restores the layout, spacing and label choices.
+- HTML report: neutral grey surfaces and lines in place of the blue-tinted ones; the graph canvas has a deeper gradient.
+
 ## 0.39.1 - 2026-09-19
 
 ### Changed
