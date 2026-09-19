@@ -167,13 +167,12 @@ def render(theme: Theme | None = None) -> str:
     # the descriptions into an ellipsis, which is the one thing this report does
     # not do anywhere else.
     lines.extend(_section(theme, "usage", USAGE))
+    lines.extend(_listed(theme, "commands", COMMANDS))
+    lines.append(_row(theme, "help", "filegrail help <command>"))
+    lines.append("")
     lines.extend(_section(theme, "start", START))
     lines.extend(_grouped(theme, "investigate", INVESTIGATE))
     lines.extend(_section(theme, "verify", VERIFY))
-    lines.extend(_listed(theme, "commands", COMMANDS))
-
-    lines.append(_row(theme, "help", "filegrail help <command>"))
-    lines.append("")
     return "\n".join(lines)
 
 
