@@ -241,10 +241,10 @@ margin:0 8px 4px 0}
 .tl.filtered .tl-gap{display:none}
 
 /* ── graph ── */
-.graph-panel{margin:0 0 22px;border:1px solid var(--line);border-radius:var(--r);
-background:var(--surface);overflow:hidden}
+.graph-panel{--field:#09090A;margin:0 0 22px;border:1px solid var(--line);border-radius:var(--r);
+background:var(--field);overflow:hidden}
 .graph-toolbar{display:grid;grid-template-columns:1fr auto;gap:12px 16px;align-items:end;
-padding:12px 14px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+padding:12px 14px}
 .graph-toolbar .rel-controls{grid-column:1/-1}
 .graph-arrange{display:flex;align-items:end;gap:12px;flex-wrap:wrap}
 .graph-arrange label{display:grid;gap:5px;color:var(--muted);
@@ -265,21 +265,20 @@ font:var(--t-table)/1 var(--mono);letter-spacing:0;text-transform:none}
 font-size:var(--t-small)}
 .graph-filterbar{display:flex;align-items:center;gap:12px;padding:10px 14px 0;flex-wrap:wrap}
 .graph-filterbar .rel-kinds{margin:0}
-.graph{margin:0;padding:10px 14px 12px}
+.graph{margin:0;padding:6px 0 0}
 .graph-canvas{position:relative}
 .graph-panel.full{position:fixed;inset:0;z-index:40;margin:0;border:0;border-radius:0;
-display:flex;flex-direction:column;background:var(--bg);overflow:auto}
+display:flex;flex-direction:column;background:var(--field);overflow:auto}
 .graph-panel.full .graph{flex:1;display:flex;flex-direction:column;min-height:0}
 .graph-panel.full .graph-canvas{flex:1;min-height:0}
 .graph-panel.full .graph-canvas>svg{height:100%;min-height:360px}
-.graph-panel:fullscreen{background:var(--bg)}
+.graph-panel:fullscreen{background:var(--field)}
 body.graph-full{overflow:hidden}
 #graph-full .ic.out,#graph-full[aria-pressed=true] .ic.in{display:none}
 #graph-full[aria-pressed=true] .ic.out{display:block}
 .graph-canvas>svg{display:block;width:100%;height:clamp(360px,52vw,620px);border:0;
 background:radial-gradient(circle,#1F1F21 1px,transparent 1.5px) 0 0/24px 24px,
-radial-gradient(ellipse 70% 60% at 50% 42%,#161617 0%,#0E0E0F 45%,#070708 80%,#030304 100%);
-box-shadow:inset 0 0 160px rgba(0,0,0,.7);
+radial-gradient(ellipse 70% 60% at 50% 42%,#161617 0%,#0E0E0F 45%,#0A0A0B 80%,var(--field) 100%);
 touch-action:none;cursor:grab;user-select:none}
 .graph-canvas>svg.dragging{cursor:grabbing}
 .graph .graph-viewport{transform-origin:0 0}
@@ -449,23 +448,28 @@ tr:hover .copy,.rec:hover .copy,dd:hover .copy,.pair:hover .copy,.facts dd:hover
 
 /* ── findings ─────────────────────────────────────────────── */
 .findings{border-top:1px solid var(--line)}
-.find{display:grid;grid-template-columns:56px 1fr;gap:0 18px;padding:18px 0 18px 14px;
+.find{display:grid;grid-template-columns:56px 1fr;gap:0 18px;padding:20px 0 20px 14px;
 border-bottom:1px solid var(--line);position:relative}
-.find.warn:before{content:"";position:absolute;left:0;top:18px;bottom:18px;width:2px;
+.find.warn:before{content:"";position:absolute;left:0;top:20px;bottom:20px;width:2px;
 background:var(--alert);border-radius:1px}
 .find:target{background:linear-gradient(90deg,var(--accent-soft),transparent 70%)}
-.find .fid{display:inline-flex;align-items:center;height:22px;font-size:var(--t-label);
+.find .fid{display:inline-flex;align-items:center;height:22px;padding:0 7px;
+border:1px solid var(--accent);border-radius:var(--r);font-size:var(--t-label);
 letter-spacing:.06em;color:var(--accent)}
-.find .fid:hover{text-decoration:underline;text-underline-offset:3px}
+.find .fid:hover{text-decoration:none;background:var(--accent-soft)}
+.find.warn .fid{border-color:var(--alert);color:var(--alert)}
+.find.warn .fid:hover{background:var(--alert-soft)}
+.find .head{display:flex;align-items:baseline;gap:6px 14px;flex-wrap:wrap}
 .find .t{color:var(--ink);font:400 var(--t-lead)/1.5 var(--sans);overflow-wrap:anywhere}
-.find .t.warn:before{content:"!";display:inline-flex;align-items:center;justify-content:center;
-width:16px;height:16px;border-radius:var(--r);background:var(--alert-soft);color:var(--alert);
-margin-right:8px;font-size:var(--t-label);vertical-align:1px}
+.find .kind{color:var(--faint);font:500 var(--t-label)/1.4 var(--sans);
+letter-spacing:var(--track);text-transform:uppercase;white-space:nowrap}
 .find .fields{margin-top:10px;font-size:var(--t-table)}
-.find .files{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;font-size:var(--t-small)}
-.find .files a{display:inline-flex;align-items:center;height:24px;padding:0 9px;
-border-radius:var(--r);color:var(--ink-2);background:var(--surface)}
-.find .files a:hover{background:var(--surface-2);color:var(--ink);text-decoration:none}
+.find .files{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;font-size:var(--t-small)}
+.find .files a{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;
+border:1px solid var(--line);border-radius:var(--r);color:var(--ink);background:var(--surface)}
+.find .files a .ref{color:var(--accent)}
+.find.warn .files a .ref{color:var(--alert)}
+.find .files a:hover{border-color:var(--accent);text-decoration:none}
 .find .files+.fields{margin-top:8px;padding-bottom:6px}
 .find details .files{margin-top:8px}
 .find .note{color:var(--muted);font:400 var(--t-body)/1.6 var(--sans);margin-top:8px;max-width:78ch}
@@ -534,6 +538,7 @@ border-bottom:1px solid var(--line)}
 border:1px solid var(--alert);border-radius:var(--r);font-size:var(--t-label);color:var(--alert)}
 .conf .cid:hover{text-decoration:none;background:var(--alert-soft)}
 .conf .t{color:var(--ink);font:400 var(--t-lead)/1.5 var(--sans);overflow-wrap:anywhere}
+.conf .t a .ref{color:var(--alert)}
 .conf .field{color:var(--muted);font:500 var(--t-label)/1.4 var(--sans);letter-spacing:var(--track);
 text-transform:uppercase;margin:16px 0 0}
 .conf .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,18em),1fr));
@@ -591,7 +596,7 @@ body{font-size:11px}
 .nav,.mast-actions,.copy,.chips,.tabs,.chev,.btn,.search,.to-top,.fold{display:none!important}
 .tl .tl-day{position:static}
 section.folded .sec-body{display:block}
-.graph-canvas>svg{background:none;box-shadow:none}
+.graph-canvas>svg{background:none}
 .rel-controls,.rel-kinds,.rel-focus,.graph-arrange{display:none!important}
 .graph-toolbar,.table-actions,.relationship-table-tools{display:none!important}
 .mast{padding-top:0}

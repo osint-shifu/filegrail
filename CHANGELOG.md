@@ -5,6 +5,13 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.40.1 - 2026-09-19
+
+### Changed
+
+- HTML report: the graph toolbar, filters and canvas share one dark field; the canvas gradient fades into it with no seam.
+- HTML report: key findings carry a framed number, a kind label beside the title and outlined file chips with the file number in colour; conflicts colour the file number the same way.
+
 ## 0.40.0 - 2026-09-19
 
 ### Changed

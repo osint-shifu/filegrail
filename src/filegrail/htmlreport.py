@@ -463,7 +463,10 @@ def _name(entry: CaseFile) -> str:
 
 def _file_link(entry: CaseFile) -> str:
     """The number and the name as one link: four characters make a poor target."""
-    return f'<a href="#{_anchor(entry.ref)}">{_e(entry.ref)} {_e(_name(entry))}</a>'
+    return (
+        f'<a href="#{_anchor(entry.ref)}"><span class="ref">{_e(entry.ref)}</span> '
+        f"{_e(_name(entry))}</a>"
+    )
 
 
 def _match(found: EvidenceRecord) -> str:
@@ -593,7 +596,8 @@ def _finding(
     parts = [
         f'<div class="find{warn}" id="{finding.ref}">',
         f'<a class="fid" href="#{finding.ref}">{finding.ref}</a><div>',
-        f'<div class="t{warn}">{_e(finding.title)}</div>',
+        f'<div class="head"><div class="t{warn}">{_e(finding.title)}</div>'
+        f'<span class="kind">{_e(finding.kind.replace("-", " "))}</span></div>',
     ]
     if facts:
         parts.append(_fields([(_capital(label), value) for label, value in facts]))
