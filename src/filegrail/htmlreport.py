@@ -908,8 +908,10 @@ def _relationships(graph: Graph, files: dict[str, CaseFile], pivot_refs: dict[st
         'title="Export the current graph view as SVG">Export SVG</button>'
         '<button class="btn compact" id="graph-reset" type="button" '
         'title="Reset view and filters">Reset</button>'
-        '<button class="btn compact" id="graph-full" type="button" aria-pressed="false" '
-        'title="Work on the graph alone, filling the screen (Esc leaves)">Full screen</button>'
+        '<button class="btn icon" id="graph-full" type="button" aria-pressed="false" '
+        'title="Full screen (Esc leaves)" aria-label="Full screen">'
+        '<svg class="ic in" aria-hidden="true"><use href="#i-expand"/></svg>'
+        '<svg class="ic out" aria-hidden="true"><use href="#i-collapse"/></svg></button>'
         "</div></div>"
         '<div class="graph-filterbar">'
         f'<div class="rel-kinds" aria-label="Relationship type filters">{"".join(chips)}</div>'

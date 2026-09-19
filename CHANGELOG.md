@@ -5,6 +5,16 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.39.1 - 2026-09-19
+
+### Changed
+
+- HTML report: the graph canvas sits on a darker, vignetted field; the full screen control is an icon.
+
+### Fixed
+
+- HTML report: in the node details panel, rows for identifier and person nodes carried a hidden copy button that pushed the focus button onto a second line.
+
 ## 0.39.0 - 2026-09-19
 
 ### Changed

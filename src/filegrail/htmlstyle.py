@@ -274,9 +274,12 @@ display:flex;flex-direction:column;background:var(--bg);overflow:auto}
 .graph-panel.full .graph-canvas>svg{height:100%;min-height:360px}
 .graph-panel:fullscreen{background:var(--bg)}
 body.graph-full{overflow:hidden}
+#graph-full .ic.out,#graph-full[aria-pressed=true] .ic.in{display:none}
+#graph-full[aria-pressed=true] .ic.out{display:block}
 .graph-canvas>svg{display:block;width:100%;height:clamp(360px,52vw,620px);border:0;
-background:radial-gradient(circle,var(--line) 1px,transparent 1.5px) 0 0/24px 24px,
-radial-gradient(ellipse at 50% 40%,#131A1F 0%,#0F1418 55%,var(--bg) 100%);
+background:radial-gradient(circle,#1A2129 1px,transparent 1.5px) 0 0/24px 24px,
+radial-gradient(ellipse at 50% 40%,#0C1116 0%,#080B0F 55%,#04060A 100%);
+box-shadow:inset 0 0 120px rgba(0,0,0,.55);
 touch-action:none;cursor:grab;user-select:none}
 .graph-canvas>svg.dragging{cursor:grabbing}
 .graph .graph-viewport{transform-origin:0 0}
@@ -347,6 +350,7 @@ gap:8px 10px;padding:6px 0;border-top:1px solid var(--line);align-items:start}
 .graph-detail li .rel-node{display:contents}
 .graph-detail li .rel-node .pill{margin-top:1px}
 .graph-detail li .rel-node a,.graph-detail li .rel-node .v{min-width:0;overflow-wrap:anywhere}
+.graph-detail li .rel-node .copy{display:none}
 .graph-detail li .rel-focus{margin:0;justify-self:end}
 .graph-detail-actions{display:flex;gap:8px;flex-wrap:wrap;padding:0 18px 12px}
 .to-top{position:fixed;right:20px;bottom:20px;z-index:20;width:36px;height:36px;
@@ -587,7 +591,7 @@ body{font-size:11px}
 .nav,.mast-actions,.copy,.chips,.tabs,.chev,.btn,.search,.to-top,.fold{display:none!important}
 .tl .tl-day{position:static}
 section.folded .sec-body{display:block}
-.graph-canvas>svg{background:none}
+.graph-canvas>svg{background:none;box-shadow:none}
 .rel-controls,.rel-kinds,.rel-focus,.graph-arrange{display:none!important}
 .graph-toolbar,.table-actions,.relationship-table-tools{display:none!important}
 .mast{padding-top:0}

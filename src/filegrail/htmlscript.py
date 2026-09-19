@@ -675,8 +675,9 @@ SCRIPT = """
     graphPanel.classList.toggle('full', on);
     document.body.classList.toggle('graph-full', on);
     if (graphFull) {
-      graphFull.textContent = on ? 'Exit full screen' : 'Full screen';
       graphFull.setAttribute('aria-pressed', on ? 'true' : 'false');
+      graphFull.title = on ? 'Exit full screen (Esc)' : 'Full screen (Esc leaves)';
+      graphFull.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen');
     }
     window.requestAnimationFrame(fitGraph);
   }
