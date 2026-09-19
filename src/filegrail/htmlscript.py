@@ -383,6 +383,10 @@ SCRIPT = """
     if (!graphDetail || !mark) { return; }
     var file = !!mark.dataset.fileRef;
     graphDetail.hidden = false;
+    var family = Array.prototype.filter.call(mark.classList, function (name) {
+      return name.indexOf('f-') === 0;
+    })[0] || 'f-key';
+    graphDetail.setAttribute('data-family', family.slice(2));
     graphDetailText('#graph-detail-type', mark.dataset.nodeType);
     graphDetailText('#graph-detail-value', mark.dataset.nodeValue);
     graphDetailText('#graph-detail-degree', mark.dataset.nodeDegree);
