@@ -725,8 +725,12 @@ def _dated(case: Case) -> int:
 
 
 def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
-    """Every dated record in the scan on one axis, as the terminal `--timeline`.
+    """Every dated record in the scan on one spine, as the terminal `--timeline`.
 
+    One line per record, grouped under the day it fell on: the clock, a node
+    on the spine in the record's category colour, the verb, the file, the
+    source and what it said. A day heading stays at the top while its records
+    scroll past, and a long silence between two days is written on the spine.
     A file nothing said anything about has no place here: nothing happened at
     a time nobody recorded.
     """
@@ -741,29 +745,43 @@ def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
     )
     if not events:
         return ""
-    rows = []
-    day = None
-    band = ""
+    counts = Counter(category(found) for _, _, found in events)
+    chips = [
+        '<button type="button" class="chip on" data-tl="all" aria-pressed="true">all '
+        f"<b>{len(events):,}</b></button>"
+    ]
+    chips.extend(
+        f'<button type="button" class="chip" data-tl="{_e(kind)}" aria-pressed="false">'
+        f'<i class="f-{_e(kind)}"></i>{_e(kind)} <b>{counts[kind]:,}</b></button>'
+        for kind in CATEGORIES
+        if counts[kind]
+    )
+    items = []
+    day: str | None = None
     for at, entry, found in events[:_MAX_EVENTS]:
         stamp = _stamp(_timeline_value(at)) if at else ""
         invalid, moment, _ = _timeline_key(at)
         moment_attr = "" if invalid else f' data-moment="{moment:.3f}"'
         today, _, clock = stamp.partition(" ")
         if today != day:
-            # Days alternate between two shades, so a day's records read as one block.
-            band = "" if (day is None or band) else ' data-band="1"'
+            if day is not None and (silence := _silence(day, today)):
+                items.append(f'<li class="tl-gap"><span>{_e(silence)}</span></li>')
             day = today
-            rows.append(f'<tr class="day"{band}><td colspan="5">{_e(day)}</td></tr>')
+            items.append(
+                f'<li class="tl-day"><time datetime="{_e(day)}">{_e(day)}</time>'
+                f'<span class="wd">{_e(_weekday(day))}</span></li>'
+            )
         kind = category(found)
         verb = EVENT_VERBS.get(found.source, CATEGORY_VERBS[kind])
         detail = found.url or found.tool or found.note or ""
-        rows.append(
-            f'<tr class="event" data-f="{_e(kind)}"{band}{moment_attr}>'
-            f'<td class="dim">{_e(clock or stamp)}</td>'
-            f"<td>{_file_link(entry)}</td>"
-            f'<td><span class="cat {_e(kind)}" title="{_e(kind)}">{_e(verb)}</span></td>'
-            f"<td>{_e(named(found))} {_match(found)}</td>"
-            f'<td class="dim">{_e(_clip(detail, 96))}</td></tr>'
+        said = f'<span class="detail">{_e(_clip(detail, 120))}</span>' if detail else ""
+        items.append(
+            f'<li class="ev event" data-f="{_e(kind)}"{moment_attr}>'
+            f'<time datetime="{_e(at or "")}">{_e(clock or stamp)}</time>'
+            '<span class="node" aria-hidden="true"></span>'
+            f'<span class="verb" title="{_e(kind)}">{_e(verb)}</span>'
+            f'<span class="txt">{_file_link(entry)}'
+            f'<span class="src">{_e(named(found))} {_match(found)}</span>{said}</span></li>'
         )
     note = ""
     if len(events) > _MAX_EVENTS:
@@ -772,14 +790,38 @@ def _timeline(case: Case, files: dict[str, CaseFile]) -> str:
             "the rest are in the JSON and in each file's detail.</p>"
         )
     return (
-        _copyable_table(
-            '<div class="wrap"><table class="tbl timeline" id="timeline-table"><thead><tr>'
-            '<th data-sort="text">time</th><th data-sort="text">file</th>'
-            '<th data-sort="text">event</th><th data-sort="text">source</th><th>detail</th>'
-            f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
-        )
-        + note
+        f'<div class="chips tl-chips" aria-label="Timeline category filters">{"".join(chips)}'
+        '<span class="tl-shown" id="timeline-shown"></span></div>'
+        f'<ol class="tl" id="timeline-list">{"".join(items)}</ol>{note}'
     )
+
+
+#: A silence shorter than this between two days is just the next day.
+_SILENCE_DAYS = 30
+
+
+def _silence(earlier: str, later: str) -> str:
+    """`7 years later`, said on the spine where a case goes quiet for that long."""
+    try:
+        gap = (datetime.fromisoformat(later) - datetime.fromisoformat(earlier)).days
+    except ValueError:
+        return ""
+    if gap < _SILENCE_DAYS:
+        return ""
+    if gap >= 365:
+        count, unit = gap // 365, "year"
+    elif gap >= 60:
+        count, unit = gap // 30, "month"
+    else:
+        count, unit = gap, "day"
+    return f"{count} {unit}{'s' if count != 1 else ''} later"
+
+
+def _weekday(day: str) -> str:
+    try:
+        return datetime.fromisoformat(day).strftime("%A")
+    except ValueError:
+        return ""
 
 
 def _clip(value: str, width: int) -> str:

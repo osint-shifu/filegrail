@@ -118,6 +118,43 @@ SCRIPT = """
     if (chip) { filter(chip.dataset.filter); }
   });
 
+  var timelineList = one('#timeline-list');
+  var timelineShown = one('#timeline-shown');
+  function filterTimeline(kind) {
+    if (!timelineList) { return; }
+    var items = Array.prototype.slice.call(timelineList.children);
+    var left = 0;
+    var day = null;
+    var dayHasEvent = false;
+    items.forEach(function (item) {
+      if (item.classList.contains('tl-day')) {
+        if (day) { day.hidden = !dayHasEvent; }
+        day = item;
+        dayHasEvent = false;
+        item.hidden = false;
+        return;
+      }
+      if (!item.classList.contains('ev')) { return; }
+      var keep = kind === 'all' || item.dataset.f === kind;
+      item.hidden = !keep;
+      if (keep) { left += 1; dayHasEvent = true; }
+    });
+    if (day) { day.hidden = !dayHasEvent; }
+    timelineList.classList.toggle('filtered', kind !== 'all');
+    each(all('[data-tl]'), function (chip) {
+      var chosen = chip.dataset.tl === kind;
+      chip.classList.toggle('on', chosen);
+      chip.setAttribute('aria-pressed', chosen ? 'true' : 'false');
+    });
+    if (timelineShown) {
+      var total = items.filter(function (item) { return item.classList.contains('ev'); }).length;
+      timelineShown.textContent = kind === 'all' ? '' : left + ' of ' + total + ' records';
+    }
+  }
+  each(all('[data-tl]'), function (chip) {
+    chip.addEventListener('click', function () { filterTimeline(chip.dataset.tl); });
+  });
+
   var relationshipRows = Array.prototype.slice.call(all('#relationship-table tbody tr'));
   var relationshipNode = one('#relationship-node');
   var relationshipCount = one('#relationship-shown');

@@ -368,9 +368,10 @@ def test_the_timeline_lists_dated_records_in_order_with_what_happened():
     section = page.split('<section id="timeline"')[1].split("</section>")[0]
 
     assert section.index("downloaded") < section.index("captured")
-    assert '<tr class="day"><td colspan="5">2026-03-01</td></tr>' in section
+    assert '<li class="tl-day"><time datetime="2026-03-01">2026-03-01</time>' in section
+    assert '<span class="wd">Sunday</span>' in section
     assert "https://example.org/first.pdf" in section
-    assert '<span class="cat origin" title="origin">downloaded</span>' in section
+    assert '<span class="verb" title="origin">downloaded</span>' in section
     headings = re.findall(r"<h2>([^<]+)</h2>", page)
     assert headings.index("Summary") < headings.index("Timeline") < headings.index("Files")
 
@@ -421,9 +422,12 @@ def test_the_timeline_keeps_the_count_when_events_share_the_same_instant():
     page = _page(records)
     section = page.split('<section id="timeline"')[1].split("</section>")[0]
 
-    assert section.count('class="event" data-f="metadata"') == 4
-    assert section.count('<tr class="day"') == 2
-    assert section.count(' data-band="1"') == 2  # the second day and its one record
+    assert section.count('<li class="ev event" data-f="metadata"') == 4
+    assert section.count('<li class="tl-day">') == 2
+    assert (
+        'data-tl="metadata" aria-pressed="false"><i class="f-metadata"></i>metadata <b>4</b>'
+        in section
+    )
 
 
 def test_the_graph_is_drawn_and_its_nodes_focus_the_explorer():
