@@ -271,14 +271,14 @@ font-size:var(--t-small)}
 display:flex;flex-direction:column;background:var(--bg);overflow:auto}
 .graph-panel.full .graph{flex:1;display:flex;flex-direction:column;min-height:0}
 .graph-panel.full .graph-canvas{flex:1;min-height:0}
-.graph-panel.full .graph svg{height:100%;min-height:360px}
+.graph-panel.full .graph-canvas>svg{height:100%;min-height:360px}
 .graph-panel:fullscreen{background:var(--bg)}
 body.graph-full{overflow:hidden}
-.graph svg{display:block;width:100%;height:clamp(360px,52vw,620px);border:0;
+.graph-canvas>svg{display:block;width:100%;height:clamp(360px,52vw,620px);border:0;
 background:radial-gradient(circle,var(--line) 1px,transparent 1.5px) 0 0/24px 24px,
 radial-gradient(ellipse at 50% 40%,#131A1F 0%,#0F1418 55%,var(--bg) 100%);
 touch-action:none;cursor:grab;user-select:none}
-.graph svg.dragging{cursor:grabbing}
+.graph-canvas>svg.dragging{cursor:grabbing}
 .graph .graph-viewport{transform-origin:0 0}
 .graph .e{stroke:var(--g-edge);stroke-width:1;stroke-opacity:.9;transition:stroke-opacity .15s}
 .graph .node{--c:var(--g-key);transition:opacity .15s}
@@ -567,8 +567,8 @@ letter-spacing:var(--track);text-transform:uppercase;color:var(--faint)}
 .rel-controls label{min-width:0}
 .graph-toolbar{grid-template-columns:1fr}
 .graph-tools{justify-content:flex-end}
-.graph svg{height:420px}
-.graph-panel.full .graph svg{height:100%}
+.graph-canvas>svg{height:420px}
+.graph-panel.full .graph-canvas>svg{height:100%}
 .graph-detail{position:absolute;width:calc(100% - 24px)}
 .relationship-bar{flex-direction:column;align-items:stretch}
 .find,.conf{grid-template-columns:1fr;gap:6px 0}
@@ -587,7 +587,7 @@ body{font-size:11px}
 .nav,.mast-actions,.copy,.chips,.tabs,.chev,.btn,.search,.to-top,.fold{display:none!important}
 .tl .tl-day{position:static}
 section.folded .sec-body{display:block}
-.graph svg{background:none}
+.graph-canvas>svg{background:none}
 .rel-controls,.rel-kinds,.rel-focus,.graph-arrange{display:none!important}
 .graph-toolbar,.table-actions,.relationship-table-tools{display:none!important}
 .mast{padding-top:0}
@@ -606,7 +606,7 @@ a{color:inherit}
 .tbl th{position:static;background:none}
 .graph-panel{border:0;background:transparent}
 .graph{padding:0}
-.graph svg{height:auto;max-height:none}
+.graph-canvas>svg{height:auto;max-height:none}
 .graph.focused .node,.graph.focused .e{opacity:1;stroke-opacity:.9}
 .wrap>table.index,.wrap>table.pivots,.wrap>table.relationships{min-width:0}
 .tbl th,.tbl td{white-space:normal}

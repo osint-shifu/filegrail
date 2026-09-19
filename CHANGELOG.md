@@ -5,6 +5,12 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.38.2 - 2026-09-19
+
+### Fixed
+
+- HTML report: in the graph's full-screen view, the rule that sizes the canvas also reached the small icons inside the node details panel and stretched each to the canvas height, so the focus buttons showed as empty boxes; the rule now applies to the canvas alone.
+
 ## 0.38.1 - 2026-09-19
 
 ### Fixed

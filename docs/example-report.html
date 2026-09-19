@@ -273,14 +273,14 @@ font-size:var(--t-small)}
 display:flex;flex-direction:column;background:var(--bg);overflow:auto}
 .graph-panel.full .graph{flex:1;display:flex;flex-direction:column;min-height:0}
 .graph-panel.full .graph-canvas{flex:1;min-height:0}
-.graph-panel.full .graph svg{height:100%;min-height:360px}
+.graph-panel.full .graph-canvas>svg{height:100%;min-height:360px}
 .graph-panel:fullscreen{background:var(--bg)}
 body.graph-full{overflow:hidden}
-.graph svg{display:block;width:100%;height:clamp(360px,52vw,620px);border:0;
+.graph-canvas>svg{display:block;width:100%;height:clamp(360px,52vw,620px);border:0;
 background:radial-gradient(circle,var(--line) 1px,transparent 1.5px) 0 0/24px 24px,
 radial-gradient(ellipse at 50% 40%,#131A1F 0%,#0F1418 55%,var(--bg) 100%);
 touch-action:none;cursor:grab;user-select:none}
-.graph svg.dragging{cursor:grabbing}
+.graph-canvas>svg.dragging{cursor:grabbing}
 .graph .graph-viewport{transform-origin:0 0}
 .graph .e{stroke:var(--g-edge);stroke-width:1;stroke-opacity:.9;transition:stroke-opacity .15s}
 .graph .node{--c:var(--g-key);transition:opacity .15s}
@@ -569,8 +569,8 @@ letter-spacing:var(--track);text-transform:uppercase;color:var(--faint)}
 .rel-controls label{min-width:0}
 .graph-toolbar{grid-template-columns:1fr}
 .graph-tools{justify-content:flex-end}
-.graph svg{height:420px}
-.graph-panel.full .graph svg{height:100%}
+.graph-canvas>svg{height:420px}
+.graph-panel.full .graph-canvas>svg{height:100%}
 .graph-detail{position:absolute;width:calc(100% - 24px)}
 .relationship-bar{flex-direction:column;align-items:stretch}
 .find,.conf{grid-template-columns:1fr;gap:6px 0}
@@ -589,7 +589,7 @@ body{font-size:11px}
 .nav,.mast-actions,.copy,.chips,.tabs,.chev,.btn,.search,.to-top,.fold{display:none!important}
 .tl .tl-day{position:static}
 section.folded .sec-body{display:block}
-.graph svg{background:none}
+.graph-canvas>svg{background:none}
 .rel-controls,.rel-kinds,.rel-focus,.graph-arrange{display:none!important}
 .graph-toolbar,.table-actions,.relationship-table-tools{display:none!important}
 .mast{padding-top:0}
@@ -608,7 +608,7 @@ a{color:inherit}
 .tbl th{position:static;background:none}
 .graph-panel{border:0;background:transparent}
 .graph{padding:0}
-.graph svg{height:auto;max-height:none}
+.graph-canvas>svg{height:auto;max-height:none}
 .graph.focused .node,.graph.focused .e{opacity:1;stroke-opacity:.9}
 .wrap>table.index,.wrap>table.pivots,.wrap>table.relationships{min-width:0}
 .tbl th,.tbl td{white-space:normal}
@@ -636,10 +636,10 @@ padding:6px 0;border-bottom:1px solid var(--line)}
 <symbol id="i-focus" viewBox="0 0 16 16"><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"/></symbol>
 </svg>
 <header class="mast" id="top">
-<h1 class="word">filegrail <small>v0.38.1 · investigation report</small></h1>
+<h1 class="word">filegrail <small>v0.38.2 · investigation report</small></h1>
 <div class="mast-body">
 <div class="mast-mark"><svg class="mark" viewBox="-26 -26 196 256" aria-hidden="true"><path fill="var(--brand-soft)" stroke="var(--brand)" stroke-width="1.5" vector-effect="non-scaling-stroke" fill-rule="evenodd" d="M24,48 A48,48 0 0 1 72,0 H108 V24 H72 A24,24 0 0 0 48,48 V72 H144 V96 A60,60 0 0 1 96,154.79 V180 H132 V204 H36 V180 H72 V154.79 A60,60 0 0 1 24,96 H0 V72 H24 Z M48,96 H120 A36,36 0 0 1 48,96 Z"/></svg></div>
-<dl class="facts"><dt>target</dt><dd><span class="v">/tmp/filegrail-example/case</span><button class="copy" type="button" title="copy" aria-label="copy"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg><svg class="ic ok" aria-hidden="true"><use href="#i-check"/></svg><svg class="ic no" aria-hidden="true"><use href="#i-x"/></svg></button></dd><dt>profile</dt><dd><span class="v">/tmp/filegrail-example/home · external</span><button class="copy" type="button" title="copy" aria-label="copy"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg><svg class="ic ok" aria-hidden="true"><use href="#i-check"/></svg><svg class="ic no" aria-hidden="true"><use href="#i-x"/></svg></button></dd><dt>scanned</dt><dd>2026-09-19 04:02 CEST · 11 files · 4.3 KB</dd><dt>options</dt><dd>--content --pivots</dd><dt>report</dt><dd><span class="v">/tmp/filegrail-example/example-report.html</span><button class="copy" type="button" title="copy" aria-label="copy"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg><svg class="ic ok" aria-hidden="true"><use href="#i-check"/></svg><svg class="ic no" aria-hidden="true"><use href="#i-x"/></svg></button></dd></dl>
+<dl class="facts"><dt>target</dt><dd><span class="v">/tmp/filegrail-example/case</span><button class="copy" type="button" title="copy" aria-label="copy"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg><svg class="ic ok" aria-hidden="true"><use href="#i-check"/></svg><svg class="ic no" aria-hidden="true"><use href="#i-x"/></svg></button></dd><dt>profile</dt><dd><span class="v">/tmp/filegrail-example/home · external</span><button class="copy" type="button" title="copy" aria-label="copy"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg><svg class="ic ok" aria-hidden="true"><use href="#i-check"/></svg><svg class="ic no" aria-hidden="true"><use href="#i-x"/></svg></button></dd><dt>scanned</dt><dd>2026-09-19 04:30 CEST · 11 files · 4.3 KB</dd><dt>options</dt><dd>--content --pivots</dd><dt>report</dt><dd><span class="v">/tmp/filegrail-example/example-report.html</span><button class="copy" type="button" title="copy" aria-label="copy"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg><svg class="ic ok" aria-hidden="true"><use href="#i-check"/></svg><svg class="ic no" aria-hidden="true"><use href="#i-x"/></svg></button></dd></dl>
 </div>
 </header>
 <nav class="nav"><a class="home" href="#top" title="Back to the top" aria-label="Back to the top"><svg class="mark" viewBox="0 0 144 204" aria-hidden="true"><path fill="var(--brand)" fill-rule="evenodd" d="M24,48 A48,48 0 0 1 72,0 H108 V24 H72 A24,24 0 0 0 48,48 V72 H144 V96 A60,60 0 0 1 96,154.79 V180 H132 V204 H36 V180 H72 V154.79 A60,60 0 0 1 24,96 H0 V72 H24 Z M48,96 H120 A36,36 0 0 1 48,96 Z"/></svg></a><a href="#summary">Summary</a><a href="#findings">Findings <b>7</b></a><a href="#coverage">Coverage</a><a href="#timeline">Timeline <b>10</b></a><a href="#files">Files <b>11</b></a><a href="#relationships">Related <b>42</b></a><a href="#pivots">Pivots <b>14</b></a><a href="#conflicts">Conflicts <b>1</b></a><a href="#detail">Detail <b>9</b></a><a href="#notes">Notes</a><span class="sp"></span>
@@ -662,8 +662,8 @@ padding:6px 0;border-bottom:1px solid var(--line)}
 </main>
 <button class="btn icon to-top" id="to-top" type="button" title="Back to top" aria-label="Back to top" hidden><svg class="ic" aria-hidden="true"><use href="#i-up"/></svg></button>
 <footer>
-<span>filegrail v0.38.1 · Apache-2.0</span>
-<span>generated 2026-09-19 04:02 CEST</span>
+<span>filegrail v0.38.2 · Apache-2.0</span>
+<span>generated 2026-09-19 04:30 CEST</span>
 <span>this page makes no network requests</span>
 </footer>
 <script>
