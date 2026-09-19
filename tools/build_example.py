@@ -298,7 +298,7 @@ def main() -> int:
     home = profile()
     written = case.parent / "example-report.html"
     run = subprocess.run(
-        [*_COMMAND, str(case), "--home", str(home), "--content", "--html", "-o", str(written)],
+        [*_COMMAND, str(case), "--home", str(home), "--pivots", "--html", "-o", str(written)],
         cwd=HERE,
         env={**os.environ, "PYTHONPATH": str(HERE / "src")},
     )

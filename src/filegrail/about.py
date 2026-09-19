@@ -92,7 +92,7 @@ INVESTIGATE = (
         "DIRECTORY",
         (
             ("filegrail ~/case --pivots", "investigative pivots"),
-            ("filegrail ~/case --content", "pivots from text too"),
+            ("filegrail ~/case --pivots --meta", "metadata pivots only"),
             ("filegrail ~/case --cluster", "shared authors, cameras"),
             ("filegrail ~/case --timeline", "dated records in order"),
             ("filegrail ~/case --unknown-only", "files of unknown origin"),

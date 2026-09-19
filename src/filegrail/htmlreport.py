@@ -153,6 +153,7 @@ def render_html(
     verbose: bool = False,
     identifiers: list[Identifier] | None = None,
     content: bool = False,
+    metadata: bool = True,
     home: Path | None = None,
     unsearched: Unsearched | None = None,
     filtered: str = "",
@@ -198,8 +199,9 @@ def render_html(
     present = [(key, title, short) for key, title, short in _SECTIONS if sections[key]]
 
     options = [
-        ("--content", content),
         ("--pivots", identifiers is not None),
+        ("--content", identifiers is not None and content and not metadata),
+        ("--meta", identifiers is not None and metadata and not content),
         ("--redact", redacted),
         ("--verbose", verbose),
     ]

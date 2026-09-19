@@ -773,6 +773,7 @@ def render_text(
     identify: bool = False,
     cluster: bool = False,
     content: bool = False,
+    metadata: bool = True,
     home: Path | None = None,
     unsearched: Unsearched | None = None,
 ) -> str:
@@ -786,7 +787,7 @@ def render_text(
     theme = theme or detect()
     known = [record for record in records if record.evidence]
     unknown = [record for record in records if not record.evidence]
-    found = extract(records, content=content)
+    found = extract(records, content=content, metadata=metadata)
     contents = inventory(records)
     named = len(records) > 1
 
@@ -1776,6 +1777,7 @@ def render_json(
     *,
     identify: bool = False,
     content: bool = False,
+    metadata: bool = True,
     cluster: bool = False,
     home: Path | None = None,
     unsearched: Unsearched | None = None,
@@ -1802,7 +1804,7 @@ def render_json(
     payload["unsearched"] = (unsearched or Unsearched()).to_dict()
     identifiers = []
     if identify:
-        identifiers = extract(records, content=content)
+        identifiers = extract(records, content=content, metadata=metadata)
         payload["identifiers"] = [entry.to_dict() for entry in identifiers]
     if identify or any(
         record.sha256 or record.links or any(found.container for found in record.evidence)

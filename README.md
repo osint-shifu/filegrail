@@ -1,6 +1,6 @@
 <div align="center">
 
-[![PyPI](https://img.shields.io/badge/pypi-v0.38.2-3775A9?style=flat-square)](https://pypi.org/project/filegrail/) ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-9A6700?style=flat-square) ![93 formats](https://img.shields.io/badge/formats-93-8250DF?style=flat-square) ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-00897B?style=flat-square) ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1F883D?style=flat-square) [![CI](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml/badge.svg)](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml) ![License](https://img.shields.io/badge/license-Apache--2.0-BC4C00?style=flat-square)
+[![PyPI](https://img.shields.io/badge/pypi-v0.39.0-3775A9?style=flat-square)](https://pypi.org/project/filegrail/) ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-9A6700?style=flat-square) ![93 formats](https://img.shields.io/badge/formats-93-8250DF?style=flat-square) ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-00897B?style=flat-square) ![Local and read-only](https://img.shields.io/badge/local_%26_read--only-yes-1F883D?style=flat-square) [![CI](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml/badge.svg)](https://github.com/osintshifu/filegrail/actions/workflows/ci.yml) ![License](https://img.shields.io/badge/license-Apache--2.0-BC4C00?style=flat-square)
 
 </div>
 
@@ -23,7 +23,7 @@
 
 <div align="center">
 
-[Quick start](#quick-start) · [Why FileGrail](#why-filegrail) · [Evidence model](#evidence-model) · [Sources](#evidence-sources) · [Metadata](#embedded-metadata) · [Formats](#supported-formats) · [Content](#document-content) · [Pivots](#investigative-pivots) · [Analysis](#analysis-and-correlation) · [Reports](#html-investigation-reports) · [Live HTML report](https://osintshifu.github.io/filegrail/example-report.html) · [Usage](#usage) · [Automation](#automation-and-exports)
+[Quick start](#quick-start) · [Why FileGrail](#why-filegrail) · [Evidence model](#evidence-model) · [Sources](#evidence-sources) · [Metadata](#embedded-metadata) · [Formats](#supported-formats) · [Content](#document-content) · [Pivots](#investigative-pivots) · [Analysis](#analysis-and-correlation) · [Reports](#html-investigation-reports) · **[Live HTML report](https://osintshifu.github.io/filegrail/example-report.html)** · [Usage](#usage) · [Automation](#automation-and-exports)
 
 </div>
 
@@ -139,7 +139,7 @@ Examples:
 
 What the document actually says rather than what it records about itself.
 
-With `--content`, FileGrail reads supported document text and structured content and passes it through the same investigative-pivot detectors used for metadata.
+With `--pivots`, FileGrail reads supported document text and structured content and passes it through the same investigative-pivot detectors used for metadata. `--meta` keeps the search to metadata and provenance, `--content` to the document text.
 
 The source text itself is not added to the report.
 
@@ -219,16 +219,16 @@ Analyze a directory recursively:
 filegrail ./evidence
 ```
 
-Extract investigative pivots from provenance and metadata:
+Extract investigative pivots from provenance, metadata and document content:
 
 ```bash
 filegrail ./evidence --pivots
 ```
 
-Also inspect supported document content:
+Pivots from provenance and metadata only, no document opened:
 
 ```bash
-filegrail ./evidence --pivots --content
+filegrail ./evidence --pivots --meta
 ```
 
 Build a timeline:
@@ -240,7 +240,7 @@ filegrail ./evidence --timeline
 Create a self-contained HTML investigation report:
 
 ```bash
-filegrail ./evidence --pivots --content --html -o report.html
+filegrail ./evidence --pivots --html -o report.html
 ```
 
 [View an example HTML report](https://osintshifu.github.io/filegrail/example-report.html), built from an invented case.
@@ -590,7 +590,7 @@ A format legitimately built on another container is not a mismatch: DOCX, EPUB a
 
 ## Document content
 
-`--content` extends pivot extraction from provenance and metadata into the readable content of supported files.
+`--pivots` extracts pivots from the readable content of supported files as well as from provenance and metadata. `--content` narrows the search to the content, `--meta` to provenance and metadata.
 
 ```bash
 filegrail ./case --pivots --content
@@ -634,13 +634,13 @@ Values from metadata, provenance and content are normalized into identifiers tha
 filegrail ./case --pivots
 ```
 
-Extracts pivots from metadata and provenance.
+Extracts pivots from metadata, provenance and supported document content.
 
 ```bash
-filegrail ./case --pivots --content
+filegrail ./case --pivots --meta
 ```
 
-Also extracts pivots from supported document content.
+Metadata and provenance only, no document opened. `--content` is the opposite: document content only.
 
 Each result can preserve:
 
@@ -906,7 +906,7 @@ FileGrail performs no network enrichment. External enrichment remains downstream
 `--html` creates a self-contained investigation report that loads no external assets and makes no network requests.
 
 ```bash
-filegrail ./case --pivots --content --html -o report.html
+filegrail ./case --pivots --html -o report.html
 ```
 
 The report can contain:
@@ -971,8 +971,9 @@ Running `filegrail` without arguments shows the command overview without startin
 | --- | --- |
 | `--brief` | Compact summary and file index |
 | `-v`, `--verbose` | Expanded file details and decoded fields |
-| `--pivots` | Extract investigative pivots from provenance and metadata |
-| `--content` | Also inspect supported document content; enables pivots |
+| `--pivots` | Extract investigative pivots from provenance, metadata and document content |
+| `--meta` | Pivots from provenance and metadata only; enables pivots |
+| `--content` | Pivots from supported document content only; enables pivots |
 | `--timeline` | Build the chronological timeline |
 | `--cluster` | Group files by supported shared attributes |
 | `--unknown-only` | Show only files without evidence found |
@@ -1013,14 +1014,14 @@ One output form at a time: `--timeline`, `--json`, `--html`, `--graphml` and `--
 | Inspect why a finding exists | `filegrail explain download.pdf` |
 | Get a quick directory overview | `filegrail ./case --brief` |
 | Extract investigative identifiers | `filegrail ./case --pivots` |
-| Include document content | `filegrail ./case --pivots --content` |
+| Skip document content | `filegrail ./case --pivots --meta` |
 | Build a timeline | `filegrail ./case --timeline` |
 | Find photographs sharing camera metadata | `filegrail ./photos --cluster` |
 | Analyze a copied profile | `filegrail /mnt/evidence --home /mnt/profile` |
 | Hash every file | `filegrail ./case --hash --json > report.json` |
 | Export GraphML | `filegrail ./case --graphml -o graph.graphml` |
 | Export graph edges as CSV | `filegrail ./case --graph-csv -o relationships.csv` |
-| Produce a shareable redacted report | `filegrail ./case --pivots --content --redact --html -o report.html` |
+| Produce a shareable redacted report | `filegrail ./case --pivots --redact --html -o report.html` |
 | Check metadata before publishing | `filegrail clean ./publish --check` |
 
 ---
@@ -1105,7 +1106,7 @@ filegrail ./case --json |
 Email addresses found in metadata and supported document content:
 
 ```bash
-filegrail ./case --pivots --content --json |
+filegrail ./case --pivots --json |
   jq -r '.identifiers[] |
          select(.type == "email") |
          .normalized'
@@ -1114,13 +1115,13 @@ filegrail ./case --pivots --content --json |
 Pivots shared by more than one file:
 
 ```bash
-filegrail ./case --pivots --content --json |
+filegrail ./case --pivots --json |
   jq -r '.identifiers[] |
          select(.files > 1) |
          "\(.type)\t\(.normalized)\t\(.files) files"'
 ```
 
-The `identifiers` list is present when `--pivots`, `--content` or a graph export was requested.
+The `identifiers` list is present when `--pivots`, `--meta`, `--content` or a graph export was requested.
 
 ### JSON schemas
 

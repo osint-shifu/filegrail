@@ -879,15 +879,17 @@ def _profile(url: str) -> tuple[str, str] | None:
 # --- the corpus --------------------------------------------------------------
 
 
-def _texts(records: list[FileRecord], *, content: bool = False) -> Iterator[_Text]:
+def _texts(
+    records: list[FileRecord], *, content: bool = False, metadata: bool = True
+) -> Iterator[_Text]:
     """Yield every string a scan can search, and where each one came from.
 
     The field name travels with the value because an identifier without its
     source is a lead nobody can check.
 
-    `content` adds what the documents themselves say. It is off by default and
-    costs an open, a decode and a parse per file - the metadata was already in
-    hand, and this is not.
+    `metadata` is what the files record about themselves and what the machine
+    recorded about them; it was already in hand. `content` is what the
+    documents say, and costs an open, a decode and a parse per file.
     """
     if content:
         # Imported here rather than at the top: reading bodies pulls in the
@@ -896,7 +898,7 @@ def _texts(records: list[FileRecord], *, content: bool = False) -> Iterator[_Tex
         from .sources.content import read_passages
     for record in records:
         name = Path(record.path).name
-        for found in record.evidence:
+        for found in record.evidence if metadata else ():
             arrival = category(found) == ORIGIN
             source = source_label(found)
             for label, value in (
@@ -958,17 +960,19 @@ def _texts(records: list[FileRecord], *, content: bool = False) -> Iterator[_Tex
                 )
 
 
-def extract(records: list[FileRecord], *, content: bool = False) -> list[Identifier]:
+def extract(
+    records: list[FileRecord], *, content: bool = False, metadata: bool = True
+) -> list[Identifier]:
     """Every identifier in what the scan read, deduplicated across files.
 
-    `content` widens the corpus from what the files record about themselves to
-    what they say. The two are kept apart on each entry rather than merged, so
-    a reader can tell a name in a document from a name in a download record -
-    and see where one value is both.
+    `metadata` is the corpus of what the files record about themselves,
+    `content` the corpus of what they say. The two are kept apart on each
+    entry rather than merged, so a reader can tell a name in a document from a
+    name in a download record - and see where one value is both.
     """
     found: dict[tuple[str, str], Identifier] = {}
 
-    for source in _texts(records, content=content):
+    for source in _texts(records, content=content, metadata=metadata):
         place = f"{source.file}{PLACE}{source.source}{PLACE}{source.where}"
         for family, raw, normalized, private in _scan(source.text, source.where):
             key = (family, normalized)

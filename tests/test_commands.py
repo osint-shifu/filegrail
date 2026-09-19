@@ -284,7 +284,8 @@ def test_scan_json_records_effective_run_options_and_coverage(tmp_path: Path, ca
         "archives": False,
         "skip_named_directories": False,
         "pivots": True,
-        "content": False,
+        "content": True,
+        "metadata": True,
         "cluster": True,
         "unknown_only": False,
         "redacted": False,
@@ -444,11 +445,24 @@ def test_content_lists_what_it_opened_every_document_to_find(tmp_path: Path, cap
     assert payload["identifiers"][0]["corpora"] == ["content"]
 
 
-def test_a_scan_that_was_not_asked_for_content_does_not_read_any(tmp_path: Path, capsys):
+def test_pivots_alone_read_the_content_too(tmp_path: Path, capsys):
     case = tmp_path / "case"
     case.mkdir()
     (case / "letter.txt").write_text("write to ann.shaw@acme-legal.example", encoding="utf-8")
 
     assert main(["scan", str(case), "--pivots", "--json", "--home", str(tmp_path)]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    emails = [item["normalized"] for item in payload["identifiers"] if item["type"] == "email"]
+    assert emails == ["ann.shaw@acme-legal.example"]
+    assert payload["run"]["content"] is True and payload["run"]["metadata"] is True
+
+
+def test_a_scan_asked_for_metadata_pivots_only_does_not_read_content(tmp_path: Path, capsys):
+    case = tmp_path / "case"
+    case.mkdir()
+    (case / "letter.txt").write_text("write to ann.shaw@acme-legal.example", encoding="utf-8")
+
+    assert main(["scan", str(case), "--pivots", "--meta", "--json", "--home", str(tmp_path)]) == 0
 
     assert json.loads(capsys.readouterr().out)["identifiers"] == []

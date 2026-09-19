@@ -164,7 +164,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--pivots",
         action="store_true",
-        help="List the emails, domains, addresses, hashes and coordinates found.",
+        help="List the emails, domains, addresses, hashes and coordinates found "
+        "in metadata and in the text of supported documents.",
     )
     # The flag was `--identify` up to 0.17.1. A saved command keeps working; it
     # stays out of the help so that the option has one name to learn.
@@ -177,7 +178,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--content",
         action="store_true",
-        help="Also look for pivots in the text of supported documents. "
+        help="Pivots from the text of supported documents only. Turns --pivots on by itself.",
+    )
+    parser.add_argument(
+        "--meta",
+        action="store_true",
+        help="Pivots from provenance and metadata only, no document text opened. "
         "Turns --pivots on by itself.",
     )
     parser.add_argument(
@@ -465,10 +471,12 @@ def _scan(rest: list[str]) -> int:
     base = root if root.is_dir() else root.parent
     theme = detect(colour=args.colour)
 
-    # `--content` without `--pivots` would pay for every document to be
-    # opened and parsed and then print a count of what it found. Asking for the
-    # wider corpus is asking to be shown it.
-    listed = args.pivots or args.content or args.graphml or args.graph_csv
+    # `--content` or `--meta` without `--pivots` would pay for the search and
+    # then print a count of what it found. Naming a corpus is asking to be
+    # shown it. Both corpora are read unless one was asked for alone.
+    listed = args.pivots or args.content or args.meta or args.graphml or args.graph_csv
+    content = listed and (args.content or not args.meta)
+    metadata = listed and (args.meta or not args.content)
     output_format = (
         "json"
         if args.json
@@ -491,7 +499,8 @@ def _scan(rest: list[str]) -> int:
         "archives": not args.no_archives,
         "skip_named_directories": not args.no_skip,
         "pivots": listed,
-        "content": args.content,
+        "content": content,
+        "metadata": metadata,
         "cluster": args.cluster,
         "unknown_only": args.unknown_only,
         "redacted": args.redact,
@@ -509,7 +518,8 @@ def _scan(rest: list[str]) -> int:
             records,
             base,
             identify=listed,
-            content=args.content,
+            content=content,
+            metadata=metadata,
             cluster=args.cluster,
             home=home,
             unsearched=missed,
@@ -520,19 +530,20 @@ def _scan(rest: list[str]) -> int:
         from .graph import build_graph
         from .graph_export import render_graph_csv, render_graphml
 
-        graph = build_graph(records, extract(records, content=args.content))
+        graph = build_graph(records, extract(records, content=content, metadata=metadata))
         report = (
             render_graphml(graph, run=run, coverage=coverage_document)
             if args.graphml
             else render_graph_csv(graph, run=run, coverage=coverage_document)
         )
     elif args.html:
-        case, found = _case(records, base, home, content=args.content, listed=listed)
+        case, found = _case(records, base, home, content=content, metadata=metadata, listed=listed)
         report = render_html(
             case,
             verbose=args.verbose,
             identifiers=found,
-            content=args.content,
+            content=content,
+            metadata=metadata,
             home=home,
             unsearched=missed,
             filtered=describe(args.families, args.extensions),
@@ -542,7 +553,7 @@ def _scan(rest: list[str]) -> int:
     elif args.timeline:
         report = render_timeline(records, base, theme=theme, home=home)
     elif root.is_dir():
-        case, found = _case(records, base, home, content=args.content, listed=listed)
+        case, found = _case(records, base, home, content=content, metadata=metadata, listed=listed)
         report = render_case(
             case,
             theme=theme,
@@ -550,7 +561,7 @@ def _scan(rest: list[str]) -> int:
             brief=args.brief,
             limit=_limit(args),
             identifiers=found,
-            content=args.content,
+            content=content,
             cluster=args.cluster,
             home=home,
             unsearched=missed,
@@ -567,7 +578,8 @@ def _scan(rest: list[str]) -> int:
             theme=theme,
             filtered=describe(args.families, args.extensions),
             identify=listed,
-            content=args.content,
+            content=content,
+            metadata=metadata,
             cluster=args.cluster,
             home=home,
             unsearched=missed,
@@ -597,10 +609,16 @@ def _emit(report: str, out: Path | None) -> int:
 
 
 def _case(
-    records: list[FileRecord], base: Path, home: Path | None, *, content: bool, listed: bool
+    records: list[FileRecord],
+    base: Path,
+    home: Path | None,
+    *,
+    content: bool,
+    metadata: bool,
+    listed: bool,
 ) -> tuple[Case, list[Identifier] | None]:
     """The scan read as a case, with its pivots when they were asked for."""
-    found = extract(records, content=content) if listed else None
+    found = extract(records, content=content, metadata=metadata) if listed else None
     return analyse(records, base, survey=survey(home), identifiers=found), found
 
 

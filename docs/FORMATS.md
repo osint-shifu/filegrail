@@ -222,7 +222,7 @@ reported, and what is inside that zip is not.
 
 A different axis from everything above. The tables so far are what a file
 records *about itself*; this is what it *says*, and it is read only when
-`--content` asks for it. The identifier detectors are then pointed at the text
+`--pivots` asks for it. The identifier detectors are then pointed at the text
 as well as at the metadata, and every value carries which of the two it came
 from, and where in the document it was.
 

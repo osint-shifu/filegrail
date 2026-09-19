@@ -5,6 +5,12 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.39.0 - 2026-09-19
+
+### Changed
+
+- `--pivots` now searches document content as well as provenance and metadata. `--meta` keeps the search to provenance and metadata, `--content` to document content; either turns `--pivots` on by itself. Graph exports read both corpora too. Scan JSON `run` gains `metadata` beside `content`.
+
 ## 0.38.2 - 2026-09-19
 
 ### Fixed
