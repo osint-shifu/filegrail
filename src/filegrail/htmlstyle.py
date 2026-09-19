@@ -164,6 +164,19 @@ color:var(--ink-2)}
 .tbl td.num,.tbl th.num{text-align:right;white-space:nowrap}
 .tbl th.num{letter-spacing:.04em}
 .tbl .id{color:var(--faint);white-space:nowrap}
+.tbl .pid{display:inline-flex;align-items:center;height:20px;padding:0 6px;
+border:1px solid var(--accent);border-radius:var(--r);font-size:var(--t-label);
+letter-spacing:.06em;color:var(--accent)}
+.tbl.pivots .kind{white-space:nowrap}
+.tbl.pivots .kind i{display:inline-block;width:8px;height:8px;border-radius:50%;
+background:var(--g-key);margin-right:8px;vertical-align:1px}
+.tbl.pivots .kind i.f-file{background:var(--g-file)}
+.tbl.pivots .kind i.f-person{background:var(--g-person)}
+.tbl.pivots .kind i.f-device{background:var(--g-device)}
+.tbl.pivots .kind i.f-address{background:var(--g-address)}
+.tbl.pivots .kind i.f-money{background:var(--g-money)}
+.tbl .corpus{white-space:nowrap}
+.pill.corpus.both{border-color:var(--accent);color:var(--accent)}
 .tbl .path{color:var(--ink);overflow-wrap:anywhere;min-width:18em}
 .tbl .val{color:var(--ink);overflow-wrap:anywhere;min-width:16em;max-width:26em}
 .tbl .dim{color:var(--muted)}
@@ -244,7 +257,14 @@ margin:0 8px 4px 0}
 .graph-panel{--field:#09090A;margin:0 0 22px;border:1px solid var(--line);border-radius:var(--r);
 background:var(--field);overflow:hidden}
 .graph-toolbar{display:grid;grid-template-columns:1fr auto;gap:12px 16px;align-items:end;
-padding:12px 14px}
+padding:12px 14px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.graph-toolbar .rel-controls select,.graph-toolbar .rel-controls input,
+.graph-toolbar .graph-arrange select,.graph-toolbar .graph-arrange .range,
+.graph-toolbar .btn{background:var(--field);border-color:var(--line-2)}
+.graph-toolbar .btn:hover,.graph-toolbar .rel-controls select:hover,
+.graph-toolbar .rel-controls select:focus,.graph-toolbar .rel-controls input:focus,
+.graph-toolbar .graph-arrange select:hover,.graph-toolbar .graph-arrange select:focus{
+border-color:var(--accent)}
 .graph-toolbar .rel-controls{grid-column:1/-1}
 .graph-arrange{display:flex;align-items:end;gap:12px;flex-wrap:wrap}
 .graph-arrange label{display:grid;gap:5px;color:var(--muted);
@@ -263,7 +283,7 @@ font:var(--t-table)/1 var(--mono);letter-spacing:0;text-transform:none}
 .graph-tools .btn.icon{width:34px}
 .graph-tools output{min-width:44px;text-align:center;color:var(--muted);
 font-size:var(--t-small)}
-.graph-filterbar{display:flex;align-items:center;gap:12px;padding:10px 14px 0;flex-wrap:wrap}
+.graph-filterbar{display:flex;align-items:center;gap:12px;padding:12px 14px 0;flex-wrap:wrap}
 .graph-filterbar .rel-kinds{margin:0}
 .graph{margin:0;padding:6px 0 0}
 .graph-canvas{position:relative}

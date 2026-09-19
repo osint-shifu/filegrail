@@ -1259,13 +1259,18 @@ def _pivot_table(
         # The number is an anchor once, in the table across files; the same
         # pivot listed again under its type must not carry the id a second time.
         opening = f'<tr class="pivot" id="{ref}">' if ref and across else '<tr class="pivot">'
+        number = f'<span class="pid">{_e(ref)}</span>' if ref else ""
         leading = (
-            f'<td class="id">{_e(ref or "")}</td><td>{_e(_type_name(entry.type))}</td>'
+            f'<td class="id">{number}</td>'
+            f'<td class="kind"><i class="f-{_family(entry.type)}"></i>'
+            f"{_e(_type_name(entry.type))}</td>"
             if across
             else ""
         )
+        corpus = "both" if len(entry.corpora) > 1 else next(iter(entry.corpora), "")
         rows.append(
             opening + leading + f'<td class="val">{_value(entry.value)}</td>'
+            f'<td class="corpus"><span class="pill corpus {corpus}">{corpus}</span></td>'
             f'<td class="num" data-value="{entry.files}">{entry.files:,}</td>'
             f'<td class="num" data-value="{entry.count}">{entry.count:,}</td>'
             f'<td class="where">{places}</td><td class="found">{found_in}</td></tr>'
@@ -1273,7 +1278,8 @@ def _pivot_table(
     heads = '<th data-sort="text">#</th><th data-sort="text">type</th>' if across else ""
     return _copyable_table(
         f'<div class="wrap"><table class="tbl pivots"><thead><tr>{heads}'
-        '<th data-sort="text">value</th><th data-sort="num" class="num">files</th>'
+        '<th data-sort="text">value</th><th data-sort="text">corpus</th>'
+        '<th data-sort="num" class="num">files</th>'
         '<th data-sort="num" class="num">times</th><th>where (sample)</th>'
         f"<th>found in</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
     )

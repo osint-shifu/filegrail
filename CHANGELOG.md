@@ -5,6 +5,13 @@ All notable changes to `filegrail` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.40.2 - 2026-09-19
+
+### Changed
+
+- HTML report: the graph toolbar is a lighter band with dark controls; the relationship-type chips sit on the canvas field.
+- HTML report: investigative pivots carry a framed number, a family-coloured dot on the type and a corpus column that marks values seen in both metadata and content.
+
 ## 0.40.1 - 2026-09-19
 
 ### Changed
