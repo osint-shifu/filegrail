@@ -10,6 +10,8 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Terminal report: the masthead carries the mark in the brand colour beside the name and the product line, and one line says when the scan ran and what it covered. Sections are numbered, with the title and a rule on one line. The summary lists the same figures as the HTML report, in the same order, with a note beside each; `Relationships` counts the graph's edges. The file index gives every file the same two-line shape, with the full block kept for `-v`. Coverage states are marked `●`, `◐` and `○`. The XMP derivation section is named `XMP LINEAGE`. The footer names the version and the time.
+- Start screen: the mark in the brand colour beside the name and the product line, and every example fits beside its description on an 80-column terminal.
+- HTML report: in the graph's node details, the connected-to rows wrap inside the panel and their focus buttons stay in reach, in full screen too; the dotted field, the edges and the nodes of other kinds carry less grey.
 
 ### Fixed
 

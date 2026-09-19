@@ -17,7 +17,7 @@ STYLE = """
 --t-label:11px;--t-small:12px;--t-table:12.5px;--t-body:13.5px;--t-lead:15px;
 --t-h2:21px;--t-num:28px;--track:.14em;
 --g-file:#7FB5A8;--g-person:#C9A66B;--g-device:#A39BD9;--g-address:#6E9ED2;
---g-money:#C97B8F;--g-key:#7A8592;--g-edge:#2E3742;
+--g-money:#C97B8F;--g-key:#7C93B5;--g-edge:#2A3A40;
 --mono:"IBM Plex Mono","JetBrains Mono","SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,
 "DejaVu Sans Mono",monospace;
 --sans:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI","Noto Sans",
@@ -275,8 +275,8 @@ display:flex;flex-direction:column;background:var(--bg);overflow:auto}
 .graph-panel:fullscreen{background:var(--bg)}
 body.graph-full{overflow:hidden}
 .graph svg{display:block;width:100%;height:clamp(360px,52vw,620px);border:0;
-background:radial-gradient(circle,var(--line-2) 1px,transparent 1.5px) 0 0/22px 22px,
-radial-gradient(ellipse at 50% 40%,#151B22 0%,#10141A 55%,var(--bg) 100%);
+background:radial-gradient(circle,var(--line) 1px,transparent 1.5px) 0 0/24px 24px,
+radial-gradient(ellipse at 50% 40%,#131A1F 0%,#0F1418 55%,var(--bg) 100%);
 touch-action:none;cursor:grab;user-select:none}
 .graph svg.dragging{cursor:grabbing}
 .graph .graph-viewport{transform-origin:0 0}
@@ -299,7 +299,7 @@ paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
 .graph .node:focus{outline:none}
 .graph .node:hover circle:not(.halo),.graph .node:focus circle:not(.halo),
 .graph .node.on circle:not(.halo){stroke:var(--ink);stroke-width:2}
-.graph.focused .node:not(.on):not(.near){opacity:.2}
+.graph.focused .node:not(.on):not(.near){opacity:.14}
 .graph.focused .e{stroke-opacity:.1}
 .graph.focused .e.on{stroke:var(--accent);stroke-opacity:1;stroke-width:1.5}
 .graph.kinded .node:not(.kind-near){opacity:.15}
@@ -342,7 +342,10 @@ letter-spacing:var(--track);text-transform:uppercase;color:var(--faint)}
 .graph-detail li{display:grid;grid-template-columns:minmax(88px,max-content) 1fr;gap:12px;
 padding:6px 0;border-top:1px solid var(--line);align-items:start}
 .graph-detail li .kind{font-family:var(--sans);color:var(--faint);white-space:nowrap}
-.graph-detail li .rel-node{min-width:0}
+.graph-detail li .rel-node{min-width:0;flex-wrap:wrap;gap:6px 8px}
+.graph-detail li .rel-node a,.graph-detail li .rel-node .v{flex:1 1 8em;min-width:0}
+.graph-detail li .rel-focus{margin-left:0}
+.graph-detail li{grid-template-columns:minmax(0,max-content) minmax(0,1fr)}
 .graph-detail-actions{display:flex;gap:8px;flex-wrap:wrap;padding:0 18px 12px}
 .to-top{position:fixed;right:20px;bottom:20px;z-index:20;width:36px;height:36px;
 box-shadow:0 6px 18px rgba(0,0,0,.28)}

@@ -31,17 +31,21 @@ from .theme import MIDDOT, Theme, detect
 #: that tie things together - so a reader meets the glyphs here and then meets
 #: them again meaning the same thing four lines later.
 WORDMARK = (
-    " \u25cf\u2500\u2510 \u250c\u2500\u25cf",
-    "   \u2514\u252c\u2518  ",
-    "    \u25cf    ",
+    " ▄▄▄▄▄▄▄▄ ",
+    "▐████████▌",
+    " ▀██████▀ ",
+    "    ██    ",
+    "  ▄▄██▄▄  ",
 )
 
 #: The same shape where no box drawing is available. Not a different mark: the
 #: same one, in the characters the terminal has.
 WORDMARK_ASCII = (
-    " o-+ +-o",
-    "   +++  ",
-    "    o   ",
+    " ________ ",
+    "|________|",
+    " \\______/ ",
+    "    ||    ",
+    "  __||__  ",
 )
 
 
@@ -66,8 +70,8 @@ USAGE = (
 
 #: The two commands somebody types first.
 START = (
-    ("filegrail suspicious.pdf", "analyze one file"),
-    ("filegrail ~/Downloads", "analyze a directory"),
+    ("filegrail suspicious.pdf", "one file"),
+    ("filegrail ~/Downloads", "a directory"),
 )
 
 #: What to reach for once the first scan has run, grouped by what is being
@@ -78,41 +82,40 @@ INVESTIGATE = (
     (
         "FILE",
         (
-            ("filegrail evidence.pdf", "inspect file metadata and origin"),
-            ("filegrail explain evidence.pdf", "explain evidence behind findings"),
-            ("filegrail compare a.jpg b.jpg", "compare two files"),
-            ("filegrail evidence.pdf --hash", "compute SHA-256"),
+            ("filegrail evidence.pdf", "metadata and origin"),
+            ("filegrail explain evidence.pdf", "the evidence behind it"),
+            ("filegrail compare a.jpg b.jpg", "two files side by side"),
+            ("filegrail evidence.pdf --hash", "with its SHA-256"),
         ),
     ),
     (
         "DIRECTORY",
         (
-            ("filegrail ~/case --pivots", "extract investigation pivots"),
-            ("filegrail ~/case --pivots --content", "inspect content and extract pivots"),
-            ("filegrail ~/case --cluster", "find files sharing authors or cameras"),
-            ("filegrail ~/case --timeline", "reconstruct recorded events"),
-            ("filegrail ~/case --unknown-only", "find files with no explained origin"),
-            ("filegrail ~/case --hash", "hash every file in the case"),
-            ("filegrail ~/case --home /mnt/profile", "correlate with another user profile"),
+            ("filegrail ~/case --pivots", "investigative pivots"),
+            ("filegrail ~/case --content", "pivots from text too"),
+            ("filegrail ~/case --cluster", "shared authors, cameras"),
+            ("filegrail ~/case --timeline", "dated records in order"),
+            ("filegrail ~/case --unknown-only", "files of unknown origin"),
+            ("filegrail ~/case --html -o case.html", "one self-contained page"),
+            ("filegrail ~/case --home /mnt/user", "another user's traces"),
         ),
     ),
     (
         "FILE TYPE",
         (
-            ("filegrail ~/case --type image", "analyze images only"),
-            ("filegrail ~/case --type document", "analyze documents only"),
-            ("filegrail ~/case --type video", "analyze videos only"),
-            ("filegrail ~/case --type mail", "analyze email files only"),
-            ("filegrail ~/case --ext jpg,pdf", "analyze selected extensions only"),
+            ("filegrail ~/case --type image", "images only"),
+            ("filegrail ~/case --type document", "documents only"),
+            ("filegrail ~/case --type mail", "mail only"),
+            ("filegrail ~/case --ext jpg,pdf", "these extensions only"),
         ),
     ),
 )
 
 #: What to run before trusting a result, and before publishing one.
 VERIFY = (
-    ("filegrail doctor", "check available local sources"),
-    ("filegrail clean image.jpg --check", "preview removable metadata"),
-    ("filegrail clean image.jpg --out clean/", "remove metadata from a copy"),
+    ("filegrail doctor", "readable local sources"),
+    ("filegrail clean image.jpg --check", "removable metadata"),
+    ("filegrail clean image.jpg --out clean/", "a cleaned copy"),
 )
 
 #: Named rather than described. What each one does is a sentence away in
@@ -334,11 +337,13 @@ def _head(theme: Theme) -> list[str]:
     Three lines and three facts: a landing screen has about that much of a
     reader's attention, and the option tables are a `filegrail help` away.
     """
-    mark = [theme.paint(line, "origin") for line in wordmark(theme)]
+    mark = [theme.paint(line, "brand") for line in wordmark(theme)]
     beside = [
-        f"{theme.bold('filegrail')} {__version__}",
+        f"{theme.bold('FILEGRAIL')} {__version__}",
+        theme.label("LOCAL FILE INTELLIGENCE"),
         theme.dim(TAGLINE),
         theme.dim(REPOSITORY.split("//", 1)[-1]),
+        "",
     ]
     gutter = max(len(line) for line in wordmark(theme)) + 3
 
