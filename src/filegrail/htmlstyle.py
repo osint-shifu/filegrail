@@ -64,10 +64,10 @@ display:flex;align-items:center;gap:2px;overflow-x:auto;scrollbar-width:none;
 background:color-mix(in srgb,var(--surface-2) 94%,transparent);backdrop-filter:blur(12px);
 border-bottom:1px solid var(--line)}
 .nav::-webkit-scrollbar{display:none}
-.nav a{color:var(--muted);font:400 13px/1 var(--sans);padding:0 12px;height:var(--nav);
+.nav a{color:var(--muted);font:400 14px/1 var(--sans);padding:0 13px;height:var(--nav);
 display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
 border-bottom:2px solid transparent;border-top:2px solid transparent}
-.nav a b{font:400 var(--t-small)/1 var(--mono);color:var(--faint)}
+.nav a b{font:400 13px/1 var(--mono);color:var(--faint)}
 .nav a:hover{color:var(--ink);text-decoration:none}
 .nav a.on{color:var(--ink);border-bottom-color:var(--accent)}
 .nav a.on b{color:var(--accent)}

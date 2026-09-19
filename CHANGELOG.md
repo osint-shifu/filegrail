@@ -10,6 +10,7 @@ the project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - HTML report: the timeline is a timeline. Every dated record is one line on a spine: the clock, a node in the record's category colour, the verb as a chip, the file, the source with its match basis, and what the record said. Records are grouped under their day, whose heading names the weekday and stays at the top while the day scrolls past; a silence of a month or more between two days is written on the spine as `7 years later`. Category chips above narrow the list to one category.
+- HTML report: the navigation bar's type is a step larger.
 
 ## 0.35.1 - 2026-09-19
 
