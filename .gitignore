@@ -35,6 +35,10 @@ AGENTS.md
 # run here sweeps whatever it finds into the source distribution.
 .claude/
 
+# Review exports from local Claude sessions. Keep the screenshots and patches
+# available to the operator without making them candidates for a release commit.
+Claude outputs/
+
 # The working instructions for this checkout, kept local like the design
 # document. `.git/info/exclude` hides it from git but not from the build.
 CLAUDE.md
